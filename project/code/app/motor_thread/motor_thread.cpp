@@ -29,9 +29,11 @@ std::mutex g_target_mutex;
 float g_target_left_count = 0.0f;
 float g_target_right_count = 0.0f;
 
-// 输出数据（atomic 足够，单写多读）
-std::atomic<float> g_left_count{0.0f};
-std::atomic<float> g_right_count{0.0f};
+// 对外调试口默认发布原始编码器计数；滤波后的反馈仅供速度环内部使用。
+std::atomic<float> g_left_raw_count{0.0f};
+std::atomic<float> g_right_raw_count{0.0f};
+std::atomic<float> g_left_filtered_count{0.0f};
+std::atomic<float> g_right_filtered_count{0.0f};
 std::atomic<float> g_left_error{0.0f};
 std::atomic<float> g_right_error{0.0f};
 std::atomic<float> g_left_duty{0.0f};
@@ -145,16 +147,21 @@ void motor_loop()
             target_r_count = g_target_right_count;
         }
 
+        const float left_raw_count = motor_driver.left_count_5ms();
+        const float right_raw_count = motor_driver.right_count_5ms();
+
         MotorSpeedControlState control_state =
             count_pid.compute(target_l_count, target_r_count,
-                              motor_driver.left_count_5ms(),
-                              motor_driver.right_count_5ms());
+                              left_raw_count,
+                              right_raw_count);
 
         motor_driver.set_left_duty(control_state.left_duty);
         motor_driver.set_right_duty(control_state.right_duty);
 
-        g_left_count.store(control_state.left_feedback);
-        g_right_count.store(control_state.right_feedback);
+        g_left_raw_count.store(left_raw_count);
+        g_right_raw_count.store(right_raw_count);
+        g_left_filtered_count.store(control_state.left_feedback);
+        g_right_filtered_count.store(control_state.right_feedback);
         g_left_error.store(control_state.left_error);
         g_right_error.store(control_state.right_error);
         g_left_duty.store(control_state.left_duty);
@@ -196,12 +203,12 @@ void motor_thread_set_target_count(float left_count, float right_count)
 
 float motor_thread_left_count()
 {
-    return g_left_count.load();
+    return g_left_raw_count.load();
 }
 
 float motor_thread_right_count()
 {
-    return g_right_count.load();
+    return g_right_raw_count.load();
 }
 
 float motor_thread_left_duty()
@@ -238,8 +245,8 @@ MotorUartStatus motor_thread_uart_status()
 
     status.left_error = g_left_error.load();
     status.right_error = g_right_error.load();
-    status.left_current_count = g_left_count.load();
-    status.right_current_count = g_right_count.load();
+    status.left_current_count = g_left_raw_count.load();
+    status.right_current_count = g_right_raw_count.load();
     status.left_duty = g_left_duty.load();
     status.right_duty = g_right_duty.load();
     return status;

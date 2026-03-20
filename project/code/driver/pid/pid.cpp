@@ -373,24 +373,24 @@ MotorSpeedPidController::MotorSpeedPidController()
 MotorSpeedPidConfig MotorSpeedPidController::default_config(float duty_limit)
 {
     MotorSpeedPidConfig config;
-    config.pid_params.left_kp = 0.0058f;
-    config.pid_params.left_ki = 0.00070f;
-    config.pid_params.left_kd = 0.000f;
-    config.pid_params.right_kp = 0.0058f;
-    config.pid_params.right_ki = 0.00070f;
-    config.pid_params.right_kd = 0.000f;
-    config.integral_limit = 180.0f;
-    config.max_output_step = 1.20f;
-    config.correction_limit = 24.0f;
+    config.pid_params.left_kp = pid_tuning::motor_speed::kLeftKp;
+    config.pid_params.left_ki = pid_tuning::motor_speed::kLeftKi;
+    config.pid_params.left_kd = pid_tuning::motor_speed::kLeftKd;
+    config.pid_params.right_kp = pid_tuning::motor_speed::kRightKp;
+    config.pid_params.right_ki = pid_tuning::motor_speed::kRightKi;
+    config.pid_params.right_kd = pid_tuning::motor_speed::kRightKd;
+    config.integral_limit = pid_tuning::motor_speed::kIntegralLimit;
+    config.max_output_step = pid_tuning::motor_speed::kMaxOutputStep;
+    config.correction_limit = pid_tuning::motor_speed::kCorrectionLimit;
     config.duty_limit = duty_limit;
-    config.left_feedforward_gain = 0.075f;
-    config.right_feedforward_gain = 0.085f;
-    config.left_feedforward_bias = 1.2f;
-    config.right_feedforward_bias = 1.4f;
-    config.feedforward_bias_threshold = 5.0f;
-    config.decel_error_threshold = 5.0f;
-    config.decel_duty_gain = 0.18f;
-    config.decel_duty_limit = 14.0f;
+    config.left_feedforward_gain = pid_tuning::motor_speed::kLeftFeedforwardGain;
+    config.right_feedforward_gain = pid_tuning::motor_speed::kRightFeedforwardGain;
+    config.left_feedforward_bias = pid_tuning::motor_speed::kLeftFeedforwardBias;
+    config.right_feedforward_bias = pid_tuning::motor_speed::kRightFeedforwardBias;
+    config.feedforward_bias_threshold = pid_tuning::motor_speed::kFeedforwardBiasThreshold;
+    config.decel_error_threshold = pid_tuning::motor_speed::kDecelErrorThreshold;
+    config.decel_duty_gain = pid_tuning::motor_speed::kDecelDutyGain;
+    config.decel_duty_limit = pid_tuning::motor_speed::kDecelDutyLimit;
     return config;
 }
 

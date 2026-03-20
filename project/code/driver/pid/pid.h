@@ -1,6 +1,7 @@
 #ifndef __PID_H__
 #define __PID_H__
 
+#include "driver/pid/pid_tuning.h"
 #include "zf_common_headfile.h"
 #include <mutex>
 
@@ -202,12 +203,12 @@ private:
  */
 struct DualPidParams
 {
-    float left_kp;
-    float left_ki;
-    float left_kd;
-    float right_kp;
-    float right_ki;
-    float right_kd;
+    float left_kp;   // 左轮比例系数
+    float left_ki;   // 左轮积分系数
+    float left_kd;   // 左轮微分系数
+    float right_kp;  // 右轮比例系数
+    float right_ki;  // 右轮积分系数
+    float right_kd;  // 右轮微分系数
 };
 
 /**
@@ -216,19 +217,19 @@ struct DualPidParams
  */
 struct MotorSpeedPidConfig
 {
-    DualPidParams pid_params;
-    float integral_limit;
-    float max_output_step;
-    float correction_limit;
-    float duty_limit;
-    float left_feedforward_gain;
-    float right_feedforward_gain;
-    float left_feedforward_bias;
-    float right_feedforward_bias;
-    float feedforward_bias_threshold;
-    float decel_error_threshold;
-    float decel_duty_gain;
-    float decel_duty_limit;
+    DualPidParams pid_params;          // 左右轮速度环 PID 三参数
+    float integral_limit;             // 积分限幅，防止长期误差把积分项堆得过大
+    float max_output_step;            // 单个 5ms 周期内 PID 修正项最大变化步长
+    float correction_limit;           // PID 修正项总限幅，不包含前馈和减速辅助
+    float duty_limit;                 // 最终输出 duty 绝对值上限
+    float left_feedforward_gain;      // 左轮速度前馈斜率
+    float right_feedforward_gain;     // 右轮速度前馈斜率
+    float left_feedforward_bias;      // 左轮静摩擦补偿
+    float right_feedforward_bias;     // 右轮静摩擦补偿
+    float feedforward_bias_threshold; // 前馈静摩擦补偿触发阈值
+    float decel_error_threshold;      // 减速辅助触发误差阈值
+    float decel_duty_gain;            // 减速辅助增益
+    float decel_duty_limit;           // 减速辅助最大输出
 };
 
 /**
@@ -297,8 +298,8 @@ public:
                                    float left_raw_feedback, float right_raw_feedback);
 
 private:
-    static constexpr int32 kFeedbackAverageWindow = 2;
-    static constexpr float kFeedbackLowPassAlpha = 0.45f;
+    static constexpr int32 kFeedbackAverageWindow = pid_tuning::motor_speed::kFeedbackAverageWindow;
+    static constexpr float kFeedbackLowPassAlpha = pid_tuning::motor_speed::kFeedbackLowPassAlpha;
 
     struct SpeedFeedbackFilter
     {

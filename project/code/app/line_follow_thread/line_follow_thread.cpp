@@ -18,28 +18,6 @@ namespace
 constexpr int32 LINE_FOLLOW_PERIOD_MS = 10;
 // 调度优先级：巡线线程作为中高优先级实时任务执行。
 constexpr int32 LINE_FOLLOW_THREAD_PRIORITY = 8;
-// 一阶低通滤波系数。适当提高后，能让回正时更快释放满舵状态。
-constexpr float LINE_ERROR_FILTER_ALPHA = 0.62f;
-// 位置环参数：输入为归一化横向误差，输出为左右轮差速目标。
-constexpr float LINE_PID_KP = 150.0f;
-constexpr float LINE_PID_KI = 0.0f;
-constexpr float LINE_PID_KD = 55.0f;
-// 位置环最大输出，单位与 motor_thread_set_target_count 保持一致（counts/5ms）。
-constexpr float LINE_PID_MAX_OUTPUT = 180.0f;
-// 本线程先按较宽范围裁剪，最终还会经过 motor_thread 的二次限幅保护。
-// 负向保留轻微反转能力，方便在大误差时更快把车头拧回赛道中心。
-constexpr float LINE_TARGET_COUNT_MIN = -8.0f;
-constexpr float LINE_TARGET_COUNT_MAX = 800.0f;
-// 大弯时主动降基础速度，避免速度环长期追不上剧烈的内外轮目标跳变。
-constexpr float LINE_TURN_SLOWDOWN_START_PX = 8.0f;
-constexpr float LINE_TURN_SLOWDOWN_FULL_PX = 30.0f;
-constexpr float LINE_TURN_MIN_SPEED_SCALE = 0.52f;
-// 误差归一化后的限幅，防止异常视觉值导致控制突变。
-constexpr float LINE_NORMALIZED_ERROR_LIMIT = 1.2f;
-// 小误差抑制：采用像素尺度阈值，避免 1px 误差被完全吞掉。
-constexpr float LINE_ERROR_DEADZONE_PX = 0.5f;
-constexpr float LINE_ERROR_LOW_GAIN_LIMIT_PX = 3.0f;
-constexpr float LINE_ERROR_LOW_GAIN = 0.70f;
 
 std::thread g_line_follow_thread;
 std::atomic<bool> g_line_follow_running(false);
@@ -127,14 +105,14 @@ void line_follow_loop()
         // 这样 PID 参数可以脱离具体分辨率，后续改摄像头宽度时更容易复用。
         const float normalized_error = std::clamp(
             raw_error_px / ((float)UVC_WIDTH * 0.5f),
-            -LINE_NORMALIZED_ERROR_LIMIT,
-            LINE_NORMALIZED_ERROR_LIMIT);
+            -pid_tuning::line_follow::kNormalizedErrorLimit,
+            pid_tuning::line_follow::kNormalizedErrorLimit);
 
         // 一阶 IIR 滤波：抑制视觉噪声，避免转向输出高频抖动。
         // 这一步相当于告诉控制器：“相信趋势，不要被单帧跳动牵着走”。
         g_filtered_error =
-            g_filtered_error * (1.0f - LINE_ERROR_FILTER_ALPHA) +
-            normalized_error * LINE_ERROR_FILTER_ALPHA;
+            g_filtered_error * (1.0f - pid_tuning::line_follow::kErrorFilterAlpha) +
+            normalized_error * pid_tuning::line_follow::kErrorFilterAlpha;
 
         // 后面的 deadzone / 小误差降增益继续使用像素尺度判断，
         // 是为了让阈值更直观，便于你结合画面观察实际偏差量。
@@ -143,32 +121,34 @@ void line_follow_loop()
         float control_error = g_filtered_error;
 
         // 先做死区：图像中心附近的轻微抖动直接忽略，避免小车左右来回“抽动”。
-        if (std::fabs(filtered_error_px) < LINE_ERROR_DEADZONE_PX)
+        if (std::fabs(filtered_error_px) < pid_tuning::line_follow::kErrorDeadzonePx)
         {
             control_error = 0.0f;
         }
         // 再做小误差降增益：还没到需要强修正的时候，就先温和拉回，提升直道稳定性。
-        else if (std::fabs(filtered_error_px) < LINE_ERROR_LOW_GAIN_LIMIT_PX)
+        else if (std::fabs(filtered_error_px) < pid_tuning::line_follow::kErrorLowGainLimitPx)
         {
-            control_error *= LINE_ERROR_LOW_GAIN;
+            control_error *= pid_tuning::line_follow::kErrorLowGain;
         }
 
         // 位置式 PID 输出“差速量”而不是“绝对速度”。
         // 输出越大，说明需要更激烈地拉开左右轮速度差来完成回正。
         float steering_output = position_pid1.compute_by_error(control_error);
-        steering_output = std::clamp(steering_output, -LINE_PID_MAX_OUTPUT, LINE_PID_MAX_OUTPUT);
+        steering_output = std::clamp(steering_output,
+                                     -pid_tuning::line_follow::kPidMaxOutput,
+                                     pid_tuning::line_follow::kPidMaxOutput);
 
         // 大弯主动降基础速度：
         // 如果还按直道速度冲，内外轮目标会跳得很大，速度环很容易跟不上，车体就会发飘。
         float speed_scale = 1.0f;
-        if (abs_filtered_error_px > LINE_TURN_SLOWDOWN_START_PX)
+        if (abs_filtered_error_px > pid_tuning::line_follow::kTurnSlowdownStartPx)
         {
             const float slowdown_ratio = std::clamp(
-                (abs_filtered_error_px - LINE_TURN_SLOWDOWN_START_PX) /
-                (LINE_TURN_SLOWDOWN_FULL_PX - LINE_TURN_SLOWDOWN_START_PX),
+                (abs_filtered_error_px - pid_tuning::line_follow::kTurnSlowdownStartPx) /
+                (pid_tuning::line_follow::kTurnSlowdownFullPx - pid_tuning::line_follow::kTurnSlowdownStartPx),
                 0.0f,
                 1.0f);
-            speed_scale = 1.0f - slowdown_ratio * (1.0f - LINE_TURN_MIN_SPEED_SCALE);
+            speed_scale = 1.0f - slowdown_ratio * (1.0f - pid_tuning::line_follow::kTurnMinSpeedScale);
         }
         const float adjusted_base_speed = current_base_speed * speed_scale;
 
@@ -179,11 +159,11 @@ void line_follow_loop()
         // 这里不再把内轮硬限制在 0，而是允许轻微反转，缩短大误差区的滞留时间，
         // 也就是允许车辆在很偏的时候更“果断”地拧回来。
         const float left_target = std::clamp(adjusted_base_speed - steering_output,
-                                             LINE_TARGET_COUNT_MIN,
-                                             LINE_TARGET_COUNT_MAX);
+                                             pid_tuning::line_follow::kTargetCountMin,
+                                             pid_tuning::line_follow::kTargetCountMax);
         const float right_target = std::clamp(adjusted_base_speed + steering_output,
-                                              LINE_TARGET_COUNT_MIN,
-                                              LINE_TARGET_COUNT_MAX);
+                                              pid_tuning::line_follow::kTargetCountMin,
+                                              pid_tuning::line_follow::kTargetCountMax);
         // 重新用限幅后的左右轮目标反推实际差速，保证对外上报值和真正下发给电机的一致。
         const float applied_steering_output = (right_target - left_target) * 0.5f;
         motor_thread_set_target_count(left_target, right_target);
@@ -213,7 +193,11 @@ bool line_follow_thread_init()
     g_filtered_error = 0.0f;
 
     // 目标固定为 0：希望赛道中线最终回到图像中心，也就是“小车正对赛道”。
-    position_pid1.init(LINE_PID_KP, LINE_PID_KI, LINE_PID_KD, 0.0f, LINE_PID_MAX_OUTPUT);
+    position_pid1.init(pid_tuning::line_follow::kPidKp,
+                       pid_tuning::line_follow::kPidKi,
+                       pid_tuning::line_follow::kPidKd,
+                       0.0f,
+                       pid_tuning::line_follow::kPidMaxOutput);
     position_pid1.set_target(0.0f);
 
     g_line_follow_running = true;

@@ -25,8 +25,8 @@ struct MotorUartStatus
     float right_target_count; // 右轮目标计数值
     float left_error;         // 左轮当前误差
     float right_error;        // 右轮当前误差
-    float left_current_count; // 左轮当前反馈计数值
-    float right_current_count;// 右轮当前反馈计数值
+    float left_current_count; // 左轮原始编码器计数值（未滤波）
+    float right_current_count;// 右轮原始编码器计数值（未滤波）
     float left_duty;          // 左轮当前占空比
     float right_duty;         // 右轮当前占空比
 };
@@ -45,14 +45,14 @@ bool motor_thread_init();
 void motor_thread_set_target_count(float left_count, float right_count);
 
 /**
- * @brief 获取左轮当前反馈计数
- * @return 左轮实际编码器增量值
+ * @brief 获取左轮当前原始编码器计数
+ * @return 左轮实际编码器增量值（未滤波）
  */
 float motor_thread_left_count();
 
 /**
- * @brief 获取右轮当前反馈计数
- * @return 右轮实际编码器增量值
+ * @brief 获取右轮当前原始编码器计数
+ * @return 右轮实际编码器增量值（未滤波）
  */
 float motor_thread_right_count();
 

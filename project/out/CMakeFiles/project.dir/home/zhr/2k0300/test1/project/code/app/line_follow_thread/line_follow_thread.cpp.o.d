@@ -311,6 +311,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/app/line_follow_thread
  /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_image_processor.h \
  /home/zhr/2k0300/test1/project/user/../code/app/motor_thread/motor_thread.h \
  /home/zhr/2k0300/test1/project/user/../code/driver/pid/pid.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/pid/pid_tuning.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/mutex \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/std_mutex.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/algorithm \
