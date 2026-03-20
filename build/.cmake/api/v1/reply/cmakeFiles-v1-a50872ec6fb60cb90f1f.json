@@ -1,0 +1,185 @@
+{
+	"inputs" : 
+	[
+		{
+			"path" : "CMakeLists.txt"
+		},
+		{
+			"path" : "cross.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindPkgConfig.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "/home/zhr/2k0300/test1/build/CMakeFiles/3.28.1/CMakeSystem.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "/home/zhr/2k0300/test1/build/CMakeFiles/3.28.1/CMakeCCompiler.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "/home/zhr/2k0300/test1/build/CMakeFiles/3.28.1/CMakeCXXCompiler.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CMakeGenericSystem.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Platform/Linux.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Platform/UnixPaths.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CMakeCInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Compiler/GNU-C.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Platform/Linux-GNU-C.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CMakeCXXInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Compiler/GNU-CXX.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/opt/ls_2k0300_env/opencv_4_10_build/lib/cmake/opencv4/OpenCVConfig-version.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/opt/ls_2k0300_env/opencv_4_10_build/lib/cmake/opencv4/OpenCVConfig.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/opt/ls_2k0300_env/opencv_4_10_build/lib/cmake/opencv4/OpenCVModules.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/opt/ls_2k0300_env/opencv_4_10_build/lib/cmake/opencv4/OpenCVModules-release.cmake"
+		}
+	],
+	"kind" : "cmakeFiles",
+	"paths" : 
+	{
+		"build" : "/home/zhr/2k0300/test1/build",
+		"source" : "/home/zhr/2k0300/test1/project/user"
+	},
+	"version" : 
+	{
+		"major" : 1,
+		"minor" : 0
+	}
+}
