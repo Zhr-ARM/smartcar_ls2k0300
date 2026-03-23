@@ -25,16 +25,14 @@ static constexpr uint32 kAssistantServerPort = 8888;
 #endif
 
 // 图传调试配置：集中在这里修改。
-// 可选模式：
-// VISION_THREAD_SEND_BINARY         : 二值图（1bit打包）
-// VISION_THREAD_SEND_GRAY           : 原始灰度图
-// VISION_THREAD_SEND_RGB565         : 彩色纯图（不叠加）
-// VISION_THREAD_SEND_IPM_RGB565     : 彩色逆透视图
-// VISION_THREAD_SEND_IPM_EDGE_GRAY  : 逆透视边线图（黑底白线）
-// VISION_THREAD_SEND_RGB565_OVERLAY : 彩色叠加调试图（中心线/边线）
-static constexpr vision_thread_send_mode_enum kVisionSendMode = VISION_THREAD_SEND_RGB565;
+// 可选模式（当前仅保留两种显示）：
+// VISION_THREAD_SEND_RGB565 : 彩色纯图（不画线）
+// VISION_THREAD_SEND_GRAY   : 灰度图（画边线+中线）
+static constexpr vision_thread_send_mode_enum kVisionSendMode = VISION_THREAD_SEND_GRAY;
 // 图传发送上限帧率，0 表示不限速。
 static constexpr uint32 kVisionSendMaxFps = 60;
+// 采图模式：检测到红色矩形后，每 1s 保存一次推理 ROI 彩图，共 20 张。
+static constexpr bool kVisionRoiCaptureMode = true;
 #if defined(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM)
 static constexpr bool kVisionAssistantStreamEnabled = true;
 #endif
@@ -128,17 +126,20 @@ int main(int, char**)
 
     vision_thread_set_send_mode(kVisionSendMode);
     vision_thread_set_send_max_fps(kVisionSendMaxFps);
+    vision_thread_set_roi_capture_mode(kVisionRoiCaptureMode);
 
 #if defined(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM)
     vision_thread_set_assistant_camera_stream(kVisionAssistantStreamEnabled);
-    printf("[VISION SEND CFG] mode=%d max_fps=%u stream=%d\r\n",
+    printf("[VISION SEND CFG] mode=%d max_fps=%u stream=%d roi_capture=%d\r\n",
            static_cast<int>(vision_thread_get_send_mode()),
            static_cast<unsigned int>(vision_thread_get_send_max_fps()),
-           vision_thread_assistant_camera_stream_enabled() ? 1 : 0);
+           vision_thread_assistant_camera_stream_enabled() ? 1 : 0,
+           vision_thread_roi_capture_mode_enabled() ? 1 : 0);
 #else
-    printf("[VISION SEND CFG] mode=%d max_fps=%u\r\n",
+    printf("[VISION SEND CFG] mode=%d max_fps=%u roi_capture=%d\r\n",
            static_cast<int>(vision_thread_get_send_mode()),
-           static_cast<unsigned int>(vision_thread_get_send_max_fps()));
+           static_cast<unsigned int>(vision_thread_get_send_max_fps()),
+           vision_thread_roi_capture_mode_enabled() ? 1 : 0);
 #endif
 
     // uart_thread_init();

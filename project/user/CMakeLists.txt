@@ -40,7 +40,7 @@ if(NOT ENABLE_CAR_SCREEN_DISPLAY)
 endif()
 
 # E99视觉栈开关：开启时尝试启用ncnn相关模块（pipeline/client_sender/ncnn）。
-option(ENABLE_E99_VISION_STACK "Enable E99 vision full stack" OFF)
+option(ENABLE_E99_VISION_STACK "Enable E99 vision full stack" ON)
 
 set(E99_VISION_STACK_READY OFF)
 if(ENABLE_E99_VISION_STACK)

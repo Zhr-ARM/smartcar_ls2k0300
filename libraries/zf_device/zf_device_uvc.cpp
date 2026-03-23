@@ -73,7 +73,7 @@ int8 wait_image_refresh()
         std::cerr << "OpenCV 异常: " << e.what() << std::endl;
         return -1;
     }
-    // 当前视觉主链路只消费BGR彩图；灰度/二值/RGB565均在后级按160x120处理。
+    // 当前视觉主链路只消费BGR彩图；灰度/二值/RGB565均在后级按处理分辨率生成。
     rgay_image = nullptr;
     rgb565_image = nullptr;
 

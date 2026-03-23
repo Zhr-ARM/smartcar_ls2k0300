@@ -16,14 +16,51 @@
 #include <vector>
 
 // 当前阶段目标：
-// 1) 直接采集 160x120 BGR 图像（不翻转）；
+// 1) 直接采集 UVC_WIDTH x UVC_HEIGHT BGR 图像（不翻转）；
 // 2) 采集与处理解耦为两个线程；
 // 3) 使用全图 OTSU 二值化；
 // 4) 在图像下方区域，基于迷宫法提取左右边线；
-// 5) 左/右边线经逆透视后，按单边偏移方式生成中线。
+// 5) 原图输出左右边线及均值中线；逆透视后的边线与拟合中线另存。
 
 #define VISION_BOUNDARY_NUM (VISION_DOWNSAMPLED_HEIGHT * 2)
-static constexpr int MAZE_LOWER_REGION_PERCENT = 90;
+static constexpr int kRefProcWidth = 160;
+static constexpr int kRefProcHeight = 120;
+static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
+
+static inline int scale_by_width(int ref_px)
+{
+    if (ref_px <= 0)
+    {
+        return 0;
+    }
+    return std::max(1, (ref_px * UVC_WIDTH + kRefProcWidth / 2) / kRefProcWidth);
+}
+
+static inline int scale_by_height(int ref_px)
+{
+    if (ref_px <= 0)
+    {
+        return 0;
+    }
+    return std::max(1, (ref_px * UVC_HEIGHT + kRefProcHeight / 2) / kRefProcHeight);
+}
+
+static inline int scale_by_area(int ref_area_px)
+{
+    if (ref_area_px <= 0)
+    {
+        return 0;
+    }
+    const int64_t scaled = static_cast<int64_t>(ref_area_px) * UVC_WIDTH * UVC_HEIGHT;
+    return std::max(1, static_cast<int>((scaled + kRefProcPixels / 2) / kRefProcPixels));
+}
+
+static inline float scale_by_width_f(float ref_px)
+{
+    return ref_px * static_cast<float>(UVC_WIDTH) / static_cast<float>(kRefProcWidth);
+}
+
+static constexpr int MAZE_LOWER_REGION_PERCENT = 60;
 // 临时性能开关：
 // true  : 按需OTSU（迷宫法按灰度+阈值即取即判，不依赖全图二值图）
 // false : 传统全图OTSU二值化后再迷宫法
@@ -38,29 +75,24 @@ static constexpr int kIpmOutputWidth = 100;
 static constexpr int kIpmOutputHeight = 100;
 // 赛道参数：当前标定为 70px 对应 45cm。
 static constexpr float kLaneWidthCm = 45.0f;
-static constexpr float kLaneWidthPx = 70.0f;
-static constexpr float kHalfLaneOffsetPx = kLaneWidthPx * 0.5f;
+static constexpr float kLaneWidthPxRef = 70.0f;
 // 边线/中线等距采样步长：按 2cm 采样。
 static constexpr float kSampleStepCm = 2.0f;
-static constexpr float kSampleStepPx = (kSampleStepCm * kLaneWidthPx) / kLaneWidthCm;
-// 中线起点归一化固定点（降低左右切换导致的抖动）。
-static constexpr float kCenterNormalizeStartX = static_cast<float>(UVC_WIDTH / 2);
-static constexpr float kCenterNormalizeStartY = static_cast<float>(UVC_HEIGHT - 1);
-
-enum center_track_mode_t
+static inline float lane_width_px_scaled()
 {
-    CENTER_TRACK_LEFT = 0,
-    CENTER_TRACK_RIGHT = 1,
-    CENTER_TRACK_AUTO = 2,
-};
-// AUTO: 左优先，左线丢失时自动切右线。
-static constexpr center_track_mode_t kCenterTrackMode = CENTER_TRACK_AUTO;
+    return scale_by_width_f(kLaneWidthPxRef);
+}
+static inline float sample_step_px()
+{
+    return (kSampleStepCm * lane_width_px_scaled()) / kLaneWidthCm;
+}
+
+static inline float min_point_spacing_px()
+{
+    return std::max(0.5f, scale_by_width_f(0.5f));
+}
 // 逆透视矩阵（用户提供）。
-static constexpr double change_un_Mat[3][3] = {
-    {-0.404545, 0.346369, -27.015230},
-    {0.000000, 0.068428, -23.873436},
-    {0.000000, 0.004613, -0.609445}
-};
+static constexpr double change_un_Mat[3][3] = {{-0.915703,0.894108,-46.429507},{0.018386,0.236110,-46.731327},{0.000361,0.011642,-1.231855}};
 // 畸变参数接口暂保留（当前流程未使用）。
 [[maybe_unused]] static constexpr double cameraMatrix[3][3] = {
     {81.742134, 0.000000, 73.715838},
@@ -70,13 +102,25 @@ static constexpr double change_un_Mat[3][3] = {
 [[maybe_unused]] static constexpr double distCoeffs[5] = {0.191611, -0.146004, -0.010946, -0.008742, -0.030884};
 [[maybe_unused]] static constexpr int move_xy[2] = {0, 162};
 
-static uint8 g_xy_x1_boundary[VISION_BOUNDARY_NUM];
-static uint8 g_xy_x2_boundary[VISION_BOUNDARY_NUM];
-static uint8 g_xy_x3_boundary[VISION_BOUNDARY_NUM];
-static uint8 g_xy_y1_boundary[VISION_BOUNDARY_NUM];
-static uint8 g_xy_y2_boundary[VISION_BOUNDARY_NUM];
-static uint8 g_xy_y3_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_xy_x1_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_xy_x2_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_xy_x3_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_xy_y1_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_xy_y2_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_xy_y3_boundary[VISION_BOUNDARY_NUM];
 static int g_boundary_count = 0;
+// 逆透视后边界数组（另存）
+static uint16 g_ipm_xy_x1_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_xy_x2_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_xy_x3_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_xy_y1_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_xy_y2_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_xy_y3_boundary[VISION_BOUNDARY_NUM];
+static int g_ipm_boundary_count = 0;
+// 逆透视后拟合中线（另存）
+static uint16 g_ipm_center_fit_x[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_center_fit_y[VISION_BOUNDARY_NUM];
+static int g_ipm_center_fit_count = 0;
 
 static uint8 g_image_bgr[UVC_HEIGHT * UVC_WIDTH * 3];
 static uint8 g_image_gray[UVC_HEIGHT * UVC_WIDTH];
@@ -103,13 +147,24 @@ static int g_ncnn_roi_x = 0;
 static int g_ncnn_roi_y = 0;
 static int g_ncnn_roi_w = 0;
 static int g_ncnn_roi_h = 0;
+static std::mutex g_detect_result_mutex;
 
 // 最近一帧处理耗时（us）
 static uint32 g_last_capture_wait_us = 0;
 static uint32 g_last_preprocess_us = 0;
+static uint32 g_last_red_detect_us = 0;
 static uint32 g_last_otsu_us = 0;
 static uint32 g_last_maze_us = 0;
 static uint32 g_last_total_us = 0;
+static uint32 g_last_maze_setup_us = 0;
+static uint32 g_last_maze_start_us = 0;
+static uint32 g_last_maze_trace_left_us = 0;
+static uint32 g_last_maze_trace_right_us = 0;
+static uint32 g_last_maze_post_us = 0;
+static uint16 g_last_maze_left_points = 0;
+static uint16 g_last_maze_right_points = 0;
+static bool g_last_maze_left_ok = false;
+static bool g_last_maze_right_ok = false;
 
 // 采集线程：只负责拿相机最新 BGR 帧并写入共享缓冲。
 static std::thread g_capture_thread;
@@ -135,6 +190,8 @@ static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
                                            int left_num,
                                            const maze_point_t *right_pts,
                                            int right_num);
+static bool init_ipm_forward_matrix();
+static int compute_line_error_from_boundary_midline();
 
 /* 前进方向定义：
  *   0
@@ -162,13 +219,27 @@ static constexpr int kDirFrontRight[4][2] = {
 
 static void clear_boundary_arrays()
 {
-    std::fill_n(g_xy_x1_boundary, VISION_BOUNDARY_NUM, static_cast<uint8>(0));
-    std::fill_n(g_xy_x2_boundary, VISION_BOUNDARY_NUM, static_cast<uint8>(0));
-    std::fill_n(g_xy_x3_boundary, VISION_BOUNDARY_NUM, static_cast<uint8>(0));
-    std::fill_n(g_xy_y1_boundary, VISION_BOUNDARY_NUM, static_cast<uint8>(0));
-    std::fill_n(g_xy_y2_boundary, VISION_BOUNDARY_NUM, static_cast<uint8>(0));
-    std::fill_n(g_xy_y3_boundary, VISION_BOUNDARY_NUM, static_cast<uint8>(0));
+    std::fill_n(g_xy_x1_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_xy_x2_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_xy_x3_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_xy_y1_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_xy_y2_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_xy_y3_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     g_boundary_count = 0;
+}
+
+static void clear_ipm_saved_arrays()
+{
+    std::fill_n(g_ipm_xy_x1_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_xy_x2_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_xy_x3_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_xy_y1_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_xy_y2_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_xy_y3_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_center_fit_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_center_fit_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    g_ipm_boundary_count = 0;
+    g_ipm_center_fit_count = 0;
 }
 
 static uint8 compute_global_otsu_threshold_u8(const uint8 *gray_img)
@@ -250,6 +321,177 @@ static void build_binary_image_from_gray_threshold(const uint8 *gray_img, uint8 
     }
 }
 
+[[maybe_unused]] static cv::Rect build_red_search_roi_from_midline()
+{
+    const int width = UVC_WIDTH;
+    const int height = UVC_HEIGHT;
+
+    // 无中线时回退到图像中部窗口。
+    auto fallback_center_roi = [width, height]() -> cv::Rect {
+        const int rw = std::clamp(width / 2, scale_by_width(48), width);
+        const int rh = std::clamp(height / 2, scale_by_height(36), height);
+        int rx = (width - rw) / 2;
+        int ry = (height - rh) / 2;
+        rx = std::clamp(rx, 0, std::max(0, width - rw));
+        ry = std::clamp(ry, 0, std::max(0, height - rh));
+        return cv::Rect(rx, ry, rw, rh);
+    };
+
+    if (g_boundary_count <= 0)
+    {
+        return fallback_center_roi();
+    }
+
+    int min_x = width - 1;
+    int max_x = 0;
+    int min_y = height - 1;
+    int max_y = 0;
+    int valid = 0;
+    for (int i = 0; i < g_boundary_count; ++i)
+    {
+        const int x = std::clamp(static_cast<int>(g_xy_x2_boundary[i]), 0, width - 1);
+        const int y = std::clamp(static_cast<int>(g_xy_y2_boundary[i]), 0, height - 1);
+        min_x = std::min(min_x, x);
+        max_x = std::max(max_x, x);
+        min_y = std::min(min_y, y);
+        max_y = std::max(max_y, y);
+        ++valid;
+    }
+    if (valid <= 0)
+    {
+        return fallback_center_roi();
+    }
+
+    // 只在中线附近搜索，减少计算量。
+    const int kExpandX = scale_by_width(28);
+    const int kExpandY = scale_by_height(24);
+    int x0 = std::max(0, min_x - kExpandX);
+    int y0 = std::max(0, min_y - kExpandY);
+    int x1 = std::min(width - 1, max_x + kExpandX);
+    int y1 = std::min(height - 1, max_y + kExpandY);
+
+    // 保证ROI最小尺寸，避免中线太短导致窗口过小。
+    const int kMinRoiW = scale_by_width(48);
+    const int kMinRoiH = scale_by_height(36);
+    int rw = x1 - x0 + 1;
+    int rh = y1 - y0 + 1;
+    if (rw < kMinRoiW)
+    {
+        const int cx = (x0 + x1) / 2;
+        x0 = std::max(0, cx - kMinRoiW / 2);
+        x1 = std::min(width - 1, x0 + kMinRoiW - 1);
+        x0 = std::max(0, x1 - kMinRoiW + 1);
+        rw = x1 - x0 + 1;
+    }
+    if (rh < kMinRoiH)
+    {
+        const int cy = (y0 + y1) / 2;
+        y0 = std::max(0, cy - kMinRoiH / 2);
+        y1 = std::min(height - 1, y0 + kMinRoiH - 1);
+        y0 = std::max(0, y1 - kMinRoiH + 1);
+        rh = y1 - y0 + 1;
+    }
+
+    if (rw <= 0 || rh <= 0)
+    {
+        return fallback_center_roi();
+    }
+    return cv::Rect(x0, y0, rw, rh);
+}
+
+[[maybe_unused]] static bool detect_red_rectangle_bbox(const cv::Mat &bgr, cv::Rect *bbox, int *area_px)
+{
+    if (bbox == nullptr || area_px == nullptr || bgr.empty() || bgr.type() != CV_8UC3)
+    {
+        return false;
+    }
+
+    const cv::Rect roi = build_red_search_roi_from_midline();
+    if (roi.width <= 0 || roi.height <= 0)
+    {
+        return false;
+    }
+
+    cv::Mat mask(roi.height, roi.width, CV_8UC1, cv::Scalar(0));
+    for (int y = 0; y < roi.height; ++y)
+    {
+        const cv::Vec3b *src = bgr.ptr<cv::Vec3b>(roi.y + y);
+        uint8 *dst = mask.ptr<uint8>(y);
+        for (int x = 0; x < roi.width; ++x)
+        {
+            const cv::Vec3b &px = src[roi.x + x];
+            const int b = static_cast<int>(px[0]);
+            const int g = static_cast<int>(px[1]);
+            const int r = static_cast<int>(px[2]);
+            const int rg = r - g;
+            const int rb = r - b;
+            if (r >= 80 && rg >= 28 && rb >= 22)
+            {
+                dst[x] = 255;
+            }
+        }
+    }
+
+    cv::Mat labels;
+    cv::Mat stats;
+    cv::Mat centroids;
+    const int comp_num = cv::connectedComponentsWithStats(mask, labels, stats, centroids, 8, CV_32S);
+    if (comp_num <= 1)
+    {
+        return false;
+    }
+
+    const int kExpectedAreaPx = scale_by_area(60);
+    const int kAreaMinPx = scale_by_area(20);
+    const int kAreaMaxPx = scale_by_area(450);
+    const int kMinCompW = scale_by_width(3);
+    const int kMinCompH = scale_by_height(3);
+
+    int best_label = -1;
+    int best_score = std::numeric_limits<int>::max();
+    int best_area = 0;
+    for (int i = 1; i < comp_num; ++i)
+    {
+        const int area = stats.at<int>(i, cv::CC_STAT_AREA);
+        const int w = stats.at<int>(i, cv::CC_STAT_WIDTH);
+        const int h = stats.at<int>(i, cv::CC_STAT_HEIGHT);
+        if (area < kAreaMinPx || area > kAreaMaxPx || w < kMinCompW || h < kMinCompH)
+        {
+            continue;
+        }
+
+        const int side_min = std::min(w, h);
+        const int side_max = std::max(w, h);
+        if (side_min <= 0 || (side_max > side_min * 6))
+        {
+            continue;
+        }
+
+        const int area_cost = std::abs(area - kExpectedAreaPx);
+        const int shape_cost = std::abs((w * 10) - (h * 24)); // 12:5 近似为 24:10
+        const int score = area_cost * 4 + shape_cost;
+        if (score < best_score || (score == best_score && area > best_area))
+        {
+            best_score = score;
+            best_label = i;
+            best_area = area;
+        }
+    }
+
+    if (best_label < 0)
+    {
+        return false;
+    }
+
+    const int x = stats.at<int>(best_label, cv::CC_STAT_LEFT) + roi.x;
+    const int y = stats.at<int>(best_label, cv::CC_STAT_TOP) + roi.y;
+    const int w = stats.at<int>(best_label, cv::CC_STAT_WIDTH);
+    const int h = stats.at<int>(best_label, cv::CC_STAT_HEIGHT);
+    *bbox = cv::Rect(x, y, w, h);
+    *area_px = best_area;
+    return true;
+}
+
 static bool init_ipm_forward_matrix()
 {
     cv::Mat h_inv(3, 3, CV_64F, const_cast<double *>(&change_un_Mat[0][0]));
@@ -284,14 +526,24 @@ static bool src_point_to_ipm_point(int src_x, int src_y, int *ipm_x, int *ipm_y)
         return false;
     }
 
-    const double w = g_ipm_forward_mat[2][0] * src_x + g_ipm_forward_mat[2][1] * src_y + g_ipm_forward_mat[2][2];
+    // 逆透视矩阵按 160x120 标定；在其他分辨率下先映射回标定坐标系。
+    const double src_x_ref = (UVC_WIDTH > 1)
+                                 ? (static_cast<double>(src_x) * static_cast<double>(kRefProcWidth - 1) /
+                                    static_cast<double>(UVC_WIDTH - 1))
+                                 : 0.0;
+    const double src_y_ref = (UVC_HEIGHT > 1)
+                                 ? (static_cast<double>(src_y) * static_cast<double>(kRefProcHeight - 1) /
+                                    static_cast<double>(UVC_HEIGHT - 1))
+                                 : 0.0;
+
+    const double w = g_ipm_forward_mat[2][0] * src_x_ref + g_ipm_forward_mat[2][1] * src_y_ref + g_ipm_forward_mat[2][2];
     if (std::fabs(w) < 1e-9)
     {
         return false;
     }
 
-    const int x = static_cast<int>(std::lround((g_ipm_forward_mat[0][0] * src_x + g_ipm_forward_mat[0][1] * src_y + g_ipm_forward_mat[0][2]) / w));
-    const int y = static_cast<int>(std::lround((g_ipm_forward_mat[1][0] * src_x + g_ipm_forward_mat[1][1] * src_y + g_ipm_forward_mat[1][2]) / w));
+    const int x = static_cast<int>(std::lround((g_ipm_forward_mat[0][0] * src_x_ref + g_ipm_forward_mat[0][1] * src_y_ref + g_ipm_forward_mat[0][2]) / w));
+    const int y = static_cast<int>(std::lround((g_ipm_forward_mat[1][0] * src_x_ref + g_ipm_forward_mat[1][1] * src_y_ref + g_ipm_forward_mat[1][2]) / w));
     if (x < 0 || x >= kIpmOutputWidth || y < 0 || y >= kIpmOutputHeight)
     {
         return false;
@@ -467,50 +719,20 @@ static std::vector<cv::Point2f> resample_polyline_equal_spacing(const std::vecto
 static std::vector<cv::Point2f> preprocess_boundary_polyline(const maze_point_t *pts, int num)
 {
     std::vector<cv::Point2f> line = maze_points_to_polyline(pts, num);
+    const float min_dist_px = min_point_spacing_px();
     if (line.size() <= 1)
     {
         clamp_polyline_to_image(&line);
         return line;
     }
 
-    remove_near_duplicate_points(&line, 0.5f);
+    remove_near_duplicate_points(&line, min_dist_px);
     line = triangle_filter_polyline(line);
-    line = resample_polyline_equal_spacing(line, kSampleStepPx);
+    line = resample_polyline_equal_spacing(line, sample_step_px());
     line = triangle_filter_polyline(line);
     clamp_polyline_to_image(&line);
-    remove_near_duplicate_points(&line, 0.5f);
+    remove_near_duplicate_points(&line, min_dist_px);
     return line;
-}
-
-static std::vector<cv::Point2f> offset_centerline_from_side(const std::vector<cv::Point2f> &side_line, bool from_left, float offset_px)
-{
-    std::vector<cv::Point2f> center;
-    if (side_line.size() < 2)
-    {
-        return center;
-    }
-
-    center.reserve(side_line.size());
-    for (size_t i = 0; i < side_line.size(); ++i)
-    {
-        const cv::Point2f prev = side_line[(i == 0) ? 0 : (i - 1)];
-        const cv::Point2f next = side_line[(i + 1 >= side_line.size()) ? (side_line.size() - 1) : (i + 1)];
-        const cv::Point2f t_raw = next - prev;
-        const float t_norm = std::sqrt(t_raw.x * t_raw.x + t_raw.y * t_raw.y);
-        if (t_norm < 1e-5f)
-        {
-            continue;
-        }
-
-        const cv::Point2f t = t_raw * (1.0f / t_norm);
-        // 图像坐标系下，左边线向右偏移用 n=( -dy, dx )；右边线向左偏移用 n=( dy, -dx )。
-        cv::Point2f n = from_left ? cv::Point2f(-t.y, t.x) : cv::Point2f(t.y, -t.x);
-        center.push_back(side_line[i] + n * offset_px);
-    }
-
-    clamp_polyline_to_image(&center);
-    remove_near_duplicate_points(&center, 0.5f);
-    return center;
 }
 
 static std::vector<cv::Point2f> midpoint_centerline(const std::vector<cv::Point2f> &left_line,
@@ -531,114 +753,46 @@ static std::vector<cv::Point2f> midpoint_centerline(const std::vector<cv::Point2
         center.push_back((left_line[li] + right_line[ri]) * 0.5f);
     }
     clamp_polyline_to_image(&center);
-    remove_near_duplicate_points(&center, 0.5f);
+    remove_near_duplicate_points(&center, min_point_spacing_px());
     return center;
 }
 
-static void normalize_centerline_start(std::vector<cv::Point2f> *center_line,
-                                       const cv::Point2f &start_point)
-{
-    if (center_line == nullptr || center_line->empty())
-    {
-        return;
-    }
-
-    int best_idx = 0;
-    float best_dist = std::numeric_limits<float>::max();
-    for (int i = 0; i < static_cast<int>(center_line->size()); ++i)
-    {
-        float d = cv::norm((*center_line)[i] - start_point);
-        if (d < best_dist)
-        {
-            best_dist = d;
-            best_idx = i;
-        }
-    }
-
-    if (best_idx > 0)
-    {
-        center_line->erase(center_line->begin(), center_line->begin() + best_idx);
-    }
-
-    if (center_line->empty())
-    {
-        center_line->push_back(start_point);
-        return;
-    }
-
-    if (cv::norm(center_line->front() - start_point) > 1.0f)
-    {
-        center_line->insert(center_line->begin(), start_point);
-    }
-    else
-    {
-        center_line->front() = start_point;
-    }
-}
-
-static bool choose_center_from_left(size_t left_n, size_t right_n)
-{
-    if (kCenterTrackMode == CENTER_TRACK_LEFT)
-    {
-        return true;
-    }
-    if (kCenterTrackMode == CENTER_TRACK_RIGHT)
-    {
-        return false;
-    }
-
-    // AUTO: 左优先，左边线不足时切到右边线。
-    if (left_n >= 2)
-    {
-        return true;
-    }
-    return right_n < 2;
-}
-
-static int compute_line_error_from_centerline(const std::vector<cv::Point2f> &center_line)
-{
-    if (center_line.empty())
-    {
-        return 0;
-    }
-
-    const int den = std::max(1, line_sample_ratio_den);
-    const int num = std::clamp(line_sample_ratio_num, 0, den);
-    const float sample_y = static_cast<float>((UVC_HEIGHT - 1) * num) / static_cast<float>(den);
-
-    int best_idx = 0;
-    float best_dy = std::fabs(center_line[0].y - sample_y);
-    for (int i = 1; i < static_cast<int>(center_line.size()); ++i)
-    {
-        const float dy = std::fabs(center_line[i].y - sample_y);
-        if (dy < best_dy)
-        {
-            best_dy = dy;
-            best_idx = i;
-        }
-    }
-
-    const int cx = std::clamp(static_cast<int>(std::lround(center_line[best_idx].x)), 0, UVC_WIDTH - 1);
-    return cx - (UVC_WIDTH / 2);
-}
-
-static inline uint8 point_x_to_u8(const cv::Point2f &p)
+static inline uint16 point_x_to_u16(const cv::Point2f &p)
 {
     const int x = std::clamp(static_cast<int>(std::lround(p.x)), 0, UVC_WIDTH - 1);
-    return static_cast<uint8>(x);
+    return static_cast<uint16>(x);
 }
 
-static inline uint8 point_y_to_u8(const cv::Point2f &p)
+static inline uint16 point_y_to_u16(const cv::Point2f &p)
 {
     const int y = std::clamp(static_cast<int>(std::lround(p.y)), 0, UVC_HEIGHT - 1);
-    return static_cast<uint8>(y);
+    return static_cast<uint16>(y);
 }
 
-static void fill_boundary_arrays_from_lines(const std::vector<cv::Point2f> &left_line,
-                                            const std::vector<cv::Point2f> &center_line,
-                                            const std::vector<cv::Point2f> &right_line)
+static void fill_boundary_arrays_from_lines_to_target(const std::vector<cv::Point2f> &left_line,
+                                                      const std::vector<cv::Point2f> &center_line,
+                                                      const std::vector<cv::Point2f> &right_line,
+                                                      uint16 *x1,
+                                                      uint16 *x2,
+                                                      uint16 *x3,
+                                                      uint16 *y1,
+                                                      uint16 *y2,
+                                                      uint16 *y3,
+                                                      int *count)
 {
-    clear_boundary_arrays();
+    if (x1 == nullptr || x2 == nullptr || x3 == nullptr ||
+        y1 == nullptr || y2 == nullptr || y3 == nullptr || count == nullptr)
+    {
+        return;
+    }
+
+    std::fill_n(x1, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(x2, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(x3, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(y1, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(y2, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(y3, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    *count = 0;
 
     const int left_num = static_cast<int>(left_line.size());
     const int center_num = static_cast<int>(center_line.size());
@@ -687,15 +841,61 @@ static void fill_boundary_arrays_from_lines(const std::vector<cv::Point2f> &left
             cp = (lp + rp) * 0.5f;
         }
 
-        g_xy_x1_boundary[i] = point_x_to_u8(lp);
-        g_xy_y1_boundary[i] = point_y_to_u8(lp);
-        g_xy_x2_boundary[i] = point_x_to_u8(cp);
-        g_xy_y2_boundary[i] = point_y_to_u8(cp);
-        g_xy_x3_boundary[i] = point_x_to_u8(rp);
-        g_xy_y3_boundary[i] = point_y_to_u8(rp);
+        x1[i] = point_x_to_u16(lp);
+        y1[i] = point_y_to_u16(lp);
+        x2[i] = point_x_to_u16(cp);
+        y2[i] = point_y_to_u16(cp);
+        x3[i] = point_x_to_u16(rp);
+        y3[i] = point_y_to_u16(rp);
     }
 
-    g_boundary_count = out_num;
+    *count = out_num;
+}
+
+static void fill_ipm_fitted_centerline_array(const std::vector<cv::Point2f> &center_line)
+{
+    std::fill_n(g_ipm_center_fit_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_center_fit_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    g_ipm_center_fit_count = 0;
+    if (center_line.empty())
+    {
+        return;
+    }
+
+    int out_num = std::clamp(static_cast<int>(center_line.size()), 0, VISION_BOUNDARY_NUM);
+    for (int i = 0; i < out_num; ++i)
+    {
+        const cv::Point2f &p = center_line[static_cast<size_t>(i)];
+        g_ipm_center_fit_x[i] = point_x_to_u16(p);
+        g_ipm_center_fit_y[i] = point_y_to_u16(p);
+    }
+    g_ipm_center_fit_count = out_num;
+}
+
+static int compute_line_error_from_boundary_midline()
+{
+    if (g_boundary_count <= 0)
+    {
+        return 0;
+    }
+
+    const int den = std::max(1, line_sample_ratio_den);
+    const int num = std::clamp(line_sample_ratio_num, 0, den);
+    const int sample_y = ((UVC_HEIGHT - 1) * num) / den;
+
+    int best_idx = 0;
+    int best_dy = std::abs(static_cast<int>(g_xy_y2_boundary[0]) - sample_y);
+    for (int i = 1; i < g_boundary_count; ++i)
+    {
+        int dy = std::abs(static_cast<int>(g_xy_y2_boundary[i]) - sample_y);
+        if (dy < best_dy)
+        {
+            best_dy = dy;
+            best_idx = i;
+        }
+    }
+
+    return static_cast<int>(g_xy_x2_boundary[best_idx]) - (UVC_WIDTH / 2);
 }
 
 static void draw_polyline_gray(uint8 *img,
@@ -752,30 +952,15 @@ static int transform_boundary_points_to_proc(const maze_point_t *src_pts, int sr
     return out;
 }
 
-static void build_ipm_bgr_debug_image()
-{
-    std::memset(g_image_ipm_bgr, 0, UVC_WIDTH * UVC_HEIGHT * 3);
-    if (!g_ipm_forward_ready && !init_ipm_forward_matrix())
-    {
-        return;
-    }
-
-    cv::Mat src(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr);
-    cv::Mat ipm_small(kIpmOutputHeight, kIpmOutputWidth, CV_8UC3, cv::Scalar(0, 0, 0));
-    cv::Mat ipm_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_ipm_bgr);
-    cv::Mat h(3, 3, CV_64F, &g_ipm_forward_mat[0][0]);
-
-    cv::warpPerspective(src, ipm_small, h, ipm_small.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
-    cv::resize(ipm_small, ipm_full, ipm_full.size(), 0.0, 0.0, cv::INTER_LINEAR);
-}
-
 static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *left_pts,
                                                            int left_num,
                                                            const maze_point_t *right_pts,
                                                            int right_num)
 {
     std::memset(g_image_ipm_edge_gray, 0, UVC_WIDTH * UVC_HEIGHT);
-    build_ipm_bgr_debug_image();
+    // 关闭整图逆透视彩色调试图，避免 warpPerspective + resize 带来的额外耗时。
+    std::memset(g_image_ipm_bgr, 0, UVC_WIDTH * UVC_HEIGHT * 3);
+    clear_ipm_saved_arrays();
 
     std::array<maze_point_t, VISION_BOUNDARY_NUM> left_proc{};
     std::array<maze_point_t, VISION_BOUNDARY_NUM> right_proc{};
@@ -784,46 +969,35 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
 
     std::vector<cv::Point2f> left_line = preprocess_boundary_polyline(left_proc.data(), left_proc_num);
     std::vector<cv::Point2f> right_line = preprocess_boundary_polyline(right_proc.data(), right_proc_num);
+    std::vector<cv::Point2f> center_mean_line = midpoint_centerline(left_line, right_line);
+    std::vector<cv::Point2f> center_fit_line = center_mean_line;
 
-    const bool use_left = choose_center_from_left(left_line.size(), right_line.size());
-    std::vector<cv::Point2f> center_line;
-    if (use_left)
+    if (!center_fit_line.empty())
     {
-        center_line = offset_centerline_from_side(left_line, true, kHalfLaneOffsetPx);
-        if (center_line.size() < 2)
-        {
-            center_line = offset_centerline_from_side(right_line, false, kHalfLaneOffsetPx);
-        }
-    }
-    else
-    {
-        center_line = offset_centerline_from_side(right_line, false, kHalfLaneOffsetPx);
-        if (center_line.size() < 2)
-        {
-            center_line = offset_centerline_from_side(left_line, true, kHalfLaneOffsetPx);
-        }
-    }
-
-    if (center_line.empty())
-    {
-        center_line = midpoint_centerline(left_line, right_line);
-    }
-
-    if (!center_line.empty())
-    {
-        center_line = triangle_filter_polyline(center_line);
-        center_line = resample_polyline_equal_spacing(center_line, kSampleStepPx);
-        normalize_centerline_start(&center_line, cv::Point2f(kCenterNormalizeStartX, kCenterNormalizeStartY));
-        clamp_polyline_to_image(&center_line);
-        remove_near_duplicate_points(&center_line, 0.5f);
+        const float min_dist_px = min_point_spacing_px();
+        center_fit_line = triangle_filter_polyline(center_fit_line);
+        center_fit_line = resample_polyline_equal_spacing(center_fit_line, sample_step_px());
+        center_fit_line = triangle_filter_polyline(center_fit_line);
+        clamp_polyline_to_image(&center_fit_line);
+        remove_near_duplicate_points(&center_fit_line, min_dist_px);
     }
 
     draw_polyline_gray(g_image_ipm_edge_gray, UVC_WIDTH, UVC_HEIGHT, left_line, 255);
     draw_polyline_gray(g_image_ipm_edge_gray, UVC_WIDTH, UVC_HEIGHT, right_line, 255);
-    draw_polyline_gray(g_image_ipm_edge_gray, UVC_WIDTH, UVC_HEIGHT, center_line, 255);
+    draw_polyline_gray(g_image_ipm_edge_gray, UVC_WIDTH, UVC_HEIGHT, center_fit_line, 255);
 
-    fill_boundary_arrays_from_lines(left_line, center_line, right_line);
-    return compute_line_error_from_centerline(center_line);
+    fill_boundary_arrays_from_lines_to_target(left_line,
+                                              center_mean_line,
+                                              right_line,
+                                              g_ipm_xy_x1_boundary,
+                                              g_ipm_xy_x2_boundary,
+                                              g_ipm_xy_x3_boundary,
+                                              g_ipm_xy_y1_boundary,
+                                              g_ipm_xy_y2_boundary,
+                                              g_ipm_xy_y3_boundary,
+                                              &g_ipm_boundary_count);
+    fill_ipm_fitted_centerline_array(center_fit_line);
+    return 0;
 }
 
 static bool find_maze_start_from_bottom(const uint8 *classify_img,
@@ -846,47 +1020,62 @@ static bool find_maze_start_from_bottom(const uint8 *classify_img,
     }
 
     const int center_x = width / 2;
-    const int scan_y = height - 1;   // 从图像最底部行找起始边界
-    const int track_y = height - 2;  // 实际迷宫法从倒数第二行开始，避免访问越界
+    // 从图像最底部向上多行搜索起点，避免底部被同色覆盖时整侧起点丢失。
+    const int kMazeStartSearchRows = scale_by_height(40);
+    const int min_scan_y = std::max(1, height - kMazeStartSearchRows);
 
     int x_found = -1;
+    int y_found = -1;
     bool path_is_white = false;
     bool wall_is_white_local = false;
-    if (search_left)
+    for (int scan_y = height - 1; scan_y >= min_scan_y; --scan_y)
     {
-        for (int x = center_x; x >= 2; --x)
+        if (search_left)
         {
-            bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
-            bool outer_white = pixel_is_white(classify_img, x - 1, scan_y, white_threshold);
-            if (inner_white != outer_white)
+            for (int x = center_x; x >= 2; --x)
             {
-                x_found = x; // 靠近图像中心的一侧
-                path_is_white = inner_white;
-                wall_is_white_local = outer_white;
-                break;
+                bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
+                bool outer_white = pixel_is_white(classify_img, x - 1, scan_y, white_threshold);
+                if (inner_white != outer_white)
+                {
+                    x_found = x; // 靠近图像中心的一侧
+                    y_found = scan_y;
+                    path_is_white = inner_white;
+                    wall_is_white_local = outer_white;
+                    break;
+                }
             }
         }
-    }
-    else
-    {
-        for (int x = center_x; x <= width - 3; ++x)
+        else
         {
-            bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
-            bool outer_white = pixel_is_white(classify_img, x + 1, scan_y, white_threshold);
-            if (inner_white != outer_white)
+            for (int x = center_x; x <= width - 3; ++x)
             {
-                x_found = x; // 靠近图像中心的一侧
-                path_is_white = inner_white;
-                wall_is_white_local = outer_white;
-                break;
+                bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
+                bool outer_white = pixel_is_white(classify_img, x + 1, scan_y, white_threshold);
+                if (inner_white != outer_white)
+                {
+                    x_found = x; // 靠近图像中心的一侧
+                    y_found = scan_y;
+                    path_is_white = inner_white;
+                    wall_is_white_local = outer_white;
+                    break;
+                }
             }
+        }
+
+        if (x_found >= 1 && x_found <= width - 2)
+        {
+            break;
         }
     }
 
-    if (x_found < 1 || x_found > width - 2)
+    if (x_found < 1 || x_found > width - 2 || y_found < 1)
     {
         return false;
     }
+
+    // 实际迷宫法从扫描行上一行开始，避免访问越界。
+    const int track_y = std::clamp(y_found - 1, 1, height - 2);
 
     // 如果起点误落在墙侧，向图像中心方向微调到路径侧。
     int x_adjust = x_found;
@@ -932,13 +1121,13 @@ static int maze_trace_left_hand(const uint8 *classify_img,
     int dir = 0;
     int turn = 0;
     int step = 0;
-
     while (step < max_pts &&
            x > 0 && x < UVC_WIDTH - 1 &&
            y > 0 && y < UVC_HEIGHT - 1 &&
            y >= y_min &&
            turn < 4)
     {
+
         int fx = x + kDirFront[dir][0];
         int fy = y + kDirFront[dir][1];
         int flx = x + kDirFrontLeft[dir][0];
@@ -991,13 +1180,13 @@ static int maze_trace_right_hand(const uint8 *classify_img,
     int dir = 0;
     int turn = 0;
     int step = 0;
-
     while (step < max_pts &&
            x > 0 && x < UVC_WIDTH - 1 &&
            y > 0 && y < UVC_HEIGHT - 1 &&
            y >= y_min &&
            turn < 4)
     {
+
         int fx = x + kDirFront[dir][0];
         int fy = y + kDirFront[dir][1];
         int frx = x + kDirFrontRight[dir][0];
@@ -1029,6 +1218,46 @@ static int maze_trace_right_hand(const uint8 *classify_img,
     }
 
     return step;
+}
+
+// 当起点不是最底行时，先把起点以下到底部的边界点补到点集前端，避免中线底部断层。
+static int prepend_bottom_seed_points(maze_point_t *pts,
+                                      int num,
+                                      int max_pts,
+                                      int start_x,
+                                      int start_y)
+{
+    if (pts == nullptr || max_pts <= 0)
+    {
+        return 0;
+    }
+
+    int cur_num = std::max(0, num);
+    cur_num = std::min(cur_num, max_pts);
+
+    const int sx = std::clamp(start_x, 0, UVC_WIDTH - 1);
+    const int sy = std::clamp(start_y, 0, UVC_HEIGHT - 1);
+    int pad = std::max(0, (UVC_HEIGHT - 1) - sy); // y=H-1 ... sy+1
+    if (pad <= 0)
+    {
+        return cur_num;
+    }
+
+    pad = std::min(pad, max_pts);
+    int keep = std::min(cur_num, max_pts - pad);
+
+    for (int i = keep - 1; i >= 0; --i)
+    {
+        pts[i + pad] = pts[i];
+    }
+
+    for (int i = 0; i < pad; ++i)
+    {
+        pts[i].x = sx;
+        pts[i].y = (UVC_HEIGHT - 1) - i;
+    }
+
+    return pad + keep;
 }
 
 static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
@@ -1065,18 +1294,22 @@ static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
         int ly = (left_num > 0) ? left_pts[li].y : ((right_num > 0) ? right_pts[ri].y : 0);
         int rx = (right_num > 0) ? right_pts[ri].x : ((left_num > 0) ? left_pts[li].x : 0);
         int ry = (right_num > 0) ? right_pts[ri].y : ((left_num > 0) ? left_pts[li].y : 0);
+        lx = std::clamp(lx, 0, UVC_WIDTH - 1);
+        ly = std::clamp(ly, 0, UVC_HEIGHT - 1);
+        rx = std::clamp(rx, 0, UVC_WIDTH - 1);
+        ry = std::clamp(ry, 0, UVC_HEIGHT - 1);
 
-        g_xy_x1_boundary[i] = static_cast<uint8>(lx);
-        g_xy_y1_boundary[i] = static_cast<uint8>(ly);
+        g_xy_x1_boundary[i] = static_cast<uint16>(lx);
+        g_xy_y1_boundary[i] = static_cast<uint16>(ly);
 
         // 中线使用左右边界的均值。
         int mx = (lx + rx) / 2;
         int my = (ly + ry) / 2;
-        g_xy_x2_boundary[i] = static_cast<uint8>(mx);
-        g_xy_y2_boundary[i] = static_cast<uint8>(my);
+        g_xy_x2_boundary[i] = static_cast<uint16>(mx);
+        g_xy_y2_boundary[i] = static_cast<uint16>(my);
 
-        g_xy_x3_boundary[i] = static_cast<uint8>(rx);
-        g_xy_y3_boundary[i] = static_cast<uint8>(ry);
+        g_xy_x3_boundary[i] = static_cast<uint16>(rx);
+        g_xy_y3_boundary[i] = static_cast<uint16>(ry);
     }
 
     g_boundary_count = out_num;
@@ -1125,6 +1358,7 @@ bool vision_image_processor_init(const char *camera_path)
     }
 
     clear_boundary_arrays();
+    clear_ipm_saved_arrays();
     line_error = 0;
 
     g_capture_running.store(true);
@@ -1165,9 +1399,22 @@ bool vision_image_processor_process_step()
         {
             g_last_capture_wait_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count());
             g_last_preprocess_us = 0;
+            {
+                std::lock_guard<std::mutex> lk(g_detect_result_mutex);
+                g_last_red_detect_us = 0;
+            }
             g_last_otsu_us = 0;
             g_last_maze_us = 0;
             g_last_total_us = g_last_capture_wait_us;
+            g_last_maze_setup_us = 0;
+            g_last_maze_start_us = 0;
+            g_last_maze_trace_left_us = 0;
+            g_last_maze_trace_right_us = 0;
+            g_last_maze_post_us = 0;
+            g_last_maze_left_points = 0;
+            g_last_maze_right_points = 0;
+            g_last_maze_left_ok = false;
+            g_last_maze_right_ok = false;
             return false;
         }
 
@@ -1179,12 +1426,45 @@ bool vision_image_processor_process_step()
 
     auto t_pre_start = t1;
 
-    // 灰度图（160x120）
+    // 灰度图（当前处理分辨率）
     cv::Mat bgr(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr);
     cv::Mat gray(UVC_HEIGHT, UVC_WIDTH, CV_8UC1, g_image_gray);
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
 
-    // RGB565（160x120）
+    // 红色矩形检测在 E99 视觉栈下由异步线程处理；
+    // 非 E99 模式保留本地检测逻辑。
+#if !defined(ENABLE_E99_VISION_STACK)
+    auto t_red_start = std::chrono::steady_clock::now();
+    cv::Rect red_bbox;
+    int red_area_px = 0;
+    const bool red_found = detect_red_rectangle_bbox(bgr, &red_bbox, &red_area_px);
+    auto t_red_end = std::chrono::steady_clock::now();
+    {
+        std::lock_guard<std::mutex> lk(g_detect_result_mutex);
+        g_last_red_detect_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_red_end - t_red_start).count());
+        if (red_found)
+        {
+            red_bbox &= cv::Rect(0, 0, UVC_WIDTH, UVC_HEIGHT);
+            g_red_rect_found = true;
+            g_red_rect_x = red_bbox.x;
+            g_red_rect_y = red_bbox.y;
+            g_red_rect_w = red_bbox.width;
+            g_red_rect_h = red_bbox.height;
+            g_red_rect_cx = red_bbox.x + red_bbox.width / 2;
+            g_red_rect_cy = red_bbox.y + red_bbox.height / 2;
+            g_red_rect_area = red_area_px;
+        }
+        else
+        {
+            g_red_rect_found = false;
+            g_red_rect_x = g_red_rect_y = g_red_rect_w = g_red_rect_h = 0;
+            g_red_rect_cx = g_red_rect_cy = 0;
+            g_red_rect_area = 0;
+        }
+    }
+#endif
+
+    // RGB565（当前处理分辨率）
     for (int y = 0; y < UVC_HEIGHT; ++y)
     {
         const cv::Vec3b *row = bgr.ptr<cv::Vec3b>(y);
@@ -1251,6 +1531,7 @@ bool vision_image_processor_process_step()
 
     int left_num = 0;
     int right_num = 0;
+    auto t_maze_setup_end = std::chrono::steady_clock::now();
 
     bool left_ok = find_maze_start_from_bottom(classify_img,
                                                classify_white_threshold,
@@ -1264,6 +1545,7 @@ bool vision_image_processor_process_step()
                                                 &right_start_x,
                                                 &right_start_y,
                                                 &right_wall_is_white);
+    auto t_maze_start_search_end = std::chrono::steady_clock::now();
 
     if (left_ok)
     {
@@ -1275,7 +1557,13 @@ bool vision_image_processor_process_step()
                                         y_min,
                                         left_pts.data(),
                                         static_cast<int>(left_pts.size()));
+        left_num = prepend_bottom_seed_points(left_pts.data(),
+                                              left_num,
+                                              static_cast<int>(left_pts.size()),
+                                              left_start_x,
+                                              left_start_y);
     }
+    auto t_maze_left_trace_end = std::chrono::steady_clock::now();
     if (right_ok)
     {
         right_num = maze_trace_right_hand(classify_img,
@@ -1286,30 +1574,43 @@ bool vision_image_processor_process_step()
                                           y_min,
                                           right_pts.data(),
                                           static_cast<int>(right_pts.size()));
+        right_num = prepend_bottom_seed_points(right_pts.data(),
+                                               right_num,
+                                               static_cast<int>(right_pts.size()),
+                                               right_start_x,
+                                               right_start_y);
     }
+    auto t_maze_trace_end = std::chrono::steady_clock::now();
+
+    // 主输出边界使用原图坐标系：左右边线 + 均值中线（无丢线补偿）。
+    fill_boundary_arrays_from_maze(left_pts.data(), left_num, right_pts.data(), right_num);
+    line_error = compute_line_error_from_boundary_midline();
 
     if constexpr (kEnableGrayPointerInversePerspective)
     {
-        line_error = render_ipm_boundary_image_and_update_boundaries(left_pts.data(), left_num, right_pts.data(), right_num);
+        render_ipm_boundary_image_and_update_boundaries(left_pts.data(), left_num, right_pts.data(), right_num);
     }
     else
     {
         std::memset(g_image_ipm_bgr, 0, UVC_WIDTH * UVC_HEIGHT * 3);
         std::memset(g_image_ipm_edge_gray, 0, UVC_WIDTH * UVC_HEIGHT);
-        fill_boundary_arrays_from_maze(left_pts.data(), left_num, right_pts.data(), right_num);
-        line_error = 0;
+        clear_ipm_saved_arrays();
     }
     auto t_maze_end = std::chrono::steady_clock::now();
-
-    g_red_rect_found = false;
-    g_red_rect_x = g_red_rect_y = g_red_rect_w = g_red_rect_h = 0;
-    g_red_rect_cx = g_red_rect_cy = 0;
-    g_red_rect_area = 0;
 
     g_last_capture_wait_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
     g_last_preprocess_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_pre_end - t_pre_start).count());
     g_last_otsu_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_otsu_end - t_otsu_start).count());
     g_last_maze_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_end - t_maze_start).count());
+    g_last_maze_setup_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_setup_end - t_maze_start).count());
+    g_last_maze_start_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_start_search_end - t_maze_setup_end).count());
+    g_last_maze_trace_left_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_left_trace_end - t_maze_start_search_end).count());
+    g_last_maze_trace_right_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_trace_end - t_maze_left_trace_end).count());
+    g_last_maze_post_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_end - t_maze_trace_end).count());
+    g_last_maze_left_points = static_cast<uint16>(std::max(left_num, 0));
+    g_last_maze_right_points = static_cast<uint16>(std::max(right_num, 0));
+    g_last_maze_left_ok = left_ok;
+    g_last_maze_right_ok = right_ok;
     g_last_total_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_end - t0).count());
 
     return true;
@@ -1326,6 +1627,36 @@ void vision_image_processor_get_last_perf_us(uint32 *capture_wait_us,
     if (otsu_us) *otsu_us = g_last_otsu_us;
     if (maze_us) *maze_us = g_last_maze_us;
     if (total_us) *total_us = g_last_total_us;
+}
+
+void vision_image_processor_get_last_red_detect_us(uint32 *red_detect_us)
+{
+    if (red_detect_us)
+    {
+        std::lock_guard<std::mutex> lk(g_detect_result_mutex);
+        *red_detect_us = g_last_red_detect_us;
+    }
+}
+
+void vision_image_processor_get_last_maze_detail_us(uint32 *maze_setup_us,
+                                                    uint32 *maze_start_us,
+                                                    uint32 *maze_trace_left_us,
+                                                    uint32 *maze_trace_right_us,
+                                                    uint32 *maze_post_us,
+                                                    uint16 *left_points,
+                                                    uint16 *right_points,
+                                                    bool *left_ok,
+                                                    bool *right_ok)
+{
+    if (maze_setup_us) *maze_setup_us = g_last_maze_setup_us;
+    if (maze_start_us) *maze_start_us = g_last_maze_start_us;
+    if (maze_trace_left_us) *maze_trace_left_us = g_last_maze_trace_left_us;
+    if (maze_trace_right_us) *maze_trace_right_us = g_last_maze_trace_right_us;
+    if (maze_post_us) *maze_post_us = g_last_maze_post_us;
+    if (left_points) *left_points = g_last_maze_left_points;
+    if (right_points) *right_points = g_last_maze_right_points;
+    if (left_ok) *left_ok = g_last_maze_left_ok;
+    if (right_ok) *right_ok = g_last_maze_right_ok;
 }
 
 const uint8 *vision_image_processor_gray_image()
@@ -1378,8 +1709,8 @@ const uint8 *vision_image_processor_ipm_edge_gray_downsampled_image()
     return g_image_ipm_edge_gray;
 }
 
-void vision_image_processor_get_boundaries(uint8 **x1, uint8 **x2, uint8 **x3,
-                                           uint8 **y1, uint8 **y2, uint8 **y3,
+void vision_image_processor_get_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
+                                           uint16 **y1, uint16 **y2, uint16 **y3,
                                            uint16 *dot_num)
 {
     if (x1) *x1 = g_xy_x1_boundary;
@@ -1391,8 +1722,29 @@ void vision_image_processor_get_boundaries(uint8 **x1, uint8 **x2, uint8 **x3,
     if (dot_num) *dot_num = static_cast<uint16>(g_boundary_count);
 }
 
+void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
+                                               uint16 **y1, uint16 **y2, uint16 **y3,
+                                               uint16 *dot_num)
+{
+    if (x1) *x1 = g_ipm_xy_x1_boundary;
+    if (x2) *x2 = g_ipm_xy_x2_boundary;
+    if (x3) *x3 = g_ipm_xy_x3_boundary;
+    if (y1) *y1 = g_ipm_xy_y1_boundary;
+    if (y2) *y2 = g_ipm_xy_y2_boundary;
+    if (y3) *y3 = g_ipm_xy_y3_boundary;
+    if (dot_num) *dot_num = static_cast<uint16>(g_ipm_boundary_count);
+}
+
+void vision_image_processor_get_ipm_fitted_centerline(uint16 **x, uint16 **y, uint16 *dot_num)
+{
+    if (x) *x = g_ipm_center_fit_x;
+    if (y) *y = g_ipm_center_fit_y;
+    if (dot_num) *dot_num = static_cast<uint16>(g_ipm_center_fit_count);
+}
+
 void vision_image_processor_get_red_rect(bool *found, int *x, int *y, int *w, int *h, int *cx, int *cy)
 {
+    std::lock_guard<std::mutex> lk(g_detect_result_mutex);
     if (found) *found = g_red_rect_found;
     if (x) *x = g_red_rect_x;
     if (y) *y = g_red_rect_y;
@@ -1404,11 +1756,32 @@ void vision_image_processor_get_red_rect(bool *found, int *x, int *y, int *w, in
 
 int vision_image_processor_get_red_rect_area()
 {
+    std::lock_guard<std::mutex> lk(g_detect_result_mutex);
     return g_red_rect_area;
+}
+
+void vision_image_processor_set_red_rect(bool found, int x, int y, int w, int h, int cx, int cy, int area)
+{
+    std::lock_guard<std::mutex> lk(g_detect_result_mutex);
+    g_red_rect_found = found;
+    g_red_rect_x = std::clamp(x, 0, UVC_WIDTH - 1);
+    g_red_rect_y = std::clamp(y, 0, UVC_HEIGHT - 1);
+    g_red_rect_w = std::clamp(w, 0, UVC_WIDTH);
+    g_red_rect_h = std::clamp(h, 0, UVC_HEIGHT);
+    g_red_rect_cx = std::clamp(cx, 0, UVC_WIDTH - 1);
+    g_red_rect_cy = std::clamp(cy, 0, UVC_HEIGHT - 1);
+    g_red_rect_area = std::max(0, area);
+}
+
+void vision_image_processor_set_last_red_detect_us(uint32 red_detect_us)
+{
+    std::lock_guard<std::mutex> lk(g_detect_result_mutex);
+    g_last_red_detect_us = red_detect_us;
 }
 
 void vision_image_processor_set_ncnn_roi(bool valid, int x, int y, int w, int h)
 {
+    std::lock_guard<std::mutex> lk(g_detect_result_mutex);
     g_ncnn_roi_valid = valid;
     g_ncnn_roi_x = x;
     g_ncnn_roi_y = y;
@@ -1418,6 +1791,7 @@ void vision_image_processor_set_ncnn_roi(bool valid, int x, int y, int w, int h)
 
 void vision_image_processor_get_ncnn_roi(bool *valid, int *x, int *y, int *w, int *h)
 {
+    std::lock_guard<std::mutex> lk(g_detect_result_mutex);
     if (valid) *valid = g_ncnn_roi_valid;
     if (x) *x = g_ncnn_roi_x;
     if (y) *y = g_ncnn_roi_y;

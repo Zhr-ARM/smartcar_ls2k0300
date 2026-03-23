@@ -2,22 +2,17 @@
 
 #include "driver/vision/vision_image_processor.h"
 
-#include <opencv2/opencv.hpp>
-
 #include <atomic>
 #include <chrono>
 #include <cstring>
 #include <vector>
 
 // ============================== 参数区 ==============================
-// 1bit打包二值图缓存大小（发送分辨率固定为降采样图）
-#define VISION_BINARY_PACKED_SIZE (VISION_DOWNSAMPLED_HEIGHT * VISION_DOWNSAMPLED_WIDTH / 8)
 // 图传发送限频，避免处理线程过快导致 TCP 发送队列持续堆积。
 static constexpr uint32 VISION_SEND_DEFAULT_MAX_FPS = 30;
 static constexpr uint32 VISION_SEND_MAX_FPS_UPPER = 240;
 
 // ============================== 全局变量区 ==============================
-static uint8 g_image_binary_1bit[VISION_BINARY_PACKED_SIZE];
 static std::vector<uint8> g_image_rgb565_frame(VISION_DOWNSAMPLED_WIDTH * VISION_DOWNSAMPLED_HEIGHT * 2);
 // 保持与旧工程一致：默认图传和屏显都使用二值图。
 static std::atomic<int> g_send_mode(VISION_SEND_BINARY);
@@ -27,25 +22,16 @@ static std::atomic<uint32> g_last_send_time_us(0);
 static std::atomic<uint64> g_last_send_tick_us(0);
 static std::atomic<uint32> g_send_max_fps(VISION_SEND_DEFAULT_MAX_FPS);
 
-static void pack_binary_1bit(const uint8 *src, uint8 *dst, int width, int height)
+static vision_send_mode_enum vision_sender_sanitize_mode(vision_send_mode_enum mode)
 {
-    std::memset(dst, 0, static_cast<size_t>(width) * static_cast<size_t>(height) / 8);
-    int out_idx = 0;
-    for (int y = 0; y < height; ++y)
+    // 仅保留两种显示模式：
+    // 1) 彩色纯图不画线（RGB565）
+    // 2) 灰度图画边线/中线（GRAY）
+    if (mode == VISION_SEND_RGB565 || mode == VISION_SEND_IPM_RGB565)
     {
-        for (int x = 0; x < width; x += 8)
-        {
-            uint8 v = 0;
-            for (int b = 0; b < 8; ++b)
-            {
-                if (src[y * width + x + b] > 0)
-                {
-                    v |= static_cast<uint8>(1u << (7 - b));
-                }
-            }
-            dst[out_idx++] = v;
-        }
+        return VISION_SEND_RGB565;
     }
+    return VISION_SEND_GRAY;
 }
 
 static void convert_bgr_to_rgb565_be(const uint8 *bgr_data, uint8 *rgb565_data, int width, int height)
@@ -83,50 +69,35 @@ static void update_rgb565_from_bgr_source(const uint8 *bgr_data)
 
 static bool mode_enable_boundary_packet(vision_send_mode_enum mode)
 {
-    // 纯彩图模式默认关闭边界包，保证画面“纯净”用于调试。
-    if (mode == VISION_SEND_RGB565 || mode == VISION_SEND_IPM_RGB565)
-    {
-        return false;
-    }
-    return true;
+    return mode == VISION_SEND_GRAY;
 }
 
 static void config_camera_send_packet(vision_send_mode_enum mode)
 {
-    uint8 *x1 = nullptr;
-    uint8 *x2 = nullptr;
-    uint8 *x3 = nullptr;
-    uint8 *y1 = nullptr;
-    uint8 *y2 = nullptr;
-    uint8 *y3 = nullptr;
+    uint16 *x1 = nullptr;
+    uint16 *x2 = nullptr;
+    uint16 *x3 = nullptr;
+    uint16 *y1 = nullptr;
+    uint16 *y2 = nullptr;
+    uint16 *y3 = nullptr;
     uint16 dot_num = 0;
     vision_image_processor_get_boundaries(&x1, &x2, &x3, &y1, &y2, &y3, &dot_num);
 
     switch (mode)
     {
-        case VISION_SEND_BINARY:
-            seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_BINARY,
-                                                         g_image_binary_1bit,
-                                                         VISION_DOWNSAMPLED_WIDTH,
-                                                         VISION_DOWNSAMPLED_HEIGHT);
-            break;
-        case VISION_SEND_GRAY:
-            seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_GRAY,
-                                                         const_cast<uint8 *>(vision_image_processor_gray_downsampled_image()),
-                                                         VISION_DOWNSAMPLED_WIDTH,
-                                                         VISION_DOWNSAMPLED_HEIGHT);
-            break;
         case VISION_SEND_RGB565:
         case VISION_SEND_IPM_RGB565:
-        case VISION_SEND_RGB565_OVERLAY:
             seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_RGB565,
                                                          g_image_rgb565_frame.data(),
                                                          VISION_DOWNSAMPLED_WIDTH,
                                                          VISION_DOWNSAMPLED_HEIGHT);
             break;
+        case VISION_SEND_BINARY:
         case VISION_SEND_IPM_EDGE_GRAY:
+        case VISION_SEND_RGB565_OVERLAY:
+        case VISION_SEND_GRAY:
             seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_GRAY,
-                                                         const_cast<uint8 *>(vision_image_processor_ipm_edge_gray_downsampled_image()),
+                                                         const_cast<uint8 *>(vision_image_processor_gray_downsampled_image()),
                                                          VISION_DOWNSAMPLED_WIDTH,
                                                          VISION_DOWNSAMPLED_HEIGHT);
             break;
@@ -157,12 +128,12 @@ static void refresh_camera_boundary_packet(vision_send_mode_enum mode)
         return;
     }
 
-    uint8 *x1 = nullptr;
-    uint8 *x2 = nullptr;
-    uint8 *x3 = nullptr;
-    uint8 *y1 = nullptr;
-    uint8 *y2 = nullptr;
-    uint8 *y3 = nullptr;
+    uint16 *x1 = nullptr;
+    uint16 *x2 = nullptr;
+    uint16 *x3 = nullptr;
+    uint16 *y1 = nullptr;
+    uint16 *y2 = nullptr;
+    uint16 *y3 = nullptr;
     uint16 dot_num = 0;
     vision_image_processor_get_boundaries(&x1, &x2, &x3, &y1, &y2, &y3, &dot_num);
     if (dot_num > 0 && x1 && x2 && x3 && y1 && y2 && y3)
@@ -172,58 +143,6 @@ static void refresh_camera_boundary_packet(vision_send_mode_enum mode)
     else
     {
         seekfree_assistant_camera_boundary_config(NO_BOUNDARY, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
-    }
-}
-
-static void update_rgb565_overlay_frame()
-{
-    const uint8 *bgr_data = vision_image_processor_bgr_downsampled_image();
-    if (bgr_data == nullptr)
-    {
-        std::memset(g_image_rgb565_frame.data(), 0, g_image_rgb565_frame.size());
-        return;
-    }
-
-    cv::Mat frame(VISION_DOWNSAMPLED_HEIGHT, VISION_DOWNSAMPLED_WIDTH, CV_8UC3, const_cast<uint8 *>(bgr_data));
-    cv::Mat draw = frame.clone();
-
-    // 竖直中心线（去掉原先横向虚线）
-    const int x_center = VISION_DOWNSAMPLED_WIDTH / 2;
-    cv::line(draw,
-             cv::Point(x_center, 0),
-             cv::Point(x_center, VISION_DOWNSAMPLED_HEIGHT - 1),
-             cv::Scalar(0, 255, 0),
-             1);
-
-    // 画“左右边界均值中线”（x2/y2）
-    uint8 *x2 = nullptr;
-    uint8 *y2 = nullptr;
-    uint16 dot_num = 0;
-    vision_image_processor_get_boundaries(nullptr, &x2, nullptr, nullptr, &y2, nullptr, &dot_num);
-    if (dot_num > 1 && x2 != nullptr && y2 != nullptr)
-    {
-        for (uint16 i = 1; i < dot_num; ++i)
-        {
-            cv::Point p0(x2[i - 1], y2[i - 1]);
-            cv::Point p1(x2[i], y2[i]);
-            cv::line(draw, p0, p1, cv::Scalar(0, 255, 255), 1);
-        }
-    }
-
-    for (int y = 0; y < VISION_DOWNSAMPLED_HEIGHT; ++y)
-    {
-        const cv::Vec3b *row = draw.ptr<cv::Vec3b>(y);
-        for (int x = 0; x < VISION_DOWNSAMPLED_WIDTH; ++x)
-        {
-            uint8 b = row[x][0];
-            uint8 g = row[x][1];
-            uint8 r = row[x][2];
-            uint16 v = static_cast<uint16>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
-            int i = (y * VISION_DOWNSAMPLED_WIDTH + x) * 2;
-            // RGB565 大端
-            g_image_rgb565_frame[i] = static_cast<uint8>(v >> 8);
-            g_image_rgb565_frame[i + 1] = static_cast<uint8>(v & 0xFF);
-        }
     }
 }
 
@@ -256,31 +175,17 @@ void vision_client_sender_send_step()
         return;
     }
 
-    vision_send_mode_enum mode = static_cast<vision_send_mode_enum>(g_send_mode.load());
+    vision_send_mode_enum mode = vision_sender_sanitize_mode(
+        static_cast<vision_send_mode_enum>(g_send_mode.load()));
     if (g_last_send_mode.load() != static_cast<int>(mode))
     {
         config_camera_send_packet(mode);
     }
     refresh_camera_boundary_packet(mode);
 
-    if (mode == VISION_SEND_BINARY)
-    {
-        pack_binary_1bit(vision_image_processor_binary_downsampled_u8_image(),
-                         g_image_binary_1bit,
-                         VISION_DOWNSAMPLED_WIDTH,
-                         VISION_DOWNSAMPLED_HEIGHT);
-    }
-    else if (mode == VISION_SEND_RGB565)
+    if (mode == VISION_SEND_RGB565 || mode == VISION_SEND_IPM_RGB565)
     {
         update_rgb565_from_bgr_source(vision_image_processor_bgr_downsampled_image());
-    }
-    else if (mode == VISION_SEND_IPM_RGB565)
-    {
-        update_rgb565_from_bgr_source(vision_image_processor_ipm_bgr_downsampled_image());
-    }
-    else if (mode == VISION_SEND_RGB565_OVERLAY)
-    {
-        update_rgb565_overlay_frame();
     }
 
     seekfree_assistant_camera_send();
@@ -297,7 +202,8 @@ uint32 vision_client_sender_get_last_send_time_us()
 
 void vision_client_sender_set_mode(vision_send_mode_enum mode)
 {
-    int m = static_cast<int>(mode);
+    const vision_send_mode_enum mode_sanitized = vision_sender_sanitize_mode(mode);
+    int m = static_cast<int>(mode_sanitized);
     if (m < static_cast<int>(VISION_SEND_BINARY) || m > static_cast<int>(VISION_SEND_RGB565_OVERLAY))
     {
         return;

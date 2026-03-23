@@ -1,6 +1,7 @@
-CMakeFiles/project.dir/main.cpp.o: \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/main.cpp \
+CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_pipeline.cpp.o: \
+ /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_pipeline.cpp \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/stdc-predef.h \
+ /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_pipeline.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_common/zf_common_headfile.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/stdio.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/libc-header-start.h \
@@ -307,13 +308,6 @@ CMakeFiles/project.dir/main.cpp.o: \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_device/zf_device_imu963ra.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_components/seekfree_assistant.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_components/seekfree_assistant_interface.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/battery/battery.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/uart_thread/uart_thread.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/motor_thread/motor_thread.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/imu_thread/imu_thread.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/imu660ra/imu660ra.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/line_follow_thread/line_follow_thread.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/vision_thread/vision_thread.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/lq_ncnn.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/cvdef.h \
@@ -415,6 +409,113 @@ CMakeFiles/project.dir/main.cpp.o: \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/layer.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/modelbin.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/paramdict.h \
+ /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_client_sender.h \
+ /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_image_processor.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_ncnn.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/brushless/brushless.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/motor/motor.h
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/opencv.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/calib3d.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/features2d.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/miniflann.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/defines.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/config.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/affine.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/utils/logger.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/utils/logger.defines.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/utils/logtag.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/dnn.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/dnn/dnn.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/async.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/dnn/version.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/dnn/dict.hpp \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/map \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/stl_tree.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/stl_map.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/stl_multimap.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/dnn/layer.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/dnn/dnn.inl.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/dnn/utils/inference_engine.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/dnn/dnn.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/flann_base.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/general.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/matrix.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/params.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/any.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/defines.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/saving.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/nn_index.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/result_set.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/set \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/stl_set.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/stl_multiset.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/all_indices.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/kdtree_index.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/dynamic_bitset.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/dist.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/heap.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/allocator.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/random.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/kdtree_single_index.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/kmeans_index.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/logger.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/composite_index.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/linear_index.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/hierarchical_clustering_index.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/lsh_index.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/lsh_table.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/iomanip \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/locale \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/locale_facets_nonio.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/time_members.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/messages_members.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/libintl.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/codecvt.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/locale_facets_nonio.tcc \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/locale_conv.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/quoted_string.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/autotuned_index.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/ground_truth.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/index_testing.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/timer.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/flann/sampling.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/highgui.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/imgcodecs.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/videoio.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/imgproc.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/imgproc/segmentation.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/ml.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/ml/ml.inl.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/objdetect.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/objdetect/aruco_detector.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/objdetect/aruco_dictionary.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/objdetect/aruco_board.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/objdetect/graphical_code_detector.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/objdetect/detection_based_tracker.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/objdetect/face.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/objdetect/charuco_detector.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/objdetect/barcode.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/photo.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/warpers.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/warpers.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/cuda.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/cuda_types.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/cuda.inl.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/warpers_inl.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/warpers.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/matchers.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/motion_estimators.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/matchers.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/util.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/util_inl.hpp \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/queue \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/stl_queue.h \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/camera.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/exposure_compensate.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/seam_finders.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/blenders.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/stitching/detail/camera.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/video.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/video/tracking.hpp \
+ /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/video/background_segm.hpp \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/condition_variable

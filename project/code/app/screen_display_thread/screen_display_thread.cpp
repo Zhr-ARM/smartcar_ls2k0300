@@ -81,8 +81,8 @@ void screen_display_loop()
         int32 sample_y = std::min<int32>(VISION_PROC_HEIGHT - 1, (VISION_PROC_HEIGHT * num) / den);
 
         // 获取并绘制视觉边界数据
-        uint8 *x1 = nullptr, *x2 = nullptr, *x3 = nullptr;
-        uint8 *y1 = nullptr, *y2 = nullptr, *y3 = nullptr;
+        uint16 *x1 = nullptr, *x2 = nullptr, *x3 = nullptr;
+        uint16 *y1 = nullptr, *y2 = nullptr, *y3 = nullptr;
         uint16 dot_num = 0;
         vision_image_processor_get_boundaries(&x1, &x2, &x3, &y1, &y2, &y3, &dot_num);
 
