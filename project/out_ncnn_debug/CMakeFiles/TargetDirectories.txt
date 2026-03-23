@@ -1,3 +1,0 @@
-/home/zhr/2k0300/test1/project/out_ncnn_debug/CMakeFiles/project.dir
-/home/zhr/2k0300/test1/project/out_ncnn_debug/CMakeFiles/edit_cache.dir
-/home/zhr/2k0300/test1/project/out_ncnn_debug/CMakeFiles/rebuild_cache.dir

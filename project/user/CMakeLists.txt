@@ -7,14 +7,29 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -pthread -Wall")  # 对于 C++ 编译器
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Wall")      # 对于 C 编译器
 
+# 获取当前 CMakeLists.txt 文件所在目录的完整路径
+set(CURRENT_DIR ${CMAKE_CURRENT_LIST_DIR})
+
+# 获取上上级目录的完整路径
+get_filename_component(PARENT_PARENT_DIR ${CURRENT_DIR}/.. ABSOLUTE)
+
+# 从完整路径中提取文件夹名称
+get_filename_component(PARENT_PARENT_FOLDER_NAME ${PARENT_PARENT_DIR} NAME)
+
+# 打印上上级文件夹名称
+message("Parent parent folder name: ${PARENT_PARENT_FOLDER_NAME}")
+
+# 定义项目名称和版本，并指定使用C和C++语言
+project(${PARENT_PARENT_FOLDER_NAME} VERSION 0.1.0 LANGUAGES C CXX)
+
 # 仅在开启该选项时编译逐飞助手网络传图逻辑
-option(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM "Enable Seekfree assistant camera streaming" OFF)
+option(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM "Enable Seekfree assistant camera streaming" ON)
 if(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM)
     add_compile_definitions(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM=1)
 endif()
 
 # 仅在开启该选项时编译和启用车载屏显线程
-option(ENABLE_CAR_SCREEN_DISPLAY "Enable on-board screen display thread" ON)
+option(ENABLE_CAR_SCREEN_DISPLAY "Enable on-board screen display thread" OFF)
 if(ENABLE_CAR_SCREEN_DISPLAY)
     add_compile_definitions(ENABLE_CAR_SCREEN_DISPLAY=1)
 endif()
@@ -25,40 +40,46 @@ if(NOT ENABLE_CAR_SCREEN_DISPLAY)
 endif()
 
 # E99视觉栈开关：开启时尝试启用ncnn相关模块（pipeline/client_sender/ncnn）。
-option(ENABLE_E99_VISION_STACK "Enable E99 vision full stack" ON)
-set(NCNN_ROOT "" CACHE PATH "Path to an NCNN install prefix containing include/ and lib/")
+option(ENABLE_E99_VISION_STACK "Enable E99 vision full stack" OFF)
 
 set(E99_VISION_STACK_READY OFF)
 if(ENABLE_E99_VISION_STACK)
-    set(_ncnn_search_roots "")
-    if(NCNN_ROOT)
-        list(APPEND _ncnn_search_roots "${NCNN_ROOT}")
-    endif()
-    if(DEFINED ENV{NCNN_ROOT} AND NOT "$ENV{NCNN_ROOT}" STREQUAL "")
-        list(APPEND _ncnn_search_roots "$ENV{NCNN_ROOT}")
-    endif()
+    set(_local_ncnn_root "${CMAKE_CURRENT_LIST_DIR}/../../lib-ncnn")
+    set(_ncnn_install_root "${_local_ncnn_root}/tools/LQ_Dep_libs/ncnn_install")
 
-    list(APPEND _ncnn_search_roots
-        "${CMAKE_CURRENT_LIST_DIR}/../../libraries/zf_components/ncnn"
-        "/home/zhr/.local/share/Trash/files/LS2K0300_Library/LS2K300_Library/Seekfree_LS2K0300_Opensource_Library/libraries/zf_components/ncnn")
-    list(REMOVE_DUPLICATES _ncnn_search_roots)
-
-    find_package(PkgConfig QUIET)
-    if(PkgConfig_FOUND)
-        pkg_check_modules(NCNN QUIET ncnn)
-    endif()
-
-    if(NOT NCNN_FOUND)
+    find_package(ncnn CONFIG QUIET
+        HINTS "${_ncnn_install_root}"
+        PATH_SUFFIXES lib/cmake/ncnn ncnn/cmake)
+    if(ncnn_FOUND)
+        set(NCNN_FOUND TRUE)
+        if(TARGET ncnn::ncnn)
+            set(NCNN_LIBRARIES ncnn::ncnn)
+            get_target_property(_ncnn_iface_includes ncnn::ncnn INTERFACE_INCLUDE_DIRECTORIES)
+        elseif(TARGET ncnn)
+            set(NCNN_LIBRARIES ncnn)
+            get_target_property(_ncnn_iface_includes ncnn INTERFACE_INCLUDE_DIRECTORIES)
+        endif()
+        if(_ncnn_iface_includes AND NOT NCNN_INCLUDE_DIRS)
+            set(_ncnn_fixed_includes "")
+            foreach(_inc ${_ncnn_iface_includes})
+                list(APPEND _ncnn_fixed_includes "${_inc}")
+                if(_inc MATCHES "/include/ncnn$")
+                    string(REGEX REPLACE "/include/ncnn$" "/include" _inc_parent "${_inc}")
+                    list(APPEND _ncnn_fixed_includes "${_inc_parent}")
+                endif()
+            endforeach()
+            list(REMOVE_DUPLICATES _ncnn_fixed_includes)
+            set(NCNN_INCLUDE_DIRS ${_ncnn_fixed_includes})
+        endif()
+    else()
         find_path(NCNN_INCLUDE_DIR
             NAMES ncnn/net.h
-            PATHS ${_ncnn_search_roots}
-            PATH_SUFFIXES include
-            NO_CMAKE_FIND_ROOT_PATH)
+            PATHS "${_ncnn_install_root}"
+            PATH_SUFFIXES include)
         find_library(NCNN_LIBRARY
             NAMES ncnn
-            PATHS ${_ncnn_search_roots}
-            PATH_SUFFIXES lib
-            NO_CMAKE_FIND_ROOT_PATH)
+            PATHS "${_ncnn_install_root}"
+            PATH_SUFFIXES lib)
 
         if(NCNN_INCLUDE_DIR AND NCNN_LIBRARY)
             set(NCNN_FOUND TRUE)
@@ -77,24 +98,10 @@ if(ENABLE_E99_VISION_STACK)
         message(STATUS "NCNN_INCLUDE_DIRS: ${NCNN_INCLUDE_DIRS}")
         message(STATUS "NCNN_LIBRARIES: ${NCNN_LIBRARIES}")
     else()
-        message(STATUS "NCNN not found, build will skip ncnn-related E99 vision sources. Set NCNN_ROOT to an install prefix if needed.")
+        message(STATUS "NCNN not found under ${_local_ncnn_root}. Build will skip ncnn-related E99 vision sources.")
     endif()
 endif()
 
-# 获取当前 CMakeLists.txt 文件所在目录的完整路径
-set(CURRENT_DIR ${CMAKE_CURRENT_LIST_DIR})
-
-# 获取上上级目录的完整路径
-get_filename_component(PARENT_PARENT_DIR ${CURRENT_DIR}/.. ABSOLUTE)
-
-# 从完整路径中提取文件夹名称
-get_filename_component(PARENT_PARENT_FOLDER_NAME ${PARENT_PARENT_DIR} NAME)
-
-# 打印上上级文件夹名称
-message("Parent parent folder name: ${PARENT_PARENT_FOLDER_NAME}")
-
-# 定义项目名称和版本，并指定使用C和C++语言
-project(${PARENT_PARENT_FOLDER_NAME} VERSION 0.1.0 LANGUAGES C CXX)
 
 # 设置OpenCV的安装路径
 set(CMAKE_PREFIX_PATH "/opt/ls_2k0300_env/opencv_4_10_build")

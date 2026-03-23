@@ -16,8 +16,6 @@
 using namespace cv;
 
 cv::Mat frame_rgb;      // 构建opencv对象 彩色
-cv::Mat frame_rgay;     // 构建opencv对象 灰度
-cv::Mat frame_rgb565;   // 构建opencv对象 RGB565    
 
 uint8_t *rgay_image;    // 灰度图像数组指针
 uint8_t *rgb565_image;  // RGB565图像数组指针
@@ -75,29 +73,9 @@ int8 wait_image_refresh()
         std::cerr << "OpenCV 异常: " << e.what() << std::endl;
         return -1;
     }
-
-    // rgb转灰度
-    cv::cvtColor(frame_rgb, frame_rgay, cv::COLOR_BGR2GRAY);
-    // cv对象转指针
-    rgay_image = reinterpret_cast<uint8_t *>(frame_rgay.ptr(0));
-
-    // rgb转rgb565
-    static std::vector<uint8_t> rgb565_buf(UVC_WIDTH * UVC_HEIGHT * 2);
-    for (int y = 0; y < UVC_HEIGHT; ++y) {
-        const cv::Vec3b* row = frame_rgb.ptr<cv::Vec3b>(y);
-        for (int x = 0; x < UVC_WIDTH; ++x) {
-            uint8_t b = row[x][0];
-            uint8_t g = row[x][1];
-            uint8_t r = row[x][2];
-            uint16_t v = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3); // RGB565
-            int i = (y * UVC_WIDTH + x) * 2;
-            // 按大端发送
-            rgb565_buf[i]     = (uint8_t)(v >> 8);
-            rgb565_buf[i + 1] = (uint8_t)(v & 0xFF);
-        }
-    }
-    // cv对象转指针
-    rgb565_image = rgb565_buf.data();
+    // 当前视觉主链路只消费BGR彩图；灰度/二值/RGB565均在后级按160x120处理。
+    rgay_image = nullptr;
+    rgb565_image = nullptr;
 
     return 0;
 }

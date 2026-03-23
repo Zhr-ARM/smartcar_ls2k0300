@@ -119,6 +119,16 @@ vision_send_mode_enum vision_pipeline_get_send_mode()
     return vision_client_sender_get_mode();
 }
 
+void vision_pipeline_set_send_max_fps(uint32 max_fps)
+{
+    vision_client_sender_set_max_fps(max_fps);
+}
+
+uint32 vision_pipeline_get_send_max_fps()
+{
+    return vision_client_sender_get_max_fps();
+}
+
 void vision_pipeline_set_send_enabled(bool enabled)
 {
     vision_client_sender_set_enabled(enabled);

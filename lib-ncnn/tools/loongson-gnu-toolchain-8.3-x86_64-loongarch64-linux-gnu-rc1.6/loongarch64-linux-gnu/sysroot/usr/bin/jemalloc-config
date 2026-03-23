@@ -1,0 +1,83 @@
+#!/bin/sh
+
+usage() {
+	cat <<EOF
+Usage:
+  /usr/bin/jemalloc-config <option>
+Options:
+  --help | -h  : Print usage.
+  --version    : Print jemalloc version.
+  --revision   : Print shared library revision number.
+  --config     : Print configure options used to build jemalloc.
+  --prefix     : Print installation directory prefix.
+  --bindir     : Print binary installation directory.
+  --datadir    : Print data installation directory.
+  --includedir : Print include installation directory.
+  --libdir     : Print library installation directory.
+  --mandir     : Print manual page installation directory.
+  --cc         : Print compiler used to build jemalloc.
+  --cflags     : Print compiler flags used to build jemalloc.
+  --cppflags   : Print preprocessor flags used to build jemalloc.
+  --cxxflags   : Print C++ compiler flags used to build jemalloc.
+  --ldflags    : Print library flags used to build jemalloc.
+  --libs       : Print libraries jemalloc was linked against.
+EOF
+}
+
+prefix="/usr"
+exec_prefix="/usr"
+
+case "$1" in
+--help | -h)
+	usage
+	exit 0
+	;;
+--version)
+	echo "0.0.0-0-g000000missing_version_try_git_fetch_tags"
+	;;
+--revision)
+	echo "2"
+	;;
+--config)
+	echo "'CFLAGS=-g0 ' 'CXXFLAGS=-g0 ' --build=x86_64-linux-gnu --host=loongarch64-linux-gnu --prefix=/usr --libdir=/usr/lib64 --disable-dependency-tracking --disable-rpath --enable-shared --enable-static --enable-doc=no --with-lg-page=14 --with-lg-hugepage=25 --with-lg-quantum=4 build_alias=x86_64-linux-gnu host_alias=loongarch64-linux-gnu"
+	;;
+--prefix)
+	echo "/usr"
+	;;
+--bindir)
+	echo "/usr/bin"
+	;;
+--datadir)
+	echo "/usr/share"
+	;;
+--includedir)
+	echo "/usr/include"
+	;;
+--libdir)
+	echo "/usr/lib64"
+	;;
+--mandir)
+	echo "/usr/share/man"
+	;;
+--cc)
+	echo "loongarch64-linux-gnu-gcc"
+	;;
+--cflags)
+	echo "-std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -g0 "
+	;;
+--cppflags)
+	echo "-D_GNU_SOURCE -D_REENTRANT"
+	;;
+--cxxflags)
+	echo "-Wall -Wextra -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -g0 "
+	;;
+--ldflags)
+	echo " "
+	;;
+--libs)
+	echo "-lm -lstdc++ -pthread -ldl"
+	;;
+*)
+	usage
+	exit 1
+esac

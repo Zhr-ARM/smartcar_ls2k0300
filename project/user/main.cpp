@@ -24,6 +24,21 @@ static constexpr const char *kAssistantServerIp = "192.168.1.74";
 static constexpr uint32 kAssistantServerPort = 8888;
 #endif
 
+// 图传调试配置：集中在这里修改。
+// 可选模式：
+// VISION_THREAD_SEND_BINARY         : 二值图（1bit打包）
+// VISION_THREAD_SEND_GRAY           : 原始灰度图
+// VISION_THREAD_SEND_RGB565         : 彩色纯图（不叠加）
+// VISION_THREAD_SEND_IPM_RGB565     : 彩色逆透视图
+// VISION_THREAD_SEND_IPM_EDGE_GRAY  : 逆透视边线图（黑底白线）
+// VISION_THREAD_SEND_RGB565_OVERLAY : 彩色叠加调试图（中心线/边线）
+static constexpr vision_thread_send_mode_enum kVisionSendMode = VISION_THREAD_SEND_RGB565;
+// 图传发送上限帧率，0 表示不限速。
+static constexpr uint32 kVisionSendMaxFps = 60;
+#if defined(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM)
+static constexpr bool kVisionAssistantStreamEnabled = true;
+#endif
+
 volatile sig_atomic_t g_should_exit = 0;
 
 void sigint_handler(int signum) 
@@ -71,17 +86,17 @@ int main(int, char**)
 #endif
 
     // 初始化各线程
-    if (!motor_thread_init())
-    {
-        cleanup();
-        return -1;
-    }
+    // if (!motor_thread_init())
+    // {
+    //     cleanup();
+    //     return -1;
+    // }
 
-    if (!imu_thread_init())
-    {
-        cleanup();
-        return -1;
-    }
+    // if (!imu_thread_init())
+    // {
+    //     cleanup();
+    //     return -1;
+    // }
 
 #if defined(ENABLE_E99_VISION_STACK)
     if (!vision_thread_init("/dev/video0", &ncnn, ncnn_ready))
@@ -97,11 +112,11 @@ int main(int, char**)
     }
 #endif
 
-    if (!line_follow_thread_init())
-    {
-        cleanup();
-        return -1;
-    }
+    // if (!line_follow_thread_init())
+    // {
+    //     cleanup();
+    //     return -1;
+    // }
 
 #if defined(ENABLE_CAR_SCREEN_DISPLAY)
     if (!screen_display_thread_init())
@@ -111,27 +126,34 @@ int main(int, char**)
     }
 #endif
 
-    // 保持与原先调试体验一致：屏显和图传默认都使用二值图。
-    vision_thread_set_send_mode(VISION_THREAD_SEND_BINARY);
+    vision_thread_set_send_mode(kVisionSendMode);
+    vision_thread_set_send_max_fps(kVisionSendMaxFps);
 
 #if defined(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM)
-    // 图传与屏显解耦：只要编译了图传能力，启动时默认开启发送。
-    vision_thread_set_assistant_camera_stream(true);
+    vision_thread_set_assistant_camera_stream(kVisionAssistantStreamEnabled);
+    printf("[VISION SEND CFG] mode=%d max_fps=%u stream=%d\r\n",
+           static_cast<int>(vision_thread_get_send_mode()),
+           static_cast<unsigned int>(vision_thread_get_send_max_fps()),
+           vision_thread_assistant_camera_stream_enabled() ? 1 : 0);
+#else
+    printf("[VISION SEND CFG] mode=%d max_fps=%u\r\n",
+           static_cast<int>(vision_thread_get_send_mode()),
+           static_cast<unsigned int>(vision_thread_get_send_max_fps()));
 #endif
 
-    uart_thread_init();
+    // uart_thread_init();
 
-    line_follow_thread_set_base_speed(150.0f);
+    // line_follow_thread_set_base_speed(150.0f);
     
     // 为motor_thread设置目标计数，单位 counts/5ms。
     // 方便其他线程调用
     //motor_thread_set_target_count(1000.0f, 1000.0f);
-    brushless_driver.set_left_duty(0);
-    brushless_driver.set_right_duty(0);
-    system_delay_ms(50);
-    motor_thread_print_info();
-    imu_thread_print_info();
-    line_follow_thread_print_info();
+    // brushless_driver.set_left_duty(0);
+    // brushless_driver.set_right_duty(0);
+    // system_delay_ms(50);
+    // motor_thread_print_info();
+    // imu_thread_print_info();
+    // line_follow_thread_print_info();
 
     while(!g_should_exit)
     {   
