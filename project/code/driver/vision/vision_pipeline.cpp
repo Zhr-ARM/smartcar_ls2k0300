@@ -22,9 +22,16 @@
 
 namespace
 {
+static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
+static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
+static constexpr int kFullWidth = UVC_WIDTH;
+static constexpr int kFullHeight = UVC_HEIGHT;
+
 static constexpr int kRefProcWidth = 160;
 static constexpr int kRefProcHeight = 120;
 static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
+static constexpr int kRefFullWidth = 320;
+static constexpr int kRefFullHeight = 240;
 
 static inline int scale_by_width(int ref_px)
 {
@@ -32,7 +39,7 @@ static inline int scale_by_width(int ref_px)
     {
         return 0;
     }
-    return std::max(1, (ref_px * UVC_WIDTH + kRefProcWidth / 2) / kRefProcWidth);
+    return std::max(1, (ref_px * kProcWidth + kRefProcWidth / 2) / kRefProcWidth);
 }
 
 static inline int scale_by_height(int ref_px)
@@ -41,7 +48,7 @@ static inline int scale_by_height(int ref_px)
     {
         return 0;
     }
-    return std::max(1, (ref_px * UVC_HEIGHT + kRefProcHeight / 2) / kRefProcHeight);
+    return std::max(1, (ref_px * kProcHeight + kRefProcHeight / 2) / kRefProcHeight);
 }
 
 static inline int scale_by_area(int ref_area_px)
@@ -50,12 +57,30 @@ static inline int scale_by_area(int ref_area_px)
     {
         return 0;
     }
-    const int64_t scaled = static_cast<int64_t>(ref_area_px) * UVC_WIDTH * UVC_HEIGHT;
+    const int64_t scaled = static_cast<int64_t>(ref_area_px) * kProcWidth * kProcHeight;
     return std::max(1, static_cast<int>((scaled + kRefProcPixels / 2) / kRefProcPixels));
 }
 
-static constexpr int kNcnnRoiSizeRef = 25;
-static constexpr int kNcnnBottomOffsetRef = 5;
+static inline int scale_full_width(int ref_px)
+{
+    if (ref_px <= 0)
+    {
+        return 0;
+    }
+    return std::max(1, (ref_px * kFullWidth + kRefFullWidth / 2) / kRefFullWidth);
+}
+
+static inline int scale_full_height(int ref_px)
+{
+    if (ref_px <= 0)
+    {
+        return 0;
+    }
+    return std::max(1, (ref_px * kFullHeight + kRefFullHeight / 2) / kRefFullHeight);
+}
+
+static constexpr int kInferRoiSizeFullRef = 64;
+static constexpr int kInferBottomOffsetFullRef = 5;
 static constexpr int kInferMinIntervalMs = 80;
 static constexpr int kInferMaxStaleMs = 280;
 static constexpr int kInferCenterMovePxRef = 4;
@@ -93,8 +118,9 @@ static std::atomic<bool> g_red_ncnn_running(false);
 
 static std::mutex g_red_ncnn_task_mutex;
 static std::condition_variable g_red_ncnn_task_cv;
-static std::array<uint8, UVC_WIDTH * UVC_HEIGHT * 3> g_red_ncnn_frame{};
-static cv::Rect g_red_search_roi(0, 0, UVC_WIDTH, UVC_HEIGHT);
+static std::array<uint8, kProcWidth * kProcHeight * 3> g_red_ncnn_proc_frame{};
+static std::array<uint8, kFullWidth * kFullHeight * 3> g_red_ncnn_full_frame{};
+static cv::Rect g_red_search_roi(0, 0, kProcWidth, kProcHeight);
 static uint32 g_red_ncnn_task_seq = 0;
 static uint32 g_red_ncnn_handled_seq = 0;
 
@@ -106,22 +132,74 @@ static std::atomic<int> g_roi_capture_saved_count(0);
 static std::atomic<int64_t> g_roi_capture_last_save_ms(-(int64_t)kCaptureMinIntervalMs);
 static std::atomic<bool> g_roi_capture_done_notified(false);
 
-static cv::Rect build_ncnn_roi_from_red_rect(int cx, int red_y, int red_h)
+static inline int map_proc_to_full_x(int x_proc)
 {
-    const int width = UVC_WIDTH;
-    const int height = UVC_HEIGHT;
-    const int roi_w = std::min(scale_by_width(kNcnnRoiSizeRef), width);
-    const int roi_h = std::min(scale_by_height(kNcnnRoiSizeRef), height);
+    if (kProcWidth <= 1)
+    {
+        return 0;
+    }
+    return std::clamp((x_proc * (kFullWidth - 1)) / (kProcWidth - 1), 0, kFullWidth - 1);
+}
 
-    const int red_bottom = red_y + std::max(0, red_h - 1);
-    const int roi_bottom = std::min(height - 1, red_bottom + scale_by_height(kNcnnBottomOffsetRef));
+static inline int map_proc_to_full_y(int y_proc)
+{
+    if (kProcHeight <= 1)
+    {
+        return 0;
+    }
+    return std::clamp((y_proc * (kFullHeight - 1)) / (kProcHeight - 1), 0, kFullHeight - 1);
+}
 
-    int roi_x = cx - roi_w / 2;
+static inline int map_full_to_proc_x(int x_full)
+{
+    if (kFullWidth <= 1)
+    {
+        return 0;
+    }
+    return std::clamp((x_full * (kProcWidth - 1)) / (kFullWidth - 1), 0, kProcWidth - 1);
+}
+
+static inline int map_full_to_proc_y(int y_full)
+{
+    if (kFullHeight <= 1)
+    {
+        return 0;
+    }
+    return std::clamp((y_full * (kProcHeight - 1)) / (kFullHeight - 1), 0, kProcHeight - 1);
+}
+
+static cv::Rect build_ncnn_full_roi_from_red_rect_proc(int cx_proc, int red_y_proc, int red_h_proc)
+{
+    const int roi_w = std::min(scale_full_width(kInferRoiSizeFullRef), kFullWidth);
+    const int roi_h = std::min(scale_full_height(kInferRoiSizeFullRef), kFullHeight);
+    const int cx_full = map_proc_to_full_x(cx_proc);
+    const int red_top_full = map_proc_to_full_y(red_y_proc);
+    const int red_h_full = std::max(1, (red_h_proc * kFullHeight + kProcHeight / 2) / kProcHeight);
+    const int red_bottom_full = red_top_full + std::max(0, red_h_full - 1);
+    const int roi_bottom = std::min(kFullHeight - 1, red_bottom_full + scale_full_height(kInferBottomOffsetFullRef));
+
+    int roi_x = cx_full - roi_w / 2;
     int roi_y = roi_bottom - roi_h + 1;
-
-    roi_x = std::max(0, std::min(roi_x, width - roi_w));
-    roi_y = std::max(0, std::min(roi_y, height - roi_h));
+    roi_x = std::clamp(roi_x, 0, std::max(0, kFullWidth - roi_w));
+    roi_y = std::clamp(roi_y, 0, std::max(0, kFullHeight - roi_h));
     return cv::Rect(roi_x, roi_y, roi_w, roi_h);
+}
+
+static cv::Rect map_full_roi_to_proc(const cv::Rect &full_roi)
+{
+    cv::Rect safe = full_roi & cv::Rect(0, 0, kFullWidth, kFullHeight);
+    if (safe.width <= 0 || safe.height <= 0)
+    {
+        return cv::Rect(0, 0, 0, 0);
+    }
+
+    const int x0 = map_full_to_proc_x(safe.x);
+    const int y0 = map_full_to_proc_y(safe.y);
+    const int x1 = map_full_to_proc_x(safe.x + safe.width - 1);
+    const int y1 = map_full_to_proc_y(safe.y + safe.height - 1);
+    const int w = std::max(1, x1 - x0 + 1);
+    const int h = std::max(1, y1 - y0 + 1);
+    return cv::Rect(x0, y0, w, h);
 }
 
 static int64_t steady_now_ms()
@@ -201,8 +279,8 @@ static void try_save_infer_roi_png(const cv::Mat &frame, const cv::Rect &ncnn_ro
 
 static cv::Rect fallback_center_roi()
 {
-    const int width = UVC_WIDTH;
-    const int height = UVC_HEIGHT;
+    const int width = kProcWidth;
+    const int height = kProcHeight;
     const int rw = std::clamp(width / 2, scale_by_width(kRedSearchMinWRef), width);
     const int rh = std::clamp(height / 2, scale_by_height(kRedSearchMinHRef), height);
     int rx = (width - rw) / 2;
@@ -223,8 +301,8 @@ static cv::Rect build_red_search_roi_from_midline()
         return fallback_center_roi();
     }
 
-    const int width = UVC_WIDTH;
-    const int height = UVC_HEIGHT;
+    const int width = kProcWidth;
+    const int height = kProcHeight;
     int min_x = width - 1;
     int max_x = 0;
     int min_y = height - 1;
@@ -369,7 +447,8 @@ static bool detect_red_rectangle_bbox(const cv::Mat &bgr,
 
 static void red_ncnn_worker_loop()
 {
-    std::array<uint8, UVC_WIDTH * UVC_HEIGHT * 3> local_frame{};
+    std::array<uint8, kProcWidth * kProcHeight * 3> local_proc_frame{};
+    std::array<uint8, kFullWidth * kFullHeight * 3> local_full_frame{};
     bool last_detect_found = false;
     bool last_infer_valid = false;
     int last_infer_cx = 0;
@@ -394,14 +473,16 @@ static void red_ncnn_worker_loop()
             task_seq = g_red_ncnn_task_seq;
             g_red_ncnn_handled_seq = task_seq;
             search_roi = g_red_search_roi;
-            std::memcpy(local_frame.data(), g_red_ncnn_frame.data(), local_frame.size());
+            std::memcpy(local_proc_frame.data(), g_red_ncnn_proc_frame.data(), local_proc_frame.size());
+            std::memcpy(local_full_frame.data(), g_red_ncnn_full_frame.data(), local_full_frame.size());
         }
 
-        cv::Mat frame(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, local_frame.data());
+        cv::Mat proc_frame(kProcHeight, kProcWidth, CV_8UC3, local_proc_frame.data());
+        cv::Mat full_frame(kFullHeight, kFullWidth, CV_8UC3, local_full_frame.data());
         auto t0 = std::chrono::steady_clock::now();
         cv::Rect red_bbox;
         int red_area = 0;
-        const bool found = detect_red_rectangle_bbox(frame, search_roi, &red_bbox, &red_area);
+        const bool found = detect_red_rectangle_bbox(proc_frame, search_roi, &red_bbox, &red_area);
         auto t1 = std::chrono::steady_clock::now();
         const uint32 red_detect_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
 
@@ -411,7 +492,7 @@ static void red_ncnn_worker_loop()
         result.red_detect_us = red_detect_us;
         if (found)
         {
-            red_bbox &= cv::Rect(0, 0, UVC_WIDTH, UVC_HEIGHT);
+            red_bbox &= cv::Rect(0, 0, kProcWidth, kProcHeight);
             result.red_x = red_bbox.x;
             result.red_y = red_bbox.y;
             result.red_w = red_bbox.width;
@@ -419,8 +500,11 @@ static void red_ncnn_worker_loop()
             result.red_cx = red_bbox.x + red_bbox.width / 2;
             result.red_cy = red_bbox.y + red_bbox.height / 2;
             result.red_area = red_area;
-            result.ncnn_roi = build_ncnn_roi_from_red_rect(result.red_cx, result.red_y, result.red_h);
-            try_save_infer_roi_png(frame, result.ncnn_roi);
+            const cv::Rect ncnn_full_roi = build_ncnn_full_roi_from_red_rect_proc(result.red_cx,
+                                                                                   result.red_y,
+                                                                                   result.red_h);
+            result.ncnn_roi = map_full_roi_to_proc(ncnn_full_roi);
+            try_save_infer_roi_png(full_frame, ncnn_full_roi);
 
             if (vision_ncnn_is_enabled())
             {
@@ -452,7 +536,7 @@ static void red_ncnn_worker_loop()
 
                 if (should_infer)
                 {
-                    cv::Mat roi_bgr = frame(result.ncnn_roi).clone();
+                    cv::Mat roi_bgr = full_frame(ncnn_full_roi).clone();
                     vision_ncnn_step(reinterpret_cast<const uint8 *>(roi_bgr.data), roi_bgr.cols, roi_bgr.rows);
                     last_infer_valid = true;
                     last_infer_tp = now_tp;
@@ -489,16 +573,19 @@ static void red_ncnn_worker_loop()
     }
 }
 
-static void submit_async_task(const uint8 *bgr_data, const cv::Rect &search_roi)
+static void submit_async_task(const uint8 *bgr_proc_data,
+                              const uint8 *bgr_full_data,
+                              const cv::Rect &search_roi)
 {
-    if (bgr_data == nullptr)
+    if (bgr_proc_data == nullptr || bgr_full_data == nullptr)
     {
         return;
     }
 
     {
         std::lock_guard<std::mutex> lk(g_red_ncnn_task_mutex);
-        std::memcpy(g_red_ncnn_frame.data(), bgr_data, g_red_ncnn_frame.size());
+        std::memcpy(g_red_ncnn_proc_frame.data(), bgr_proc_data, g_red_ncnn_proc_frame.size());
+        std::memcpy(g_red_ncnn_full_frame.data(), bgr_full_data, g_red_ncnn_full_frame.size());
         g_red_search_roi = search_roi;
         ++g_red_ncnn_task_seq;
     }
@@ -566,10 +653,11 @@ bool vision_pipeline_process_step()
         return false;
     }
 
-    const uint8 *bgr_data = vision_image_processor_bgr_image();
-    if (bgr_data != nullptr)
+    const uint8 *bgr_proc_data = vision_image_processor_bgr_image();
+    const uint8 *bgr_full_data = vision_image_processor_bgr_full_image();
+    if (bgr_proc_data != nullptr && bgr_full_data != nullptr)
     {
-        submit_async_task(bgr_data, build_red_search_roi_from_midline());
+        submit_async_task(bgr_proc_data, bgr_full_data, build_red_search_roi_from_midline());
     }
 
     const red_ncnn_result_t result = get_latest_async_result();
@@ -581,16 +669,16 @@ bool vision_pipeline_process_step()
                                             result.ncnn_roi.width,
                                             result.ncnn_roi.height);
 
-        if (bgr_data != nullptr)
+        if (bgr_proc_data != nullptr)
         {
-            cv::Mat frame(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, const_cast<uint8 *>(bgr_data));
+            cv::Mat frame(kProcHeight, kProcWidth, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
             cv::rectangle(frame, result.ncnn_roi, cv::Scalar(0, 255, 0), 1, cv::LINE_8);
         }
 
         const uint8 *gray_data = vision_image_processor_gray_image();
         if (gray_data != nullptr)
         {
-            cv::Mat gray(UVC_HEIGHT, UVC_WIDTH, CV_8UC1, const_cast<uint8 *>(gray_data));
+            cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, const_cast<uint8 *>(gray_data));
             cv::rectangle(gray, result.ncnn_roi, cv::Scalar(255), 1, cv::LINE_8);
         }
     }

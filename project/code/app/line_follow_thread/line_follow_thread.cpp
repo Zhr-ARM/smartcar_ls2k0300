@@ -104,7 +104,7 @@ void line_follow_loop()
         // 以半幅宽度归一化到近似[-1,1]范围，并对异常值做保护限幅。
         // 这样 PID 参数可以脱离具体分辨率，后续改摄像头宽度时更容易复用。
         const float normalized_error = std::clamp(
-            raw_error_px / ((float)UVC_WIDTH * 0.5f),
+            raw_error_px / ((float)VISION_DOWNSAMPLED_WIDTH * 0.5f),
             -pid_tuning::line_follow::kNormalizedErrorLimit,
             pid_tuning::line_follow::kNormalizedErrorLimit);
 
@@ -116,7 +116,7 @@ void line_follow_loop()
 
         // 后面的 deadzone / 小误差降增益继续使用像素尺度判断，
         // 是为了让阈值更直观，便于你结合画面观察实际偏差量。
-        const float filtered_error_px = g_filtered_error * ((float)UVC_WIDTH * 0.5f);
+        const float filtered_error_px = g_filtered_error * ((float)VISION_DOWNSAMPLED_WIDTH * 0.5f);
         const float abs_filtered_error_px = std::fabs(filtered_error_px);
         float control_error = g_filtered_error;
 

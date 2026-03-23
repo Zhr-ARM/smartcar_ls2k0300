@@ -16,16 +16,19 @@
 #include <vector>
 
 // 当前阶段目标：
-// 1) 直接采集 UVC_WIDTH x UVC_HEIGHT BGR 图像（不翻转）；
-// 2) 采集与处理解耦为两个线程；
-// 3) 使用全图 OTSU 二值化；
-// 4) 在图像下方区域，基于迷宫法提取左右边线；
-// 5) 原图输出左右边线及均值中线；逆透视后的边线与拟合中线另存。
+// 1) 直接采集 UVC_WIDTH x UVC_HEIGHT BGR 原图（不翻转）；
+// 2) 降采样到 VISION_DOWNSAMPLED_WIDTH x VISION_DOWNSAMPLED_HEIGHT 做视觉处理；
+// 3) 采集与处理解耦为两个线程；
+// 4) 使用全图 OTSU 二值化；
+// 5) 在图像下方区域，基于迷宫法提取左右边线；
+// 6) 原图输出左右边线及均值中线；逆透视后的边线与拟合中线另存。
 
 #define VISION_BOUNDARY_NUM (VISION_DOWNSAMPLED_HEIGHT * 2)
 static constexpr int kRefProcWidth = 160;
 static constexpr int kRefProcHeight = 120;
 static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
+static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
+static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
 
 static inline int scale_by_width(int ref_px)
 {
@@ -33,7 +36,7 @@ static inline int scale_by_width(int ref_px)
     {
         return 0;
     }
-    return std::max(1, (ref_px * UVC_WIDTH + kRefProcWidth / 2) / kRefProcWidth);
+    return std::max(1, (ref_px * kProcWidth + kRefProcWidth / 2) / kRefProcWidth);
 }
 
 static inline int scale_by_height(int ref_px)
@@ -42,7 +45,7 @@ static inline int scale_by_height(int ref_px)
     {
         return 0;
     }
-    return std::max(1, (ref_px * UVC_HEIGHT + kRefProcHeight / 2) / kRefProcHeight);
+    return std::max(1, (ref_px * kProcHeight + kRefProcHeight / 2) / kRefProcHeight);
 }
 
 static inline int scale_by_area(int ref_area_px)
@@ -51,13 +54,13 @@ static inline int scale_by_area(int ref_area_px)
     {
         return 0;
     }
-    const int64_t scaled = static_cast<int64_t>(ref_area_px) * UVC_WIDTH * UVC_HEIGHT;
+    const int64_t scaled = static_cast<int64_t>(ref_area_px) * kProcWidth * kProcHeight;
     return std::max(1, static_cast<int>((scaled + kRefProcPixels / 2) / kRefProcPixels));
 }
 
 static inline float scale_by_width_f(float ref_px)
 {
-    return ref_px * static_cast<float>(UVC_WIDTH) / static_cast<float>(kRefProcWidth);
+    return ref_px * static_cast<float>(kProcWidth) / static_cast<float>(kRefProcWidth);
 }
 
 static constexpr int MAZE_LOWER_REGION_PERCENT = 60;
@@ -122,13 +125,14 @@ static uint16 g_ipm_center_fit_x[VISION_BOUNDARY_NUM];
 static uint16 g_ipm_center_fit_y[VISION_BOUNDARY_NUM];
 static int g_ipm_center_fit_count = 0;
 
-static uint8 g_image_bgr[UVC_HEIGHT * UVC_WIDTH * 3];
-static uint8 g_image_gray[UVC_HEIGHT * UVC_WIDTH];
-static uint8 g_image_binary_u8[UVC_HEIGHT * UVC_WIDTH];
-static uint8 g_image_rgb565[UVC_HEIGHT * UVC_WIDTH * 2];
+static uint8 g_image_bgr_full[UVC_HEIGHT * UVC_WIDTH * 3];
+static uint8 g_image_bgr[kProcHeight * kProcWidth * 3];
+static uint8 g_image_gray[kProcHeight * kProcWidth];
+static uint8 g_image_binary_u8[kProcHeight * kProcWidth];
+static uint8 g_image_rgb565[kProcHeight * kProcWidth * 2];
 // 调试输出缓存：逆透视彩色图、逆透视边线图（黑底白线）。
-static uint8 g_image_ipm_bgr[UVC_HEIGHT * UVC_WIDTH * 3];
-static uint8 g_image_ipm_edge_gray[UVC_HEIGHT * UVC_WIDTH];
+static uint8 g_image_ipm_bgr[kProcHeight * kProcWidth * 3];
+static uint8 g_image_ipm_edge_gray[kProcHeight * kProcWidth];
 // 逆透视矩阵正向映射（原图->俯视）及初始化标志。
 static double g_ipm_forward_mat[3][3] = {{0.0}};
 static bool g_ipm_forward_ready = false;
@@ -251,7 +255,7 @@ static uint8 compute_global_otsu_threshold_u8(const uint8 *gray_img)
 
     std::array<uint32, 256> histogram{};
     uint64_t gray_sum = 0;
-    constexpr int kPixelCount = UVC_WIDTH * UVC_HEIGHT;
+    constexpr int kPixelCount = kProcWidth * kProcHeight;
 
     for (int i = 0; i < kPixelCount; ++i)
     {
@@ -298,7 +302,7 @@ static uint8 compute_global_otsu_threshold_u8(const uint8 *gray_img)
 
 static inline bool pixel_is_white(const uint8 *img, int x, int y, uint8 white_threshold)
 {
-    return img[y * UVC_WIDTH + x] > white_threshold;
+    return img[y * kProcWidth + x] > white_threshold;
 }
 
 static inline bool pixel_is_wall(const uint8 *img, int x, int y, uint8 white_threshold, bool wall_is_white)
@@ -310,11 +314,11 @@ static void build_binary_image_from_gray_threshold(const uint8 *gray_img, uint8 
 {
     if (gray_img == nullptr)
     {
-        std::fill_n(g_image_binary_u8, UVC_WIDTH * UVC_HEIGHT, static_cast<uint8>(0));
+        std::fill_n(g_image_binary_u8, kProcWidth * kProcHeight, static_cast<uint8>(0));
         return;
     }
 
-    constexpr int kPixelCount = UVC_WIDTH * UVC_HEIGHT;
+    constexpr int kPixelCount = kProcWidth * kProcHeight;
     for (int i = 0; i < kPixelCount; ++i)
     {
         g_image_binary_u8[i] = (gray_img[i] > threshold) ? static_cast<uint8>(255) : static_cast<uint8>(0);
@@ -323,8 +327,8 @@ static void build_binary_image_from_gray_threshold(const uint8 *gray_img, uint8 
 
 [[maybe_unused]] static cv::Rect build_red_search_roi_from_midline()
 {
-    const int width = UVC_WIDTH;
-    const int height = UVC_HEIGHT;
+    const int width = kProcWidth;
+    const int height = kProcHeight;
 
     // 无中线时回退到图像中部窗口。
     auto fallback_center_roi = [width, height]() -> cv::Rect {
@@ -527,13 +531,13 @@ static bool src_point_to_ipm_point(int src_x, int src_y, int *ipm_x, int *ipm_y)
     }
 
     // 逆透视矩阵按 160x120 标定；在其他分辨率下先映射回标定坐标系。
-    const double src_x_ref = (UVC_WIDTH > 1)
+    const double src_x_ref = (kProcWidth > 1)
                                  ? (static_cast<double>(src_x) * static_cast<double>(kRefProcWidth - 1) /
-                                    static_cast<double>(UVC_WIDTH - 1))
+                                    static_cast<double>(kProcWidth - 1))
                                  : 0.0;
-    const double src_y_ref = (UVC_HEIGHT > 1)
+    const double src_y_ref = (kProcHeight > 1)
                                  ? (static_cast<double>(src_y) * static_cast<double>(kRefProcHeight - 1) /
-                                    static_cast<double>(UVC_HEIGHT - 1))
+                                    static_cast<double>(kProcHeight - 1))
                                  : 0.0;
 
     const double w = g_ipm_forward_mat[2][0] * src_x_ref + g_ipm_forward_mat[2][1] * src_y_ref + g_ipm_forward_mat[2][2];
@@ -558,8 +562,8 @@ static inline void ipm_to_proc_point(int ipm_x, int ipm_y, int *proc_x, int *pro
 {
     const int denom_x = std::max(1, kIpmOutputWidth - 1);
     const int denom_y = std::max(1, kIpmOutputHeight - 1);
-    *proc_x = std::clamp((ipm_x * (UVC_WIDTH - 1)) / denom_x, 0, UVC_WIDTH - 1);
-    *proc_y = std::clamp((ipm_y * (UVC_HEIGHT - 1)) / denom_y, 0, UVC_HEIGHT - 1);
+    *proc_x = std::clamp((ipm_x * (kProcWidth - 1)) / denom_x, 0, kProcWidth - 1);
+    *proc_y = std::clamp((ipm_y * (kProcHeight - 1)) / denom_y, 0, kProcHeight - 1);
 }
 
 static void draw_line_gray(uint8 *img, int width, int height, int x0, int y0, int x1, int y1, uint8 value)
@@ -624,8 +628,8 @@ static void clamp_polyline_to_image(std::vector<cv::Point2f> *pts)
 
     for (auto &p : *pts)
     {
-        p.x = std::clamp(p.x, 0.0f, static_cast<float>(UVC_WIDTH - 1));
-        p.y = std::clamp(p.y, 0.0f, static_cast<float>(UVC_HEIGHT - 1));
+        p.x = std::clamp(p.x, 0.0f, static_cast<float>(kProcWidth - 1));
+        p.y = std::clamp(p.y, 0.0f, static_cast<float>(kProcHeight - 1));
     }
 }
 
@@ -759,13 +763,13 @@ static std::vector<cv::Point2f> midpoint_centerline(const std::vector<cv::Point2
 
 static inline uint16 point_x_to_u16(const cv::Point2f &p)
 {
-    const int x = std::clamp(static_cast<int>(std::lround(p.x)), 0, UVC_WIDTH - 1);
+    const int x = std::clamp(static_cast<int>(std::lround(p.x)), 0, kProcWidth - 1);
     return static_cast<uint16>(x);
 }
 
 static inline uint16 point_y_to_u16(const cv::Point2f &p)
 {
-    const int y = std::clamp(static_cast<int>(std::lround(p.y)), 0, UVC_HEIGHT - 1);
+    const int y = std::clamp(static_cast<int>(std::lround(p.y)), 0, kProcHeight - 1);
     return static_cast<uint16>(y);
 }
 
@@ -881,7 +885,7 @@ static int compute_line_error_from_boundary_midline()
 
     const int den = std::max(1, line_sample_ratio_den);
     const int num = std::clamp(line_sample_ratio_num, 0, den);
-    const int sample_y = ((UVC_HEIGHT - 1) * num) / den;
+    const int sample_y = ((kProcHeight - 1) * num) / den;
 
     int best_idx = 0;
     int best_dy = std::abs(static_cast<int>(g_xy_y2_boundary[0]) - sample_y);
@@ -895,7 +899,7 @@ static int compute_line_error_from_boundary_midline()
         }
     }
 
-    return static_cast<int>(g_xy_x2_boundary[best_idx]) - (UVC_WIDTH / 2);
+    return static_cast<int>(g_xy_x2_boundary[best_idx]) - (kProcWidth / 2);
 }
 
 static void draw_polyline_gray(uint8 *img,
@@ -957,9 +961,9 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                            const maze_point_t *right_pts,
                                                            int right_num)
 {
-    std::memset(g_image_ipm_edge_gray, 0, UVC_WIDTH * UVC_HEIGHT);
+    std::memset(g_image_ipm_edge_gray, 0, kProcWidth * kProcHeight);
     // 关闭整图逆透视彩色调试图，避免 warpPerspective + resize 带来的额外耗时。
-    std::memset(g_image_ipm_bgr, 0, UVC_WIDTH * UVC_HEIGHT * 3);
+    std::memset(g_image_ipm_bgr, 0, kProcWidth * kProcHeight * 3);
     clear_ipm_saved_arrays();
 
     std::array<maze_point_t, VISION_BOUNDARY_NUM> left_proc{};
@@ -982,9 +986,9 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
         remove_near_duplicate_points(&center_fit_line, min_dist_px);
     }
 
-    draw_polyline_gray(g_image_ipm_edge_gray, UVC_WIDTH, UVC_HEIGHT, left_line, 255);
-    draw_polyline_gray(g_image_ipm_edge_gray, UVC_WIDTH, UVC_HEIGHT, right_line, 255);
-    draw_polyline_gray(g_image_ipm_edge_gray, UVC_WIDTH, UVC_HEIGHT, center_fit_line, 255);
+    draw_polyline_gray(g_image_ipm_edge_gray, kProcWidth, kProcHeight, left_line, 255);
+    draw_polyline_gray(g_image_ipm_edge_gray, kProcWidth, kProcHeight, right_line, 255);
+    draw_polyline_gray(g_image_ipm_edge_gray, kProcWidth, kProcHeight, center_fit_line, 255);
 
     fill_boundary_arrays_from_lines_to_target(left_line,
                                               center_mean_line,
@@ -1012,8 +1016,8 @@ static bool find_maze_start_from_bottom(const uint8 *classify_img,
         return false;
     }
 
-    const int width = UVC_WIDTH;
-    const int height = UVC_HEIGHT;
+    const int width = kProcWidth;
+    const int height = kProcHeight;
     if (width < 4 || height < 3)
     {
         return false;
@@ -1122,8 +1126,8 @@ static int maze_trace_left_hand(const uint8 *classify_img,
     int turn = 0;
     int step = 0;
     while (step < max_pts &&
-           x > 0 && x < UVC_WIDTH - 1 &&
-           y > 0 && y < UVC_HEIGHT - 1 &&
+           x > 0 && x < kProcWidth - 1 &&
+           y > 0 && y < kProcHeight - 1 &&
            y >= y_min &&
            turn < 4)
     {
@@ -1181,8 +1185,8 @@ static int maze_trace_right_hand(const uint8 *classify_img,
     int turn = 0;
     int step = 0;
     while (step < max_pts &&
-           x > 0 && x < UVC_WIDTH - 1 &&
-           y > 0 && y < UVC_HEIGHT - 1 &&
+           x > 0 && x < kProcWidth - 1 &&
+           y > 0 && y < kProcHeight - 1 &&
            y >= y_min &&
            turn < 4)
     {
@@ -1235,9 +1239,9 @@ static int prepend_bottom_seed_points(maze_point_t *pts,
     int cur_num = std::max(0, num);
     cur_num = std::min(cur_num, max_pts);
 
-    const int sx = std::clamp(start_x, 0, UVC_WIDTH - 1);
-    const int sy = std::clamp(start_y, 0, UVC_HEIGHT - 1);
-    int pad = std::max(0, (UVC_HEIGHT - 1) - sy); // y=H-1 ... sy+1
+    const int sx = std::clamp(start_x, 0, kProcWidth - 1);
+    const int sy = std::clamp(start_y, 0, kProcHeight - 1);
+    int pad = std::max(0, (kProcHeight - 1) - sy); // y=H-1 ... sy+1
     if (pad <= 0)
     {
         return cur_num;
@@ -1254,7 +1258,7 @@ static int prepend_bottom_seed_points(maze_point_t *pts,
     for (int i = 0; i < pad; ++i)
     {
         pts[i].x = sx;
-        pts[i].y = (UVC_HEIGHT - 1) - i;
+        pts[i].y = (kProcHeight - 1) - i;
     }
 
     return pad + keep;
@@ -1294,10 +1298,10 @@ static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
         int ly = (left_num > 0) ? left_pts[li].y : ((right_num > 0) ? right_pts[ri].y : 0);
         int rx = (right_num > 0) ? right_pts[ri].x : ((left_num > 0) ? left_pts[li].x : 0);
         int ry = (right_num > 0) ? right_pts[ri].y : ((left_num > 0) ? left_pts[li].y : 0);
-        lx = std::clamp(lx, 0, UVC_WIDTH - 1);
-        ly = std::clamp(ly, 0, UVC_HEIGHT - 1);
-        rx = std::clamp(rx, 0, UVC_WIDTH - 1);
-        ry = std::clamp(ry, 0, UVC_HEIGHT - 1);
+        lx = std::clamp(lx, 0, kProcWidth - 1);
+        ly = std::clamp(ly, 0, kProcHeight - 1);
+        rx = std::clamp(rx, 0, kProcWidth - 1);
+        ry = std::clamp(ry, 0, kProcHeight - 1);
 
         g_xy_x1_boundary[i] = static_cast<uint16>(lx);
         g_xy_y1_boundary[i] = static_cast<uint16>(ly);
@@ -1418,7 +1422,7 @@ bool vision_image_processor_process_step()
             return false;
         }
 
-        std::memcpy(g_image_bgr, g_capture_frame.data(), sizeof(g_image_bgr));
+        std::memcpy(g_image_bgr_full, g_capture_frame.data(), sizeof(g_image_bgr_full));
         g_processed_seq = g_capture_seq;
     }
 
@@ -1426,9 +1430,11 @@ bool vision_image_processor_process_step()
 
     auto t_pre_start = t1;
 
-    // 灰度图（当前处理分辨率）
-    cv::Mat bgr(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr);
-    cv::Mat gray(UVC_HEIGHT, UVC_WIDTH, CV_8UC1, g_image_gray);
+    // 先保留原始 320x240 彩图，再降采样到 160x120 做后续全部视觉处理。
+    cv::Mat bgr_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr_full);
+    cv::Mat bgr(kProcHeight, kProcWidth, CV_8UC3, g_image_bgr);
+    cv::resize(bgr_full, bgr, cv::Size(kProcWidth, kProcHeight), 0.0, 0.0, cv::INTER_LINEAR);
+    cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
 
     // 红色矩形检测在 E99 视觉栈下由异步线程处理；
@@ -1444,7 +1450,7 @@ bool vision_image_processor_process_step()
         g_last_red_detect_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_red_end - t_red_start).count());
         if (red_found)
         {
-            red_bbox &= cv::Rect(0, 0, UVC_WIDTH, UVC_HEIGHT);
+            red_bbox &= cv::Rect(0, 0, kProcWidth, kProcHeight);
             g_red_rect_found = true;
             g_red_rect_x = red_bbox.x;
             g_red_rect_y = red_bbox.y;
@@ -1465,16 +1471,16 @@ bool vision_image_processor_process_step()
 #endif
 
     // RGB565（当前处理分辨率）
-    for (int y = 0; y < UVC_HEIGHT; ++y)
+    for (int y = 0; y < kProcHeight; ++y)
     {
         const cv::Vec3b *row = bgr.ptr<cv::Vec3b>(y);
-        for (int x = 0; x < UVC_WIDTH; ++x)
+        for (int x = 0; x < kProcWidth; ++x)
         {
             uint8 bb = row[x][0];
             uint8 gg = row[x][1];
             uint8 rr = row[x][2];
             uint16 v = static_cast<uint16>(((rr >> 3) << 11) | ((gg >> 2) << 5) | (bb >> 3));
-            int idx = (y * UVC_WIDTH + x) * 2;
+            int idx = (y * kProcWidth + x) * 2;
             g_image_rgb565[idx] = static_cast<uint8>(v >> 8);
             g_image_rgb565[idx + 1] = static_cast<uint8>(v & 0xFF);
         }
@@ -1493,19 +1499,19 @@ bool vision_image_processor_process_step()
         }
         else
         {
-            std::fill_n(g_image_binary_u8, UVC_WIDTH * UVC_HEIGHT, static_cast<uint8>(0));
+            std::fill_n(g_image_binary_u8, kProcWidth * kProcHeight, static_cast<uint8>(0));
         }
     }
     else
     {
-        cv::Mat gray_ipm(UVC_HEIGHT, UVC_WIDTH, CV_8UC1, g_image_gray);
-        cv::Mat binary(UVC_HEIGHT, UVC_WIDTH, CV_8UC1, g_image_binary_u8);
+        cv::Mat gray_ipm(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
+        cv::Mat binary(kProcHeight, kProcWidth, CV_8UC1, g_image_binary_u8);
         cv::threshold(gray_ipm, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
     }
     auto t_otsu_end = std::chrono::steady_clock::now();
 
     auto t_maze_start = t_otsu_end;
-    const int y_min = std::max(1, UVC_HEIGHT - (UVC_HEIGHT * MAZE_LOWER_REGION_PERCENT) / 100);
+    const int y_min = std::max(1, kProcHeight - (kProcHeight * MAZE_LOWER_REGION_PERCENT) / 100);
     const uint8 *classify_img = nullptr;
     uint8 classify_white_threshold = 127;
     if constexpr (kTempDemandOtsuEnable)
@@ -1592,8 +1598,8 @@ bool vision_image_processor_process_step()
     }
     else
     {
-        std::memset(g_image_ipm_bgr, 0, UVC_WIDTH * UVC_HEIGHT * 3);
-        std::memset(g_image_ipm_edge_gray, 0, UVC_WIDTH * UVC_HEIGHT);
+        std::memset(g_image_ipm_bgr, 0, kProcWidth * kProcHeight * 3);
+        std::memset(g_image_ipm_edge_gray, 0, kProcWidth * kProcHeight);
         clear_ipm_saved_arrays();
     }
     auto t_maze_end = std::chrono::steady_clock::now();
@@ -1672,6 +1678,11 @@ const uint8 *vision_image_processor_binary_u8_image()
 const uint8 *vision_image_processor_bgr_image()
 {
     return g_image_bgr;
+}
+
+const uint8 *vision_image_processor_bgr_full_image()
+{
+    return g_image_bgr_full;
 }
 
 const uint8 *vision_image_processor_rgb565_image()
@@ -1764,12 +1775,12 @@ void vision_image_processor_set_red_rect(bool found, int x, int y, int w, int h,
 {
     std::lock_guard<std::mutex> lk(g_detect_result_mutex);
     g_red_rect_found = found;
-    g_red_rect_x = std::clamp(x, 0, UVC_WIDTH - 1);
-    g_red_rect_y = std::clamp(y, 0, UVC_HEIGHT - 1);
-    g_red_rect_w = std::clamp(w, 0, UVC_WIDTH);
-    g_red_rect_h = std::clamp(h, 0, UVC_HEIGHT);
-    g_red_rect_cx = std::clamp(cx, 0, UVC_WIDTH - 1);
-    g_red_rect_cy = std::clamp(cy, 0, UVC_HEIGHT - 1);
+    g_red_rect_x = std::clamp(x, 0, kProcWidth - 1);
+    g_red_rect_y = std::clamp(y, 0, kProcHeight - 1);
+    g_red_rect_w = std::clamp(w, 0, kProcWidth);
+    g_red_rect_h = std::clamp(h, 0, kProcHeight);
+    g_red_rect_cx = std::clamp(cx, 0, kProcWidth - 1);
+    g_red_rect_cy = std::clamp(cy, 0, kProcHeight - 1);
     g_red_rect_area = std::max(0, area);
 }
 

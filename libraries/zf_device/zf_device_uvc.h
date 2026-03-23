@@ -4,8 +4,8 @@
 
 #include "zf_common_typedef.h"
 
-#define UVC_WIDTH   160
-#define UVC_HEIGHT  120
+#define UVC_WIDTH   320
+#define UVC_HEIGHT  240
 #define UVC_FPS     120
 
 int8 uvc_camera_init(const char *path);

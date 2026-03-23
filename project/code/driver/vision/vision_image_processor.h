@@ -3,8 +3,8 @@
 
 #include "zf_common_headfile.h"
 
-#define VISION_DOWNSAMPLED_WIDTH UVC_WIDTH
-#define VISION_DOWNSAMPLED_HEIGHT UVC_HEIGHT
+#define VISION_DOWNSAMPLED_WIDTH 160
+#define VISION_DOWNSAMPLED_HEIGHT 120
 
 // 轮廓线误差：在图像高度(line_sample_ratio_num/line_sample_ratio_den)处，中线x与图像中心x的差值
 extern int line_error;
@@ -52,10 +52,11 @@ void vision_image_processor_get_last_maze_detail_us(uint32 *maze_setup_us,
                                                     bool *right_ok);
 
 // 图像数据访问接口
-// 当前阶段图像统一为 UVC_WIDTH x UVC_HEIGHT（无翻转）。
+// 当前阶段处理图像统一为 VISION_DOWNSAMPLED_WIDTH x VISION_DOWNSAMPLED_HEIGHT。
 const uint8 *vision_image_processor_gray_image();
 const uint8 *vision_image_processor_binary_u8_image();
 const uint8 *vision_image_processor_bgr_image();
+const uint8 *vision_image_processor_bgr_full_image();
 const uint8 *vision_image_processor_rgb565_image();
 // 降采样接口与主接口一致（当前输入即处理分辨率）
 const uint8 *vision_image_processor_gray_downsampled_image();
