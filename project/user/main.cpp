@@ -32,7 +32,7 @@ static constexpr vision_thread_send_mode_enum kVisionSendMode = VISION_THREAD_SE
 // 图传发送上限帧率，0 表示不限速。
 static constexpr uint32 kVisionSendMaxFps = 60;
 // 采图模式：检测到红色矩形后，每 1s 保存一次推理 ROI 彩图，共 20 张。
-static constexpr bool kVisionRoiCaptureMode = true;
+static constexpr bool kVisionRoiCaptureMode = false;
 #if defined(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM)
 static constexpr bool kVisionAssistantStreamEnabled = true;
 #endif

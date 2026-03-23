@@ -13,10 +13,13 @@ bool vision_ncnn_init_default_model(LQ_NCNN &ncnn)
 {
     const std::string model_param = "tiny_classifier_fp32.ncnn.param";
     const std::string model_bin   = "tiny_classifier_fp32.ncnn.bin";
-    const int input_width  = 96;
-    const int input_height = 96;
+    const int input_width  = 25;
+    const int input_height = 25;
 
-    const std::vector<std::string> labels = {"supplies", "vehicle", "weapon"};
+    const std::vector<std::string> labels = {
+        "aid", "amb", "arm", "axe", "baton", "bulletproof", "explosive",
+        "fire", "flashlight", "gun", "helmet", "knife", "motor", "tele", "walkie"
+    };
 
     float mean_vals[3] = {123.675f, 116.28f, 103.53f};
     float norm_vals[3] = {0.01712475f, 0.017507f, 0.01742919f};
