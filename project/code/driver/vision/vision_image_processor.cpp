@@ -1430,7 +1430,7 @@ bool vision_image_processor_process_step()
 
     auto t_pre_start = t1;
 
-    // 先保留原始 320x240 彩图，再降采样到 160x120 做后续全部视觉处理。
+    // 先保留原始 UVC_WIDTH x UVC_HEIGHT 彩图，再降采样到 kProcWidth x kProcHeight 做后续视觉处理。
     cv::Mat bgr_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr_full);
     cv::Mat bgr(kProcHeight, kProcWidth, CV_8UC3, g_image_bgr);
     cv::resize(bgr_full, bgr, cv::Size(kProcWidth, kProcHeight), 0.0, 0.0, cv::INTER_LINEAR);

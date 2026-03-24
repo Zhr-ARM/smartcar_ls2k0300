@@ -1,22 +1,22 @@
 Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
 Change Dir: /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/out/CMakeFiles/CMakeTmp
 
-Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_e2600/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_e2600.dir/build.make CMakeFiles/cmTC_e2600.dir/build
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_89157/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_89157.dir/build.make CMakeFiles/cmTC_89157.dir/build
 gmake[1]: 进入目录“/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/out/CMakeFiles/CMakeTmp”
-Building C object CMakeFiles/cmTC_e2600.dir/src.c.o
-/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc -DCMAKE_HAVE_LIBC_PTHREAD  -O3 -Wall  -o CMakeFiles/cmTC_e2600.dir/src.c.o -c /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/out/CMakeFiles/CMakeTmp/src.c
-Linking C executable cmTC_e2600
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e2600.dir/link.txt --verbose=1
-/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc  -O3 -Wall  CMakeFiles/cmTC_e2600.dir/src.c.o -o cmTC_e2600 
-/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/ld: CMakeFiles/cmTC_e2600.dir/src.c.o: in function `main':
+Building C object CMakeFiles/cmTC_89157.dir/src.c.o
+/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc -DCMAKE_HAVE_LIBC_PTHREAD  -O3 -Wall  -o CMakeFiles/cmTC_89157.dir/src.c.o -c /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/out/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_89157
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_89157.dir/link.txt --verbose=1
+/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc  -O3 -Wall  CMakeFiles/cmTC_89157.dir/src.c.o -o cmTC_89157 
+/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/ld: CMakeFiles/cmTC_89157.dir/src.c.o: in function `main':
 src.c:(.text.startup+0x1c): undefined reference to `pthread_create'
 /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/ld: src.c:(.text.startup+0x24): undefined reference to `pthread_detach'
 /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/ld: src.c:(.text.startup+0x2c): undefined reference to `pthread_cancel'
 /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/ld: src.c:(.text.startup+0x38): undefined reference to `pthread_join'
 collect2: error: ld returned 1 exit status
-gmake[1]: *** [CMakeFiles/cmTC_e2600.dir/build.make:99：cmTC_e2600] 错误 1
+gmake[1]: *** [CMakeFiles/cmTC_89157.dir/build.make:99：cmTC_89157] 错误 1
 gmake[1]: 离开目录“/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/out/CMakeFiles/CMakeTmp”
-gmake: *** [Makefile:127：cmTC_e2600/fast] 错误 2
+gmake: *** [Makefile:127：cmTC_89157/fast] 错误 2
 
 
 Source file was:

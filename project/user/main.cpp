@@ -28,7 +28,7 @@ static constexpr uint32 kAssistantServerPort = 8888;
 // 可选模式（当前仅保留两种显示）：
 // VISION_THREAD_SEND_RGB565 : 彩色纯图（不画线）
 // VISION_THREAD_SEND_GRAY   : 灰度图（画边线+中线）
-static constexpr vision_thread_send_mode_enum kVisionSendMode = VISION_THREAD_SEND_GRAY;
+static constexpr vision_thread_send_mode_enum kVisionSendMode = VISION_THREAD_SEND_RGB565;
 // 图传发送上限帧率，0 表示不限速。
 static constexpr uint32 kVisionSendMaxFps = 60;
 // 采图模式：检测到红色矩形后，每 1s 保存一次推理 ROI 彩图，共 20 张。

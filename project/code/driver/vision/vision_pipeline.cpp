@@ -79,9 +79,11 @@ static inline int scale_full_height(int ref_px)
     return std::max(1, (ref_px * kFullHeight + kRefFullHeight / 2) / kRefFullHeight);
 }
 
-static constexpr int kInferRoiSizeFullRef = 64;
-static constexpr int kInferBottomOffsetFullRef = 5;
-static constexpr int kInferMinIntervalMs = 80;
+// 以处理分辨率(160x120)为基准的推理ROI边长。
+// 设为40表示：在160x120图上，ROI画框/识别窗口为40x40。
+static constexpr int kInferRoiSizeProcRef = 40;
+static constexpr int kInferBottomOffsetFullRef = 10;
+static constexpr int kInferMinIntervalMs = 200;
 static constexpr int kInferMaxStaleMs = 280;
 static constexpr int kInferCenterMovePxRef = 4;
 static constexpr int kInferAreaChangePercent = 20;
@@ -170,8 +172,11 @@ static inline int map_full_to_proc_y(int y_full)
 
 static cv::Rect build_ncnn_full_roi_from_red_rect_proc(int cx_proc, int red_y_proc, int red_h_proc)
 {
-    const int roi_w = std::min(scale_full_width(kInferRoiSizeFullRef), kFullWidth);
-    const int roi_h = std::min(scale_full_height(kInferRoiSizeFullRef), kFullHeight);
+    // 先在处理分辨率坐标系里确定40x40，再映射到full图。
+    const int roi_w_proc = std::min(scale_by_width(kInferRoiSizeProcRef), kProcWidth);
+    const int roi_h_proc = std::min(scale_by_height(kInferRoiSizeProcRef), kProcHeight);
+    const int roi_w = std::max(1, std::min((roi_w_proc * kFullWidth + kProcWidth / 2) / kProcWidth, kFullWidth));
+    const int roi_h = std::max(1, std::min((roi_h_proc * kFullHeight + kProcHeight / 2) / kProcHeight, kFullHeight));
     const int cx_full = map_proc_to_full_x(cx_proc);
     const int red_top_full = map_proc_to_full_y(red_y_proc);
     const int red_h_full = std::max(1, (red_h_proc * kFullHeight + kProcHeight / 2) / kProcHeight);
@@ -521,17 +526,26 @@ static void red_ncnn_worker_loop()
                 const bool area_changed = (area_diff * 100) >= (safe_prev_area * kInferAreaChangePercent);
 
                 bool should_infer = false;
-                if (!last_infer_valid || !last_detect_found)
+                if (!last_infer_valid)
                 {
+                    // 首次识别立即触发。
                     should_infer = true;
                 }
-                else if (center_changed || area_changed)
+                else if (elapsed_ms >= kInferMinIntervalMs)
                 {
-                    should_infer = true; // 变化明显，提前触发
-                }
-                else if (elapsed_ms >= kInferMaxStaleMs && elapsed_ms >= kInferMinIntervalMs)
-                {
-                    should_infer = true; // 长时间未刷新，强制推理
+                    // 严格限频：没达到最小间隔，无论目标变化多大都不推理。
+                    if (!last_detect_found)
+                    {
+                        should_infer = true;
+                    }
+                    else if (center_changed || area_changed)
+                    {
+                        should_infer = true;
+                    }
+                    else if (elapsed_ms >= kInferMaxStaleMs)
+                    {
+                        should_infer = true; // 长时间未刷新，强制推理
+                    }
                 }
 
                 if (should_infer)
