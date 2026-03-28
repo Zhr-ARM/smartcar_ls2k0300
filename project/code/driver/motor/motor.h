@@ -2,7 +2,6 @@
 #define __MOTOR_H__
 
 #include "zf_common_headfile.h"
-#include <chrono>
 
 #define MOTOR1_DIR "/dev/zf_driver_gpio_motor_1"
 #define MOTOR1_PWM "/dev/zf_device_pwm_motor_1"
@@ -12,10 +11,10 @@
 #define ENCODER_1 "/dev/zf_encoder_1"
 #define ENCODER_2 "/dev/zf_encoder_2"
 
-#define LEFT_MOTOR_DIR MOTOR2_DIR
-#define LEFT_MOTOR_PWM MOTOR2_PWM
-#define RIGHT_MOTOR_DIR MOTOR1_DIR
-#define RIGHT_MOTOR_PWM MOTOR1_PWM
+#define LEFT_MOTOR_DIR MOTOR1_DIR
+#define LEFT_MOTOR_PWM MOTOR1_PWM
+#define RIGHT_MOTOR_DIR MOTOR2_DIR
+#define RIGHT_MOTOR_PWM MOTOR2_PWM
 
 #define LEFT_ENCODER_PATH ENCODER_1
 #define RIGHT_ENCODER_PATH ENCODER_2
@@ -82,8 +81,8 @@ public:
 
 private:
     /**
-     * @brief 读取编码器原始累计值
-     * @return 编码器累计计数
+     * @brief 读取编码器当前输出值
+     * @return 方向编码器当前速度测量值
      */
     int32 read_encoder_raw() const;
 
@@ -112,11 +111,8 @@ private:
     const char *encoder_path_;
     int8 encoder_sign_;
     struct pwm_info pwm_info_;
-    int32 encoder_raw_last_;
     int32 encoder_5ms_count_;
     float current_duty_percent_;
-    float actual_dt_s_;
-    std::chrono::steady_clock::time_point last_update_time_;
 };
 
 /**

@@ -63,14 +63,14 @@ static inline float scale_by_width_f(float ref_px)
     return ref_px * static_cast<float>(kProcWidth) / static_cast<float>(kRefProcWidth);
 }
 
-static constexpr int MAZE_LOWER_REGION_PERCENT = 60;
+static constexpr int MAZE_LOWER_REGION_PERCENT = 100;
 // 临时性能开关：
 // true  : 按需OTSU（迷宫法按灰度+阈值即取即判，不依赖全图二值图）
 // false : 传统全图OTSU二值化后再迷宫法
 static constexpr bool kTempDemandOtsuEnable = true;
 // 按需OTSU时，是否仍然额外生成完整二值图缓存（给二值图发送/调试用）。
 // 关闭后性能更好，但 binary 图像接口会返回全黑图。
-static constexpr bool kTempDemandOtsuKeepFullBinaryCache = false;
+static constexpr bool kTempDemandOtsuKeepFullBinaryCache = true;
 // 后处理逆透视开关：先迷宫法，再将边线点做逆透视并渲染黑底白线图。
 static constexpr bool kEnableGrayPointerInversePerspective = true;
 // 逆透视输出域（用户反馈按 100x100 标定）。
@@ -181,8 +181,8 @@ static uint32 g_processed_seq = 0;
 
 // 对外暴露控制量
 int line_error = 0;
-int line_sample_ratio_num = 1;
-int line_sample_ratio_den = 2;
+int line_sample_ratio_num = 55;
+int line_sample_ratio_den = 100;
 
 struct maze_point_t
 {

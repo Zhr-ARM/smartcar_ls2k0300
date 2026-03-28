@@ -36,7 +36,7 @@
 
 int32 encoder_get_count(const char *path)
 {
-    int32 dat;
+    int32 dat = 0;
 
     file_read_dat(path, &dat);
 

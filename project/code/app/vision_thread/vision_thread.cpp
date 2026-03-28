@@ -34,9 +34,14 @@ constexpr uint32_t VISION_THREAD_SEND_MAX_FPS_UPPER = 240;
 
 static vision_thread_send_mode_enum vision_thread_sanitize_send_mode(vision_thread_send_mode_enum mode)
 {
-    // 仅保留两种显示模式：
-    // 1) 彩色纯图不画线（RGB565）
-    // 2) 灰度图画边线/中线（GRAY）
+    // 常用显示模式：
+    // 1) 二值图（BINARY）
+    // 2) 彩色纯图不画线（RGB565）
+    // 3) 灰度图画边线/中线（GRAY）
+    if (mode == VISION_THREAD_SEND_BINARY)
+    {
+        return VISION_THREAD_SEND_BINARY;
+    }
     if (mode == VISION_THREAD_SEND_RGB565 || mode == VISION_THREAD_SEND_IPM_RGB565)
     {
         return VISION_THREAD_SEND_RGB565;
@@ -77,27 +82,27 @@ static void vision_perf_print_and_reset(vision_perf_accum_t &acc, int64_t window
     const double inv_frames = 1.0 / static_cast<double>(acc.frame_count);
     const double fps = (static_cast<double>(acc.frame_count) * 1000000.0) / static_cast<double>(window_us);
 
-    printf("[VISION PERF] fps=%.1f loop=%.2fms proc=%.2fms(wait=%.2f pre=%.2f red=%.2f otsu=%.2f maze=%.2f) send=%.2fms\r\n",
-           fps,
-           (static_cast<double>(acc.loop_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.process_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.capture_wait_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.preprocess_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.red_detect_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.otsu_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.maze_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.send_us) * inv_frames) / 1000.0);
+    // printf("[VISION PERF] fps=%.1f loop=%.2fms proc=%.2fms(wait=%.2f pre=%.2f red=%.2f otsu=%.2f maze=%.2f) send=%.2fms\r\n",
+    //        fps,
+    //        (static_cast<double>(acc.loop_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.process_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.capture_wait_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.preprocess_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.red_detect_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.otsu_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.maze_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.send_us) * inv_frames) / 1000.0);
 
-    printf("[VISION MAZE] setup=%.3fms start=%.3fms traceL=%.3fms traceR=%.3fms post=%.3fms pts(L/R)=%.1f/%.1f ok(L/R)=%.1f%%/%.1f%%\r\n",
-           (static_cast<double>(acc.maze_setup_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.maze_start_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.maze_trace_left_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.maze_trace_right_us) * inv_frames) / 1000.0,
-           (static_cast<double>(acc.maze_post_us) * inv_frames) / 1000.0,
-           static_cast<double>(acc.maze_left_points) * inv_frames,
-           static_cast<double>(acc.maze_right_points) * inv_frames,
-           (static_cast<double>(acc.maze_left_ok_frames) * 100.0) * inv_frames,
-           (static_cast<double>(acc.maze_right_ok_frames) * 100.0) * inv_frames);
+    // printf("[VISION MAZE] setup=%.3fms start=%.3fms traceL=%.3fms traceR=%.3fms post=%.3fms pts(L/R)=%.1f/%.1f ok(L/R)=%.1f%%/%.1f%%\r\n",
+    //        (static_cast<double>(acc.maze_setup_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.maze_start_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.maze_trace_left_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.maze_trace_right_us) * inv_frames) / 1000.0,
+    //        (static_cast<double>(acc.maze_post_us) * inv_frames) / 1000.0,
+    //        static_cast<double>(acc.maze_left_points) * inv_frames,
+    //        static_cast<double>(acc.maze_right_points) * inv_frames,
+    //        (static_cast<double>(acc.maze_left_ok_frames) * 100.0) * inv_frames,
+    //        (static_cast<double>(acc.maze_right_ok_frames) * 100.0) * inv_frames);
 
     acc = vision_perf_accum_t{};
 }
@@ -163,6 +168,19 @@ void vision_send_camera_by_seekfree_assistant()
             break;
         }
         case VISION_THREAD_SEND_BINARY:
+        {
+            const uint8 *binary = vision_image_processor_binary_downsampled_u8_image();
+            if (binary == nullptr)
+            {
+                return;
+            }
+            seekfree_assistant_camera_information_config(
+                SEEKFREE_ASSISTANT_GRAY,
+                const_cast<uint8 *>(binary),
+                VISION_DOWNSAMPLED_WIDTH,
+                VISION_DOWNSAMPLED_HEIGHT);
+            break;
+        }
         case VISION_THREAD_SEND_IPM_EDGE_GRAY:
         case VISION_THREAD_SEND_RGB565_OVERLAY:
         case VISION_THREAD_SEND_GRAY:

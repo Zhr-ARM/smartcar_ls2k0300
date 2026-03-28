@@ -1,10 +1,4 @@
 #include "motor.h"
-#include <chrono>
-
-namespace
-{
-constexpr float kControlPeriodS = 0.005f;
-}
 
 /**
  * @brief 构造单路电机对象
@@ -18,11 +12,8 @@ Motor::Motor(const char *dir_path, const char *pwm_path, const char *encoder_pat
       pwm_path_(pwm_path),
       encoder_path_(encoder_path),
       encoder_sign_(encoder_sign),
-      encoder_raw_last_(0),
       encoder_5ms_count_(0),
-      current_duty_percent_(0),
-      actual_dt_s_(0.005f),
-      last_update_time_(std::chrono::steady_clock::now())
+      current_duty_percent_(0)
 {
     memset(&pwm_info_, 0, sizeof(pwm_info_));
 }
@@ -33,10 +24,7 @@ Motor::Motor(const char *dir_path, const char *pwm_path, const char *encoder_pat
 void Motor::init()
 {
     pwm_get_dev_info(pwm_path_, &pwm_info_);
-    encoder_raw_last_ = read_encoder_raw();
     encoder_5ms_count_ = 0;
-    actual_dt_s_ = kControlPeriodS;
-    last_update_time_ = std::chrono::steady_clock::now();
     stop();
 }
 
@@ -45,38 +33,9 @@ void Motor::init()
  */
 void Motor::update_encoder(uint32 elapsed_periods)
 {
-    auto now = std::chrono::steady_clock::now();
-    float measured_dt_s = std::chrono::duration<float>(now - last_update_time_).count();
-    last_update_time_ = now;
-
-    if (0 == elapsed_periods)
-    {
-        elapsed_periods = 1;
-    }
-
-    // 以 timerfd 到期次数作为主参考，再用实际时间做小幅修正，降低调度抖动造成的速度估计毛刺。
-    float expected_dt_s = kControlPeriodS * (float)elapsed_periods;
-    if (measured_dt_s <= 0.000001f)
-    {
-        measured_dt_s = expected_dt_s;
-    }
-
-    float min_dt_s = expected_dt_s * 0.70f;
-    float max_dt_s = expected_dt_s * 1.35f;
-    if (measured_dt_s < min_dt_s)
-    {
-        measured_dt_s = min_dt_s;
-    }
-    else if (measured_dt_s > max_dt_s)
-    {
-        measured_dt_s = max_dt_s;
-    }
-
-    actual_dt_s_ = expected_dt_s * 0.75f + measured_dt_s * 0.25f;
-
-    int32 encoder_raw_now = read_encoder_raw();
-    encoder_5ms_count_ = encoder_raw_now - encoder_raw_last_;
-    encoder_raw_last_ = encoder_raw_now;
+    (void)elapsed_periods;
+    // 方向编码器驱动每次 read 返回的已经是当前测量值，不是累计计数。
+    encoder_5ms_count_ = read_encoder_raw();
 }
 
 /**
@@ -111,11 +70,7 @@ int32 Motor::get_encoder() const
  */
 float Motor::get_count_5ms() const
 {
-    if (actual_dt_s_ <= 0.000001f)
-    {
-        return 0.0f;
-    }
-    return (float)encoder_5ms_count_ * (kControlPeriodS / actual_dt_s_);
+    return (float)encoder_5ms_count_;
 }
 
 /**
@@ -128,8 +83,8 @@ float Motor::get_duty() const
 }
 
 /**
- * @brief 读取编码器原始累计值
- * @return 编码器累计计数
+ * @brief 读取编码器当前输出值
+ * @return 编码器当前速度测量值
  */
 int32 Motor::read_encoder_raw() const
 {

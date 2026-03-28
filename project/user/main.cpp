@@ -25,10 +25,11 @@ static constexpr uint32 kAssistantServerPort = 8888;
 #endif
 
 // 图传调试配置：集中在这里修改。
-// 可选模式（当前仅保留两种显示）：
+// 可选模式（常用）：
+// VISION_THREAD_SEND_BINARY : 二值图（黑白）
 // VISION_THREAD_SEND_RGB565 : 彩色纯图（不画线）
 // VISION_THREAD_SEND_GRAY   : 灰度图（画边线+中线）
-static constexpr vision_thread_send_mode_enum kVisionSendMode = VISION_THREAD_SEND_RGB565;
+static constexpr vision_thread_send_mode_enum kVisionSendMode = VISION_THREAD_SEND_GRAY;
 // 图传发送上限帧率，0 表示不限速。
 static constexpr uint32 kVisionSendMaxFps = 60;
 // 采图模式：检测到红色矩形后，每 1s 保存一次推理 ROI 彩图，共 20 张。
@@ -83,12 +84,6 @@ int main(int, char**)
     seekfree_assistant_interface_init(tcp_client_send_data, tcp_client_read_data);
 #endif
 
-    // 初始化各线程
-    // if (!motor_thread_init())
-    // {
-    //     cleanup();
-    //     return -1;
-    // }
 
     // if (!imu_thread_init())
     // {
@@ -109,12 +104,18 @@ int main(int, char**)
         return -1;
     }
 #endif
+     system_delay_ms(2000);
+    if (!line_follow_thread_init())
+    {
+        cleanup();
+        return -1;
+    }
 
-    // if (!line_follow_thread_init())
-    // {
-    //     cleanup();
-    //     return -1;
-    // }
+    if (!motor_thread_init())
+    {
+        cleanup();
+        return -1;
+    }
 
 #if defined(ENABLE_CAR_SCREEN_DISPLAY)
     if (!screen_display_thread_init())
@@ -142,34 +143,24 @@ int main(int, char**)
            vision_thread_roi_capture_mode_enabled() ? 1 : 0);
 #endif
 
-    // uart_thread_init();
+    uart_thread_init();
 
-    // line_follow_thread_set_base_speed(150.0f);
+    line_follow_thread_set_base_speed(300.0f);
     
     // 为motor_thread设置目标计数，单位 counts/5ms。
-    // 方便其他线程调用
-    //motor_thread_set_target_count(1000.0f, 1000.0f);
-    // brushless_driver.set_left_duty(0);
-    // brushless_driver.set_right_duty(0);
-    // system_delay_ms(50);
-    // motor_thread_print_info();
-    // imu_thread_print_info();
-    // line_follow_thread_print_info();
+    // 固定左右轮目标值为 800，便于速度环调参。
+    //motor_thread_set_target_count(600.0f, 600.0f);
+    brushless_driver.set_left_duty(0);
+    brushless_driver.set_right_duty(0);
+    system_delay_ms(50);
+    motor_thread_print_info();
+    //imu_thread_print_info();
+    line_follow_thread_print_info();
 
     while(!g_should_exit)
     {   
         battery_monitor.update();
-
-        // printf("\r\n");
-        // printf("roll=%.2f  pitch=%.2f  yaw=%.2f\r\n",
-        //        att.roll, att.pitch, att.yaw);
-        // printf("battery=%.2f V\r\n", battery_monitor.voltage_v());
-        // printf("target=%.1f count/5ms  left=%.1f count/5ms (duty=%d)  right=%.1f count/5ms (duty=%d)\r\n",
-        //        motor_thread_left_target_count(),
-        //        motor_thread_left_count(), motor_thread_left_duty(),
-        //        motor_thread_right_count(), motor_thread_right_duty());
-        // printf("\r\n");
-        system_delay_ms(100);
+        system_delay_ms(1000);
     }
 
     printf("收到Ctrl+C,程序即将退出\n");

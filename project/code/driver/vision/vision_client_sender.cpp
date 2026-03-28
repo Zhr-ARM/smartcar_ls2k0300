@@ -24,9 +24,14 @@ static std::atomic<uint32> g_send_max_fps(VISION_SEND_DEFAULT_MAX_FPS);
 
 static vision_send_mode_enum vision_sender_sanitize_mode(vision_send_mode_enum mode)
 {
-    // 仅保留两种显示模式：
-    // 1) 彩色纯图不画线（RGB565）
-    // 2) 灰度图画边线/中线（GRAY）
+    // 常用显示模式：
+    // 1) 二值图（BINARY）
+    // 2) 彩色纯图不画线（RGB565）
+    // 3) 灰度图画边线/中线（GRAY）
+    if (mode == VISION_SEND_BINARY)
+    {
+        return VISION_SEND_BINARY;
+    }
     if (mode == VISION_SEND_RGB565 || mode == VISION_SEND_IPM_RGB565)
     {
         return VISION_SEND_RGB565;
@@ -93,6 +98,11 @@ static void config_camera_send_packet(vision_send_mode_enum mode)
                                                          VISION_DOWNSAMPLED_HEIGHT);
             break;
         case VISION_SEND_BINARY:
+            seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_GRAY,
+                                                         const_cast<uint8 *>(vision_image_processor_binary_downsampled_u8_image()),
+                                                         VISION_DOWNSAMPLED_WIDTH,
+                                                         VISION_DOWNSAMPLED_HEIGHT);
+            break;
         case VISION_SEND_IPM_EDGE_GRAY:
         case VISION_SEND_RGB565_OVERLAY:
         case VISION_SEND_GRAY:

@@ -23,13 +23,13 @@ message("Parent parent folder name: ${PARENT_PARENT_FOLDER_NAME}")
 project(${PARENT_PARENT_FOLDER_NAME} VERSION 0.1.0 LANGUAGES C CXX)
 
 # 仅在开启该选项时编译逐飞助手网络传图逻辑
-option(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM "Enable Seekfree assistant camera streaming" ON)
+option(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM "Enable Seekfree assistant camera streaming" OFF)
 if(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM)
     add_compile_definitions(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM=1)
 endif()
 
 # 仅在开启该选项时编译和启用车载屏显线程
-option(ENABLE_CAR_SCREEN_DISPLAY "Enable on-board screen display thread" OFF)
+option(ENABLE_CAR_SCREEN_DISPLAY "Enable on-board screen display thread" ON)
 if(ENABLE_CAR_SCREEN_DISPLAY)
     add_compile_definitions(ENABLE_CAR_SCREEN_DISPLAY=1)
 endif()
@@ -40,7 +40,7 @@ if(NOT ENABLE_CAR_SCREEN_DISPLAY)
 endif()
 
 # E99视觉栈开关：开启时尝试启用ncnn相关模块（pipeline/client_sender/ncnn）。
-option(ENABLE_E99_VISION_STACK "Enable E99 vision full stack" ON)
+option(ENABLE_E99_VISION_STACK "Enable E99 vision full stack" OFF)
 
 set(E99_VISION_STACK_READY OFF)
 if(ENABLE_E99_VISION_STACK)

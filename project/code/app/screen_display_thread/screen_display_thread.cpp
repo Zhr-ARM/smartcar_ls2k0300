@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <vector>
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <thread>
@@ -20,9 +21,68 @@ namespace
 constexpr int32 SCREEN_REFRESH_PERIOD_MS = 50;
 constexpr int32 VISION_PROC_WIDTH = VISION_DOWNSAMPLED_WIDTH;
 constexpr int32 VISION_PROC_HEIGHT = VISION_DOWNSAMPLED_HEIGHT;
+constexpr int32 OVERLAY_LINE_THICKNESS_PX = 3;
 
 std::thread g_screen_display_thread;
 std::atomic<bool> g_screen_display_running(false);
+
+void draw_thick_overlay_line(int32 x_start,
+                             int32 y_start,
+                             int32 x_end,
+                             int32 y_end,
+                             uint16 color,
+                             int32 thickness)
+{
+    int32 max_x = VISION_PROC_WIDTH - 1;
+    int32 max_y = VISION_PROC_HEIGHT - 1;
+
+    int32 sx = std::clamp(x_start, 0, max_x);
+    int32 sy = std::clamp(y_start, 0, max_y);
+    int32 ex = std::clamp(x_end, 0, max_x);
+    int32 ey = std::clamp(y_end, 0, max_y);
+
+    if (thickness <= 1)
+    {
+        ips200_draw_line(static_cast<uint16>(sx),
+                         static_cast<uint16>(sy),
+                         static_cast<uint16>(ex),
+                         static_cast<uint16>(ey),
+                         color);
+        return;
+    }
+
+    const int32 half = thickness / 2;
+    const int32 dx = std::abs(ex - sx);
+    const int32 dy = std::abs(ey - sy);
+
+    // 近似法线方向加偏移，低成本实现边线加粗效果。
+    if (dx >= dy)
+    {
+        for (int32 offset = -half; offset <= half; ++offset)
+        {
+            int32 sy_off = std::clamp(sy + offset, 0, max_y);
+            int32 ey_off = std::clamp(ey + offset, 0, max_y);
+            ips200_draw_line(static_cast<uint16>(sx),
+                             static_cast<uint16>(sy_off),
+                             static_cast<uint16>(ex),
+                             static_cast<uint16>(ey_off),
+                             color);
+        }
+    }
+    else
+    {
+        for (int32 offset = -half; offset <= half; ++offset)
+        {
+            int32 sx_off = std::clamp(sx + offset, 0, max_x);
+            int32 ex_off = std::clamp(ex + offset, 0, max_x);
+            ips200_draw_line(static_cast<uint16>(sx_off),
+                             static_cast<uint16>(sy),
+                             static_cast<uint16>(ex_off),
+                             static_cast<uint16>(ey),
+                             color);
+        }
+    }
+}
 
 /**
  * @brief 车载屏幕显示线程主循环
@@ -86,21 +146,21 @@ void screen_display_loop()
         uint16 dot_num = 0;
         vision_image_processor_get_boundaries(&x1, &x2, &x3, &y1, &y2, &y3, &dot_num);
 
-        // 竖直中心线
-        ips200_draw_line(static_cast<uint16>(x_center),
-                         0,
-                         static_cast<uint16>(x_center),
-                         static_cast<uint16>(VISION_PROC_HEIGHT - 1),
-                         RGB565_GREEN);
+        // // 竖直中心线
+        // ips200_draw_line(static_cast<uint16>(x_center),
+        //                  0,
+        //                  static_cast<uint16>(x_center),
+        //                  static_cast<uint16>(VISION_PROC_HEIGHT - 1),
+        //                  RGB565_GREEN);
 
         // 左右边界和左右均值中线（不画横向虚线）
         if (dot_num > 1 && x1 && y1 && x2 && y2 && x3 && y3)
         {
             for (uint16 i = 1; i < dot_num; ++i)
             {
-                ips200_draw_line(x1[i - 1], y1[i - 1], x1[i], y1[i], RGB565_RED);
-                ips200_draw_line(x2[i - 1], y2[i - 1], x2[i], y2[i], RGB565_YELLOW);
-                ips200_draw_line(x3[i - 1], y3[i - 1], x3[i], y3[i], RGB565_BLUE);
+                draw_thick_overlay_line(x1[i - 1], y1[i - 1], x1[i], y1[i], RGB565_RED, OVERLAY_LINE_THICKNESS_PX);
+                draw_thick_overlay_line(x2[i - 1], y2[i - 1], x2[i], y2[i], RGB565_YELLOW, OVERLAY_LINE_THICKNESS_PX);
+                draw_thick_overlay_line(x3[i - 1], y3[i - 1], x3[i], y3[i], RGB565_BLUE, OVERLAY_LINE_THICKNESS_PX);
             }
         }
 
