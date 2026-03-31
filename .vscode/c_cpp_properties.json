@@ -2,7 +2,9 @@
     "configurations": [
         {
             "name": "LoongArch",
-            "compileCommands": "${workspaceFolder}/project/out/compile_commands.json",
+            "compileCommands": [
+                "${workspaceFolder}/project/out/compile_commands.json"
+            ],
             "includePath": [
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/project/code/**",
@@ -19,7 +21,8 @@
                 "/opt/ls_2k0300_env/opencv_4_10_build/include/opencv4",
                 "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include",
                 "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0",
-                "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include"
+                "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include",
+                "${workspaceFolder}/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include"
             ],
             "defines": [],
             "compilerPath": "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++",

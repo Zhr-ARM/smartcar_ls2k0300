@@ -27,22 +27,27 @@ static constexpr uint32 kVisionSendMaxFps = 60;
 static constexpr bool kVisionInferEnabled = false;
 // 客户端发送开关：控制逐飞助手发送链路是否启用。
 static constexpr bool kVisionClientSenderEnabled = false;
+/*********************************** */
 // 车载屏显示开关：true 时启动 screen_display_thread。
 static constexpr bool kVisionScreenDisplayEnabled = false;
+/*********************************** */
 // UDP 网页图传开关：控制是否向电脑端发送视频帧。
-static constexpr bool kVisionUdpWebEnabled = false;
+static constexpr bool kVisionUdpWebEnabled = true;
+/*********************************** */
 // UDP 网页图传最大发送帧率，0 表示不限速。
 static constexpr uint32 kVisionUdpWebMaxFps = 30;
+/************************************* */
 // TCP 状态上报开关：控制是否向电脑端发送 JSON 状态数据。
-static constexpr bool kVisionUdpWebTcpEnabled = false;
+static constexpr bool kVisionUdpWebTcpEnabled = true;
+/************************************* */
 // 电脑端接收服务 IP（运行 vision_pc_receiver.py 的主机地址）。
-static constexpr const char *kVisionUdpWebServerIp = "172.21.79.179";
+static constexpr const char *kVisionUdpWebServerIp = "10.205.225.102";
 // 电脑端 UDP 视频端口（需与 PC 接收端 --udp-port 一致）。
 static constexpr uint16 kVisionUdpWebVideoPort = 10000;
 // 电脑端 TCP 状态端口（需与 PC 接收端 --tcp-port 一致）。
 static constexpr uint16 kVisionUdpWebMetaPort = 10001;
 // 逐飞客户端 UDP 通道开关（与网页端 UDP/TCP 独立）。
-static constexpr bool kVisionAssistantUdpEnabled = true;
+static constexpr bool kVisionAssistantUdpEnabled = false;
 // 逐飞客户端接收端 IP（可与 kVisionUdpWebServerIp 不同）。
 static constexpr const char *kVisionAssistantServerIp = "172.21.79.129";
 // 逐飞客户端接收端端口（逐飞工具监听端口）。
@@ -222,7 +227,7 @@ int main(int, char**)
     uart_thread_init();
 
     // 巡线基础速度配置（控制线程会在此基础上叠加转向差速）。
-    line_follow_thread_set_base_speed(50.0f);
+    line_follow_thread_set_base_speed(300.0f);
     
     // 为motor_thread设置目标计数，单位 counts/5ms。
     // 固定左右轮目标值为 800，便于速度环调参。

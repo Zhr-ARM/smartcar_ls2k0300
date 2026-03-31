@@ -54,34 +54,34 @@ inline constexpr float kDecelDutyLimit = 14.0f;
 // 反馈平均窗口：越大越稳，越小越灵；当前用于速度反馈平滑。
 inline constexpr int32 kFeedbackAverageWindow = 2;
 // 反馈低通系数：越大越信任新值、响应更快；越小越平滑、但滞后更明显。
-inline constexpr float kFeedbackLowPassAlpha = 0.65f;
+inline constexpr float kFeedbackLowPassAlpha = 0.80f;
 } // namespace motor_speed
 
 namespace line_follow
 {
 // 视觉误差低通系数：越大越跟当前帧，越小越重视历史趋势。
-inline constexpr float kErrorFilterAlpha = 0.62f;
+inline constexpr float kErrorFilterAlpha = 0.80f;
 
 // 巡线位置环比例项：横向误差一出现就打方向，越大回正越快。
-inline constexpr float kPidKp = 150.0f;
+inline constexpr float kPidKp = 2250.0f;
 // 巡线位置环积分项：用于消除长期偏差，当前默认关闭。
 inline constexpr float kPidKi = 0.0f;
 // 巡线位置环微分项：抑制误差变化过快，缓和转向过冲。
-inline constexpr float kPidKd = 55.0f;
+inline constexpr float kPidKd = 1200.0f;
 // 巡线位置环输出限幅：限制最终差速大小，避免大舵过猛。
-inline constexpr float kPidMaxOutput = 180.0f;
+inline constexpr float kPidMaxOutput = 800.0f;
 
 // 左右轮目标最小值：允许轻微反转，方便大误差时快速拧回车头。
 inline constexpr float kTargetCountMin = -8.0f;
 // 左右轮目标最大值：限制巡线线程下发给速度环的目标上限。
-inline constexpr float kTargetCountMax = 800.0f;
+inline constexpr float kTargetCountMax = 1000.0f;
 
 // 大弯降速起点：误差超过这个像素后，开始按比例降低基础速度。
-inline constexpr float kTurnSlowdownStartPx = 8.0f;
+inline constexpr float kTurnSlowdownStartPx = 6.0f;
 // 大弯降速满量程点：误差超过这个像素后，降速比例达到上限。
 inline constexpr float kTurnSlowdownFullPx = 30.0f;
 // 大弯最低速度比例：基础速度最低会保留到这个比例，不会无限降。
-inline constexpr float kTurnMinSpeedScale = 0.52f;
+inline constexpr float kTurnMinSpeedScale = 0.30f;
 
 // 归一化误差保护限幅：防止视觉异常值把控制链一下子打爆。
 inline constexpr float kNormalizedErrorLimit = 1.2f;

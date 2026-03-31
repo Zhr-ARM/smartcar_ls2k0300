@@ -955,13 +955,17 @@ static int compute_line_error_from_ipm_shifted_centerline()
     g_ipm_line_error_source.store(use_right ? static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT)
                                             : static_cast<int>(VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT));
 
-    const int idx = std::clamp(g_ipm_line_error_point_index.load(), 0, count - 1);
-    const int x = static_cast<int>(xs[idx]);
-    const int y = static_cast<int>(ys[idx]);
+    const int idx4 = std::min(4, count - 1);
+    const bool has_idx8 = (count > 8);
+    const int idx8 = has_idx8 ? 8 : idx4;
+    const float x = has_idx8 ? (0.3f * static_cast<float>(xs[idx8]) + 0.7f * static_cast<float>(xs[idx4]))
+                             : static_cast<float>(xs[idx4]);
+    const float y = has_idx8 ? (0.3f * static_cast<float>(ys[idx8]) + 0.7f * static_cast<float>(ys[idx4]))
+                             : static_cast<float>(ys[idx4]);
     g_ipm_line_error_track_valid = true;
-    g_ipm_line_error_track_x = x;
-    g_ipm_line_error_track_y = y;
-    return x - 200;
+    g_ipm_line_error_track_x = static_cast<int>(std::lround(x));
+    g_ipm_line_error_track_y = static_cast<int>(std::lround(y));
+    return static_cast<int>(std::lround(x - 200.0f));
 }
 
 static int transform_boundary_points_to_ipm(const maze_point_t *src_pts, int src_num, maze_point_t *dst_pts, int max_pts)

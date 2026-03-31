@@ -1,7 +1,7 @@
 CMakeFiles/project.dir/main.cpp.o: \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/main.cpp \
+ /home/zhr/2k0300/test1/project/user/main.cpp \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/stdc-predef.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_common/zf_common_headfile.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_common/zf_common_headfile.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/stdio.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/libc-header-start.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/features.h \
@@ -33,8 +33,8 @@ CMakeFiles/project.dir/main.cpp.o: \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/types/locale_t.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/types/__locale_t.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/strings.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_common/zf_common_font.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_common/zf_common_typedef.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_common/zf_common_font.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_common/zf_common_typedef.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/sys/ioctl.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/ioctls.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/asm/ioctls.h \
@@ -126,15 +126,15 @@ CMakeFiles/project.dir/main.cpp.o: \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/stdlib-bsearch.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/stdlib-float.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/std_abs.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_common/zf_common_function.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_driver/zf_driver_delay.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_common/zf_common_typedef.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_driver/zf_driver_gpio.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_driver/zf_driver_file.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_driver/zf_driver_encoder.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_driver/zf_driver_pwm.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_driver/zf_driver_adc.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_driver/zf_driver_pit.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_common/zf_common_function.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_driver/zf_driver_delay.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_common/zf_common_typedef.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_driver/zf_driver_gpio.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_driver/zf_driver_file.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_driver/zf_driver_encoder.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_driver/zf_driver_pwm.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_driver/zf_driver_adc.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_driver/zf_driver_pit.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/functional \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/stl_function.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/move.h \
@@ -266,9 +266,9 @@ CMakeFiles/project.dir/main.cpp.o: \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/bits/atomic_lockfree_defines.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/backward/auto_ptr.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/atomic \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_driver/zf_driver_udp.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_driver/zf_driver_tcp_client.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_driver/zf_driver_pit_fd.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_driver/zf_driver_udp.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_driver/zf_driver_tcp_client.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_driver/zf_driver_pit_fd.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/iostream \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/ostream \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/ios \
@@ -299,24 +299,24 @@ CMakeFiles/project.dir/main.cpp.o: \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/asm-generic/unistd.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/syscall.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/inttypes.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_device/zf_device_ips200_fb.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_device/zf_device_uvc.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_device/zf_device_imu_core.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_device/zf_device_imu660ra.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_device/zf_device_imu660rb.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_device/zf_device_imu963ra.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_components/seekfree_assistant.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_components/seekfree_assistant_interface.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/battery/battery.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/uart_thread/uart_thread.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/motor_thread/motor_thread.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/imu_thread/imu_thread.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/imu660ra/imu660ra.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/line_follow_thread/line_follow_thread.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/vision_thread/vision_thread.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/screen_display_thread/screen_display_thread.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_assistant_udp.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_infer_async.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_device/zf_device_ips200_fb.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_device/zf_device_uvc.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_device/zf_device_imu_core.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_device/zf_device_imu660ra.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_device/zf_device_imu660rb.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_device/zf_device_imu963ra.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_components/seekfree_assistant.h \
+ /home/zhr/2k0300/test1/project/user/../../libraries/zf_components/seekfree_assistant_interface.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/battery/battery.h \
+ /home/zhr/2k0300/test1/project/user/../code/app/uart_thread/uart_thread.h \
+ /home/zhr/2k0300/test1/project/user/../code/app/motor_thread/motor_thread.h \
+ /home/zhr/2k0300/test1/project/user/../code/app/imu_thread/imu_thread.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/imu660ra/imu660ra.h \
+ /home/zhr/2k0300/test1/project/user/../code/app/line_follow_thread/line_follow_thread.h \
+ /home/zhr/2k0300/test1/project/user/../code/app/vision_thread/vision_thread.h \
+ /home/zhr/2k0300/test1/project/user/../code/app/screen_display_thread/screen_display_thread.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_assistant_udp.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_infer_async.h \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/cvdef.h \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/version.hpp \
@@ -392,12 +392,12 @@ CMakeFiles/project.dir/main.cpp.o: \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/optim.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/ovx.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/cvdef.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/net.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/blob.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/mat.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/allocator.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/platform.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/ncnn_export.h \
+ /home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/net.h \
+ /home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/blob.h \
+ /home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/mat.h \
+ /home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/allocator.h \
+ /home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/platform.h \
+ /home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/ncnn_export.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/sys/stat.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/statx.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/list \
@@ -413,11 +413,11 @@ CMakeFiles/project.dir/main.cpp.o: \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/fenv.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/fenv.h \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/bits/fenvinline.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/option.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/layer.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/modelbin.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/paramdict.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_transport.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_image_processor.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/brushless/brushless.h \
- /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/motor/motor.h
+ /home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/option.h \
+ /home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/layer.h \
+ /home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/modelbin.h \
+ /home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/include/ncnn/paramdict.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_transport.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_image_processor.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/brushless/brushless.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/motor/motor.h
