@@ -14,8 +14,8 @@ const TCP_PORT = Number(process.env.TCP_PORT || 10001);
 const HTTP_PORT = Number(process.env.HTTP_PORT || 8080);
 
 const latestByMode = {
-  0: { jpeg: null, frameId: -1 }, // binary
-  1: { jpeg: null, frameId: -1 }  // gray
+  0: { jpeg: null, frameId: -1, updatedAtMs: 0 }, // binary
+  1: { jpeg: null, frameId: -1, updatedAtMs: 0 }  // gray
 };
 let latestStatus = { message: 'waiting' };
 
@@ -41,6 +41,24 @@ function cleanupInflight() {
       inflightFrames.delete(frameId);
     }
   }
+}
+
+function isFrameNewer(prevFrameId, nextFrameId) {
+  // 按 uint32 序关系判断 next 是否比 prev 更新，兼容回绕。
+  const diff = ((nextFrameId >>> 0) - (prevFrameId >>> 0)) >>> 0;
+  return diff !== 0 && diff < 0x80000000;
+}
+
+function shouldAcceptFrame(mode, frameId, nowMs) {
+  const latest = latestByMode[mode];
+  if (!latest) return false;
+  if (latest.frameId < 0) return true;
+  if (isFrameNewer(latest.frameId, frameId)) return true;
+
+  // 主板重连/发送中断后，frameId 可能从 0 重新开始。
+  // 当该 mode 超过 1.5s 没有新图后，允许接纳“非更新序”帧作为新起点。
+  if ((nowMs - latest.updatedAtMs) > 1500) return true;
+  return false;
 }
 
 function onUdpMessage(msg) {
@@ -77,9 +95,11 @@ function onUdpMessage(msg) {
       ordered.push(chunk);
     }
     const jpeg = Buffer.concat(ordered);
-    if (latestByMode[hdr.mode] && hdr.frameId >= latestByMode[hdr.mode].frameId) {
-      latestByMode[hdr.mode].frameId = hdr.frameId;
+    const nowMs = Date.now();
+    if (shouldAcceptFrame(hdr.mode, hdr.frameId, nowMs)) {
+      latestByMode[hdr.mode].frameId = hdr.frameId >>> 0;
       latestByMode[hdr.mode].jpeg = jpeg;
+      latestByMode[hdr.mode].updatedAtMs = nowMs;
     }
     inflightFrames.delete(hdr.frameId);
   }

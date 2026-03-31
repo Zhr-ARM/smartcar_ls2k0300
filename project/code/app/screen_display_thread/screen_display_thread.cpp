@@ -136,9 +136,8 @@ void screen_display_loop()
 
         const float error_px = line_follow_thread_error();
         const int32 x_center = VISION_PROC_WIDTH / 2;
-        int32 den = (line_sample_ratio_den <= 0) ? 1 : line_sample_ratio_den;
-        int32 num = std::max<int32>(0, line_sample_ratio_num);
-        int32 sample_y = std::min<int32>(VISION_PROC_HEIGHT - 1, (VISION_PROC_HEIGHT * num) / den);
+        const float ratio = std::clamp(line_sample_ratio, 0.0f, 1.0f);
+        int32 sample_y = std::clamp<int32>(static_cast<int32>(VISION_PROC_HEIGHT * ratio), 0, VISION_PROC_HEIGHT - 1);
 
         // 获取并绘制视觉边界数据
         uint16 *x1 = nullptr, *x2 = nullptr, *x3 = nullptr;
@@ -181,7 +180,7 @@ void screen_display_loop()
         std::snprintf(buf, sizeof(buf), "Out:%+6.1f", line_follow_thread_turn_output());
         ips200_show_string(0, VISION_PROC_HEIGHT + 90, buf);
 
-        std::snprintf(buf, sizeof(buf), "SmpY:%3d(%d/%d)", sample_y, num, den);
+        std::snprintf(buf, sizeof(buf), "SmpY:%3d(%.2f)", sample_y, ratio);
         ips200_show_string(0, VISION_PROC_HEIGHT + 110, buf);
 
         system_delay_ms(SCREEN_REFRESH_PERIOD_MS);

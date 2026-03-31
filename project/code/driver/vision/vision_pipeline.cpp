@@ -8,11 +8,14 @@
 
 namespace
 {
+// 当前主链固定处理分辨率与 full 分辨率。
 static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
 static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
 static constexpr int kFullWidth = UVC_WIDTH;
 static constexpr int kFullHeight = UVC_HEIGHT;
 
+// 作用：清空 image_processor 内缓存的推理结果。
+// 调用关系：推理关闭、无结果、cleanup 时调用。
 static void clear_infer_result_in_image_processor()
 {
     vision_image_processor_set_last_red_detect_us(0);
@@ -20,6 +23,9 @@ static void clear_infer_result_in_image_processor()
     vision_image_processor_set_ncnn_roi(false, 0, 0, 0, 0);
 }
 
+// 作用：将异步推理结果写回 image_processor（供发送/状态展示复用）。
+// 参数：result 为最近一帧异步推理结果。
+// 如何修改：如需新增绘制元素，可在此处扩展叠加逻辑。
 static void apply_infer_result_to_image(vision_infer_async_result_t *result)
 {
     if (result == nullptr)
@@ -83,6 +89,7 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
 
 bool vision_pipeline_init(const char *camera_path, LQ_NCNN *ncnn, bool ncnn_enabled)
 {
+    // 初始化顺序：处理模块 -> 推理模块 -> 发送模块。
     if (!vision_image_processor_init(camera_path))
     {
         return false;
@@ -108,6 +115,7 @@ void vision_pipeline_cleanup()
 
 bool vision_pipeline_process_step()
 {
+    // 1) 固定先跑采图+巡线/逆透视。
     if (!vision_image_processor_process_step())
     {
         return false;
@@ -115,12 +123,14 @@ bool vision_pipeline_process_step()
 
     const uint8 *bgr_proc_data = vision_image_processor_bgr_image();
     const uint8 *bgr_full_data = vision_image_processor_bgr_full_image();
+    // 2) 推理关闭或图像无效时，清空推理相关状态但不影响巡线主链。
     if (!vision_infer_async_enabled() || bgr_proc_data == nullptr || bgr_full_data == nullptr)
     {
         clear_infer_result_in_image_processor();
         return true;
     }
 
+    // 3) 提交当前帧到异步推理线程（不会阻塞主线程）。
     vision_infer_async_submit_frame(bgr_proc_data,
                                     kProcWidth,
                                     kProcHeight,
@@ -128,6 +138,7 @@ bool vision_pipeline_process_step()
                                     kFullWidth,
                                     kFullHeight);
 
+    // 4) 取“最近完成”的异步结果并回填到可视化状态。
     vision_infer_async_result_t latest{};
     if (!vision_infer_async_fetch_latest(&latest))
     {

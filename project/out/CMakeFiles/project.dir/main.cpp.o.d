@@ -315,6 +315,7 @@ CMakeFiles/project.dir/main.cpp.o: \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/line_follow_thread/line_follow_thread.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/vision_thread/vision_thread.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/screen_display_thread/screen_display_thread.h \
+ /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_assistant_udp.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_infer_async.h \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/cvdef.h \

@@ -12,14 +12,17 @@
 #include <cstring>
 #include <limits>
 #include <mutex>
-#include <vector>
 
 // 当前视觉流程：
 // 1) 固定采集 160x120（与处理分辨率一致）；
-// 2) 采集与处理解耦为两个线程；
+// 2) 采集与处理解耦为两个线程（采图在 vision_frame_capture）；
 // 3) 使用全图 OTSU 阈值；
 // 4) 迷宫法提取左右边线；
 // 5) 输出原图边线/中线，并缓存逆透视后的边线与拟合中线。
+// 调用关系：
+// - 上层入口：vision_pipeline_process_step；
+// - 控制使用：line_follow_thread 读取 line_error；
+// - 发送使用：transport 读取图像/边线/状态。
 
 #define VISION_BOUNDARY_NUM (VISION_DOWNSAMPLED_HEIGHT * 2)
 static constexpr int kRefProcWidth = 160;
@@ -27,6 +30,70 @@ static constexpr int kRefProcHeight = 120;
 static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
 static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
 static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
+
+// ==================== Vision Config (集中配置区) ====================
+// 说明：
+// 1) 本区仅放“可调参数”；下方算法逻辑统一引用这些配置，避免散落硬编码。
+// 2) 如需调试视觉效果，优先只改这里。
+
+// 迷宫法单侧巡线最大输出点数（左/右各自上限）。
+// 调大：边线更长但耗时增加；调小：更快但边线可能不足。
+static constexpr int kCfgMazeTraceMaxPoints = 120;
+// 迷宫法允许追踪的纵向区域百分比（100=全高）。
+static constexpr int kCfgMazeLowerRegionPercent = 100;
+
+// OTSU 二值化策略：
+// true = 按需 OTSU（迷宫法直接用灰度+阈值判断）；
+// false = 先生成全图二值图再巡线。
+static constexpr bool kCfgDemandOtsuEnable = true;
+// 按需 OTSU 时是否保留完整二值图缓存（给发送/调试用）。
+static constexpr bool kCfgDemandOtsuKeepFullBinaryCache = true;
+
+// 是否启用“边线点逆透视 + IPM 边界输出”流程。
+static constexpr bool kCfgEnableInversePerspective = true;
+// 逆透视输出尺寸（坐标域）。
+static constexpr int kCfgIpmOutputWidth = VISION_IPM_WIDTH;
+static constexpr int kCfgIpmOutputHeight = VISION_IPM_HEIGHT;
+
+// 逆透视矩阵（用户标定参数）。
+static constexpr double kCfgChangeUnMat[3][3] = {{0.077734, -0.064964, -0.133337},
+                                                  {-0.003830, 0.006425, 2.751086},
+                                                  {-0.000113, -0.000825, 0.217794}};
+
+// 去畸变参数（用户标定参数）。
+// distCoeffs 顺序：[k1, k2, p1, p2, k3]
+static constexpr double kCfgCameraMatrix[3][3] = {
+    {88.352003, 0.000000, 76.039402},
+    {0.000000, 88.094982, 60.149306},
+    {0.000000, 0.000000, 1.000000}
+};
+static constexpr double kCfgDistCoeffs[5] = {0.301435, -0.683306, -0.001952, -0.019920, 0.420358};
+// 去畸变后平移补偿（像素）：正x右移，正y下移。
+static constexpr int kCfgUndistortMoveX = 2;
+static constexpr int kCfgUndistortMoveY = -2;
+
+// 运行时配置默认值（可被接口覆盖）。
+static constexpr int kCfgDefaultMazeStartRow = (kProcHeight - 2);
+static constexpr bool kCfgDefaultUndistortEnabled = true;
+static constexpr bool kCfgDefaultIpmTriangleFilterEnabled = true;
+static constexpr bool kCfgDefaultIpmMinPointDistFilterEnabled = true;
+static constexpr float kCfgDefaultIpmMinPointDistPx = 1.0f;
+static constexpr bool kCfgDefaultIpmResampleEnabled = true;
+static constexpr float kCfgDefaultIpmResampleStepPx = 1.0f;
+static constexpr float kCfgDefaultIpmBoundaryShiftDistancePx = 15.0f;
+static constexpr bool kCfgDefaultIpmCenterlinePostprocessEnabled = true;
+static constexpr bool kCfgDefaultIpmCenterlineTriangleFilterEnabled = true;
+static constexpr bool kCfgDefaultIpmCenterlineResampleEnabled = true;
+static constexpr float kCfgDefaultIpmCenterlineResampleStepPx = 1.0f;
+static constexpr float kCfgDefaultIpmCenterlineMinPointDistPx = 1.0f;
+static constexpr int kCfgDefaultIpmLineErrorPointIndex = 3;
+static constexpr vision_ipm_line_error_source_enum kCfgDefaultIpmLineErrorSource = VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT;
+static constexpr float kCfgDefaultLineSampleRatio = 0.55f;
+// 原图迷宫法巡线允许的水平区间（包含边界）。
+// 作用：屏蔽去畸变后左右黑边区域，默认仅在 [10, 150] 内找线和巡线。
+static constexpr int kCfgDefaultMazeTraceXMin = 10;
+static constexpr int kCfgDefaultMazeTraceXMax = 150;
+// ==================== End Vision Config ====================
 
 static inline int scale_by_width(int ref_px)
 {
@@ -56,53 +123,10 @@ static inline int scale_by_area(int ref_area_px)
     return std::max(1, static_cast<int>((scaled + kRefProcPixels / 2) / kRefProcPixels));
 }
 
-static inline float scale_by_width_f(float ref_px)
-{
-    return ref_px * static_cast<float>(kProcWidth) / static_cast<float>(kRefProcWidth);
-}
+static constexpr int kIpmOutputWidth = kCfgIpmOutputWidth;
+static constexpr int kIpmOutputHeight = kCfgIpmOutputHeight;
 
-static constexpr int MAZE_LOWER_REGION_PERCENT = 100;
-// 临时性能开关：
-// true  : 按需OTSU（迷宫法按灰度+阈值即取即判，不依赖全图二值图）
-// false : 传统全图OTSU二值化后再迷宫法
-static constexpr bool kTempDemandOtsuEnable = true;
-// 按需OTSU时，是否仍然额外生成完整二值图缓存（给二值图发送/调试用）。
-// 关闭后性能更好，但 binary 图像接口会返回全黑图。
-static constexpr bool kTempDemandOtsuKeepFullBinaryCache = true;
-// 后处理逆透视开关：先迷宫法，再将边线点做逆透视并渲染黑底白线图。
-static constexpr bool kEnableGrayPointerInversePerspective = true;
-// 逆透视输出域（用户反馈按 100x100 标定）。
-static constexpr int kIpmOutputWidth = 100;
-static constexpr int kIpmOutputHeight = 100;
-// 赛道参数：当前标定为 70px 对应 45cm。
-static constexpr float kLaneWidthCm = 45.0f;
-static constexpr float kLaneWidthPxRef = 70.0f;
-// 边线/中线等距采样步长：按 2cm 采样。
-static constexpr float kSampleStepCm = 2.0f;
-static inline float lane_width_px_scaled()
-{
-    return scale_by_width_f(kLaneWidthPxRef);
-}
-static inline float sample_step_px()
-{
-    return (kSampleStepCm * lane_width_px_scaled()) / kLaneWidthCm;
-}
-
-static inline float min_point_spacing_px()
-{
-    return std::max(0.5f, scale_by_width_f(0.5f));
-}
-// 逆透视矩阵（用户提供）。
-static constexpr double change_un_Mat[3][3] = {{-0.915703,0.894108,-46.429507},{0.018386,0.236110,-46.731327},{0.000361,0.011642,-1.231855}};
-// 畸变参数接口暂保留（当前流程未使用）。
-[[maybe_unused]] static constexpr double cameraMatrix[3][3] = {
-    {81.742134, 0.000000, 73.715838},
-    {0.000000, 81.615092, 56.550951},
-    {0.000000, 0.000000, 1.000000}
-};
-[[maybe_unused]] static constexpr double distCoeffs[5] = {0.191611, -0.146004, -0.010946, -0.008742, -0.030884};
-[[maybe_unused]] static constexpr int move_xy[2] = {0, 162};
-
+// 原图坐标系边线缓存：x1/x2/x3 对应 左/中/右边线，y1/y2/y3 为对应 y。
 static uint16 g_xy_x1_boundary[VISION_BOUNDARY_NUM];
 static uint16 g_xy_x2_boundary[VISION_BOUNDARY_NUM];
 static uint16 g_xy_x3_boundary[VISION_BOUNDARY_NUM];
@@ -111,6 +135,7 @@ static uint16 g_xy_y2_boundary[VISION_BOUNDARY_NUM];
 static uint16 g_xy_y3_boundary[VISION_BOUNDARY_NUM];
 static int g_boundary_count = 0;
 // 逆透视后边界数组（另存）
+// 逆透视坐标系边线缓存：供网页状态上报和调试显示使用。
 static uint16 g_ipm_xy_x1_boundary[VISION_BOUNDARY_NUM];
 static uint16 g_ipm_xy_x2_boundary[VISION_BOUNDARY_NUM];
 static uint16 g_ipm_xy_x3_boundary[VISION_BOUNDARY_NUM];
@@ -118,23 +143,45 @@ static uint16 g_ipm_xy_y1_boundary[VISION_BOUNDARY_NUM];
 static uint16 g_ipm_xy_y2_boundary[VISION_BOUNDARY_NUM];
 static uint16 g_ipm_xy_y3_boundary[VISION_BOUNDARY_NUM];
 static int g_ipm_boundary_count = 0;
+// 逆透视后“原始拷贝”边界数组（未三角滤波）。
+static uint16 g_ipm_raw_xy_x1_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_raw_xy_x2_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_raw_xy_x3_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_raw_xy_y1_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_raw_xy_y2_boundary[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_raw_xy_y3_boundary[VISION_BOUNDARY_NUM];
+static int g_ipm_raw_boundary_count = 0;
+// 逆透视处理链平移中线（左边界右移/右边界左移）。
+static uint16 g_ipm_shift_left_center_x[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_shift_left_center_y[VISION_BOUNDARY_NUM];
+static int g_ipm_shift_left_center_count = 0;
+static uint16 g_ipm_shift_right_center_x[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_shift_right_center_y[VISION_BOUNDARY_NUM];
+static int g_ipm_shift_right_center_count = 0;
 // 逆透视后拟合中线（另存）
 static uint16 g_ipm_center_fit_x[VISION_BOUNDARY_NUM];
 static uint16 g_ipm_center_fit_y[VISION_BOUNDARY_NUM];
 static int g_ipm_center_fit_count = 0;
 
+// 图像缓存：
+// - g_image_bgr_full: full 分辨率原图；
+// - g_image_bgr/g_image_gray/g_image_binary_u8/g_image_rgb565: 处理分辨率图像。
 static uint8 g_image_bgr_full[UVC_HEIGHT * UVC_WIDTH * 3];
 static uint8 g_image_bgr[kProcHeight * kProcWidth * 3];
 static uint8 g_image_gray[kProcHeight * kProcWidth];
 static uint8 g_image_binary_u8[kProcHeight * kProcWidth];
 static uint8 g_image_rgb565[kProcHeight * kProcWidth * 2];
-// 调试输出缓存：逆透视彩色图、逆透视边线图（黑底白线）。
-static uint8 g_image_ipm_bgr[kProcHeight * kProcWidth * 3];
-static uint8 g_image_ipm_edge_gray[kProcHeight * kProcWidth];
+// 调试输出缓存：逆透视彩色图。
+static uint8 g_image_ipm_bgr[kIpmOutputHeight * kIpmOutputWidth * 3];
+// 去畸变映射表：输出(去畸变后)像素 -> 输入(原始畸变图)像素。
+static cv::Mat g_undistort_map_x;
+static cv::Mat g_undistort_map_y;
+static bool g_undistort_ready = false;
 // 逆透视矩阵正向映射（原图->俯视）及初始化标志。
 static double g_ipm_forward_mat[3][3] = {{0.0}};
 static bool g_ipm_forward_ready = false;
 
+// 红框检测结果缓存（由 infer 模块写入，本模块/transport 读取）。
 static bool g_red_rect_found = false;
 static int g_red_rect_x = 0;
 static int g_red_rect_y = 0;
@@ -144,6 +191,7 @@ static int g_red_rect_cx = 0;
 static int g_red_rect_cy = 0;
 static int g_red_rect_area = 0;
 
+// ncnn ROI 缓存（由 infer 模块写入，发送/显示层读取）。
 static bool g_ncnn_roi_valid = false;
 static int g_ncnn_roi_x = 0;
 static int g_ncnn_roi_y = 0;
@@ -151,7 +199,7 @@ static int g_ncnn_roi_w = 0;
 static int g_ncnn_roi_h = 0;
 static std::mutex g_detect_result_mutex;
 
-// 最近一帧处理耗时（us）
+// 最近一帧处理耗时（us）：用于性能统计与 TCP 状态上报。
 static uint32 g_last_capture_wait_us = 0;
 static uint32 g_last_preprocess_us = 0;
 static uint32 g_last_red_detect_us = 0;
@@ -168,12 +216,36 @@ static uint16 g_last_maze_right_points = 0;
 static bool g_last_maze_left_ok = false;
 static bool g_last_maze_right_ok = false;
 
-static std::atomic<int> g_maze_start_row(kProcHeight - 2);
+// 迷宫法起始搜索行（可运行时配置）。
+static std::atomic<int> g_maze_start_row(kCfgDefaultMazeStartRow);
+static std::atomic<int> g_maze_trace_x_min(kCfgDefaultMazeTraceXMin);
+static std::atomic<int> g_maze_trace_x_max(kCfgDefaultMazeTraceXMax);
+// 去畸变开关（默认开启）。
+static std::atomic<bool> g_undistort_enabled(kCfgDefaultUndistortEnabled);
+// 逆透视边界三角滤波开关（默认开启）。
+static std::atomic<bool> g_ipm_triangle_filter_enabled(kCfgDefaultIpmTriangleFilterEnabled);
+// 逆透视边界近重复点过滤开关与阈值。
+static std::atomic<bool> g_ipm_min_point_dist_filter_enabled(kCfgDefaultIpmMinPointDistFilterEnabled);
+static std::atomic<float> g_ipm_min_point_dist_px(kCfgDefaultIpmMinPointDistPx);
+// 逆透视边界等距采样开关与参数（默认开启，步长1px）。
+static std::atomic<bool> g_ipm_resample_enabled(kCfgDefaultIpmResampleEnabled);
+static std::atomic<float> g_ipm_resample_step_px(kCfgDefaultIpmResampleStepPx);
+static std::atomic<float> g_ipm_boundary_shift_distance_px(kCfgDefaultIpmBoundaryShiftDistancePx);
+// 逆透视处理中线独立配置。
+static std::atomic<bool> g_ipm_centerline_postprocess_enabled(kCfgDefaultIpmCenterlinePostprocessEnabled);
+static std::atomic<bool> g_ipm_centerline_triangle_filter_enabled(kCfgDefaultIpmCenterlineTriangleFilterEnabled);
+static std::atomic<bool> g_ipm_centerline_resample_enabled(kCfgDefaultIpmCenterlineResampleEnabled);
+static std::atomic<float> g_ipm_centerline_resample_step_px(kCfgDefaultIpmCenterlineResampleStepPx);
+static std::atomic<float> g_ipm_centerline_min_point_dist_px(kCfgDefaultIpmCenterlineMinPointDistPx);
+static std::atomic<int> g_ipm_line_error_point_index(kCfgDefaultIpmLineErrorPointIndex);
+static std::atomic<int> g_ipm_line_error_source(static_cast<int>(kCfgDefaultIpmLineErrorSource));
+static bool g_ipm_line_error_track_valid = false;
+static int g_ipm_line_error_track_x = 0;
+static int g_ipm_line_error_track_y = 0;
 
-// 对外暴露控制量
+// 对外暴露控制量（line_follow_thread 直接读取）。
 int line_error = 0;
-int line_sample_ratio_num = 55;
-int line_sample_ratio_den = 100;
+float line_sample_ratio = kCfgDefaultLineSampleRatio;
 
 struct maze_point_t
 {
@@ -185,8 +257,11 @@ static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
                                            int left_num,
                                            const maze_point_t *right_pts,
                                            int right_num);
+static void resample_boundary_points_equal_spacing_inplace(maze_point_t *pts, int *num, int width, int height, float step_px);
+static bool init_undistort_remap_table();
 static bool init_ipm_forward_matrix();
-static int compute_line_error_from_boundary_midline();
+static int compute_line_error_from_ipm_shifted_centerline();
+static void get_maze_trace_x_range_clamped(int *x_min, int *x_max);
 
 /* 前进方向定义：
  *   0
@@ -212,8 +287,24 @@ static constexpr int kDirFrontRight[4][2] = {
     {-1, -1}
 };
 
+static void get_maze_trace_x_range_clamped(int *x_min, int *x_max)
+{
+    const int min_limit = 1;
+    const int max_limit = kProcWidth - 2;
+    int left = std::clamp(g_maze_trace_x_min.load(), min_limit, max_limit);
+    int right = std::clamp(g_maze_trace_x_max.load(), min_limit, max_limit);
+    if (left > right)
+    {
+        std::swap(left, right);
+    }
+
+    if (x_min) *x_min = left;
+    if (x_max) *x_max = right;
+}
+
 static void clear_boundary_arrays()
 {
+    // 作用：清空原图边线缓存，避免上帧残留。
     std::fill_n(g_xy_x1_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_xy_x2_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_xy_x3_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
@@ -225,15 +316,29 @@ static void clear_boundary_arrays()
 
 static void clear_ipm_saved_arrays()
 {
+    // 作用：清空逆透视边线和拟合中线缓存。
     std::fill_n(g_ipm_xy_x1_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_xy_x2_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_xy_x3_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_xy_y1_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_xy_y2_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_xy_y3_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_raw_xy_x1_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_raw_xy_x2_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_raw_xy_x3_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_raw_xy_y1_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_raw_xy_y2_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_raw_xy_y3_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_shift_left_center_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_shift_left_center_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_shift_right_center_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_shift_right_center_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_center_fit_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_center_fit_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     g_ipm_boundary_count = 0;
+    g_ipm_raw_boundary_count = 0;
+    g_ipm_shift_left_center_count = 0;
+    g_ipm_shift_right_center_count = 0;
     g_ipm_center_fit_count = 0;
 }
 
@@ -314,6 +419,61 @@ static void build_binary_image_from_gray_threshold(const uint8 *gray_img, uint8 
     {
         g_image_binary_u8[i] = (gray_img[i] > threshold) ? static_cast<uint8>(255) : static_cast<uint8>(0);
     }
+}
+
+static bool init_undistort_remap_table()
+{
+    if (g_undistort_ready)
+    {
+        return true;
+    }
+
+    g_undistort_map_x = cv::Mat(kProcHeight, kProcWidth, CV_32FC1);
+    g_undistort_map_y = cv::Mat(kProcHeight, kProcWidth, CV_32FC1);
+
+    const double fx = kCfgCameraMatrix[0][0];
+    const double fy = kCfgCameraMatrix[1][1];
+    const double ux = kCfgCameraMatrix[0][2];
+    const double uy = kCfgCameraMatrix[1][2];
+    if (std::fabs(fx) < 1e-9 || std::fabs(fy) < 1e-9)
+    {
+        g_undistort_ready = false;
+        return false;
+    }
+
+    const double k1 = kCfgDistCoeffs[0];
+    const double k2 = kCfgDistCoeffs[1];
+    const double p1 = kCfgDistCoeffs[2];
+    const double p2 = kCfgDistCoeffs[3];
+    const double k3 = kCfgDistCoeffs[4];
+    const int move_x = kCfgUndistortMoveX;
+    const int move_y = kCfgUndistortMoveY;
+
+    for (int y = 0; y < kProcHeight; ++y)
+    {
+        float *row_x = g_undistort_map_x.ptr<float>(y);
+        float *row_y = g_undistort_map_y.ptr<float>(y);
+        for (int x = 0; x < kProcWidth; ++x)
+        {
+            const double xu = static_cast<double>(x - move_x);
+            const double yu = static_cast<double>(y - move_y);
+
+            const double x_corrected = (xu - ux) / fx;
+            const double y_corrected = (yu - uy) / fy;
+            const double r2 = x_corrected * x_corrected + y_corrected * y_corrected;
+            const double radial = 1.0 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2;
+            const double delta_tx = 2.0 * p1 * x_corrected * y_corrected + p2 * (r2 + 2.0 * x_corrected * x_corrected);
+            const double delta_ty = p1 * (r2 + 2.0 * y_corrected * y_corrected) + 2.0 * p2 * x_corrected * y_corrected;
+
+            const double x_distorted = (x_corrected * radial + delta_tx) * fx + ux;
+            const double y_distorted = (y_corrected * radial + delta_ty) * fy + uy;
+            row_x[x] = static_cast<float>(x_distorted);
+            row_y[x] = static_cast<float>(y_distorted);
+        }
+    }
+
+    g_undistort_ready = true;
+    return true;
 }
 
 [[maybe_unused]] static cv::Rect build_red_search_roi_from_midline()
@@ -489,7 +649,7 @@ static void build_binary_image_from_gray_threshold(const uint8 *gray_img, uint8 
 
 static bool init_ipm_forward_matrix()
 {
-    cv::Mat h_inv(3, 3, CV_64F, const_cast<double *>(&change_un_Mat[0][0]));
+    cv::Mat h_inv(3, 3, CV_64F, const_cast<double *>(&kCfgChangeUnMat[0][0]));
     cv::Mat h(3, 3, CV_64F);
     const double det = cv::invert(h_inv, h, cv::DECOMP_LU);
     if (std::fabs(det) < 1e-12)
@@ -549,231 +709,24 @@ static bool src_point_to_ipm_point(int src_x, int src_y, int *ipm_x, int *ipm_y)
     return true;
 }
 
-static inline void ipm_to_proc_point(int ipm_x, int ipm_y, int *proc_x, int *proc_y)
+static inline uint16 clamp_u16_to_range(int v, int max_inclusive)
 {
-    const int denom_x = std::max(1, kIpmOutputWidth - 1);
-    const int denom_y = std::max(1, kIpmOutputHeight - 1);
-    *proc_x = std::clamp((ipm_x * (kProcWidth - 1)) / denom_x, 0, kProcWidth - 1);
-    *proc_y = std::clamp((ipm_y * (kProcHeight - 1)) / denom_y, 0, kProcHeight - 1);
+    return static_cast<uint16>(std::clamp(v, 0, std::max(0, max_inclusive)));
 }
 
-static void draw_line_gray(uint8 *img, int width, int height, int x0, int y0, int x1, int y1, uint8 value)
-{
-    if (img == nullptr || width <= 0 || height <= 0)
-    {
-        return;
-    }
-
-    int dx = std::abs(x1 - x0);
-    int dy = std::abs(y1 - y0);
-    int sx = (x0 < x1) ? 1 : -1;
-    int sy = (y0 < y1) ? 1 : -1;
-    int err = dx - dy;
-
-    while (true)
-    {
-        if (x0 >= 0 && x0 < width && y0 >= 0 && y0 < height)
-        {
-            img[y0 * width + x0] = value;
-        }
-        if (x0 == x1 && y0 == y1)
-        {
-            break;
-        }
-        int e2 = err * 2;
-        if (e2 > -dy)
-        {
-            err -= dy;
-            x0 += sx;
-        }
-        if (e2 < dx)
-        {
-            err += dx;
-            y0 += sy;
-        }
-    }
-}
-
-static std::vector<cv::Point2f> maze_points_to_polyline(const maze_point_t *pts, int num)
-{
-    std::vector<cv::Point2f> out;
-    if (pts == nullptr || num <= 0)
-    {
-        return out;
-    }
-
-    out.reserve(static_cast<size_t>(num));
-    for (int i = 0; i < num; ++i)
-    {
-        out.emplace_back(static_cast<float>(pts[i].x), static_cast<float>(pts[i].y));
-    }
-    return out;
-}
-
-static void clamp_polyline_to_image(std::vector<cv::Point2f> *pts)
-{
-    if (pts == nullptr)
-    {
-        return;
-    }
-
-    for (auto &p : *pts)
-    {
-        p.x = std::clamp(p.x, 0.0f, static_cast<float>(kProcWidth - 1));
-        p.y = std::clamp(p.y, 0.0f, static_cast<float>(kProcHeight - 1));
-    }
-}
-
-static void remove_near_duplicate_points(std::vector<cv::Point2f> *pts, float min_dist)
-{
-    if (pts == nullptr || pts->size() <= 1)
-    {
-        return;
-    }
-
-    const float min_dist_sq = min_dist * min_dist;
-    std::vector<cv::Point2f> filtered;
-    filtered.reserve(pts->size());
-    filtered.push_back((*pts)[0]);
-    for (size_t i = 1; i < pts->size(); ++i)
-    {
-        cv::Point2f d = (*pts)[i] - filtered.back();
-        if ((d.x * d.x + d.y * d.y) >= min_dist_sq)
-        {
-            filtered.push_back((*pts)[i]);
-        }
-    }
-    pts->swap(filtered);
-}
-
-static std::vector<cv::Point2f> triangle_filter_polyline(const std::vector<cv::Point2f> &pts)
-{
-    if (pts.size() < 3)
-    {
-        return pts;
-    }
-
-    std::vector<cv::Point2f> out = pts;
-    for (size_t i = 1; i + 1 < pts.size(); ++i)
-    {
-        out[i] = (pts[i - 1] + pts[i] * 2.0f + pts[i + 1]) * 0.25f;
-    }
-    return out;
-}
-
-static std::vector<cv::Point2f> resample_polyline_equal_spacing(const std::vector<cv::Point2f> &pts, float step)
-{
-    std::vector<cv::Point2f> out;
-    if (pts.empty())
-    {
-        return out;
-    }
-
-    if (pts.size() == 1 || step <= 0.01f)
-    {
-        return pts;
-    }
-
-    out.reserve(pts.size());
-    out.push_back(pts[0]);
-
-    float dist_acc = 0.0f;
-    for (size_t i = 1; i < pts.size(); ++i)
-    {
-        cv::Point2f a = pts[i - 1];
-        cv::Point2f b = pts[i];
-        cv::Point2f v = b - a;
-        float seg_len = std::sqrt(v.x * v.x + v.y * v.y);
-        if (seg_len < 1e-5f)
-        {
-            continue;
-        }
-
-        float used = 0.0f;
-        while ((dist_acc + (seg_len - used)) >= step)
-        {
-            float remain = step - dist_acc;
-            float t = (used + remain) / seg_len;
-            cv::Point2f p = a + v * t;
-            out.push_back(p);
-            used += remain;
-            dist_acc = 0.0f;
-        }
-
-        dist_acc += (seg_len - used);
-    }
-
-    if (cv::norm(out.back() - pts.back()) > (step * 0.5f))
-    {
-        out.push_back(pts.back());
-    }
-
-    return out;
-}
-
-static std::vector<cv::Point2f> preprocess_boundary_polyline(const maze_point_t *pts, int num)
-{
-    std::vector<cv::Point2f> line = maze_points_to_polyline(pts, num);
-    const float min_dist_px = min_point_spacing_px();
-    if (line.size() <= 1)
-    {
-        clamp_polyline_to_image(&line);
-        return line;
-    }
-
-    remove_near_duplicate_points(&line, min_dist_px);
-    line = triangle_filter_polyline(line);
-    line = resample_polyline_equal_spacing(line, sample_step_px());
-    line = triangle_filter_polyline(line);
-    clamp_polyline_to_image(&line);
-    remove_near_duplicate_points(&line, min_dist_px);
-    return line;
-}
-
-static std::vector<cv::Point2f> midpoint_centerline(const std::vector<cv::Point2f> &left_line,
-                                                    const std::vector<cv::Point2f> &right_line)
-{
-    std::vector<cv::Point2f> center;
-    if (left_line.empty() || right_line.empty())
-    {
-        return center;
-    }
-
-    const size_t out_n = std::max(left_line.size(), right_line.size());
-    center.reserve(out_n);
-    for (size_t i = 0; i < out_n; ++i)
-    {
-        const size_t li = (left_line.size() <= 1 || out_n <= 1) ? 0 : (i * (left_line.size() - 1)) / (out_n - 1);
-        const size_t ri = (right_line.size() <= 1 || out_n <= 1) ? 0 : (i * (right_line.size() - 1)) / (out_n - 1);
-        center.push_back((left_line[li] + right_line[ri]) * 0.5f);
-    }
-    clamp_polyline_to_image(&center);
-    remove_near_duplicate_points(&center, min_point_spacing_px());
-    return center;
-}
-
-static inline uint16 point_x_to_u16(const cv::Point2f &p)
-{
-    const int x = std::clamp(static_cast<int>(std::lround(p.x)), 0, kProcWidth - 1);
-    return static_cast<uint16>(x);
-}
-
-static inline uint16 point_y_to_u16(const cv::Point2f &p)
-{
-    const int y = std::clamp(static_cast<int>(std::lround(p.y)), 0, kProcHeight - 1);
-    return static_cast<uint16>(y);
-}
-
-static void fill_boundary_arrays_from_lines_to_target(const std::vector<cv::Point2f> &left_line,
-                                                      const std::vector<cv::Point2f> &center_line,
-                                                      const std::vector<cv::Point2f> &right_line,
-                                                      uint16 *x1,
-                                                      uint16 *x2,
-                                                      uint16 *x3,
-                                                      uint16 *y1,
-                                                      uint16 *y2,
-                                                      uint16 *y3,
-                                                      int *count)
+static void fill_boundary_arrays_from_points_to_target(const maze_point_t *left_pts,
+                                                       int left_num,
+                                                       const maze_point_t *right_pts,
+                                                       int right_num,
+                                                       uint16 *x1,
+                                                       uint16 *x2,
+                                                       uint16 *x3,
+                                                       uint16 *y1,
+                                                       uint16 *y2,
+                                                       uint16 *y3,
+                                                       int *count,
+                                                       int width,
+                                                       int height)
 {
     if (x1 == nullptr || x2 == nullptr || x3 == nullptr ||
         y1 == nullptr || y2 == nullptr || y3 == nullptr || count == nullptr)
@@ -789,140 +742,229 @@ static void fill_boundary_arrays_from_lines_to_target(const std::vector<cv::Poin
     std::fill_n(y3, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     *count = 0;
 
-    const int left_num = static_cast<int>(left_line.size());
-    const int center_num = static_cast<int>(center_line.size());
-    const int right_num = static_cast<int>(right_line.size());
-    if (left_num <= 0 && center_num <= 0 && right_num <= 0)
-    {
-        return;
-    }
-
-    int out_num = std::max({left_num, center_num, right_num});
-    out_num = std::clamp(out_num, 0, VISION_BOUNDARY_NUM);
+    const int out_num = std::clamp(std::max(left_num, right_num), 0, VISION_BOUNDARY_NUM);
     if (out_num <= 0)
     {
         return;
     }
 
+    const int max_x = width - 1;
+    const int max_y = height - 1;
     for (int i = 0; i < out_num; ++i)
     {
-        auto pick_point = [i, out_num](const std::vector<cv::Point2f> &line) -> cv::Point2f {
-            if (line.empty())
-            {
-                return cv::Point2f(0.0f, 0.0f);
-            }
-            if (line.size() == 1 || out_num <= 1)
-            {
-                return line[0];
-            }
-            size_t idx = (static_cast<size_t>(i) * (line.size() - 1)) / static_cast<size_t>(out_num - 1);
-            return line[idx];
-        };
+        const int li = (left_num > 0) ? std::min(i, left_num - 1) : 0;
+        const int ri = (right_num > 0) ? std::min(i, right_num - 1) : 0;
 
-        cv::Point2f lp = pick_point(left_line);
-        cv::Point2f rp = pick_point(right_line);
-        cv::Point2f cp = pick_point(center_line);
+        int lx = (left_num > 0) ? left_pts[li].x : ((right_num > 0) ? right_pts[ri].x : 0);
+        int ly = (left_num > 0) ? left_pts[li].y : ((right_num > 0) ? right_pts[ri].y : 0);
+        int rx = (right_num > 0) ? right_pts[ri].x : ((left_num > 0) ? left_pts[li].x : 0);
+        int ry = (right_num > 0) ? right_pts[ri].y : ((left_num > 0) ? left_pts[li].y : 0);
 
-        if (left_line.empty())
-        {
-            lp = right_line.empty() ? cp : rp;
-        }
-        if (right_line.empty())
-        {
-            rp = left_line.empty() ? cp : lp;
-        }
-        if (center_line.empty())
-        {
-            cp = (lp + rp) * 0.5f;
-        }
+        lx = std::clamp(lx, 0, max_x);
+        ly = std::clamp(ly, 0, max_y);
+        rx = std::clamp(rx, 0, max_x);
+        ry = std::clamp(ry, 0, max_y);
 
-        x1[i] = point_x_to_u16(lp);
-        y1[i] = point_y_to_u16(lp);
-        x2[i] = point_x_to_u16(cp);
-        y2[i] = point_y_to_u16(cp);
-        x3[i] = point_x_to_u16(rp);
-        y3[i] = point_y_to_u16(rp);
+        x1[i] = clamp_u16_to_range(lx, max_x);
+        y1[i] = clamp_u16_to_range(ly, max_y);
+        x3[i] = clamp_u16_to_range(rx, max_x);
+        y3[i] = clamp_u16_to_range(ry, max_y);
+        x2[i] = clamp_u16_to_range((lx + rx) / 2, max_x);
+        y2[i] = clamp_u16_to_range((ly + ry) / 2, max_y);
     }
-
     *count = out_num;
 }
 
-static void fill_ipm_fitted_centerline_array(const std::vector<cv::Point2f> &center_line)
+static void fill_single_line_arrays_from_points(const maze_point_t *pts,
+                                                int num,
+                                                uint16 *xs,
+                                                uint16 *ys,
+                                                int *count,
+                                                int width,
+                                                int height)
 {
-    std::fill_n(g_ipm_center_fit_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
-    std::fill_n(g_ipm_center_fit_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
-    g_ipm_center_fit_count = 0;
-    if (center_line.empty())
+    if (pts == nullptr || xs == nullptr || ys == nullptr || count == nullptr)
     {
         return;
     }
 
-    int out_num = std::clamp(static_cast<int>(center_line.size()), 0, VISION_BOUNDARY_NUM);
+    std::fill_n(xs, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(ys, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    *count = 0;
+
+    const int out_num = std::clamp(num, 0, VISION_BOUNDARY_NUM);
+    if (out_num <= 0)
+    {
+        return;
+    }
+
+    const int max_x = width - 1;
+    const int max_y = height - 1;
     for (int i = 0; i < out_num; ++i)
     {
-        const cv::Point2f &p = center_line[static_cast<size_t>(i)];
-        g_ipm_center_fit_x[i] = point_x_to_u16(p);
-        g_ipm_center_fit_y[i] = point_y_to_u16(p);
+        xs[i] = clamp_u16_to_range(pts[i].x, max_x);
+        ys[i] = clamp_u16_to_range(pts[i].y, max_y);
     }
-    g_ipm_center_fit_count = out_num;
+    *count = out_num;
 }
 
-static int compute_line_error_from_boundary_midline()
+static void shift_boundary_along_normal(const maze_point_t *src,
+                                        int src_num,
+                                        const maze_point_t *guide,
+                                        int guide_num,
+                                        maze_point_t *dst,
+                                        int *dst_num,
+                                        int width,
+                                        int height,
+                                        float shift_dist_px,
+                                        bool first_point_prefer_positive_x)
 {
-    if (g_boundary_count <= 0)
+    if (dst_num) *dst_num = 0;
+    if (src == nullptr || dst == nullptr || dst_num == nullptr || src_num <= 0 || width <= 0 || height <= 0)
+    {
+        return;
+    }
+
+    const int num = std::clamp(src_num, 0, VISION_BOUNDARY_NUM);
+    const float dist = std::max(0.0f, shift_dist_px);
+    const int max_x = width - 1;
+    const int max_y = height - 1;
+    float prev_nx = 0.0f;
+    float prev_ny = 0.0f;
+    bool has_prev_normal = false;
+
+    for (int i = 0; i < num; ++i)
+    {
+        const int prev_i = (i > 0) ? (i - 1) : i;
+        const int next_i = (i + 1 < num) ? (i + 1) : i;
+        const float tx = static_cast<float>(src[next_i].x - src[prev_i].x);
+        const float ty = static_cast<float>(src[next_i].y - src[prev_i].y);
+
+        // 两个候选法向：(-ty, tx) 和 (ty, -tx)。
+        float nx1 = -ty;
+        float ny1 = tx;
+        float nx2 = ty;
+        float ny2 = -tx;
+
+        // 动态方向约束：法向应朝向“对侧边界对应点”方向（非固定dx/dy符号）。
+        float gx = 0.0f;
+        float gy = 0.0f;
+        bool has_guide = false;
+        if (guide != nullptr && guide_num > 0)
+        {
+            const int gi = (guide_num <= 1 || num <= 1) ? 0 : (i * (guide_num - 1)) / (num - 1);
+            gx = static_cast<float>(guide[gi].x - src[i].x);
+            gy = static_cast<float>(guide[gi].y - src[i].y);
+            has_guide = (std::fabs(gx) + std::fabs(gy)) > 1e-6f;
+        }
+
+        float score1 = 0.0f;
+        float score2 = 0.0f;
+        if (i == 0)
+        {
+            // 首点方向固定规则：
+            // - left:  prefer_positive_x = true  -> 往右；
+            // - right: prefer_positive_x = false -> 往左。
+            score1 = first_point_prefer_positive_x ? nx1 : -nx1;
+            score2 = first_point_prefer_positive_x ? nx2 : -nx2;
+        }
+        else if (has_guide)
+        {
+            score1 = nx1 * gx + ny1 * gy;
+            score2 = nx2 * gx + ny2 * gy;
+        }
+        else if (has_prev_normal)
+        {
+            score1 = nx1 * prev_nx + ny1 * prev_ny;
+            score2 = nx2 * prev_nx + ny2 * prev_ny;
+        }
+        else
+        {
+            score1 = std::fabs(nx1) + std::fabs(ny1);
+            score2 = std::fabs(nx2) + std::fabs(ny2);
+        }
+
+        float nx = (score1 >= score2) ? nx1 : nx2;
+        float ny = (score1 >= score2) ? ny1 : ny2;
+        float nlen = std::sqrt(nx * nx + ny * ny);
+        if (nlen < 1e-6f)
+        {
+            if (has_prev_normal)
+            {
+                nx = prev_nx;
+                ny = prev_ny;
+                nlen = std::sqrt(nx * nx + ny * ny);
+            }
+            if (nlen < 1e-6f)
+            {
+                nx = 1.0f;
+                ny = 0.0f;
+                nlen = 1.0f;
+            }
+        }
+
+        // 连续性约束：与上一点法向保持同向，避免翻转跳变。
+        if (has_prev_normal)
+        {
+            const float dot = nx * prev_nx + ny * prev_ny;
+            if (dot < 0.0f)
+            {
+                nx = -nx;
+                ny = -ny;
+            }
+        }
+
+        const int x = std::clamp(static_cast<int>(std::lround(static_cast<float>(src[i].x) + dist * (nx / nlen))), 0, max_x);
+        const int y = std::clamp(static_cast<int>(std::lround(static_cast<float>(src[i].y) + dist * (ny / nlen))), 0, max_y);
+        dst[i] = {x, y};
+        prev_nx = nx / nlen;
+        prev_ny = ny / nlen;
+        has_prev_normal = true;
+    }
+    *dst_num = num;
+}
+
+static int compute_line_error_from_ipm_shifted_centerline()
+{
+    g_ipm_line_error_track_valid = false;
+    g_ipm_line_error_track_x = 0;
+    g_ipm_line_error_track_y = 0;
+
+    bool use_right = false;
+    const int left_count = g_ipm_shift_left_center_count;
+    const int right_count = g_ipm_shift_right_center_count;
+    if (right_count > left_count)
+    {
+        use_right = true;
+    }
+    else if (right_count == left_count && right_count > 0)
+    {
+        const int right_dx = static_cast<int>(g_ipm_shift_right_center_x[right_count - 1]) -
+                             static_cast<int>(g_ipm_shift_right_center_x[0]);
+        use_right = (right_dx > 0);
+    }
+
+    uint16 *xs = use_right ? g_ipm_shift_right_center_x : g_ipm_shift_left_center_x;
+    uint16 *ys = use_right ? g_ipm_shift_right_center_y : g_ipm_shift_left_center_y;
+    const int count = use_right ? g_ipm_shift_right_center_count : g_ipm_shift_left_center_count;
+    if (xs == nullptr || ys == nullptr || count <= 0)
     {
         return 0;
     }
 
-    const int den = std::max(1, line_sample_ratio_den);
-    const int num = std::clamp(line_sample_ratio_num, 0, den);
-    const int sample_y = ((kProcHeight - 1) * num) / den;
+    g_ipm_line_error_source.store(use_right ? static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT)
+                                            : static_cast<int>(VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT));
 
-    int best_idx = 0;
-    int best_dy = std::abs(static_cast<int>(g_xy_y2_boundary[0]) - sample_y);
-    for (int i = 1; i < g_boundary_count; ++i)
-    {
-        int dy = std::abs(static_cast<int>(g_xy_y2_boundary[i]) - sample_y);
-        if (dy < best_dy)
-        {
-            best_dy = dy;
-            best_idx = i;
-        }
-    }
-
-    return static_cast<int>(g_xy_x2_boundary[best_idx]) - (kProcWidth / 2);
+    const int idx = std::clamp(g_ipm_line_error_point_index.load(), 0, count - 1);
+    const int x = static_cast<int>(xs[idx]);
+    const int y = static_cast<int>(ys[idx]);
+    g_ipm_line_error_track_valid = true;
+    g_ipm_line_error_track_x = x;
+    g_ipm_line_error_track_y = y;
+    return x - 200;
 }
 
-static void draw_polyline_gray(uint8 *img,
-                               int width,
-                               int height,
-                               const std::vector<cv::Point2f> &line,
-                               uint8 value)
-{
-    if (img == nullptr || line.empty())
-    {
-        return;
-    }
-
-    if (line.size() == 1)
-    {
-        const int x = std::clamp(static_cast<int>(std::lround(line[0].x)), 0, width - 1);
-        const int y = std::clamp(static_cast<int>(std::lround(line[0].y)), 0, height - 1);
-        img[y * width + x] = value;
-        return;
-    }
-
-    for (size_t i = 1; i < line.size(); ++i)
-    {
-        const int x0 = static_cast<int>(std::lround(line[i - 1].x));
-        const int y0 = static_cast<int>(std::lround(line[i - 1].y));
-        const int x1 = static_cast<int>(std::lround(line[i].x));
-        const int y1 = static_cast<int>(std::lround(line[i].y));
-        draw_line_gray(img, width, height, x0, y0, x1, y1, value);
-    }
-}
-
-static int transform_boundary_points_to_proc(const maze_point_t *src_pts, int src_num, maze_point_t *dst_pts, int max_pts)
+static int transform_boundary_points_to_ipm(const maze_point_t *src_pts, int src_num, maze_point_t *dst_pts, int max_pts)
 {
     if (src_pts == nullptr || dst_pts == nullptr || src_num <= 0 || max_pts <= 0)
     {
@@ -939,12 +981,163 @@ static int transform_boundary_points_to_proc(const maze_point_t *src_pts, int sr
             continue;
         }
 
-        int proc_x = 0;
-        int proc_y = 0;
-        ipm_to_proc_point(ipm_x, ipm_y, &proc_x, &proc_y);
-        dst_pts[out++] = {proc_x, proc_y};
+        dst_pts[out++] = {ipm_x, ipm_y};
     }
     return out;
+}
+
+static void triangle_filter_boundary_points_inplace(maze_point_t *pts, int num, int width, int height)
+{
+    if (pts == nullptr || num < 3 || width <= 0 || height <= 0)
+    {
+        return;
+    }
+
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> src{};
+    const int copy_num = std::clamp(num, 0, static_cast<int>(src.size()));
+    for (int i = 0; i < copy_num; ++i)
+    {
+        src[static_cast<size_t>(i)] = pts[i];
+    }
+
+    const int max_x = width - 1;
+    const int max_y = height - 1;
+    for (int i = 1; i + 1 < copy_num; ++i)
+    {
+        const int fx = src[static_cast<size_t>(i - 1)].x +
+                       src[static_cast<size_t>(i)].x * 2 +
+                       src[static_cast<size_t>(i + 1)].x;
+        const int fy = src[static_cast<size_t>(i - 1)].y +
+                       src[static_cast<size_t>(i)].y * 2 +
+                       src[static_cast<size_t>(i + 1)].y;
+        pts[i].x = std::clamp((fx + 2) / 4, 0, max_x);
+        pts[i].y = std::clamp((fy + 2) / 4, 0, max_y);
+    }
+}
+
+static void remove_near_duplicate_boundary_points_inplace(maze_point_t *pts, int *num, float min_dist_px)
+{
+    if (pts == nullptr || num == nullptr || *num <= 1)
+    {
+        return;
+    }
+
+    const int in_num = std::clamp(*num, 0, VISION_BOUNDARY_NUM);
+    if (in_num <= 1)
+    {
+        *num = in_num;
+        return;
+    }
+
+    const float min_dist_sq = std::max(0.0f, min_dist_px) * std::max(0.0f, min_dist_px);
+    int out = 1;
+    for (int i = 1; i < in_num; ++i)
+    {
+        const float dx = static_cast<float>(pts[i].x - pts[out - 1].x);
+        const float dy = static_cast<float>(pts[i].y - pts[out - 1].y);
+        if ((dx * dx + dy * dy) >= min_dist_sq)
+        {
+            pts[out++] = pts[i];
+        }
+    }
+    *num = out;
+}
+
+static void postprocess_shifted_centerline_inplace(maze_point_t *pts, int *num, int width, int height)
+{
+    if (pts == nullptr || num == nullptr)
+    {
+        return;
+    }
+
+    remove_near_duplicate_boundary_points_inplace(pts, num, g_ipm_centerline_min_point_dist_px.load());
+    if (!g_ipm_centerline_postprocess_enabled.load())
+    {
+        return;
+    }
+
+    if (g_ipm_centerline_triangle_filter_enabled.load())
+    {
+        triangle_filter_boundary_points_inplace(pts, *num, width, height);
+        remove_near_duplicate_boundary_points_inplace(pts, num, g_ipm_centerline_min_point_dist_px.load());
+    }
+
+    if (g_ipm_centerline_resample_enabled.load())
+    {
+        resample_boundary_points_equal_spacing_inplace(pts,
+                                                       num,
+                                                       width,
+                                                       height,
+                                                       g_ipm_centerline_resample_step_px.load());
+        remove_near_duplicate_boundary_points_inplace(pts, num, g_ipm_centerline_min_point_dist_px.load());
+    }
+}
+
+static void resample_boundary_points_equal_spacing_inplace(maze_point_t *pts, int *num, int width, int height, float step_px)
+{
+    if (pts == nullptr || num == nullptr || *num <= 1 || width <= 0 || height <= 0)
+    {
+        return;
+    }
+
+    const float step = std::max(0.1f, step_px);
+    const int in_num = std::clamp(*num, 0, VISION_BOUNDARY_NUM);
+    if (in_num <= 1)
+    {
+        return;
+    }
+
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> src{};
+    for (int i = 0; i < in_num; ++i)
+    {
+        src[static_cast<size_t>(i)] = pts[i];
+    }
+
+    const int max_x = width - 1;
+    const int max_y = height - 1;
+    int out = 0;
+    pts[out++] = src[0];
+
+    float dist_acc = 0.0f;
+    for (int i = 1; i < in_num && out < VISION_BOUNDARY_NUM; ++i)
+    {
+        const float ax = static_cast<float>(src[static_cast<size_t>(i - 1)].x);
+        const float ay = static_cast<float>(src[static_cast<size_t>(i - 1)].y);
+        const float bx = static_cast<float>(src[static_cast<size_t>(i)].x);
+        const float by = static_cast<float>(src[static_cast<size_t>(i)].y);
+        const float vx = bx - ax;
+        const float vy = by - ay;
+        const float seg_len = std::sqrt(vx * vx + vy * vy);
+        if (seg_len < 1e-6f)
+        {
+            continue;
+        }
+
+        float used = 0.0f;
+        while ((dist_acc + (seg_len - used)) >= step && out < VISION_BOUNDARY_NUM)
+        {
+            const float remain = step - dist_acc;
+            const float t = (used + remain) / seg_len;
+            const int px = std::clamp(static_cast<int>(std::lround(ax + vx * t)), 0, max_x);
+            const int py = std::clamp(static_cast<int>(std::lround(ay + vy * t)), 0, max_y);
+            pts[out++] = {px, py};
+            used += remain;
+            dist_acc = 0.0f;
+        }
+        dist_acc += (seg_len - used);
+    }
+
+    const maze_point_t &last = src[static_cast<size_t>(in_num - 1)];
+    if (out < VISION_BOUNDARY_NUM)
+    {
+        const maze_point_t &tail = pts[out - 1];
+        if (tail.x != last.x || tail.y != last.y)
+        {
+            pts[out++] = {std::clamp(last.x, 0, max_x), std::clamp(last.y, 0, max_y)};
+        }
+    }
+
+    *num = out;
 }
 
 static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *left_pts,
@@ -952,46 +1145,131 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                            const maze_point_t *right_pts,
                                                            int right_num)
 {
-    std::memset(g_image_ipm_edge_gray, 0, kProcWidth * kProcHeight);
     // 关闭整图逆透视彩色调试图，避免 warpPerspective + resize 带来的额外耗时。
-    std::memset(g_image_ipm_bgr, 0, kProcWidth * kProcHeight * 3);
+    std::memset(g_image_ipm_bgr, 0, kIpmOutputWidth * kIpmOutputHeight * 3);
     clear_ipm_saved_arrays();
 
-    std::array<maze_point_t, VISION_BOUNDARY_NUM> left_proc{};
-    std::array<maze_point_t, VISION_BOUNDARY_NUM> right_proc{};
-    const int left_proc_num = transform_boundary_points_to_proc(left_pts, left_num, left_proc.data(), static_cast<int>(left_proc.size()));
-    const int right_proc_num = transform_boundary_points_to_proc(right_pts, right_num, right_proc.data(), static_cast<int>(right_proc.size()));
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> left_ipm{};
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> right_ipm{};
+    const int left_ipm_num = transform_boundary_points_to_ipm(left_pts, left_num, left_ipm.data(), static_cast<int>(left_ipm.size()));
+    const int right_ipm_num = transform_boundary_points_to_ipm(right_pts, right_num, right_ipm.data(), static_cast<int>(right_ipm.size()));
 
-    std::vector<cv::Point2f> left_line = preprocess_boundary_polyline(left_proc.data(), left_proc_num);
-    std::vector<cv::Point2f> right_line = preprocess_boundary_polyline(right_proc.data(), right_proc_num);
-    std::vector<cv::Point2f> center_mean_line = midpoint_centerline(left_line, right_line);
-    std::vector<cv::Point2f> center_fit_line = center_mean_line;
+    // 第一份：原始逆透视边界（用于角点识别等保形任务）。
+    fill_boundary_arrays_from_points_to_target(left_ipm.data(),
+                                               left_ipm_num,
+                                               right_ipm.data(),
+                                               right_ipm_num,
+                                               g_ipm_raw_xy_x1_boundary,
+                                               g_ipm_raw_xy_x2_boundary,
+                                               g_ipm_raw_xy_x3_boundary,
+                                               g_ipm_raw_xy_y1_boundary,
+                                               g_ipm_raw_xy_y2_boundary,
+                                               g_ipm_raw_xy_y3_boundary,
+                                               &g_ipm_raw_boundary_count,
+                                               kIpmOutputWidth,
+                                               kIpmOutputHeight);
 
-    if (!center_fit_line.empty())
+    // 第二份：处理链边界（后续可继续挂三角滤波/中线平移等处理）。
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> left_proc = left_ipm;
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> right_proc = right_ipm;
+    int left_proc_num = left_ipm_num;
+    int right_proc_num = right_ipm_num;
+    if (g_ipm_min_point_dist_filter_enabled.load())
     {
-        const float min_dist_px = min_point_spacing_px();
-        center_fit_line = triangle_filter_polyline(center_fit_line);
-        center_fit_line = resample_polyline_equal_spacing(center_fit_line, sample_step_px());
-        center_fit_line = triangle_filter_polyline(center_fit_line);
-        clamp_polyline_to_image(&center_fit_line);
-        remove_near_duplicate_points(&center_fit_line, min_dist_px);
+        remove_near_duplicate_boundary_points_inplace(left_proc.data(), &left_proc_num, g_ipm_min_point_dist_px.load());
+        remove_near_duplicate_boundary_points_inplace(right_proc.data(), &right_proc_num, g_ipm_min_point_dist_px.load());
+    }
+    if (g_ipm_triangle_filter_enabled.load())
+    {
+        triangle_filter_boundary_points_inplace(left_proc.data(), left_proc_num, kIpmOutputWidth, kIpmOutputHeight);
+        triangle_filter_boundary_points_inplace(right_proc.data(), right_proc_num, kIpmOutputWidth, kIpmOutputHeight);
+        if (g_ipm_min_point_dist_filter_enabled.load())
+        {
+            remove_near_duplicate_boundary_points_inplace(left_proc.data(), &left_proc_num, g_ipm_min_point_dist_px.load());
+            remove_near_duplicate_boundary_points_inplace(right_proc.data(), &right_proc_num, g_ipm_min_point_dist_px.load());
+        }
+    }
+    if (g_ipm_resample_enabled.load())
+    {
+        const float step_px = g_ipm_resample_step_px.load();
+        resample_boundary_points_equal_spacing_inplace(left_proc.data(), &left_proc_num, kIpmOutputWidth, kIpmOutputHeight, step_px);
+        resample_boundary_points_equal_spacing_inplace(right_proc.data(), &right_proc_num, kIpmOutputWidth, kIpmOutputHeight, step_px);
+        if (g_ipm_min_point_dist_filter_enabled.load())
+        {
+            remove_near_duplicate_boundary_points_inplace(left_proc.data(), &left_proc_num, g_ipm_min_point_dist_px.load());
+            remove_near_duplicate_boundary_points_inplace(right_proc.data(), &right_proc_num, g_ipm_min_point_dist_px.load());
+        }
     }
 
-    draw_polyline_gray(g_image_ipm_edge_gray, kProcWidth, kProcHeight, left_line, 255);
-    draw_polyline_gray(g_image_ipm_edge_gray, kProcWidth, kProcHeight, right_line, 255);
-    draw_polyline_gray(g_image_ipm_edge_gray, kProcWidth, kProcHeight, center_fit_line, 255);
+    // 处理链边界法向平移中线：
+    // - 左边界向右平移；
+    // - 右边界向左平移。
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> center_from_left{};
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> center_from_right{};
+    int center_from_left_num = 0;
+    int center_from_right_num = 0;
+    const float shift_dist_px = g_ipm_boundary_shift_distance_px.load();
+    shift_boundary_along_normal(left_proc.data(),
+                                left_proc_num,
+                                right_proc.data(),
+                                right_proc_num,
+                                center_from_left.data(),
+                                &center_from_left_num,
+                                kIpmOutputWidth,
+                                kIpmOutputHeight,
+                                shift_dist_px,
+                                true);
+    shift_boundary_along_normal(right_proc.data(),
+                                right_proc_num,
+                                left_proc.data(),
+                                left_proc_num,
+                                center_from_right.data(),
+                                &center_from_right_num,
+                                kIpmOutputWidth,
+                                kIpmOutputHeight,
+                                shift_dist_px,
+                                false);
 
-    fill_boundary_arrays_from_lines_to_target(left_line,
-                                              center_mean_line,
-                                              right_line,
-                                              g_ipm_xy_x1_boundary,
-                                              g_ipm_xy_x2_boundary,
-                                              g_ipm_xy_x3_boundary,
-                                              g_ipm_xy_y1_boundary,
-                                              g_ipm_xy_y2_boundary,
-                                              g_ipm_xy_y3_boundary,
-                                              &g_ipm_boundary_count);
-    fill_ipm_fitted_centerline_array(center_fit_line);
+    // 中线独立后处理：去近重复点、可选三角滤波、可选等距采样。
+    postprocess_shifted_centerline_inplace(center_from_left.data(),
+                                           &center_from_left_num,
+                                           kIpmOutputWidth,
+                                           kIpmOutputHeight);
+    postprocess_shifted_centerline_inplace(center_from_right.data(),
+                                           &center_from_right_num,
+                                           kIpmOutputWidth,
+                                           kIpmOutputHeight);
+
+    fill_single_line_arrays_from_points(center_from_left.data(),
+                                        center_from_left_num,
+                                        g_ipm_shift_left_center_x,
+                                        g_ipm_shift_left_center_y,
+                                        &g_ipm_shift_left_center_count,
+                                        kIpmOutputWidth,
+                                        kIpmOutputHeight);
+    fill_single_line_arrays_from_points(center_from_right.data(),
+                                        center_from_right_num,
+                                        g_ipm_shift_right_center_x,
+                                        g_ipm_shift_right_center_y,
+                                        &g_ipm_shift_right_center_count,
+                                        kIpmOutputWidth,
+                                        kIpmOutputHeight);
+
+    fill_boundary_arrays_from_points_to_target(left_proc.data(),
+                                               left_proc_num,
+                                               right_proc.data(),
+                                               right_proc_num,
+                                               g_ipm_xy_x1_boundary,
+                                               g_ipm_xy_x2_boundary,
+                                               g_ipm_xy_x3_boundary,
+                                               g_ipm_xy_y1_boundary,
+                                               g_ipm_xy_y2_boundary,
+                                               g_ipm_xy_y3_boundary,
+                                               &g_ipm_boundary_count,
+                                               kIpmOutputWidth,
+                                               kIpmOutputHeight);
+    // 根据需求移除“拟合中线”流程：该数组保持清空状态。
+    g_ipm_center_fit_count = 0;
     return 0;
 }
 
@@ -999,6 +1277,8 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
                                      uint8 white_threshold,
                                      bool search_left,
                                      int search_y,
+                                     int x_min,
+                                     int x_max,
                                      int *start_x,
                                      int *start_y,
                                      bool *wall_is_white)
@@ -1015,15 +1295,19 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
         return false;
     }
 
-    const int center_x = width / 2;
+    const int center_x = std::clamp(width / 2, x_min, x_max);
     const int scan_y = std::clamp(search_y, 1, height - 2);
+    if (x_min < 1 || x_max > width - 2 || x_min >= x_max)
+    {
+        return false;
+    }
 
     int x_found = -1;
     bool path_is_white = false;
     bool wall_is_white_local = false;
     if (search_left)
     {
-        for (int x = center_x; x >= 2; --x)
+        for (int x = center_x; x >= x_min + 1; --x)
         {
             bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
             bool outer_white = pixel_is_white(classify_img, x - 1, scan_y, white_threshold);
@@ -1038,7 +1322,7 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
     }
     else
     {
-        for (int x = center_x; x <= width - 3; ++x)
+        for (int x = center_x; x <= x_max - 1; ++x)
         {
             bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
             bool outer_white = pixel_is_white(classify_img, x + 1, scan_y, white_threshold);
@@ -1052,7 +1336,7 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
         }
     }
 
-    if (x_found < 1 || x_found > width - 2)
+    if (x_found < x_min || x_found > x_max)
     {
         return false;
     }
@@ -1072,7 +1356,7 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
         }
 
         int next_x = x_adjust + center_step;
-        if (next_x < 1 || next_x > width - 2)
+        if (next_x < x_min || next_x > x_max)
         {
             break;
         }
@@ -1091,10 +1375,12 @@ static int maze_trace_left_hand(const uint8 *classify_img,
                                 int start_x,
                                 int start_y,
                                 int y_min,
+                                int x_min,
+                                int x_max,
                                 maze_point_t *pts,
                                 int max_pts)
 {
-    if (classify_img == nullptr || pts == nullptr || max_pts <= 0)
+    if (classify_img == nullptr || pts == nullptr || max_pts <= 0 || start_x <= x_min || start_x >= x_max)
     {
         return 0;
     }
@@ -1126,6 +1412,10 @@ static int maze_trace_left_hand(const uint8 *classify_img,
         }
         else if (frontleft_is_wall)
         {
+            if (fx <= x_min || fx >= x_max)
+            {
+                break;
+            }
             x = fx;
             y = fy;
             pts[step++] = {x, y};
@@ -1133,6 +1423,10 @@ static int maze_trace_left_hand(const uint8 *classify_img,
         }
         else
         {
+            if (flx <= x_min || flx >= x_max)
+            {
+                break;
+            }
             x = flx;
             y = fly;
             dir = (dir + 3) % 4;
@@ -1150,10 +1444,12 @@ static int maze_trace_right_hand(const uint8 *classify_img,
                                  int start_x,
                                  int start_y,
                                  int y_min,
+                                 int x_min,
+                                 int x_max,
                                  maze_point_t *pts,
                                  int max_pts)
 {
-    if (classify_img == nullptr || pts == nullptr || max_pts <= 0)
+    if (classify_img == nullptr || pts == nullptr || max_pts <= 0 || start_x <= x_min || start_x >= x_max)
     {
         return 0;
     }
@@ -1185,6 +1481,10 @@ static int maze_trace_right_hand(const uint8 *classify_img,
         }
         else if (frontright_is_wall)
         {
+            if (fx <= x_min || fx >= x_max)
+            {
+                break;
+            }
             x = fx;
             y = fy;
             pts[step++] = {x, y};
@@ -1192,6 +1492,10 @@ static int maze_trace_right_hand(const uint8 *classify_img,
         }
         else
         {
+            if (frx <= x_min || frx >= x_max)
+            {
+                break;
+            }
             x = frx;
             y = fry;
             dir = (dir + 1) % 4;
@@ -1260,6 +1564,7 @@ static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
 
 bool vision_image_processor_init(const char *camera_path)
 {
+    // 初始化阶段仅做：采图初始化 + 缓存清空 + 线误差复位。
     if (!vision_frame_capture_init(camera_path))
     {
         return false;
@@ -1267,6 +1572,10 @@ bool vision_image_processor_init(const char *camera_path)
 
     clear_boundary_arrays();
     clear_ipm_saved_arrays();
+    g_undistort_map_x.release();
+    g_undistort_map_y.release();
+    g_undistort_ready = false;
+    init_undistort_remap_table();
     line_error = 0;
     return true;
 }
@@ -1274,10 +1583,19 @@ bool vision_image_processor_init(const char *camera_path)
 void vision_image_processor_cleanup()
 {
     vision_frame_capture_cleanup();
+    g_undistort_map_x.release();
+    g_undistort_map_y.release();
+    g_undistort_ready = false;
 }
 
 bool vision_image_processor_process_step()
 {
+    // 主处理步骤：
+    // 1) 等待新帧；
+    // 2) 生成灰度/RGB565/二值图；
+    // 3) 迷宫法双边线提取；
+    // 4) 计算中线误差与逆透视结果；
+    // 5) 更新时间统计。
     auto t0 = std::chrono::steady_clock::now();
 
     if (!vision_frame_capture_wait_next_bgr(g_image_bgr_full, sizeof(g_image_bgr_full), 100, &g_last_capture_wait_us))
@@ -1307,9 +1625,17 @@ bool vision_image_processor_process_step()
     auto t_pre_start = t1;
 
     // 固定160x120，处理分辨率与采图分辨率一致，无需降采样。
+    // 当前先做去畸变（含 kCfgUndistortMoveX/Y 平移补偿），再进入后续灰度/二值/巡线流程。
     cv::Mat bgr_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr_full);
     cv::Mat bgr(kProcHeight, kProcWidth, CV_8UC3, g_image_bgr);
-    std::memcpy(g_image_bgr, g_image_bgr_full, sizeof(g_image_bgr));
+    if (g_undistort_enabled.load() && init_undistort_remap_table())
+    {
+        cv::remap(bgr_full, bgr, g_undistort_map_x, g_undistort_map_y, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+    }
+    else
+    {
+        std::memcpy(g_image_bgr, g_image_bgr_full, sizeof(g_image_bgr));
+    }
     cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
 
@@ -1333,10 +1659,10 @@ bool vision_image_processor_process_step()
 
     auto t_otsu_start = t_pre_end;
     uint8 otsu_threshold = 127;
-    if constexpr (kTempDemandOtsuEnable)
+    if constexpr (kCfgDemandOtsuEnable)
     {
         otsu_threshold = compute_global_otsu_threshold_u8(g_image_gray);
-        if constexpr (kTempDemandOtsuKeepFullBinaryCache)
+        if constexpr (kCfgDemandOtsuKeepFullBinaryCache)
         {
             build_binary_image_from_gray_threshold(g_image_gray, otsu_threshold);
         }
@@ -1354,10 +1680,10 @@ bool vision_image_processor_process_step()
     auto t_otsu_end = std::chrono::steady_clock::now();
 
     auto t_maze_start = t_otsu_end;
-    const int y_min = std::max(1, kProcHeight - (kProcHeight * MAZE_LOWER_REGION_PERCENT) / 100);
+    const int y_min = std::max(1, kProcHeight - (kProcHeight * kCfgMazeLowerRegionPercent) / 100);
     const uint8 *classify_img = nullptr;
     uint8 classify_white_threshold = 127;
-    if constexpr (kTempDemandOtsuEnable)
+    if constexpr (kCfgDemandOtsuEnable)
     {
         classify_img = g_image_gray;
         classify_white_threshold = otsu_threshold;
@@ -1372,6 +1698,8 @@ bool vision_image_processor_process_step()
     int left_start_y = 0;
     int right_start_x = 0;
     int right_start_y = 0;
+    int maze_trace_x_min = 1;
+    int maze_trace_x_max = kProcWidth - 2;
     bool left_wall_is_white = false;
     bool right_wall_is_white = false;
 
@@ -1383,10 +1711,13 @@ bool vision_image_processor_process_step()
     auto t_maze_setup_end = std::chrono::steady_clock::now();
 
     const int maze_start_row = std::clamp(g_maze_start_row.load(), 1, kProcHeight - 2);
+    get_maze_trace_x_range_clamped(&maze_trace_x_min, &maze_trace_x_max);
     bool left_ok = find_maze_start_from_row(classify_img,
                                             classify_white_threshold,
                                             true,
                                             maze_start_row,
+                                            maze_trace_x_min,
+                                            maze_trace_x_max,
                                             &left_start_x,
                                             &left_start_y,
                                             &left_wall_is_white);
@@ -1394,6 +1725,8 @@ bool vision_image_processor_process_step()
                                              classify_white_threshold,
                                              false,
                                              maze_start_row,
+                                             maze_trace_x_min,
+                                             maze_trace_x_max,
                                              &right_start_x,
                                              &right_start_y,
                                              &right_wall_is_white);
@@ -1401,41 +1734,47 @@ bool vision_image_processor_process_step()
 
     if (left_ok)
     {
+        const int left_max_pts = std::min(static_cast<int>(left_pts.size()), kCfgMazeTraceMaxPoints);
         left_num = maze_trace_left_hand(classify_img,
                                         classify_white_threshold,
                                         left_wall_is_white,
                                         left_start_x,
                                         left_start_y,
                                         y_min,
+                                        maze_trace_x_min,
+                                        maze_trace_x_max,
                                         left_pts.data(),
-                                        static_cast<int>(left_pts.size()));
+                                        left_max_pts);
     }
     auto t_maze_left_trace_end = std::chrono::steady_clock::now();
     if (right_ok)
     {
+        const int right_max_pts = std::min(static_cast<int>(right_pts.size()), kCfgMazeTraceMaxPoints);
         right_num = maze_trace_right_hand(classify_img,
                                           classify_white_threshold,
                                           right_wall_is_white,
                                           right_start_x,
                                           right_start_y,
                                           y_min,
+                                          maze_trace_x_min,
+                                          maze_trace_x_max,
                                           right_pts.data(),
-                                          static_cast<int>(right_pts.size()));
+                                          right_max_pts);
     }
     auto t_maze_trace_end = std::chrono::steady_clock::now();
 
     // 主输出边界使用原图坐标系：左右边线 + 均值中线（无丢线补偿）。
     fill_boundary_arrays_from_maze(left_pts.data(), left_num, right_pts.data(), right_num);
-    line_error = compute_line_error_from_boundary_midline();
+    line_error = 0;
 
-    if constexpr (kEnableGrayPointerInversePerspective)
+    if constexpr (kCfgEnableInversePerspective)
     {
         render_ipm_boundary_image_and_update_boundaries(left_pts.data(), left_num, right_pts.data(), right_num);
+        line_error = compute_line_error_from_ipm_shifted_centerline();
     }
     else
     {
-        std::memset(g_image_ipm_bgr, 0, kProcWidth * kProcHeight * 3);
-        std::memset(g_image_ipm_edge_gray, 0, kProcWidth * kProcHeight);
+        std::memset(g_image_ipm_bgr, 0, kIpmOutputWidth * kIpmOutputHeight * 3);
         clear_ipm_saved_arrays();
     }
     auto t_maze_end = std::chrono::steady_clock::now();
@@ -1459,6 +1798,7 @@ bool vision_image_processor_process_step()
 
 void vision_image_processor_set_maze_start_row(int row)
 {
+    // 如何修改：建议保持在 [1, kProcHeight-2] 内。
     g_maze_start_row.store(std::clamp(row, 1, kProcHeight - 2));
 }
 
@@ -1467,12 +1807,189 @@ int vision_image_processor_get_maze_start_row()
     return g_maze_start_row.load();
 }
 
+void vision_image_processor_set_maze_trace_x_range(int x_min, int x_max)
+{
+    const int min_limit = 1;
+    const int max_limit = kProcWidth - 2;
+    int left = std::clamp(x_min, min_limit, max_limit);
+    int right = std::clamp(x_max, min_limit, max_limit);
+    if (left > right)
+    {
+        std::swap(left, right);
+    }
+
+    g_maze_trace_x_min.store(left);
+    g_maze_trace_x_max.store(right);
+}
+
+void vision_image_processor_get_maze_trace_x_range(int *x_min, int *x_max)
+{
+    get_maze_trace_x_range_clamped(x_min, x_max);
+}
+
+void vision_image_processor_set_undistort_enabled(bool enabled)
+{
+    g_undistort_enabled.store(enabled);
+}
+
+bool vision_image_processor_undistort_enabled()
+{
+    return g_undistort_enabled.load();
+}
+
+void vision_image_processor_set_ipm_triangle_filter_enabled(bool enabled)
+{
+    g_ipm_triangle_filter_enabled.store(enabled);
+}
+
+bool vision_image_processor_ipm_triangle_filter_enabled()
+{
+    return g_ipm_triangle_filter_enabled.load();
+}
+
+void vision_image_processor_set_ipm_min_point_dist_filter_enabled(bool enabled)
+{
+    g_ipm_min_point_dist_filter_enabled.store(enabled);
+}
+
+bool vision_image_processor_ipm_min_point_dist_filter_enabled()
+{
+    return g_ipm_min_point_dist_filter_enabled.load();
+}
+
+void vision_image_processor_set_ipm_min_point_dist_px(float dist_px)
+{
+    g_ipm_min_point_dist_px.store(std::max(0.0f, dist_px));
+}
+
+float vision_image_processor_ipm_min_point_dist_px()
+{
+    return g_ipm_min_point_dist_px.load();
+}
+
+void vision_image_processor_set_ipm_resample_enabled(bool enabled)
+{
+    g_ipm_resample_enabled.store(enabled);
+}
+
+bool vision_image_processor_ipm_resample_enabled()
+{
+    return g_ipm_resample_enabled.load();
+}
+
+void vision_image_processor_set_ipm_resample_step_px(float step_px)
+{
+    // 保护下限，避免 0 或负值导致异常行为。
+    g_ipm_resample_step_px.store(std::max(0.1f, step_px));
+}
+
+float vision_image_processor_ipm_resample_step_px()
+{
+    return g_ipm_resample_step_px.load();
+}
+
+void vision_image_processor_set_ipm_boundary_shift_distance_px(float dist_px)
+{
+    g_ipm_boundary_shift_distance_px.store(std::max(0.0f, dist_px));
+}
+
+float vision_image_processor_ipm_boundary_shift_distance_px()
+{
+    return g_ipm_boundary_shift_distance_px.load();
+}
+
+void vision_image_processor_set_ipm_centerline_postprocess_enabled(bool enabled)
+{
+    g_ipm_centerline_postprocess_enabled.store(enabled);
+}
+
+bool vision_image_processor_ipm_centerline_postprocess_enabled()
+{
+    return g_ipm_centerline_postprocess_enabled.load();
+}
+
+void vision_image_processor_set_ipm_centerline_triangle_filter_enabled(bool enabled)
+{
+    g_ipm_centerline_triangle_filter_enabled.store(enabled);
+}
+
+bool vision_image_processor_ipm_centerline_triangle_filter_enabled()
+{
+    return g_ipm_centerline_triangle_filter_enabled.load();
+}
+
+void vision_image_processor_set_ipm_centerline_resample_enabled(bool enabled)
+{
+    g_ipm_centerline_resample_enabled.store(enabled);
+}
+
+bool vision_image_processor_ipm_centerline_resample_enabled()
+{
+    return g_ipm_centerline_resample_enabled.load();
+}
+
+void vision_image_processor_set_ipm_centerline_resample_step_px(float step_px)
+{
+    g_ipm_centerline_resample_step_px.store(std::max(0.1f, step_px));
+}
+
+float vision_image_processor_ipm_centerline_resample_step_px()
+{
+    return g_ipm_centerline_resample_step_px.load();
+}
+
+void vision_image_processor_set_ipm_centerline_min_point_dist_px(float dist_px)
+{
+    g_ipm_centerline_min_point_dist_px.store(std::max(0.0f, dist_px));
+}
+
+float vision_image_processor_ipm_centerline_min_point_dist_px()
+{
+    return g_ipm_centerline_min_point_dist_px.load();
+}
+
+void vision_image_processor_set_ipm_line_error_source(vision_ipm_line_error_source_enum source)
+{
+    const int s = static_cast<int>(source);
+    if (s == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT))
+    {
+        g_ipm_line_error_source.store(s);
+        return;
+    }
+    g_ipm_line_error_source.store(static_cast<int>(VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT));
+}
+
+vision_ipm_line_error_source_enum vision_image_processor_ipm_line_error_source()
+{
+    return (g_ipm_line_error_source.load() == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT))
+               ? VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT
+               : VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT;
+}
+
+void vision_image_processor_set_ipm_line_error_point_index(int point_index)
+{
+    g_ipm_line_error_point_index.store(std::max(0, point_index));
+}
+
+int vision_image_processor_ipm_line_error_point_index()
+{
+    return g_ipm_line_error_point_index.load();
+}
+
+void vision_image_processor_get_ipm_line_error_track_point(bool *valid, int *x, int *y)
+{
+    if (valid) *valid = g_ipm_line_error_track_valid;
+    if (x) *x = g_ipm_line_error_track_x;
+    if (y) *y = g_ipm_line_error_track_y;
+}
+
 void vision_image_processor_get_last_perf_us(uint32 *capture_wait_us,
                                              uint32 *preprocess_us,
                                              uint32 *otsu_us,
                                              uint32 *maze_us,
                                              uint32 *total_us)
 {
+    // 参数说明：均为输出参数指针，可传 nullptr 跳过对应字段。
     if (capture_wait_us) *capture_wait_us = g_last_capture_wait_us;
     if (preprocess_us) *preprocess_us = g_last_preprocess_us;
     if (otsu_us) *otsu_us = g_last_otsu_us;
@@ -1482,6 +1999,7 @@ void vision_image_processor_get_last_perf_us(uint32 *capture_wait_us,
 
 void vision_image_processor_get_last_red_detect_us(uint32 *red_detect_us)
 {
+    // 注意：该值由 infer 模块更新，不在本文件内直接计算红框。
     if (red_detect_us)
     {
         std::lock_guard<std::mutex> lk(g_detect_result_mutex);
@@ -1560,15 +2078,11 @@ const uint8 *vision_image_processor_ipm_bgr_downsampled_image()
     return g_image_ipm_bgr;
 }
 
-const uint8 *vision_image_processor_ipm_edge_gray_downsampled_image()
-{
-    return g_image_ipm_edge_gray;
-}
-
 void vision_image_processor_get_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
                                            uint16 **y1, uint16 **y2, uint16 **y3,
                                            uint16 *dot_num)
 {
+    // 返回内部静态缓存指针，调用方禁止修改内容。
     if (x1) *x1 = g_xy_x1_boundary;
     if (x2) *x2 = g_xy_x2_boundary;
     if (x3) *x3 = g_xy_x3_boundary;
@@ -1589,6 +2103,33 @@ void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 
     if (y2) *y2 = g_ipm_xy_y2_boundary;
     if (y3) *y3 = g_ipm_xy_y3_boundary;
     if (dot_num) *dot_num = static_cast<uint16>(g_ipm_boundary_count);
+}
+
+void vision_image_processor_get_ipm_boundaries_raw(uint16 **x1, uint16 **x2, uint16 **x3,
+                                                   uint16 **y1, uint16 **y2, uint16 **y3,
+                                                   uint16 *dot_num)
+{
+    if (x1) *x1 = g_ipm_raw_xy_x1_boundary;
+    if (x2) *x2 = g_ipm_raw_xy_x2_boundary;
+    if (x3) *x3 = g_ipm_raw_xy_x3_boundary;
+    if (y1) *y1 = g_ipm_raw_xy_y1_boundary;
+    if (y2) *y2 = g_ipm_raw_xy_y2_boundary;
+    if (y3) *y3 = g_ipm_raw_xy_y3_boundary;
+    if (dot_num) *dot_num = static_cast<uint16>(g_ipm_raw_boundary_count);
+}
+
+void vision_image_processor_get_ipm_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num)
+{
+    if (x) *x = g_ipm_shift_left_center_x;
+    if (y) *y = g_ipm_shift_left_center_y;
+    if (dot_num) *dot_num = static_cast<uint16>(g_ipm_shift_left_center_count);
+}
+
+void vision_image_processor_get_ipm_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num)
+{
+    if (x) *x = g_ipm_shift_right_center_x;
+    if (y) *y = g_ipm_shift_right_center_y;
+    if (dot_num) *dot_num = static_cast<uint16>(g_ipm_shift_right_center_count);
 }
 
 void vision_image_processor_get_ipm_fitted_centerline(uint16 **x, uint16 **y, uint16 *dot_num)

@@ -10,7 +10,21 @@
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .card { background: #111827; border: 1px solid #334155; border-radius: 10px; padding: 12px; }
     .title { margin-bottom: 10px; color: #cbd5e1; font-size: 14px; }
-    canvas, img { width: 100%; background: #000; border-radius: 8px; image-rendering: pixelated; }
+    .view { position: relative; }
+    canvas { width: 100%; background: #000; border-radius: 8px; image-rendering: pixelated; display: block; }
+    .pixel-info {
+      position: absolute;
+      left: 8px;
+      bottom: 8px;
+      background: rgba(2, 6, 23, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 12px;
+      color: #e2e8f0;
+      pointer-events: none;
+      white-space: nowrap;
+    }
     .meta { margin: 8px 0 12px; color: #94a3b8; font-size: 13px; }
     pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; color: #93c5fd; max-height: 280px; overflow: auto; }
     @media (max-width: 900px){ .grid { grid-template-columns: 1fr; } }
@@ -20,18 +34,51 @@
   <div class="wrap">
     <h2>智能车视觉接收端（Node.js）</h2>
     <div class="meta" id="meta">connecting...</div>
+    <div class="meta">
+      <label style="margin-right: 16px;">
+        <input type="checkbox" id="toggleMeanCenterline" checked />
+        灰度图显示均值中线
+      </label>
+      <label>
+        <input type="checkbox" id="toggleIpmAnchorDot" checked />
+        透视图显示锚点圆 (x=200,y=200,r=1)
+      </label>
+      <label style="margin-left: 16px;">
+        <input type="checkbox" id="toggleBoundaryPointMode" />
+        边界/中线按采样点显示（关闭=连线）
+      </label>
+      <button id="switchIpmCenterlineSource" style="margin-left: 16px;">
+        透视中线来源：左边界平移
+      </button>
+    </div>
     <div class="grid">
       <div class="card">
         <div class="title">灰度图 + 迷宫左右边线（红/绿）</div>
-        <canvas id="grayCanvas" width="160" height="120"></canvas>
+        <div class="view">
+          <canvas id="grayCanvas" width="160" height="120"></canvas>
+          <div class="pixel-info" id="grayPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
       </div>
       <div class="card">
         <div class="title">二值图（不叠加边线）</div>
-        <img id="binaryImg" alt="binary frame" />
+        <div class="view">
+          <canvas id="binaryCanvas" width="160" height="120"></canvas>
+          <div class="pixel-info" id="binaryPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
       </div>
       <div class="card">
-        <div class="title">透视边界图（按透视输出尺寸）</div>
-        <canvas id="ipmCanvas" width="100" height="100"></canvas>
+        <div class="title">透视边界图-处理链数组（可三角滤波）</div>
+        <div class="view">
+          <canvas id="ipmCanvas" width="400" height="200"></canvas>
+          <div class="pixel-info" id="ipmPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="title">透视边界图-原始拷贝数组（角点识别）</div>
+        <div class="view">
+          <canvas id="ipmRawCanvas" width="400" height="200"></canvas>
+          <div class="pixel-info" id="ipmRawPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
       </div>
       <div class="card">
         <div class="title">状态数据</div>
@@ -42,13 +89,29 @@
   <script>
     const grayCanvas = document.getElementById('grayCanvas');
     const grayCtx = grayCanvas.getContext('2d');
+    const binaryCanvas = document.getElementById('binaryCanvas');
+    const binaryCtx = binaryCanvas.getContext('2d');
     const ipmCanvas = document.getElementById('ipmCanvas');
     const ipmCtx = ipmCanvas.getContext('2d');
-    const binaryImg = document.getElementById('binaryImg');
+    const ipmRawCanvas = document.getElementById('ipmRawCanvas');
+    const ipmRawCtx = ipmRawCanvas.getContext('2d');
+    const grayPixelInfo = document.getElementById('grayPixelInfo');
+    const binaryPixelInfo = document.getElementById('binaryPixelInfo');
+    const ipmPixelInfo = document.getElementById('ipmPixelInfo');
+    const ipmRawPixelInfo = document.getElementById('ipmRawPixelInfo');
     const statusEl = document.getElementById('status');
     const metaEl = document.getElementById('meta');
+    const toggleMeanCenterline = document.getElementById('toggleMeanCenterline');
+    const toggleIpmAnchorDot = document.getElementById('toggleIpmAnchorDot');
+    const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
+    const switchIpmCenterlineSource = document.getElementById('switchIpmCenterlineSource');
     const grayImg = new Image();
+    const binaryImg = new Image();
     let latestStatus = {};
+    let showMeanCenterline = true;
+    let showIpmAnchorDot = true;
+    let boundaryPointMode = false;
+    let ipmCenterlineSource = 'left';
 
     function drawPolyline(ctx, pts, color, lineWidth) {
       if (!Array.isArray(pts) || pts.length < 2) return;
@@ -62,25 +125,103 @@
       ctx.stroke();
     }
 
-    function drawIpmBoundaries(status) {
-      const ipmSize = status.ipm_size || [100, 100];
-      const w = ipmSize[0] || 100;
-      const h = ipmSize[1] || 100;
-      if (ipmCanvas.width !== w) ipmCanvas.width = w;
-      if (ipmCanvas.height !== h) ipmCanvas.height = h;
-      ipmCtx.fillStyle = '#000';
-      ipmCtx.fillRect(0, 0, w, h);
-      drawPolyline(ipmCtx, status.ipm_left_boundary || [], '#ff4d4f', 2);
-      drawPolyline(ipmCtx, status.ipm_right_boundary || [], '#22c55e', 2);
+    function drawPointSet(ctx, pts, color, radius) {
+      if (!Array.isArray(pts) || pts.length < 1) return;
+      ctx.fillStyle = color;
+      const r = Math.max(1, radius | 0);
+      for (let i = 0; i < pts.length; i += 1) {
+        const p = pts[i];
+        if (!Array.isArray(p) || p.length < 2) continue;
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], r, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    grayImg.onload = () => {
+    function drawSeries(ctx, pts, color, lineWidth, pointRadius) {
+      if (boundaryPointMode) {
+        drawPointSet(ctx, pts, color, pointRadius);
+      } else {
+        drawPolyline(ctx, pts, color, lineWidth);
+      }
+    }
+
+    function buildMeanCenterline(leftPts, rightPts) {
+      if (!Array.isArray(leftPts) || !Array.isArray(rightPts)) return [];
+      const n = Math.min(leftPts.length, rightPts.length);
+      if (n < 2) return [];
+      const mid = [];
+      for (let i = 0; i < n; i += 1) {
+        const l = leftPts[i];
+        const r = rightPts[i];
+        if (!Array.isArray(l) || !Array.isArray(r) || l.length < 2 || r.length < 2) continue;
+        const mx = Math.round((l[0] + r[0]) * 0.5);
+        const my = Math.round((l[1] + r[1]) * 0.5);
+        mid.push([mx, my]);
+      }
+      return mid;
+    }
+
+    function drawIpmBoundariesToCanvas(status, canvas, ctx, leftKey, rightKey, centerKey) {
+      const ipmSize = status.ipm_size || [400, 200];
+      const w = ipmSize[0] || 400;
+      const h = ipmSize[1] || 200;
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, w, h);
+      drawSeries(ctx, status[leftKey] || [], '#ff4d4f', 2, 1);
+      drawSeries(ctx, status[rightKey] || [], '#22c55e', 2, 1);
+      if (centerKey) {
+        drawSeries(ctx, status[centerKey] || [], '#facc15', 2, 1);
+      }
+      if (canvas === ipmCanvas && status.ipm_track_valid) {
+        const tp = Array.isArray(status.ipm_track_point) ? status.ipm_track_point : [0, 0];
+        const tx = Math.max(0, Math.min(w - 1, tp[0] | 0));
+        const ty = Math.max(0, Math.min(h - 1, tp[1] | 0));
+        const cx = Math.max(0, Math.min(w - 1, 200));
+        const cy = Math.max(0, Math.min(h - 1, 200));
+        ctx.strokeStyle = '#93c5fd';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx, ty);
+        ctx.lineTo(cx, cy);
+        ctx.lineTo(tx, ty);
+        ctx.stroke();
+        drawPointSet(ctx, [[cx, ty], [cx, cy], [tx, ty]], '#93c5fd', 2);
+      }
+      if (showIpmAnchorDot) {
+        const cx = Math.max(0, Math.min(w - 1, 200));
+        const cy = Math.max(0, Math.min(h - 1, 200));
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawIpmBoundaries(status) {
+      const centerKey = (ipmCenterlineSource === 'right')
+        ? 'ipm_centerline_from_right_shift'
+        : 'ipm_centerline_from_left_shift';
+      drawIpmBoundariesToCanvas(status, ipmCanvas, ipmCtx, 'ipm_left_boundary', 'ipm_right_boundary', centerKey);
+      drawIpmBoundariesToCanvas(status, ipmRawCanvas, ipmRawCtx, 'ipm_raw_left_boundary', 'ipm_raw_right_boundary', '');
+    }
+
+    function renderGrayFrame() {
       const size = latestStatus.gray_size || [160, 120];
       const w = size[0] || 160;
       const h = size[1] || 120;
       if (grayCanvas.width !== w) grayCanvas.width = w;
       if (grayCanvas.height !== h) grayCanvas.height = h;
       grayCtx.drawImage(grayImg, 0, 0, w, h);
+      const centerX = Math.max(0, Math.min(w - 1, 80));
+      grayCtx.strokeStyle = '#ffffff';
+      grayCtx.lineWidth = 1;
+      grayCtx.beginPath();
+      grayCtx.moveTo(centerX + 0.5, 0);
+      grayCtx.lineTo(centerX + 0.5, h);
+      grayCtx.stroke();
       const guideY = Math.max(0, Math.min(h - 1, 105));
       grayCtx.strokeStyle = '#ffffff';
       grayCtx.lineWidth = 1;
@@ -88,8 +229,67 @@
       grayCtx.moveTo(0, guideY + 0.5);
       grayCtx.lineTo(w, guideY + 0.5);
       grayCtx.stroke();
-      drawPolyline(grayCtx, latestStatus.left_boundary || [], '#ff4d4f', 2);
-      drawPolyline(grayCtx, latestStatus.right_boundary || [], '#22c55e', 2);
+      const left = latestStatus.left_boundary || [];
+      const right = latestStatus.right_boundary || [];
+      drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
+      drawSeries(grayCtx, right, '#22c55e', 2, 1);
+      if (showMeanCenterline) {
+        drawSeries(grayCtx, buildMeanCenterline(left, right), '#facc15', 2, 1);
+      }
+    }
+
+    function getCanvasPoint(ev, canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const sx = canvas.width / rect.width;
+      const sy = canvas.height / rect.height;
+      const x = Math.max(0, Math.min(canvas.width - 1, Math.floor((ev.clientX - rect.left) * sx)));
+      const y = Math.max(0, Math.min(canvas.height - 1, Math.floor((ev.clientY - rect.top) * sy)));
+      return [x, y];
+    }
+
+    function sampleRGB(ctx, x, y) {
+      const d = ctx.getImageData(x, y, 1, 1).data;
+      return [d[0] | 0, d[1] | 0, d[2] | 0];
+    }
+
+    function mapCoord(x, y, srcW, srcH, dstW, dstH) {
+      if (srcW <= 1 || srcH <= 1 || dstW <= 0 || dstH <= 0) return [0, 0];
+      const mx = Math.max(0, Math.min(dstW - 1, Math.round((x * (dstW - 1)) / (srcW - 1))));
+      const my = Math.max(0, Math.min(dstH - 1, Math.round((y * (dstH - 1)) / (srcH - 1))));
+      return [mx, my];
+    }
+
+    function pixelTextFromCanvas(activeCanvas, activeCtx, x, y) {
+      const [ar, ag, ab] = sampleRGB(activeCtx, x, y);
+      const [gx, gy] = mapCoord(x, y, activeCanvas.width, activeCanvas.height, grayCanvas.width, grayCanvas.height);
+      const [bx, by] = mapCoord(x, y, activeCanvas.width, activeCanvas.height, binaryCanvas.width, binaryCanvas.height);
+      const [gr, gg, gb] = sampleRGB(grayCtx, gx, gy);
+      const [br, bg, bb] = sampleRGB(binaryCtx, bx, by);
+      const gray = Math.round((gr + gg + gb) / 3);
+      const binaryGray = Math.round((br + bg + bb) / 3);
+      const bin = binaryGray >= 128 ? 1 : 0;
+      return `x:${x} y:${y} | Gray:${gray} Bin:${bin} RGB:(${ar},${ag},${ab})`;
+    }
+
+    function bindPixelProbe(canvas, ctx, infoEl) {
+      canvas.addEventListener('mousemove', (ev) => {
+        const [x, y] = getCanvasPoint(ev, canvas);
+        infoEl.textContent = pixelTextFromCanvas(canvas, ctx, x, y);
+      });
+      canvas.addEventListener('mouseleave', () => {
+        infoEl.textContent = 'x:- y:- | Gray:- Bin:- RGB:(-,-,-)';
+      });
+    }
+
+    grayImg.onload = () => { renderGrayFrame(); };
+
+    binaryImg.onload = () => {
+      const size = latestStatus.gray_size || [160, 120];
+      const w = size[0] || 160;
+      const h = size[1] || 120;
+      if (binaryCanvas.width !== w) binaryCanvas.width = w;
+      if (binaryCanvas.height !== h) binaryCanvas.height = h;
+      binaryCtx.drawImage(binaryImg, 0, 0, w, h);
     };
 
     async function pullStatus() {
@@ -109,6 +309,35 @@
       grayImg.src = `/api/frame_gray.jpg?t=${Date.now()}`;
       binaryImg.src = `/api/frame_binary.jpg?t=${Date.now()}`;
     }
+
+    bindPixelProbe(grayCanvas, grayCtx, grayPixelInfo);
+    bindPixelProbe(binaryCanvas, binaryCtx, binaryPixelInfo);
+    bindPixelProbe(ipmCanvas, ipmCtx, ipmPixelInfo);
+    bindPixelProbe(ipmRawCanvas, ipmRawCtx, ipmRawPixelInfo);
+
+    toggleMeanCenterline.addEventListener('change', () => {
+      showMeanCenterline = !!toggleMeanCenterline.checked;
+      if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
+    });
+    toggleIpmAnchorDot.addEventListener('change', () => {
+      showIpmAnchorDot = !!toggleIpmAnchorDot.checked;
+      drawIpmBoundaries(latestStatus);
+    });
+    toggleBoundaryPointMode.addEventListener('change', () => {
+      boundaryPointMode = !!toggleBoundaryPointMode.checked;
+      drawIpmBoundaries(latestStatus);
+      if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
+    });
+    switchIpmCenterlineSource.addEventListener('click', () => {
+      if (ipmCenterlineSource === 'left') {
+        ipmCenterlineSource = 'right';
+        switchIpmCenterlineSource.textContent = '透视中线来源：右边界平移';
+      } else {
+        ipmCenterlineSource = 'left';
+        switchIpmCenterlineSource.textContent = '透视中线来源：左边界平移';
+      }
+      drawIpmBoundaries(latestStatus);
+    });
 
     setInterval(pullStatus, 120);
     setInterval(pullFrames, 60);

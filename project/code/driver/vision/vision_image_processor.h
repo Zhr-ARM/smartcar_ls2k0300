@@ -5,23 +5,108 @@
 
 #define VISION_DOWNSAMPLED_WIDTH 160
 #define VISION_DOWNSAMPLED_HEIGHT 120
+#define VISION_IPM_WIDTH 400
+#define VISION_IPM_HEIGHT 200
 
-// 轮廓线误差：在图像高度(line_sample_ratio_num/line_sample_ratio_den)处，中线x与图像中心x的差值
+// 轮廓线误差：在图像高度 line_sample_ratio 处，
+// 中线 x 与图像中心 x 的差值（右偏为正，左偏为负）。
+// 是否调用：line_follow_thread 直接使用该全局量做控制输入。
 extern int line_error;
-extern int line_sample_ratio_num;
-extern int line_sample_ratio_den;
+// line_error 采样行比例（0.0~1.0）：
+// sample_y = clamp(int(VISION_DOWNSAMPLED_HEIGHT * line_sample_ratio), 0, VISION_DOWNSAMPLED_HEIGHT - 1)。
+// 图像坐标系中 y 向下增大：0.0 靠近顶部，1.0 靠近底部。
+// 默认 0.55f（约在 y=66/120 位置取样）。
+// 如何修改：提高比例值会让采样行下移（更靠近车前近处）；降低则上移（更看远处）。
+extern float line_sample_ratio;
 
-// 初始化图像处理模块（内部初始化UVC摄像头）
+typedef enum
+{
+    VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT = 0,
+    VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT = 1
+} vision_ipm_line_error_source_enum;
+
+// 作用：初始化图像处理模块（内部通过 vision_frame_capture 初始化采图）。
+// 参数：camera_path 为空时使用默认相机路径。
+// 是否调用：是，vision_pipeline_init 调用。
 bool vision_image_processor_init(const char *camera_path);
-// 释放图像处理模块资源（停止采集线程）
+// 作用：清理图像处理模块资源（停止采图线程）。
+// 是否调用：是，vision_pipeline_cleanup 调用。
 void vision_image_processor_cleanup();
 
-// 执行一帧图像采集 + OpenCV处理（灰度、二值化、边界提取）
+// 作用：执行一帧“采图+灰度/二值+迷宫法边线+逆透视+中线误差”。
+// 返回：true=处理成功，false=当前周期未取到新帧。
+// 是否调用：是，vision_pipeline_process_step 每帧调用。
 bool vision_image_processor_process_step();
 
-// 迷宫法起始搜索行（0~H-1），按单行搜索左右起点。
+// 作用：设置/获取迷宫法左右起点搜索行（单行搜索）。
+// 如何修改：建议范围 [1, H-2]；值越大越靠近图像底部。
+// 是否调用：是，main.cpp 启动时配置。
 void vision_image_processor_set_maze_start_row(int row);
 int vision_image_processor_get_maze_start_row();
+// 原图迷宫法巡线水平区间限制（包含边界）。
+// 约定：巡线起点搜索和左右手追踪都只能在 [x_min, x_max] 内进行；
+// 一旦下一步触碰到区间边界，就立即停止巡线，避免去畸变黑边干扰。
+// 默认值：10 ~ 150（以 160 宽图像为基准）。
+void vision_image_processor_set_maze_trace_x_range(int x_min, int x_max);
+void vision_image_processor_get_maze_trace_x_range(int *x_min, int *x_max);
+
+// 去畸变开关（运行时可配）。
+// true : 开启去畸变（使用 cameraMatrix/distCoeffs/move_xy）；
+// false: 跳过去畸变，直接使用原始采图。
+// 是否调用：建议在 main.cpp 启动配置区设置。
+void vision_image_processor_set_undistort_enabled(bool enabled);
+bool vision_image_processor_undistort_enabled();
+
+// 逆透视后边界三角滤波开关（对 IPM 边界点做原地平滑）。
+// true : 开启三角滤波（1-2-1）；
+// false: 关闭三角滤波（直接使用逆透视原始边界点）。
+// 说明：关闭仅跳过该平滑步骤，不影响后续处理链。
+void vision_image_processor_set_ipm_triangle_filter_enabled(bool enabled);
+bool vision_image_processor_ipm_triangle_filter_enabled();
+// 逆透视后边界近重复点过滤开关与阈值（px）。
+// 处理顺序：三角滤波之后执行该过滤。
+void vision_image_processor_set_ipm_min_point_dist_filter_enabled(bool enabled);
+bool vision_image_processor_ipm_min_point_dist_filter_enabled();
+void vision_image_processor_set_ipm_min_point_dist_px(float dist_px);
+float vision_image_processor_ipm_min_point_dist_px();
+
+// 逆透视后边界等距采样开关（作用于处理链边界，不影响 raw 边界）。
+// true : 开启按弧长等距重采样；
+// false: 关闭，保留当前点序列。
+void vision_image_processor_set_ipm_resample_enabled(bool enabled);
+bool vision_image_processor_ipm_resample_enabled();
+// 逆透视后边界等距采样步长（单位：像素）。
+// 建议 >= 1.0；数值越小点更密、越大点更稀。
+void vision_image_processor_set_ipm_resample_step_px(float step_px);
+float vision_image_processor_ipm_resample_step_px();
+
+// 逆透视处理链边界“法向平移距离”参数（单位：像素，默认15）。
+// 约定：左边界向右平移、右边界向左平移。
+void vision_image_processor_set_ipm_boundary_shift_distance_px(float dist_px);
+float vision_image_processor_ipm_boundary_shift_distance_px();
+
+// 逆透视处理中线后处理总开关（去重/平滑/重采样）。
+void vision_image_processor_set_ipm_centerline_postprocess_enabled(bool enabled);
+bool vision_image_processor_ipm_centerline_postprocess_enabled();
+// 逆透视处理中线三角滤波开关。
+void vision_image_processor_set_ipm_centerline_triangle_filter_enabled(bool enabled);
+bool vision_image_processor_ipm_centerline_triangle_filter_enabled();
+// 逆透视处理中线等距采样开关与步长（px）。
+void vision_image_processor_set_ipm_centerline_resample_enabled(bool enabled);
+bool vision_image_processor_ipm_centerline_resample_enabled();
+void vision_image_processor_set_ipm_centerline_resample_step_px(float step_px);
+float vision_image_processor_ipm_centerline_resample_step_px();
+// 逆透视处理中线近重复点过滤阈值（px）。
+void vision_image_processor_set_ipm_centerline_min_point_dist_px(float dist_px);
+float vision_image_processor_ipm_centerline_min_point_dist_px();
+// line_error 跟踪点配置：
+// - source: 选左边界平移中线或右边界平移中线；
+// - point_index: 选取中线中的第几个点（0-based）。
+void vision_image_processor_set_ipm_line_error_source(vision_ipm_line_error_source_enum source);
+vision_ipm_line_error_source_enum vision_image_processor_ipm_line_error_source();
+void vision_image_processor_set_ipm_line_error_point_index(int point_index);
+int vision_image_processor_ipm_line_error_point_index();
+void vision_image_processor_get_ipm_line_error_track_point(bool *valid, int *x, int *y);
 
 // 读取最近一帧处理耗时（单位：us）
 // capture_wait_us: 等待相机新帧
@@ -34,7 +119,8 @@ void vision_image_processor_get_last_perf_us(uint32 *capture_wait_us,
                                              uint32 *otsu_us,
                                              uint32 *maze_us,
                                              uint32 *total_us);
-// 读取最近一帧红色矩形识别耗时（单位：us）
+// 读取最近一帧红色矩形识别耗时（单位：us）。
+// 是否调用：是，vision_thread 性能统计和 TCP 状态上报调用。
 void vision_image_processor_get_last_red_detect_us(uint32 *red_detect_us);
 
 // 读取最近一帧 maze 阶段子流程耗时（单位：us）与有效性统计
@@ -55,8 +141,9 @@ void vision_image_processor_get_last_maze_detail_us(uint32 *maze_setup_us,
                                                     bool *left_ok,
                                                     bool *right_ok);
 
-// 图像数据访问接口
+// 图像数据访问接口。
 // 当前阶段处理图像统一为 VISION_DOWNSAMPLED_WIDTH x VISION_DOWNSAMPLED_HEIGHT。
+// 是否调用：被 transport/pipeline/web 状态发送等路径复用。
 const uint8 *vision_image_processor_gray_image();
 const uint8 *vision_image_processor_binary_u8_image();
 const uint8 *vision_image_processor_bgr_image();
@@ -69,11 +156,12 @@ const uint8 *vision_image_processor_bgr_downsampled_image();
 const uint8 *vision_image_processor_rgb565_downsampled_image();
 // 调试图像：逆透视彩色图与逆透视边线图（黑底白线）
 const uint8 *vision_image_processor_ipm_bgr_downsampled_image();
-const uint8 *vision_image_processor_ipm_edge_gray_downsampled_image();
 
-// 边界数据访问接口
+// 边界数据访问接口。
 // 当前返回原图(无逆透视)坐标系下的边界数组:
 // x1/y1 左边线, x2/y2 左右均值中线, x3/y3 右边线。
+// 参数均为“输出参数指针”，可传 nullptr 跳过不关心字段。
+// 是否调用：client sender、TCP 状态上报、控制链路。
 void vision_image_processor_get_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
                                            uint16 **y1, uint16 **y2, uint16 **y3,
                                            uint16 *dot_num);
@@ -82,17 +170,30 @@ void vision_image_processor_get_boundaries(uint16 **x1, uint16 **x2, uint16 **x3
 void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
                                                uint16 **y1, uint16 **y2, uint16 **y3,
                                                uint16 *dot_num);
+// 逆透视后“原始拷贝”边界数据（未做三角滤波）。
+// 用途：角点识别等需要保留原始几何形态的流程。
+void vision_image_processor_get_ipm_boundaries_raw(uint16 **x1, uint16 **x2, uint16 **x3,
+                                                   uint16 **y1, uint16 **y2, uint16 **y3,
+                                                   uint16 *dot_num);
+
+// 逆透视处理链“平移中线”结果：
+// - from_left : 左边界向右法向平移得到；
+// - from_right: 右边界向左法向平移得到。
+void vision_image_processor_get_ipm_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
+void vision_image_processor_get_ipm_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
 
 // 逆透视后拟合中线（另存）
 void vision_image_processor_get_ipm_fitted_centerline(uint16 **x, uint16 **y, uint16 *dot_num);
 
-// 红色实心矩形检测结果（坐标与尺寸）
+// 红色实心矩形检测结果（坐标与尺寸）。
+// set_* 接口由 infer 模块写入，get_* 接口供发送/UI读取。
 void vision_image_processor_get_red_rect(bool *found, int *x, int *y, int *w, int *h, int *cx, int *cy);
 int vision_image_processor_get_red_rect_area();
 void vision_image_processor_set_red_rect(bool found, int x, int y, int w, int h, int cx, int cy, int area);
 void vision_image_processor_set_last_red_detect_us(uint32 red_detect_us);
 
-// ncnn输入ROI（用于发送图像叠加调试框）
+// ncnn 输入 ROI（用于发送图像叠加调试框）。
+// set_* 由 infer 模块写入，get_* 由 transport 状态发送读取。
 void vision_image_processor_set_ncnn_roi(bool valid, int x, int y, int w, int h);
 void vision_image_processor_get_ncnn_roi(bool *valid, int *x, int *y, int *w, int *h);
 

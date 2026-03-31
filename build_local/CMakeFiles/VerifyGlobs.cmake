@@ -83,6 +83,7 @@ set(OLD_GLOB
   "/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/pid/pid.cpp"
   "/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/uart/uart.cpp"
   "/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/uart_pid_protocol/uart_pid_protocol.cpp"
+  "/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_assistant_udp.cpp"
   "/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_frame_capture.cpp"
   "/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_image_processor.cpp"
   "/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_infer_async.cpp"

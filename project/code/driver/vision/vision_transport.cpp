@@ -24,12 +24,18 @@ namespace
 // ---------- client sender ----------
 static constexpr uint32 kClientDefaultMaxFps = 30;
 static constexpr uint32 kClientMaxFpsUpper = 240;
+// RGB565 临时缓存：仅在 VISION_SEND_RGB565 模式使用。
 static std::vector<uint8> g_image_rgb565_frame(VISION_DOWNSAMPLED_WIDTH * VISION_DOWNSAMPLED_HEIGHT * 2);
+// 客户端发送模式与开关。
 static std::atomic<int> g_send_mode(VISION_SEND_BINARY);
 static std::atomic<bool> g_send_enabled(true);
+// 最近一次已配置模式（避免重复配置底层发送结构）。
 static std::atomic<int> g_last_send_mode(-1);
+// 最近一次客户端发送耗时（us）。
 static std::atomic<uint32> g_last_send_time_us(0);
+// 最近一次客户端发送时间戳（用于限频）。
 static std::atomic<uint64> g_last_send_tick_us(0);
+// 客户端发送最大 FPS（0 表示不限）。
 static std::atomic<uint32> g_send_max_fps(kClientDefaultMaxFps);
 
 // ---------- udp/tcp sender ----------
@@ -39,8 +45,8 @@ constexpr uint32 kMaxUdpPayload = 1200;
 constexpr uint32 kUdpHeaderSize = 20;
 constexpr uint32 kMagic = 0x56535544;
 constexpr uint32 kTcpStatusMinIntervalMs = 100;
-constexpr int kIpmCanvasWidth = 100;
-constexpr int kIpmCanvasHeight = 100;
+constexpr int kIpmCanvasWidth = VISION_IPM_WIDTH;
+constexpr int kIpmCanvasHeight = VISION_IPM_HEIGHT;
 
 #pragma pack(push, 1)
 struct udp_chunk_header_t
@@ -57,19 +63,19 @@ struct udp_chunk_header_t
 };
 #pragma pack(pop)
 
-std::atomic<bool> g_udp_enabled(false);
-std::atomic<bool> g_tcp_enabled(true);
-std::atomic<uint32> g_udp_max_fps(kUdpDefaultMaxFps);
-std::atomic<uint64> g_udp_last_send_tick_us(0);
-std::atomic<uint32> g_udp_frame_id(0);
-std::atomic<int64_t> g_last_status_tick_ms(0);
+std::atomic<bool> g_udp_enabled(false);            // UDP 图像发送开关。
+std::atomic<bool> g_tcp_enabled(true);             // TCP 状态发送开关。
+std::atomic<uint32> g_udp_max_fps(kUdpDefaultMaxFps); // UDP 图像限频。
+std::atomic<uint64> g_udp_last_send_tick_us(0);    // UDP 限频时间戳。
+std::atomic<uint32> g_udp_frame_id(0);             // UDP 分片帧号。
+std::atomic<int64_t> g_last_status_tick_ms(0);     // TCP 状态上报节流时间戳。
 
-std::mutex g_init_mutex;
-bool g_udp_ready = false;
-bool g_tcp_ready = false;
-char g_server_ip[64] = {0};
-uint16 g_video_port = 0;
-uint16 g_meta_port = 0;
+std::mutex g_init_mutex;      // UDP/TCP 初始化锁。
+bool g_udp_ready = false;     // UDP 初始化是否成功。
+bool g_tcp_ready = false;     // TCP 初始化是否成功。
+char g_server_ip[64] = {0};   // 接收端 IP。
+uint16 g_video_port = 0;      // UDP 视频端口。
+uint16 g_meta_port = 0;       // TCP 状态端口。
 
 static vision_send_mode_enum vision_sender_sanitize_mode(vision_send_mode_enum mode)
 {
@@ -84,6 +90,7 @@ static vision_send_mode_enum vision_sender_sanitize_mode(vision_send_mode_enum m
     return VISION_SEND_GRAY;
 }
 
+// 作用：BGR 转 RGB565（大端）用于助手发送。
 static void convert_bgr_to_rgb565_be(const uint8 *bgr_data, uint8 *rgb565_data, int width, int height)
 {
     if (bgr_data == nullptr || rgb565_data == nullptr || width <= 0 || height <= 0)
@@ -102,6 +109,7 @@ static void convert_bgr_to_rgb565_be(const uint8 *bgr_data, uint8 *rgb565_data, 
     }
 }
 
+// 作用：更新 RGB565 缓冲。
 static void update_rgb565_from_bgr_source(const uint8 *bgr_data)
 {
     if (bgr_data == nullptr)
@@ -120,6 +128,7 @@ static bool mode_enable_boundary_packet(vision_send_mode_enum mode)
     return mode == VISION_SEND_GRAY;
 }
 
+// 作用：首次配置助手图像发送与边线发送格式。
 static void config_camera_send_packet(vision_send_mode_enum mode)
 {
     uint16 *x1 = nullptr;
@@ -164,6 +173,7 @@ static void config_camera_send_packet(vision_send_mode_enum mode)
     g_last_send_mode.store(static_cast<int>(mode));
 }
 
+// 作用：刷新边线包（灰度模式下每帧刷新）。
 static void refresh_camera_boundary_packet(vision_send_mode_enum mode)
 {
     if (!mode_enable_boundary_packet(mode))
@@ -203,6 +213,7 @@ static int64_t now_ms()
         .count();
 }
 
+// 作用：UDP 限频抢占。
 static bool try_acquire_udp_send_slot()
 {
     const uint32 max_fps = g_udp_max_fps.load();
@@ -222,6 +233,7 @@ static bool try_acquire_udp_send_slot()
     return true;
 }
 
+// 作用：将灰度/二值图编码为 JPEG（供 UDP 发送）。
 static bool encode_jpeg_gray_like(const uint8 *gray_u8, int width, int height, std::vector<uint8> *jpeg_out)
 {
     if (gray_u8 == nullptr || jpeg_out == nullptr || width <= 0 || height <= 0)
@@ -271,6 +283,7 @@ static bool build_binary_jpeg(std::vector<uint8> *jpeg_out, int *width, int *hei
     return true;
 }
 
+// 作用：发送 UDP 分片帧。
 static void send_udp_frame(const std::vector<uint8> &jpeg, int width, int height, uint8 mode)
 {
     if (!g_udp_ready || jpeg.empty())
@@ -306,6 +319,7 @@ static void send_udp_frame(const std::vector<uint8> &jpeg, int width, int height
     }
 }
 
+// 作用：发送 TCP JSON 状态（性能+边线+红框+ROI）。
 static void send_tcp_status()
 {
     if (!g_tcp_enabled.load() || !g_tcp_ready)
@@ -357,6 +371,24 @@ static void send_tcp_status()
     uint16 *ipm_y3 = nullptr;
     uint16 ipm_dot_num = 0;
     vision_image_processor_get_ipm_boundaries(&ipm_x1, nullptr, &ipm_x3, &ipm_y1, nullptr, &ipm_y3, &ipm_dot_num);
+    uint16 *ipm_raw_x1 = nullptr;
+    uint16 *ipm_raw_x3 = nullptr;
+    uint16 *ipm_raw_y1 = nullptr;
+    uint16 *ipm_raw_y3 = nullptr;
+    uint16 ipm_raw_dot_num = 0;
+    vision_image_processor_get_ipm_boundaries_raw(&ipm_raw_x1, nullptr, &ipm_raw_x3, &ipm_raw_y1, nullptr, &ipm_raw_y3, &ipm_raw_dot_num);
+    uint16 *ipm_center_left_x = nullptr;
+    uint16 *ipm_center_left_y = nullptr;
+    uint16 ipm_center_left_num = 0;
+    vision_image_processor_get_ipm_shifted_centerline_from_left(&ipm_center_left_x, &ipm_center_left_y, &ipm_center_left_num);
+    uint16 *ipm_center_right_x = nullptr;
+    uint16 *ipm_center_right_y = nullptr;
+    uint16 ipm_center_right_num = 0;
+    vision_image_processor_get_ipm_shifted_centerline_from_right(&ipm_center_right_x, &ipm_center_right_y, &ipm_center_right_num);
+    bool ipm_track_valid = false;
+    int ipm_track_x = 0;
+    int ipm_track_y = 0;
+    vision_image_processor_get_ipm_line_error_track_point(&ipm_track_valid, &ipm_track_x, &ipm_track_y);
 
     std::string line;
     line.reserve(8192);
@@ -384,8 +416,12 @@ static void send_tcp_status()
     line += ",\"roi\":[";
     line += std::to_string(roi_x) + "," + std::to_string(roi_y) + "," + std::to_string(roi_w) + "," +
             std::to_string(roi_h) + "]";
+    line += ",\"ipm_track_valid\":";
+    line += ipm_track_valid ? "1" : "0";
+    line += ",\"ipm_track_point\":[";
+    line += std::to_string(ipm_track_x) + "," + std::to_string(ipm_track_y) + "]";
 
-    auto append_points = [&line](const char *name, uint16 *xs, uint16 *ys, uint16 n, bool ipm_scale) {
+    auto append_points = [&line](const char *name, uint16 *xs, uint16 *ys, uint16 n, int max_w, int max_h) {
         line += ",\"";
         line += name;
         line += "\":[";
@@ -397,13 +433,8 @@ static void send_tcp_status()
             }
             int px = static_cast<int>(xs ? xs[i] : 0);
             int py = static_cast<int>(ys ? ys[i] : 0);
-            if (ipm_scale)
-            {
-                px = (px * kIpmCanvasWidth) / VISION_DOWNSAMPLED_WIDTH;
-                py = (py * kIpmCanvasHeight) / VISION_DOWNSAMPLED_HEIGHT;
-                px = std::clamp(px, 0, kIpmCanvasWidth - 1);
-                py = std::clamp(py, 0, kIpmCanvasHeight - 1);
-            }
+            px = std::clamp(px, 0, std::max(0, max_w - 1));
+            py = std::clamp(py, 0, std::max(0, max_h - 1));
             line += "[";
             line += std::to_string(px);
             line += ",";
@@ -413,10 +444,14 @@ static void send_tcp_status()
         line += "]";
     };
 
-    append_points("left_boundary", x1, y1, dot_num, false);
-    append_points("right_boundary", x3, y3, dot_num, false);
-    append_points("ipm_left_boundary", ipm_x1, ipm_y1, ipm_dot_num, true);
-    append_points("ipm_right_boundary", ipm_x3, ipm_y3, ipm_dot_num, true);
+    append_points("left_boundary", x1, y1, dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points("right_boundary", x3, y3, dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points("ipm_left_boundary", ipm_x1, ipm_y1, ipm_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points("ipm_right_boundary", ipm_x3, ipm_y3, ipm_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points("ipm_raw_left_boundary", ipm_raw_x1, ipm_raw_y1, ipm_raw_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points("ipm_raw_right_boundary", ipm_raw_x3, ipm_raw_y3, ipm_raw_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points("ipm_centerline_from_left_shift", ipm_center_left_x, ipm_center_left_y, ipm_center_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points("ipm_centerline_from_right_shift", ipm_center_right_x, ipm_center_right_y, ipm_center_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
 
     line += ",\"gray_size\":[";
     line += std::to_string(VISION_DOWNSAMPLED_WIDTH);
@@ -436,11 +471,13 @@ static void send_tcp_status()
 
 void vision_transport_init()
 {
+    // 首帧前不做底层图像包配置，避免空指针或黑屏。
     g_last_send_mode.store(-1);
 }
 
 void vision_transport_send_step()
 {
+    // 发送统一入口：先客户端发送，再 UDP/TCP 发送。
     auto t0 = std::chrono::steady_clock::now();
     bool allow_send = true;
     const uint32 max_fps = g_send_max_fps.load();
@@ -543,6 +580,10 @@ bool vision_transport_is_send_enabled()
 
 bool vision_transport_udp_init(const char *server_ip, uint16 video_port, uint16 meta_port)
 {
+    // 参数意义：
+    // - server_ip: PC 接收端 IP；
+    // - video_port: UDP 视频端口；
+    // - meta_port: TCP 状态端口（可为 0）。
     std::lock_guard<std::mutex> lk(g_init_mutex);
     if (server_ip == nullptr || server_ip[0] == '\0' || video_port == 0)
     {

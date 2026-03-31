@@ -65,6 +65,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/uart/uart.cpp.o.d"
   "CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/uart_pid_protocol/uart_pid_protocol.cpp.o"
   "CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/uart_pid_protocol/uart_pid_protocol.cpp.o.d"
+  "CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.o"
+  "CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.o.d"
   "CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_frame_capture.cpp.o"
   "CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_frame_capture.cpp.o.d"
   "CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_image_processor.cpp.o"

@@ -10,14 +10,21 @@
 
 namespace
 {
+// 采图线程对象：由 init 创建，cleanup 回收。
 static std::thread g_capture_thread;
+// 采图线程运行标志：true=持续采图，false=停止。
 static std::atomic<bool> g_capture_running(false);
+// 采图共享缓冲互斥锁与条件变量。
 static std::mutex g_capture_mutex;
 static std::condition_variable g_capture_cv;
+// 最新一帧 BGR 缓冲（full 分辨率）。
 static std::array<uint8, UVC_HEIGHT * UVC_WIDTH * 3> g_capture_frame{};
+// 生产序号（采图线程递增）与消费序号（处理线程递增）。
 static uint32 g_capture_seq = 0;
 static uint32 g_processed_seq = 0;
 
+// 作用：采图线程主循环。
+// 调用关系：仅由 vision_frame_capture_init 创建线程后调用。
 static void capture_loop()
 {
     while (g_capture_running.load())
@@ -46,6 +53,7 @@ bool vision_frame_capture_init(const char *camera_path)
         return true;
     }
 
+    // camera_path 为空时使用默认设备。
     if (camera_path == nullptr || camera_path[0] == '\0')
     {
         camera_path = "/dev/video0";
@@ -86,6 +94,7 @@ void vision_frame_capture_cleanup()
 bool vision_frame_capture_wait_next_bgr(uint8 *out_bgr, size_t out_bgr_bytes, uint32 timeout_ms, uint32 *wait_us)
 {
     auto t0 = std::chrono::steady_clock::now();
+    // 参数合法性检查：输出缓冲大小必须覆盖 full BGR 一帧。
     if (out_bgr == nullptr || out_bgr_bytes < g_capture_frame.size())
     {
         if (wait_us != nullptr)

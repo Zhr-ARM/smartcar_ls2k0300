@@ -922,6 +922,30 @@ home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/uart_pid_protocol/uart_pid_protocol.cpp.s
 .PHONY : home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/uart_pid_protocol/uart_pid_protocol.cpp.s
 
+home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.o: home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.o
+.PHONY : home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.o
+
+# target to build an object file
+home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.o
+.PHONY : home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.o
+
+home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.i: home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.i
+.PHONY : home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.i
+
+# target to preprocess a source file
+home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.i
+.PHONY : home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.i
+
+home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.s: home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.s
+.PHONY : home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.s
+
+# target to generate assembly for a file
+home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.s
+.PHONY : home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.cpp.s
+
 home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_frame_capture.o: home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_frame_capture.cpp.o
 .PHONY : home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_frame_capture.o
 
@@ -1174,6 +1198,9 @@ help:
 	@echo "... home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/uart_pid_protocol/uart_pid_protocol.o"
 	@echo "... home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/uart_pid_protocol/uart_pid_protocol.i"
 	@echo "... home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/uart_pid_protocol/uart_pid_protocol.s"
+	@echo "... home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.o"
+	@echo "... home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.i"
+	@echo "... home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_assistant_udp.s"
 	@echo "... home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_frame_capture.o"
 	@echo "... home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_frame_capture.i"
 	@echo "... home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/code/driver/vision/vision_frame_capture.s"

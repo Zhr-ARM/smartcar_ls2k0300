@@ -21,6 +21,7 @@
 
 namespace
 {
+// 固定分辨率参数：当前工程采图/处理固定为 160x120，full 为 UVC 原始尺寸。
 static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
 static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
 static constexpr int kFullWidth = UVC_WIDTH;
@@ -32,30 +33,36 @@ static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
 static constexpr int kRefFullWidth = 320;
 static constexpr int kRefFullHeight = 240;
 
-static constexpr int kInferRoiSizeProcRef = 40;
-static constexpr int kInferBottomOffsetFullRef = 10;
+// 推理 ROI 参数（基于处理分辨率标定值）。
+static constexpr int kInferRoiSizeProcRef = 40;      // ROI 边长参考值。
+static constexpr int kInferBottomOffsetFullRef = 10; // ROI 相对红框底部偏移。
 
+// 红框搜索区域参数（以 x=80 竖线附近搜索）。
 static constexpr int kRedSearchExpandXRef = 28;
 static constexpr int kRedSearchCenterXRef = 80;
 static constexpr int kRedSearchMinWRef = 48;
 static constexpr int kRedSearchMinHRef = 36;
 
+// 红框连通域筛选阈值（面积范围与目标面积）。
 static constexpr int kRedExpectedAreaPxRef = 60;
 static constexpr int kRedAreaMinPxRef = 20;
 static constexpr int kRedAreaMaxPxRef = 450;
 
+// ROI 抓图参数：每次检测到红框后按间隔抓图，最多抓取 kCaptureMaxCount 张。
 static constexpr int kCaptureMinIntervalMs = 1000;
 static constexpr int kCaptureMaxCount = 20;
 static constexpr const char *kCaptureDir = "vision_roi_captures";
 
 struct infer_job_t
 {
+    // 异步任务输入：处理分辨率 BGR + full 分辨率 BGR。
     cv::Mat proc_bgr;
     cv::Mat full_bgr;
 };
 
 struct infer_worker_result_t
 {
+    // 异步任务输出：红框信息 + ncnn ROI（处理分辨率坐标）。
     bool found = false;
     int red_x = 0;
     int red_y = 0;
@@ -68,15 +75,17 @@ struct infer_worker_result_t
     cv::Rect ncnn_roi_proc;
 };
 
-// 原 vision_ncnn + lq_ncnn 的运行态并入 infer 模块。
+// 推理运行态（原 vision_ncnn 逻辑并入）。
 static LQ_NCNN *g_ncnn = nullptr;
 static std::atomic<bool> g_infer_enabled(false);
 
+// ROI 抓图状态。
 static std::atomic<bool> g_roi_capture_mode_enabled(false);
 static std::atomic<int> g_roi_capture_saved_count(0);
 static std::atomic<int64_t> g_roi_capture_last_save_ms(-(int64_t)kCaptureMinIntervalMs);
 static std::atomic<bool> g_roi_capture_done_notified(false);
 
+// 异步 worker 线程与共享任务/结果缓冲。
 static std::mutex g_infer_mutex;
 static std::condition_variable g_infer_cv;
 static std::thread g_infer_thread;
@@ -87,6 +96,7 @@ static infer_job_t g_infer_job;
 static infer_worker_result_t g_latest_infer_result;
 static bool g_latest_infer_result_valid = false;
 
+// 作用：参考分辨率参数缩放到当前处理分辨率。
 static inline int scale_by_width(int ref_px)
 {
     if (ref_px <= 0)
@@ -276,6 +286,7 @@ static cv::Rect fallback_center_roi()
     return cv::Rect(rx, ry, rw, rh);
 }
 
+// 作用：在 x=80 附近生成红框搜索 ROI。
 static cv::Rect build_red_search_roi_from_x_line()
 {
     const int kExpandX = scale_by_width(kRedSearchExpandXRef);
@@ -313,6 +324,8 @@ static cv::Rect build_red_search_roi_from_x_line()
     return cv::Rect(x0, y0, rw, rh);
 }
 
+// 作用：在搜索 ROI 内找红色实心矩形。
+// 如何修改：可调颜色阈值、面积阈值、形状约束。
 static bool detect_red_rectangle_bbox(const cv::Mat &bgr, const cv::Rect &search_roi, cv::Rect *bbox, int *area_px)
 {
     if (bbox == nullptr || area_px == nullptr || bgr.empty() || bgr.type() != CV_8UC3)
@@ -402,6 +415,7 @@ static bool detect_red_rectangle_bbox(const cv::Mat &bgr, const cv::Rect &search
     return true;
 }
 
+// 作用：执行一帧 ncnn 推理（内部调用 LQ_NCNN::Infer）。
 static void ncnn_step(const uint8 *bgr_data, int width, int height)
 {
     if (!g_infer_enabled.load() || g_ncnn == nullptr || bgr_data == nullptr || width <= 0 || height <= 0)
@@ -412,6 +426,7 @@ static void ncnn_step(const uint8 *bgr_data, int width, int height)
     g_ncnn->Infer(bgr);
 }
 
+// 作用：清空异步任务与结果共享状态。
 static void reset_infer_shared_state()
 {
     std::lock_guard<std::mutex> lock(g_infer_mutex);
@@ -422,6 +437,7 @@ static void reset_infer_shared_state()
     g_latest_infer_result_valid = false;
 }
 
+// 作用：异步推理工作线程主循环。
 static void run_infer_worker()
 {
     for (;;)
@@ -614,6 +630,7 @@ LQ_NCNN::~LQ_NCNN() = default;
 
 bool vision_infer_init_default_model(LQ_NCNN &ncnn)
 {
+    // 默认模型配置：集中在此，替换模型时优先修改这里。
     const std::string model_param = "tiny_classifier_fp32.ncnn.param";
     const std::string model_bin = "tiny_classifier_fp32.ncnn.bin";
     const int input_width = 64;
@@ -640,6 +657,7 @@ bool vision_infer_init_default_model(LQ_NCNN &ncnn)
 
 bool vision_infer_async_init(LQ_NCNN *ncnn, bool enabled)
 {
+    // 模块初始化：绑定 ncnn 运行态并启动 worker。
     g_ncnn = ncnn;
     g_infer_enabled.store(enabled);
 
@@ -662,6 +680,7 @@ bool vision_infer_async_init(LQ_NCNN *ncnn, bool enabled)
 
 void vision_infer_async_cleanup()
 {
+    // 停止 worker 并清理共享状态。
     if (g_infer_worker_running)
     {
         {
@@ -731,6 +750,7 @@ void vision_infer_async_submit_frame(const uint8 *bgr_proc_data,
     {
         return;
     }
+    // 尺寸不匹配时直接丢弃（保护当前固定分辨率流程）。
     if (proc_width != kProcWidth || proc_height != kProcHeight || full_width != kFullWidth || full_height != kFullHeight)
     {
         return;
