@@ -1,5 +1,6 @@
 #include "driver/vision/vision_transport.h"
 
+#include "line_follow_thread.h"
 #include "driver/vision/vision_image_processor.h"
 
 #include "zf_driver_tcp_client.h"
@@ -377,6 +378,26 @@ static void send_tcp_status()
     uint16 *ipm_raw_y3 = nullptr;
     uint16 ipm_raw_dot_num = 0;
     vision_image_processor_get_ipm_boundaries_raw(&ipm_raw_x1, nullptr, &ipm_raw_x3, &ipm_raw_y1, nullptr, &ipm_raw_y3, &ipm_raw_dot_num);
+    uint16 *ipm_corner_left_x = nullptr;
+    uint16 *ipm_corner_left_y = nullptr;
+    float *ipm_corner_left_raw_value = nullptr;
+    float *ipm_corner_left_value = nullptr;
+    uint16 ipm_corner_left_num = 0;
+    vision_image_processor_get_ipm_corner_debug_left(&ipm_corner_left_x,
+                                                     &ipm_corner_left_y,
+                                                     &ipm_corner_left_raw_value,
+                                                     &ipm_corner_left_value,
+                                                     &ipm_corner_left_num);
+    uint16 *ipm_corner_right_x = nullptr;
+    uint16 *ipm_corner_right_y = nullptr;
+    float *ipm_corner_right_raw_value = nullptr;
+    float *ipm_corner_right_value = nullptr;
+    uint16 ipm_corner_right_num = 0;
+    vision_image_processor_get_ipm_corner_debug_right(&ipm_corner_right_x,
+                                                      &ipm_corner_right_y,
+                                                      &ipm_corner_right_raw_value,
+                                                      &ipm_corner_right_value,
+                                                      &ipm_corner_right_num);
     uint16 *ipm_center_left_x = nullptr;
     uint16 *ipm_center_left_y = nullptr;
     uint16 ipm_center_left_num = 0;
@@ -385,10 +406,24 @@ static void send_tcp_status()
     uint16 *ipm_center_right_y = nullptr;
     uint16 ipm_center_right_num = 0;
     vision_image_processor_get_ipm_shifted_centerline_from_right(&ipm_center_right_x, &ipm_center_right_y, &ipm_center_right_num);
+    uint16 *src_center_left_x = nullptr;
+    uint16 *src_center_left_y = nullptr;
+    uint16 src_center_left_num = 0;
+    vision_image_processor_get_src_shifted_centerline_from_left(&src_center_left_x, &src_center_left_y, &src_center_left_num);
+    uint16 *src_center_right_x = nullptr;
+    uint16 *src_center_right_y = nullptr;
+    uint16 src_center_right_num = 0;
+    vision_image_processor_get_src_shifted_centerline_from_right(&src_center_right_x, &src_center_right_y, &src_center_right_num);
     bool ipm_track_valid = false;
+    int ipm_track_index = -1;
     int ipm_track_x = 0;
     int ipm_track_y = 0;
+    bool intersection_mode = false;
+    int intersection_stop_row = -1;
+    int intersection_current_start_row = -1;
+    ipm_track_index = vision_image_processor_ipm_line_error_track_index();
     vision_image_processor_get_ipm_line_error_track_point(&ipm_track_valid, &ipm_track_x, &ipm_track_y);
+    vision_image_processor_get_intersection_mode_state(&intersection_mode, &intersection_stop_row, &intersection_current_start_row);
 
     std::string line;
     line.reserve(8192);
@@ -396,6 +431,8 @@ static void send_tcp_status()
     line += std::to_string(static_cast<long long>(now));
     line += ",\"line_error\":";
     line += std::to_string(line_error);
+    line += ",\"base_speed\":";
+    line += std::to_string(line_follow_thread_base_speed());
     line += ",\"capture_wait_us\":";
     line += std::to_string(capture_wait_us);
     line += ",\"preprocess_us\":";
@@ -418,8 +455,22 @@ static void send_tcp_status()
             std::to_string(roi_h) + "]";
     line += ",\"ipm_track_valid\":";
     line += ipm_track_valid ? "1" : "0";
+    line += ",\"ipm_track_method\":";
+    line += std::to_string(static_cast<int>(vision_image_processor_ipm_line_error_method()));
+    line += ",\"ipm_centerline_source\":";
+    line += std::to_string(static_cast<int>(vision_image_processor_ipm_line_error_source()));
+    line += ",\"ipm_track_index\":";
+    line += std::to_string(ipm_track_index);
     line += ",\"ipm_track_point\":[";
     line += std::to_string(ipm_track_x) + "," + std::to_string(ipm_track_y) + "]";
+    line += ",\"intersection_mode\":";
+    line += intersection_mode ? "1" : "0";
+    line += ",\"intersection_stop_row\":";
+    line += std::to_string(intersection_stop_row);
+    line += ",\"intersection_current_start_row\":";
+    line += std::to_string(intersection_current_start_row);
+    line += ",\"roundabout_mode\":";
+    line += std::to_string(vision_image_processor_roundabout_mode());
 
     auto append_points = [&line](const char *name, uint16 *xs, uint16 *ys, uint16 n, int max_w, int max_h) {
         line += ",\"";
@@ -444,14 +495,37 @@ static void send_tcp_status()
         line += "]";
     };
 
+    auto append_float_array = [&line](const char *name, float *values, uint16 n) {
+        line += ",\"";
+        line += name;
+        line += "\":[";
+        for (uint16 i = 0; i < n; ++i)
+        {
+            if (i > 0)
+            {
+                line += ",";
+            }
+            line += std::to_string(values ? values[i] : 0.0f);
+        }
+        line += "]";
+    };
+
     append_points("left_boundary", x1, y1, dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points("right_boundary", x3, y3, dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points("ipm_left_boundary", ipm_x1, ipm_y1, ipm_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points("ipm_right_boundary", ipm_x3, ipm_y3, ipm_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points("ipm_raw_left_boundary", ipm_raw_x1, ipm_raw_y1, ipm_raw_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points("ipm_raw_right_boundary", ipm_raw_x3, ipm_raw_y3, ipm_raw_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points("ipm_corner_left_boundary", ipm_corner_left_x, ipm_corner_left_y, ipm_corner_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points("ipm_corner_right_boundary", ipm_corner_right_x, ipm_corner_right_y, ipm_corner_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_float_array("ipm_corner_left_raw_angle", ipm_corner_left_raw_value, ipm_corner_left_num);
+    append_float_array("ipm_corner_right_raw_angle", ipm_corner_right_raw_value, ipm_corner_right_num);
+    append_float_array("ipm_corner_left_nms", ipm_corner_left_value, ipm_corner_left_num);
+    append_float_array("ipm_corner_right_nms", ipm_corner_right_value, ipm_corner_right_num);
     append_points("ipm_centerline_from_left_shift", ipm_center_left_x, ipm_center_left_y, ipm_center_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points("ipm_centerline_from_right_shift", ipm_center_right_x, ipm_center_right_y, ipm_center_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points("src_centerline_from_left_shift", src_center_left_x, src_center_left_y, src_center_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points("src_centerline_from_right_shift", src_center_right_x, src_center_right_y, src_center_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
 
     line += ",\"gray_size\":[";
     line += std::to_string(VISION_DOWNSAMPLED_WIDTH);

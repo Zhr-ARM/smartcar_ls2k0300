@@ -37,7 +37,7 @@
     <div class="meta">
       <label style="margin-right: 16px;">
         <input type="checkbox" id="toggleMeanCenterline" checked />
-        灰度图显示均值中线
+        灰度图显示所选偏移中线
       </label>
       <label>
         <input type="checkbox" id="toggleIpmAnchorDot" checked />
@@ -47,9 +47,9 @@
         <input type="checkbox" id="toggleBoundaryPointMode" />
         边界/中线按采样点显示（关闭=连线）
       </label>
-      <button id="switchIpmCenterlineSource" style="margin-left: 16px;">
-        透视中线来源：左边界平移
-      </button>
+      <span id="ipmCenterlineSourceLabel" style="margin-left: 16px;">
+        透视中线来源：自动
+      </span>
     </div>
     <div class="grid">
       <div class="card">
@@ -104,15 +104,13 @@
     const toggleMeanCenterline = document.getElementById('toggleMeanCenterline');
     const toggleIpmAnchorDot = document.getElementById('toggleIpmAnchorDot');
     const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
-    const switchIpmCenterlineSource = document.getElementById('switchIpmCenterlineSource');
+    const ipmCenterlineSourceLabel = document.getElementById('ipmCenterlineSourceLabel');
     const grayImg = new Image();
     const binaryImg = new Image();
     let latestStatus = {};
     let showMeanCenterline = true;
     let showIpmAnchorDot = true;
     let boundaryPointMode = false;
-    let ipmCenterlineSource = 'left';
-
     function drawPolyline(ctx, pts, color, lineWidth) {
       if (!Array.isArray(pts) || pts.length < 2) return;
       ctx.strokeStyle = color;
@@ -146,20 +144,86 @@
       }
     }
 
-    function buildMeanCenterline(leftPts, rightPts) {
-      if (!Array.isArray(leftPts) || !Array.isArray(rightPts)) return [];
-      const n = Math.min(leftPts.length, rightPts.length);
-      if (n < 2) return [];
-      const mid = [];
-      for (let i = 0; i < n; i += 1) {
-        const l = leftPts[i];
-        const r = rightPts[i];
-        if (!Array.isArray(l) || !Array.isArray(r) || l.length < 2 || r.length < 2) continue;
-        const mx = Math.round((l[0] + r[0]) * 0.5);
-        const my = Math.round((l[1] + r[1]) * 0.5);
-        mid.push([mx, my]);
+    function scalarToColor(value, maxAbs) {
+      const scale = Math.max(1e-6, maxAbs || 1);
+      const t = Math.max(-1, Math.min(1, value / scale));
+      if (t >= 0) {
+        const r = 255;
+        const g = Math.round(220 - 120 * t);
+        const b = Math.round(80 - 60 * t);
+        return `rgb(${r},${Math.max(80, g)},${Math.max(20, b)})`;
       }
-      return mid;
+      const u = -t;
+      const r = Math.round(80 - 40 * u);
+      const g = Math.round(200 + 30 * u);
+      const b = 255;
+      return `rgb(${Math.max(20, r)},${Math.min(255, g)},${b})`;
+    }
+
+    function combinedCornerSamples(status) {
+      const leftPts = Array.isArray(status.ipm_corner_left_boundary) ? status.ipm_corner_left_boundary : [];
+      const leftRaw = Array.isArray(status.ipm_corner_left_raw_angle) ? status.ipm_corner_left_raw_angle : [];
+      const leftVals = Array.isArray(status.ipm_corner_left_nms) ? status.ipm_corner_left_nms : [];
+      const rightPts = Array.isArray(status.ipm_corner_right_boundary) ? status.ipm_corner_right_boundary : [];
+      const rightRaw = Array.isArray(status.ipm_corner_right_raw_angle) ? status.ipm_corner_right_raw_angle : [];
+      const rightVals = Array.isArray(status.ipm_corner_right_nms) ? status.ipm_corner_right_nms : [];
+      const samples = [];
+      for (let i = 0; i < leftPts.length && i < leftVals.length; i += 1) {
+        samples.push({
+          point: leftPts[i],
+          raw: (i < leftRaw.length) ? (Number(leftRaw[i]) || 0) : 0,
+          value: Number(leftVals[i]) || 0
+        });
+      }
+      for (let i = 0; i < rightPts.length && i < rightVals.length; i += 1) {
+        samples.push({
+          point: rightPts[i],
+          raw: (i < rightRaw.length) ? (Number(rightRaw[i]) || 0) : 0,
+          value: Number(rightVals[i]) || 0
+        });
+      }
+      return samples;
+    }
+
+    function drawCornerDebugBoundary(ctx, status, w, h) {
+      const samples = combinedCornerSamples(status);
+      if (samples.length < 1) return;
+      let maxAbs = 0;
+      for (const sample of samples) {
+        maxAbs = Math.max(maxAbs, Math.abs(sample.value));
+      }
+      for (const sample of samples) {
+        const p = sample.point;
+        if (!Array.isArray(p) || p.length < 2) continue;
+        ctx.fillStyle = scalarToColor(sample.value, maxAbs);
+        ctx.beginPath();
+        ctx.arc(
+          Math.max(0, Math.min(w - 1, p[0] | 0)),
+          Math.max(0, Math.min(h - 1, p[1] | 0)),
+          boundaryPointMode ? 2 : 2,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+    }
+
+    function findNearestCornerSample(status, x, y) {
+      const samples = combinedCornerSamples(status);
+      let best = null;
+      let bestD2 = 36;
+      for (const sample of samples) {
+        const p = sample.point;
+        if (!Array.isArray(p) || p.length < 2) continue;
+        const dx = (p[0] | 0) - x;
+        const dy = (p[1] | 0) - y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 <= bestD2) {
+          bestD2 = d2;
+          best = sample;
+        }
+      }
+      return best;
     }
 
     function drawIpmBoundariesToCanvas(status, canvas, ctx, leftKey, rightKey, centerKey) {
@@ -170,8 +234,12 @@
       if (canvas.height !== h) canvas.height = h;
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, w, h);
-      drawSeries(ctx, status[leftKey] || [], '#ff4d4f', 2, 1);
-      drawSeries(ctx, status[rightKey] || [], '#22c55e', 2, 1);
+      if (canvas === ipmRawCanvas) {
+        drawCornerDebugBoundary(ctx, status, w, h);
+      } else {
+        drawSeries(ctx, status[leftKey] || [], '#ff4d4f', 2, 1);
+        drawSeries(ctx, status[rightKey] || [], '#22c55e', 2, 1);
+      }
       if (centerKey) {
         drawSeries(ctx, status[centerKey] || [], '#facc15', 2, 1);
       }
@@ -184,11 +252,11 @@
         ctx.strokeStyle = '#93c5fd';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(cx, ty);
-        ctx.lineTo(cx, cy);
+        ctx.moveTo(cx, cy);
         ctx.lineTo(tx, ty);
+        ctx.lineTo(tx, cy);
         ctx.stroke();
-        drawPointSet(ctx, [[cx, ty], [cx, cy], [tx, ty]], '#93c5fd', 2);
+        drawPointSet(ctx, [[cx, cy], [tx, ty], [tx, cy]], '#93c5fd', 2);
       }
       if (showIpmAnchorDot) {
         const cx = Math.max(0, Math.min(w - 1, 200));
@@ -201,7 +269,7 @@
     }
 
     function drawIpmBoundaries(status) {
-      const centerKey = (ipmCenterlineSource === 'right')
+      const centerKey = (status.ipm_centerline_source === 1)
         ? 'ipm_centerline_from_right_shift'
         : 'ipm_centerline_from_left_shift';
       drawIpmBoundariesToCanvas(status, ipmCanvas, ipmCtx, 'ipm_left_boundary', 'ipm_right_boundary', centerKey);
@@ -234,7 +302,10 @@
       drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
       drawSeries(grayCtx, right, '#22c55e', 2, 1);
       if (showMeanCenterline) {
-        drawSeries(grayCtx, buildMeanCenterline(left, right), '#facc15', 2, 1);
+        const selectedCenterline = (latestStatus.ipm_centerline_source === 1)
+          ? (latestStatus.src_centerline_from_right_shift || [])
+          : (latestStatus.src_centerline_from_left_shift || []);
+        drawSeries(grayCtx, selectedCenterline, '#facc15', 2, 1);
       }
     }
 
@@ -268,6 +339,12 @@
       const gray = Math.round((gr + gg + gb) / 3);
       const binaryGray = Math.round((br + bg + bb) / 3);
       const bin = binaryGray >= 128 ? 1 : 0;
+      if (activeCanvas === ipmRawCanvas) {
+        const sample = findNearestCornerSample(latestStatus, x, y);
+        if (sample) {
+          return `x:${x} y:${y} | Gray:${gray} Bin:${bin} RGB:(${ar},${ag},${ab}) | Raw:${sample.raw.toFixed(4)} NMS:${sample.value.toFixed(4)}`;
+        }
+      }
       return `x:${x} y:${y} | Gray:${gray} Bin:${bin} RGB:(${ar},${ag},${ab})`;
     }
 
@@ -292,13 +369,106 @@
       binaryCtx.drawImage(binaryImg, 0, 0, w, h);
     };
 
+    function fmtArrayInline(arr) {
+      if (!Array.isArray(arr)) return '[]';
+      return `[${arr.map((v) => Array.isArray(v) ? `[${v.join(', ')}]` : String(v)).join(', ')}]`;
+    }
+
+    function fmtTrackMethod(method) {
+      if (method === 0) return 'fixed';
+      if (method === 1) return 'weighted';
+      if (method === 2) return 'speed';
+      return `unknown(${method})`;
+    }
+
+    function fmtCenterlineSource(source) {
+      if (source === 0) return 'left_shift';
+      if (source === 1) return 'right_shift';
+      return `unknown(${source})`;
+    }
+
+    function fmtCenterlineSourceLabel(source) {
+      if (source === 0) return '透视中线来源：自动选择（左边界平移）';
+      if (source === 1) return '透视中线来源：自动选择（右边界平移）';
+      return '透视中线来源：自动选择（未知）';
+    }
+
+    function fmtIntersectionMode(enabled) {
+      return enabled ? 'intersection' : 'normal';
+    }
+
+    function fmtRoundaboutMode(mode) {
+      if (mode === 1) return 'left_approach';
+      if (mode === 2) return 'left_loop';
+      if (mode === 3) return 'left_entry';
+      if (mode === 4) return 'left_running';
+      if (mode === 5) return 'left_exit';
+      if (mode === 6) return 'left_out';
+      if (mode === 7) return 'right_approach';
+      if (mode === 8) return 'right_loop';
+      if (mode === 9) return 'right_entry';
+      if (mode === 10) return 'right_running';
+      if (mode === 11) return 'right_exit';
+      if (mode === 12) return 'right_out';
+      return 'normal';
+    }
+
+    function fmtCurrentMode(status) {
+      const roundabout = Number(status.roundabout_mode) || 0;
+      if (roundabout !== 0) return fmtRoundaboutMode(roundabout);
+      return fmtIntersectionMode(!!status.intersection_mode);
+    }
+
+    function buildStatusSummary(status) {
+      const summary = {
+        ts_ms: status.ts_ms,
+        current_mode: fmtCurrentMode(status),
+        intersection_mode: status.intersection_mode,
+        intersection_stop_row: status.intersection_stop_row,
+        intersection_current_start_row: status.intersection_current_start_row,
+        roundabout_mode: fmtRoundaboutMode(status.roundabout_mode),
+        line_error: status.line_error,
+        base_speed: status.base_speed,
+        capture_wait_us: status.capture_wait_us,
+        preprocess_us: status.preprocess_us,
+        otsu_us: status.otsu_us,
+        maze_us: status.maze_us,
+        total_us: status.total_us,
+        red_found: status.red_found,
+        red: fmtArrayInline(status.red),
+        roi_valid: status.roi_valid,
+        roi: fmtArrayInline(status.roi),
+        ipm_track_valid: status.ipm_track_valid,
+        ipm_track_method: fmtTrackMethod(status.ipm_track_method),
+        ipm_centerline_source: fmtCenterlineSource(status.ipm_centerline_source),
+        ipm_track_index: status.ipm_track_index,
+        ipm_track_point: fmtArrayInline(status.ipm_track_point),
+        gray_size: fmtArrayInline(status.gray_size),
+        ipm_size: fmtArrayInline(status.ipm_size),
+        left_boundary_count: Array.isArray(status.left_boundary) ? status.left_boundary.length : 0,
+        right_boundary_count: Array.isArray(status.right_boundary) ? status.right_boundary.length : 0,
+        ipm_left_boundary_count: Array.isArray(status.ipm_left_boundary) ? status.ipm_left_boundary.length : 0,
+        ipm_right_boundary_count: Array.isArray(status.ipm_right_boundary) ? status.ipm_right_boundary.length : 0,
+        ipm_raw_left_boundary_count: Array.isArray(status.ipm_raw_left_boundary) ? status.ipm_raw_left_boundary.length : 0,
+        ipm_raw_right_boundary_count: Array.isArray(status.ipm_raw_right_boundary) ? status.ipm_raw_right_boundary.length : 0,
+        ipm_corner_left_boundary_count: Array.isArray(status.ipm_corner_left_boundary) ? status.ipm_corner_left_boundary.length : 0,
+        ipm_corner_right_boundary_count: Array.isArray(status.ipm_corner_right_boundary) ? status.ipm_corner_right_boundary.length : 0,
+        ipm_centerline_from_left_shift_count: Array.isArray(status.ipm_centerline_from_left_shift) ? status.ipm_centerline_from_left_shift.length : 0,
+        ipm_centerline_from_right_shift_count: Array.isArray(status.ipm_centerline_from_right_shift) ? status.ipm_centerline_from_right_shift.length : 0,
+        src_centerline_from_left_shift_count: Array.isArray(status.src_centerline_from_left_shift) ? status.src_centerline_from_left_shift.length : 0,
+        src_centerline_from_right_shift_count: Array.isArray(status.src_centerline_from_right_shift) ? status.src_centerline_from_right_shift.length : 0
+      };
+      return Object.entries(summary).map(([k, v]) => `${k}: ${v}`).join('\n');
+    }
+
     async function pullStatus() {
       try {
         const r = await fetch('/api/status', { cache: 'no-store' });
         const j = await r.json();
         latestStatus = j;
-        statusEl.textContent = JSON.stringify(j, null, 2);
+        statusEl.textContent = buildStatusSummary(j);
         drawIpmBoundaries(j);
+        ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(j.ipm_centerline_source);
         metaEl.textContent = `status ok @ ${new Date().toLocaleTimeString()}`;
       } catch (e) {
         metaEl.textContent = `status error: ${e}`;
@@ -328,17 +498,6 @@
       drawIpmBoundaries(latestStatus);
       if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
     });
-    switchIpmCenterlineSource.addEventListener('click', () => {
-      if (ipmCenterlineSource === 'left') {
-        ipmCenterlineSource = 'right';
-        switchIpmCenterlineSource.textContent = '透视中线来源：右边界平移';
-      } else {
-        ipmCenterlineSource = 'left';
-        switchIpmCenterlineSource.textContent = '透视中线来源：左边界平移';
-      }
-      drawIpmBoundaries(latestStatus);
-    });
-
     setInterval(pullStatus, 120);
     setInterval(pullFrames, 60);
     pullStatus();

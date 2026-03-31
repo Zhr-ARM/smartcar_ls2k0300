@@ -37,4 +37,10 @@ float line_follow_thread_error();
  */
 float line_follow_thread_turn_output();
 
+/**
+ * @brief 获取当前巡线基础速度
+ * @return 当前基础速度设定值
+ */
+float line_follow_thread_base_speed();
+
 #endif

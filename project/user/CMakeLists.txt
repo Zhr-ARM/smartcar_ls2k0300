@@ -118,6 +118,7 @@ include_directories(../../libraries/zf_components)
 
 # 收集源文件
 file(GLOB_RECURSE PROJECT_SRCS CONFIGURE_DEPENDS
+    ${PROJECT_DRIVER_DIR}/*.c
     ${PROJECT_DRIVER_DIR}/*.cpp
     ${PROJECT_APP_DIR}/*.cpp)
 
@@ -126,6 +127,8 @@ file(GLOB LIBRARY_SRCS CONFIGURE_DEPENDS
     ../../libraries/zf_device/*.cpp
     ../../libraries/zf_driver/*.cpp
     ../../libraries/zf_components/*.cpp)
+
+set_source_files_properties(${PROJECT_DRIVER_DIR}/vision/vision_config.c PROPERTIES LANGUAGE CXX)
 
 # 创建可执行文件，使用项目名称作为目标名称
 add_executable(${PROJECT_NAME}

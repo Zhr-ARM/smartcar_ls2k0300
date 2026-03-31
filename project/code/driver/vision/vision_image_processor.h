@@ -2,6 +2,7 @@
 #define VISION_IMAGE_PROCESSOR_H_
 
 #include "zf_common_headfile.h"
+#include <cstddef>
 
 #define VISION_DOWNSAMPLED_WIDTH 160
 #define VISION_DOWNSAMPLED_HEIGHT 120
@@ -24,6 +25,13 @@ typedef enum
     VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT = 0,
     VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT = 1
 } vision_ipm_line_error_source_enum;
+
+typedef enum
+{
+    VISION_IPM_LINE_ERROR_FIXED_INDEX = 0,
+    VISION_IPM_LINE_ERROR_WEIGHTED_INDEX = 1,
+    VISION_IPM_LINE_ERROR_SPEED_INDEX = 2
+} vision_ipm_line_error_method_enum;
 
 // 作用：初始化图像处理模块（内部通过 vision_frame_capture 初始化采图）。
 // 参数：camera_path 为空时使用默认相机路径。
@@ -101,12 +109,30 @@ void vision_image_processor_set_ipm_centerline_min_point_dist_px(float dist_px);
 float vision_image_processor_ipm_centerline_min_point_dist_px();
 // line_error 跟踪点配置：
 // - source: 选左边界平移中线或右边界平移中线；
-// - point_index: 选取中线中的第几个点（0-based）。
+// - method: 固定索引 / 加权索引 / 随速度索引；
+// - fixed_index: 固定索引模式下使用的点索引；
+// - point_indices/weights: 加权索引模式下使用的索引与权重；
+// - speed_k/speed_b: 随速度索引模式公式 idx = k * speed + b；
+// - index_min/max: 随速度索引模式的索引限制区间。
+// 若加权索引中的某索引超出当前中线长度，则该索引权重会按剩余有效权重比例重分配。
 void vision_image_processor_set_ipm_line_error_source(vision_ipm_line_error_source_enum source);
 vision_ipm_line_error_source_enum vision_image_processor_ipm_line_error_source();
-void vision_image_processor_set_ipm_line_error_point_index(int point_index);
-int vision_image_processor_ipm_line_error_point_index();
+void vision_image_processor_set_ipm_line_error_method(vision_ipm_line_error_method_enum method);
+vision_ipm_line_error_method_enum vision_image_processor_ipm_line_error_method();
+void vision_image_processor_set_ipm_line_error_fixed_index(int point_index);
+int vision_image_processor_ipm_line_error_fixed_index();
+void vision_image_processor_set_ipm_line_error_weighted_points(const int *point_indices,
+                                                              const float *weights,
+                                                              size_t count);
+size_t vision_image_processor_ipm_line_error_weighted_point_count();
+void vision_image_processor_set_ipm_line_error_speed_formula(float speed_k, float speed_b);
+void vision_image_processor_get_ipm_line_error_speed_formula(float *speed_k, float *speed_b);
+void vision_image_processor_set_ipm_line_error_index_range(int index_min, int index_max);
+void vision_image_processor_get_ipm_line_error_index_range(int *index_min, int *index_max);
+int vision_image_processor_ipm_line_error_track_index();
 void vision_image_processor_get_ipm_line_error_track_point(bool *valid, int *x, int *y);
+void vision_image_processor_get_intersection_mode_state(bool *enabled, int *stop_row, int *current_start_row);
+int vision_image_processor_roundabout_mode();
 
 // 读取最近一帧处理耗时（单位：us）
 // capture_wait_us: 等待相机新帧
@@ -175,12 +201,17 @@ void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 
 void vision_image_processor_get_ipm_boundaries_raw(uint16 **x1, uint16 **x2, uint16 **x3,
                                                    uint16 **y1, uint16 **y2, uint16 **y3,
                                                    uint16 *dot_num);
-
+// 角点识别专用边界（对原始逆透视边界做平滑、等距采样与角度/NMS处理）。
+void vision_image_processor_get_ipm_corner_debug_left(uint16 **x, uint16 **y, float **raw_value, float **nms_value, uint16 *dot_num);
+void vision_image_processor_get_ipm_corner_debug_right(uint16 **x, uint16 **y, float **raw_value, float **nms_value, uint16 *dot_num);
 // 逆透视处理链“平移中线”结果：
 // - from_left : 左边界向右法向平移得到；
 // - from_right: 右边界向左法向平移得到。
 void vision_image_processor_get_ipm_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_ipm_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
+// 将左右偏移中线从 IPM 坐标回投到原图后的结果。
+void vision_image_processor_get_src_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
+void vision_image_processor_get_src_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
 
 // 逆透视后拟合中线（另存）
 void vision_image_processor_get_ipm_fitted_centerline(uint16 **x, uint16 **y, uint16 *dot_num);

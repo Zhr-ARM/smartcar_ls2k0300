@@ -260,3 +260,8 @@ float line_follow_thread_turn_output()
 {
     return g_turn_output.load();
 }
+
+float line_follow_thread_base_speed()
+{
+    return g_base_speed.load();
+}
