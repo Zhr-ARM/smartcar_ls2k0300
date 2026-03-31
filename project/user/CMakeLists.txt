@@ -22,30 +22,9 @@ message("Parent parent folder name: ${PARENT_PARENT_FOLDER_NAME}")
 # 定义项目名称和版本，并指定使用C和C++语言
 project(${PARENT_PARENT_FOLDER_NAME} VERSION 0.1.0 LANGUAGES C CXX)
 
-# 仅在开启该选项时编译逐飞助手网络传图逻辑
-option(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM "Enable Seekfree assistant camera streaming" OFF)
-if(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM)
-    add_compile_definitions(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM=1)
-endif()
-
-# 仅在开启该选项时编译和启用车载屏显线程
-option(ENABLE_CAR_SCREEN_DISPLAY "Enable on-board screen display thread" ON)
-if(ENABLE_CAR_SCREEN_DISPLAY)
-    add_compile_definitions(ENABLE_CAR_SCREEN_DISPLAY=1)
-endif()
-
-# 关屏模式下默认启用图传，避免屏显开关影响图传链路。
-if(NOT ENABLE_CAR_SCREEN_DISPLAY)
-    set(ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM ON CACHE BOOL "Enable Seekfree assistant camera streaming" FORCE)
-endif()
-
-# E99视觉栈开关：开启时尝试启用ncnn相关模块（pipeline/client_sender/ncnn）。
-option(ENABLE_E99_VISION_STACK "Enable E99 vision full stack" OFF)
-
-set(E99_VISION_STACK_READY OFF)
-if(ENABLE_E99_VISION_STACK)
-    set(_local_ncnn_root "${CMAKE_CURRENT_LIST_DIR}/../../lib-ncnn")
-    set(_ncnn_install_root "${_local_ncnn_root}/tools/LQ_Dep_libs/ncnn_install")
+# 统一视觉主链：始终启用 ncnn 相关模块（pipeline/client_sender/ncnn）。
+set(_local_ncnn_root "${CMAKE_CURRENT_LIST_DIR}/../../lib-ncnn")
+set(_ncnn_install_root "${_local_ncnn_root}/tools/LQ_Dep_libs/ncnn_install")
 
     find_package(ncnn CONFIG QUIET
         HINTS "${_ncnn_install_root}"
@@ -90,16 +69,13 @@ if(ENABLE_E99_VISION_STACK)
         endif()
     endif()
 
-    if(NCNN_FOUND)
-        set(E99_VISION_STACK_READY ON)
-        add_compile_definitions(ENABLE_E99_VISION_STACK=1)
-        include_directories(${NCNN_INCLUDE_DIRS})
-        link_directories(${NCNN_LIBRARY_DIRS})
-        message(STATUS "NCNN_INCLUDE_DIRS: ${NCNN_INCLUDE_DIRS}")
-        message(STATUS "NCNN_LIBRARIES: ${NCNN_LIBRARIES}")
-    else()
-        message(STATUS "NCNN not found under ${_local_ncnn_root}. Build will skip ncnn-related E99 vision sources.")
-    endif()
+if(NCNN_FOUND)
+    include_directories(${NCNN_INCLUDE_DIRS})
+    link_directories(${NCNN_LIBRARY_DIRS})
+    message(STATUS "NCNN_INCLUDE_DIRS: ${NCNN_INCLUDE_DIRS}")
+    message(STATUS "NCNN_LIBRARIES: ${NCNN_LIBRARIES}")
+else()
+    message(FATAL_ERROR "NCNN not found under ${_local_ncnn_root}. Unified vision stack requires ncnn.")
 endif()
 
 
@@ -145,13 +121,6 @@ file(GLOB_RECURSE PROJECT_SRCS CONFIGURE_DEPENDS
     ${PROJECT_DRIVER_DIR}/*.cpp
     ${PROJECT_APP_DIR}/*.cpp)
 
-if(NOT E99_VISION_STACK_READY)
-    list(FILTER PROJECT_SRCS EXCLUDE REGEX ".*/driver/vision/lq_ncnn\\.cpp$")
-    list(FILTER PROJECT_SRCS EXCLUDE REGEX ".*/driver/vision/vision_ncnn\\.cpp$")
-    list(FILTER PROJECT_SRCS EXCLUDE REGEX ".*/driver/vision/vision_pipeline\\.cpp$")
-    list(FILTER PROJECT_SRCS EXCLUDE REGEX ".*/driver/vision/vision_client_sender\\.cpp$")
-endif()
-
 file(GLOB LIBRARY_SRCS CONFIGURE_DEPENDS
     ../../libraries/zf_common/*.cpp
     ../../libraries/zf_device/*.cpp
@@ -167,6 +136,4 @@ add_executable(${PROJECT_NAME}
 # 链接OpenCV库到可执行文件
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
 
-if(E99_VISION_STACK_READY)
-    target_link_libraries(${PROJECT_NAME} ${NCNN_LIBRARIES})
-endif()
+target_link_libraries(${PROJECT_NAME} ${NCNN_LIBRARIES})

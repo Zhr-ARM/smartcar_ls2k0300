@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vision JS Receiver</title>
+  <style>
+    body { margin: 0; font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif; background: #0f172a; color: #e2e8f0; }
+    .wrap { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { background: #111827; border: 1px solid #334155; border-radius: 10px; padding: 12px; }
+    .title { margin-bottom: 10px; color: #cbd5e1; font-size: 14px; }
+    canvas, img { width: 100%; background: #000; border-radius: 8px; image-rendering: pixelated; }
+    .meta { margin: 8px 0 12px; color: #94a3b8; font-size: 13px; }
+    pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; color: #93c5fd; max-height: 280px; overflow: auto; }
+    @media (max-width: 900px){ .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>智能车视觉接收端（Node.js）</h2>
+    <div class="meta" id="meta">connecting...</div>
+    <div class="grid">
+      <div class="card">
+        <div class="title">灰度图 + 迷宫左右边线（红/绿）</div>
+        <canvas id="grayCanvas" width="160" height="120"></canvas>
+      </div>
+      <div class="card">
+        <div class="title">二值图（不叠加边线）</div>
+        <img id="binaryImg" alt="binary frame" />
+      </div>
+      <div class="card">
+        <div class="title">透视边界图（按透视输出尺寸）</div>
+        <canvas id="ipmCanvas" width="100" height="100"></canvas>
+      </div>
+      <div class="card">
+        <div class="title">状态数据</div>
+        <pre id="status">loading...</pre>
+      </div>
+    </div>
+  </div>
+  <script>
+    const grayCanvas = document.getElementById('grayCanvas');
+    const grayCtx = grayCanvas.getContext('2d');
+    const ipmCanvas = document.getElementById('ipmCanvas');
+    const ipmCtx = ipmCanvas.getContext('2d');
+    const binaryImg = document.getElementById('binaryImg');
+    const statusEl = document.getElementById('status');
+    const metaEl = document.getElementById('meta');
+    const grayImg = new Image();
+    let latestStatus = {};
+
+    function drawPolyline(ctx, pts, color, lineWidth) {
+      if (!Array.isArray(pts) || pts.length < 2) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i += 1) {
+        ctx.lineTo(pts[i][0], pts[i][1]);
+      }
+      ctx.stroke();
+    }
+
+    function drawIpmBoundaries(status) {
+      const ipmSize = status.ipm_size || [100, 100];
+      const w = ipmSize[0] || 100;
+      const h = ipmSize[1] || 100;
+      if (ipmCanvas.width !== w) ipmCanvas.width = w;
+      if (ipmCanvas.height !== h) ipmCanvas.height = h;
+      ipmCtx.fillStyle = '#000';
+      ipmCtx.fillRect(0, 0, w, h);
+      drawPolyline(ipmCtx, status.ipm_left_boundary || [], '#ff4d4f', 2);
+      drawPolyline(ipmCtx, status.ipm_right_boundary || [], '#22c55e', 2);
+    }
+
+    grayImg.onload = () => {
+      const size = latestStatus.gray_size || [160, 120];
+      const w = size[0] || 160;
+      const h = size[1] || 120;
+      if (grayCanvas.width !== w) grayCanvas.width = w;
+      if (grayCanvas.height !== h) grayCanvas.height = h;
+      grayCtx.drawImage(grayImg, 0, 0, w, h);
+      const guideY = Math.max(0, Math.min(h - 1, 105));
+      grayCtx.strokeStyle = '#ffffff';
+      grayCtx.lineWidth = 1;
+      grayCtx.beginPath();
+      grayCtx.moveTo(0, guideY + 0.5);
+      grayCtx.lineTo(w, guideY + 0.5);
+      grayCtx.stroke();
+      drawPolyline(grayCtx, latestStatus.left_boundary || [], '#ff4d4f', 2);
+      drawPolyline(grayCtx, latestStatus.right_boundary || [], '#22c55e', 2);
+    };
+
+    async function pullStatus() {
+      try {
+        const r = await fetch('/api/status', { cache: 'no-store' });
+        const j = await r.json();
+        latestStatus = j;
+        statusEl.textContent = JSON.stringify(j, null, 2);
+        drawIpmBoundaries(j);
+        metaEl.textContent = `status ok @ ${new Date().toLocaleTimeString()}`;
+      } catch (e) {
+        metaEl.textContent = `status error: ${e}`;
+      }
+    }
+
+    function pullFrames() {
+      grayImg.src = `/api/frame_gray.jpg?t=${Date.now()}`;
+      binaryImg.src = `/api/frame_binary.jpg?t=${Date.now()}`;
+    }
+
+    setInterval(pullStatus, 120);
+    setInterval(pullFrames, 60);
+    pullStatus();
+    pullFrames();
+  </script>
+</body>
+</html>

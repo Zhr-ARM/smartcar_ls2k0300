@@ -19,6 +19,10 @@ void vision_image_processor_cleanup();
 // 执行一帧图像采集 + OpenCV处理（灰度、二值化、边界提取）
 bool vision_image_processor_process_step();
 
+// 迷宫法起始搜索行（0~H-1），按单行搜索左右起点。
+void vision_image_processor_set_maze_start_row(int row);
+int vision_image_processor_get_maze_start_row();
+
 // 读取最近一帧处理耗时（单位：us）
 // capture_wait_us: 等待相机新帧
 // preprocess_us  : 当前分辨率 Gray/RGB565 生成

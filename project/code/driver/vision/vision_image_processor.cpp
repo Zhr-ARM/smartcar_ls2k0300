@@ -1,4 +1,5 @@
 #include "driver/vision/vision_image_processor.h"
+#include "driver/vision/vision_frame_capture.h"
 
 #include <opencv2/opencv.hpp>
 
@@ -7,21 +8,18 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
-#include <condition_variable>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <mutex>
-#include <thread>
 #include <vector>
 
-// 当前阶段目标：
-// 1) 直接采集 UVC_WIDTH x UVC_HEIGHT BGR 原图（不翻转）；
-// 2) 降采样到 VISION_DOWNSAMPLED_WIDTH x VISION_DOWNSAMPLED_HEIGHT 做视觉处理；
-// 3) 采集与处理解耦为两个线程；
-// 4) 使用全图 OTSU 二值化；
-// 5) 在图像下方区域，基于迷宫法提取左右边线；
-// 6) 原图输出左右边线及均值中线；逆透视后的边线与拟合中线另存。
+// 当前视觉流程：
+// 1) 固定采集 160x120（与处理分辨率一致）；
+// 2) 采集与处理解耦为两个线程；
+// 3) 使用全图 OTSU 阈值；
+// 4) 迷宫法提取左右边线；
+// 5) 输出原图边线/中线，并缓存逆透视后的边线与拟合中线。
 
 #define VISION_BOUNDARY_NUM (VISION_DOWNSAMPLED_HEIGHT * 2)
 static constexpr int kRefProcWidth = 160;
@@ -170,14 +168,7 @@ static uint16 g_last_maze_right_points = 0;
 static bool g_last_maze_left_ok = false;
 static bool g_last_maze_right_ok = false;
 
-// 采集线程：只负责拿相机最新 BGR 帧并写入共享缓冲。
-static std::thread g_capture_thread;
-static std::atomic<bool> g_capture_running(false);
-static std::mutex g_capture_mutex;
-static std::condition_variable g_capture_cv;
-static std::array<uint8, UVC_HEIGHT * UVC_WIDTH * 3> g_capture_frame{};
-static uint32 g_capture_seq = 0;
-static uint32 g_processed_seq = 0;
+static std::atomic<int> g_maze_start_row(kProcHeight - 2);
 
 // 对外暴露控制量
 int line_error = 0;
@@ -1004,12 +995,13 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
     return 0;
 }
 
-static bool find_maze_start_from_bottom(const uint8 *classify_img,
-                                        uint8 white_threshold,
-                                        bool search_left,
-                                        int *start_x,
-                                        int *start_y,
-                                        bool *wall_is_white)
+static bool find_maze_start_from_row(const uint8 *classify_img,
+                                     uint8 white_threshold,
+                                     bool search_left,
+                                     int search_y,
+                                     int *start_x,
+                                     int *start_y,
+                                     bool *wall_is_white)
 {
     if (classify_img == nullptr || start_x == nullptr || start_y == nullptr || wall_is_white == nullptr)
     {
@@ -1024,62 +1016,49 @@ static bool find_maze_start_from_bottom(const uint8 *classify_img,
     }
 
     const int center_x = width / 2;
-    // 从图像最底部向上多行搜索起点，避免底部被同色覆盖时整侧起点丢失。
-    const int kMazeStartSearchRows = scale_by_height(40);
-    const int min_scan_y = std::max(1, height - kMazeStartSearchRows);
+    const int scan_y = std::clamp(search_y, 1, height - 2);
 
     int x_found = -1;
-    int y_found = -1;
     bool path_is_white = false;
     bool wall_is_white_local = false;
-    for (int scan_y = height - 1; scan_y >= min_scan_y; --scan_y)
+    if (search_left)
     {
-        if (search_left)
+        for (int x = center_x; x >= 2; --x)
         {
-            for (int x = center_x; x >= 2; --x)
+            bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
+            bool outer_white = pixel_is_white(classify_img, x - 1, scan_y, white_threshold);
+            if (inner_white != outer_white)
             {
-                bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
-                bool outer_white = pixel_is_white(classify_img, x - 1, scan_y, white_threshold);
-                if (inner_white != outer_white)
-                {
-                    x_found = x; // 靠近图像中心的一侧
-                    y_found = scan_y;
-                    path_is_white = inner_white;
-                    wall_is_white_local = outer_white;
-                    break;
-                }
+                x_found = x; // 靠近图像中心的一侧
+                path_is_white = inner_white;
+                wall_is_white_local = outer_white;
+                break;
             }
         }
-        else
+    }
+    else
+    {
+        for (int x = center_x; x <= width - 3; ++x)
         {
-            for (int x = center_x; x <= width - 3; ++x)
+            bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
+            bool outer_white = pixel_is_white(classify_img, x + 1, scan_y, white_threshold);
+            if (inner_white != outer_white)
             {
-                bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
-                bool outer_white = pixel_is_white(classify_img, x + 1, scan_y, white_threshold);
-                if (inner_white != outer_white)
-                {
-                    x_found = x; // 靠近图像中心的一侧
-                    y_found = scan_y;
-                    path_is_white = inner_white;
-                    wall_is_white_local = outer_white;
-                    break;
-                }
+                x_found = x; // 靠近图像中心的一侧
+                path_is_white = inner_white;
+                wall_is_white_local = outer_white;
+                break;
             }
-        }
-
-        if (x_found >= 1 && x_found <= width - 2)
-        {
-            break;
         }
     }
 
-    if (x_found < 1 || x_found > width - 2 || y_found < 1)
+    if (x_found < 1 || x_found > width - 2)
     {
         return false;
     }
 
-    // 实际迷宫法从扫描行上一行开始，避免访问越界。
-    const int track_y = std::clamp(y_found - 1, 1, height - 2);
+    // 迷宫法直接从指定行开始。
+    const int track_y = scan_y;
 
     // 如果起点误落在墙侧，向图像中心方向微调到路径侧。
     int x_adjust = x_found;
@@ -1224,46 +1203,6 @@ static int maze_trace_right_hand(const uint8 *classify_img,
     return step;
 }
 
-// 当起点不是最底行时，先把起点以下到底部的边界点补到点集前端，避免中线底部断层。
-static int prepend_bottom_seed_points(maze_point_t *pts,
-                                      int num,
-                                      int max_pts,
-                                      int start_x,
-                                      int start_y)
-{
-    if (pts == nullptr || max_pts <= 0)
-    {
-        return 0;
-    }
-
-    int cur_num = std::max(0, num);
-    cur_num = std::min(cur_num, max_pts);
-
-    const int sx = std::clamp(start_x, 0, kProcWidth - 1);
-    const int sy = std::clamp(start_y, 0, kProcHeight - 1);
-    int pad = std::max(0, (kProcHeight - 1) - sy); // y=H-1 ... sy+1
-    if (pad <= 0)
-    {
-        return cur_num;
-    }
-
-    pad = std::min(pad, max_pts);
-    int keep = std::min(cur_num, max_pts - pad);
-
-    for (int i = keep - 1; i >= 0; --i)
-    {
-        pts[i + pad] = pts[i];
-    }
-
-    for (int i = 0; i < pad; ++i)
-    {
-        pts[i].x = sx;
-        pts[i].y = (kProcHeight - 1) - i;
-    }
-
-    return pad + keep;
-}
-
 static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
                                            int left_num,
                                            const maze_point_t *right_pts,
@@ -1319,156 +1258,60 @@ static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
     g_boundary_count = out_num;
 }
 
-static void capture_loop()
-{
-    while (g_capture_running.load())
-    {
-        if (wait_image_refresh() < 0 || bgr_image == nullptr)
-        {
-            system_delay_ms(1);
-            continue;
-        }
-
-        {
-            std::lock_guard<std::mutex> lk(g_capture_mutex);
-            std::memcpy(g_capture_frame.data(), bgr_image, g_capture_frame.size());
-            ++g_capture_seq;
-        }
-        g_capture_cv.notify_one();
-    }
-}
-
 bool vision_image_processor_init(const char *camera_path)
 {
-    if (g_capture_running.load())
-    {
-        return true;
-    }
-
-    if (camera_path == nullptr || camera_path[0] == '\0')
-    {
-        camera_path = "/dev/video0";
-    }
-
-    if (uvc_camera_init(camera_path) != 0)
+    if (!vision_frame_capture_init(camera_path))
     {
         return false;
-    }
-
-    {
-        std::lock_guard<std::mutex> lk(g_capture_mutex);
-        g_capture_seq = 0;
-        g_processed_seq = 0;
     }
 
     clear_boundary_arrays();
     clear_ipm_saved_arrays();
     line_error = 0;
-
-    g_capture_running.store(true);
-    g_capture_thread = std::thread(capture_loop);
     return true;
 }
 
 void vision_image_processor_cleanup()
 {
-    if (!g_capture_running.load())
-    {
-        return;
-    }
-
-    g_capture_running.store(false);
-    g_capture_cv.notify_all();
-
-    if (g_capture_thread.joinable())
-    {
-        g_capture_thread.join();
-    }
+    vision_frame_capture_cleanup();
 }
 
 bool vision_image_processor_process_step()
 {
     auto t0 = std::chrono::steady_clock::now();
 
+    if (!vision_frame_capture_wait_next_bgr(g_image_bgr_full, sizeof(g_image_bgr_full), 100, &g_last_capture_wait_us))
     {
-        std::unique_lock<std::mutex> lk(g_capture_mutex);
-        bool ok = g_capture_cv.wait_for(
-            lk,
-            std::chrono::milliseconds(100),
-            []() {
-                return (g_capture_seq != g_processed_seq) || !g_capture_running.load();
-            });
-
-        if (!ok || g_capture_seq == g_processed_seq)
+        g_last_preprocess_us = 0;
         {
-            g_last_capture_wait_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count());
-            g_last_preprocess_us = 0;
-            {
-                std::lock_guard<std::mutex> lk(g_detect_result_mutex);
-                g_last_red_detect_us = 0;
-            }
-            g_last_otsu_us = 0;
-            g_last_maze_us = 0;
-            g_last_total_us = g_last_capture_wait_us;
-            g_last_maze_setup_us = 0;
-            g_last_maze_start_us = 0;
-            g_last_maze_trace_left_us = 0;
-            g_last_maze_trace_right_us = 0;
-            g_last_maze_post_us = 0;
-            g_last_maze_left_points = 0;
-            g_last_maze_right_points = 0;
-            g_last_maze_left_ok = false;
-            g_last_maze_right_ok = false;
-            return false;
+            std::lock_guard<std::mutex> lk(g_detect_result_mutex);
+            g_last_red_detect_us = 0;
         }
-
-        std::memcpy(g_image_bgr_full, g_capture_frame.data(), sizeof(g_image_bgr_full));
-        g_processed_seq = g_capture_seq;
+        g_last_otsu_us = 0;
+        g_last_maze_us = 0;
+        g_last_total_us = g_last_capture_wait_us;
+        g_last_maze_setup_us = 0;
+        g_last_maze_start_us = 0;
+        g_last_maze_trace_left_us = 0;
+        g_last_maze_trace_right_us = 0;
+        g_last_maze_post_us = 0;
+        g_last_maze_left_points = 0;
+        g_last_maze_right_points = 0;
+        g_last_maze_left_ok = false;
+        g_last_maze_right_ok = false;
+        return false;
     }
 
     auto t1 = std::chrono::steady_clock::now();
 
     auto t_pre_start = t1;
 
-    // 先保留原始 UVC_WIDTH x UVC_HEIGHT 彩图，再降采样到 kProcWidth x kProcHeight 做后续视觉处理。
+    // 固定160x120，处理分辨率与采图分辨率一致，无需降采样。
     cv::Mat bgr_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr_full);
     cv::Mat bgr(kProcHeight, kProcWidth, CV_8UC3, g_image_bgr);
-    cv::resize(bgr_full, bgr, cv::Size(kProcWidth, kProcHeight), 0.0, 0.0, cv::INTER_LINEAR);
+    std::memcpy(g_image_bgr, g_image_bgr_full, sizeof(g_image_bgr));
     cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
-
-    // 红色矩形检测在 E99 视觉栈下由异步线程处理；
-    // 非 E99 模式保留本地检测逻辑。
-#if !defined(ENABLE_E99_VISION_STACK)
-    auto t_red_start = std::chrono::steady_clock::now();
-    cv::Rect red_bbox;
-    int red_area_px = 0;
-    const bool red_found = detect_red_rectangle_bbox(bgr, &red_bbox, &red_area_px);
-    auto t_red_end = std::chrono::steady_clock::now();
-    {
-        std::lock_guard<std::mutex> lk(g_detect_result_mutex);
-        g_last_red_detect_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_red_end - t_red_start).count());
-        if (red_found)
-        {
-            red_bbox &= cv::Rect(0, 0, kProcWidth, kProcHeight);
-            g_red_rect_found = true;
-            g_red_rect_x = red_bbox.x;
-            g_red_rect_y = red_bbox.y;
-            g_red_rect_w = red_bbox.width;
-            g_red_rect_h = red_bbox.height;
-            g_red_rect_cx = red_bbox.x + red_bbox.width / 2;
-            g_red_rect_cy = red_bbox.y + red_bbox.height / 2;
-            g_red_rect_area = red_area_px;
-        }
-        else
-        {
-            g_red_rect_found = false;
-            g_red_rect_x = g_red_rect_y = g_red_rect_w = g_red_rect_h = 0;
-            g_red_rect_cx = g_red_rect_cy = 0;
-            g_red_rect_area = 0;
-        }
-    }
-#endif
 
     // RGB565（当前处理分辨率）
     for (int y = 0; y < kProcHeight; ++y)
@@ -1539,18 +1382,21 @@ bool vision_image_processor_process_step()
     int right_num = 0;
     auto t_maze_setup_end = std::chrono::steady_clock::now();
 
-    bool left_ok = find_maze_start_from_bottom(classify_img,
-                                               classify_white_threshold,
-                                               true,
-                                               &left_start_x,
-                                               &left_start_y,
-                                               &left_wall_is_white);
-    bool right_ok = find_maze_start_from_bottom(classify_img,
-                                                classify_white_threshold,
-                                                false,
-                                                &right_start_x,
-                                                &right_start_y,
-                                                &right_wall_is_white);
+    const int maze_start_row = std::clamp(g_maze_start_row.load(), 1, kProcHeight - 2);
+    bool left_ok = find_maze_start_from_row(classify_img,
+                                            classify_white_threshold,
+                                            true,
+                                            maze_start_row,
+                                            &left_start_x,
+                                            &left_start_y,
+                                            &left_wall_is_white);
+    bool right_ok = find_maze_start_from_row(classify_img,
+                                             classify_white_threshold,
+                                             false,
+                                             maze_start_row,
+                                             &right_start_x,
+                                             &right_start_y,
+                                             &right_wall_is_white);
     auto t_maze_start_search_end = std::chrono::steady_clock::now();
 
     if (left_ok)
@@ -1563,11 +1409,6 @@ bool vision_image_processor_process_step()
                                         y_min,
                                         left_pts.data(),
                                         static_cast<int>(left_pts.size()));
-        left_num = prepend_bottom_seed_points(left_pts.data(),
-                                              left_num,
-                                              static_cast<int>(left_pts.size()),
-                                              left_start_x,
-                                              left_start_y);
     }
     auto t_maze_left_trace_end = std::chrono::steady_clock::now();
     if (right_ok)
@@ -1580,11 +1421,6 @@ bool vision_image_processor_process_step()
                                           y_min,
                                           right_pts.data(),
                                           static_cast<int>(right_pts.size()));
-        right_num = prepend_bottom_seed_points(right_pts.data(),
-                                               right_num,
-                                               static_cast<int>(right_pts.size()),
-                                               right_start_x,
-                                               right_start_y);
     }
     auto t_maze_trace_end = std::chrono::steady_clock::now();
 
@@ -1604,7 +1440,6 @@ bool vision_image_processor_process_step()
     }
     auto t_maze_end = std::chrono::steady_clock::now();
 
-    g_last_capture_wait_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
     g_last_preprocess_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_pre_end - t_pre_start).count());
     g_last_otsu_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_otsu_end - t_otsu_start).count());
     g_last_maze_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_end - t_maze_start).count());
@@ -1620,6 +1455,16 @@ bool vision_image_processor_process_step()
     g_last_total_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_end - t0).count());
 
     return true;
+}
+
+void vision_image_processor_set_maze_start_row(int row)
+{
+    g_maze_start_row.store(std::clamp(row, 1, kProcHeight - 2));
+}
+
+int vision_image_processor_get_maze_start_row()
+{
+    return g_maze_start_row.load();
 }
 
 void vision_image_processor_get_last_perf_us(uint32 *capture_wait_us,

@@ -177,44 +177,44 @@ void status_push_loop()
         g_pid_protocol.send_status_push();
 #endif
         
-        if (++print_counter >= 2)
-        {
-            print_counter = 0;
-            char buf[192];
-            char term_buf[256];
-            const MotorUartStatus status = motor_thread_uart_status();
-            const float line_error = line_follow_thread_error();
+        // if (++print_counter >= 2)
+        // {
+        //     print_counter = 0;
+        //     char buf[192];
+        //     char term_buf[256];
+        //     const MotorUartStatus status = motor_thread_uart_status();
+        //     const float line_error = line_follow_thread_error();
 
-            snprintf(buf, sizeof(buf),
-                     "%7.1f,%7.1f,%6.2f,%7.1f,"
-                     "%7.1f,%7.1f,%6.2f,%7.1f\r\n",
-                     status.left_current_count,
-                     status.left_target_count,
-                     status.left_duty,
-                     status.left_error,
-                     status.right_current_count,
-                     status.right_target_count,
-                     status.right_duty,
-                     status.right_error);
+        //     snprintf(buf, sizeof(buf),
+        //              "%7.1f,%7.1f,%6.2f,%7.1f,"
+        //              "%7.1f,%7.1f,%6.2f,%7.1f\r\n",
+        //              status.left_current_count,
+        //              status.left_target_count,
+        //              status.left_duty,
+        //              status.left_error,
+        //              status.right_current_count,
+        //              status.right_target_count,
+        //              status.right_duty,
+        //              status.right_error);
 
-            snprintf(term_buf, sizeof(term_buf),
-                     "[CTRL] LineErr=%7.1f | EncL=%7.1f TarL=%7.1f ErrL=%7.1f DutyL=%6.2f | EncR=%7.1f TarR=%7.1f ErrR=%7.1f DutyR=%6.2f\n",
-                     line_error,
-                     status.left_current_count,
-                     status.left_target_count,
-                     status.left_error,
-                     status.left_duty,
-                     status.right_current_count,
-                     status.right_target_count,
-                     status.right_error,
-                     status.right_duty);
-            printf("%s", term_buf);
+        //     snprintf(term_buf, sizeof(term_buf),
+        //              "[CTRL] LineErr=%7.1f | EncL=%7.1f TarL=%7.1f ErrL=%7.1f DutyL=%6.2f | EncR=%7.1f TarR=%7.1f ErrR=%7.1f DutyR=%6.2f\n",
+        //              line_error,
+        //              status.left_current_count,
+        //              status.left_target_count,
+        //              status.left_error,
+        //              status.left_duty,
+        //              status.right_current_count,
+        //              status.right_target_count,
+        //              status.right_error,
+        //              status.right_duty);
+        //     printf("%s", term_buf);
 
-            if (uart1.is_open())
-            {
-                uart1.send_string(buf);
-            }
-        }
+        //     if (uart1.is_open())
+        //     {
+        //         uart1.send_string(buf);
+        //     }
+        // }
         
         std::this_thread::sleep_for(std::chrono::milliseconds(kStatusPushPeriodMs));
     }
