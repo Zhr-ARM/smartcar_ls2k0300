@@ -1,6 +1,7 @@
 #include "driver/vision/vision_config.h"
 
 const vision_runtime_config_t g_vision_runtime_config = {
+    // ==================== 本地显示与逐飞助手链路 ====================
     // 图传输出模式：
     // 0=binary 二值图，1=gray 灰度图(带线)，2=rgb565 彩图。
     .send_mode = 2,
@@ -12,14 +13,196 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .client_sender_enabled = false,
     // 车载屏显示开关。
     .screen_display_enabled = false,
+
+    // ==================== 网页端 UDP 视频发送配置 ====================
     // UDP 网页图传总开关。
     .udp_web_enabled = false,
     // UDP 网页图传发送上限帧率，0 表示不限速。
     .udp_web_max_fps = 30,
+    // 是否向网页端发送灰度 JPEG。
+    // 当前网页端可用该灰度图结合 TCP 下发的 otsu_threshold 自行实时二值化。
+    .udp_web_send_gray_jpeg = true,
+    // 是否向网页端发送二值 JPEG。
+    // 当前需求为停发二值图，因此默认关闭。
+    .udp_web_send_binary_jpeg = false,
+
+    // ==================== 网页端 TCP 状态发送总开关 ====================
     // TCP 状态上报开关。
     .udp_web_tcp_enabled = false,
+
+    // ==================== TCP 基础状态字段 ====================
+    // 发送主板当前时间戳（ms）。
+    .udp_web_tcp_send_ts_ms = false,
+    // 发送当前巡线误差 line_error。
+    .udp_web_tcp_send_line_error = true,
+    // 发送当前基础巡航速度 base_speed。
+    .udp_web_tcp_send_base_speed = true,
+    // 发送左轮实时目标速度 left_target_count。
+    .udp_web_tcp_send_left_target_count = true,
+    // 发送右轮实时目标速度 right_target_count。
+    .udp_web_tcp_send_right_target_count = true,
+    // 发送左轮编码器实时速度 left_current_count。
+    .udp_web_tcp_send_left_current_count = true,
+    // 发送右轮编码器实时速度 right_current_count。
+    .udp_web_tcp_send_right_current_count = true,
+    // 发送左轮滤波后的速度反馈 left_filtered_count。
+    .udp_web_tcp_send_left_filtered_count = false,
+    // 发送右轮滤波后的速度反馈 right_filtered_count。
+    .udp_web_tcp_send_right_filtered_count = false,
+    // 发送左轮速度误差 left_error。
+    .udp_web_tcp_send_left_error = false,
+    // 发送右轮速度误差 right_error。
+    .udp_web_tcp_send_right_error = false,
+    // 发送左轮前馈输出 left_feedforward。
+    .udp_web_tcp_send_left_feedforward = false,
+    // 发送右轮前馈输出 right_feedforward。
+    .udp_web_tcp_send_right_feedforward = false,
+    // 发送左轮 PID 修正项 left_correction。
+    .udp_web_tcp_send_left_correction = false,
+    // 发送右轮 PID 修正项 right_correction。
+    .udp_web_tcp_send_right_correction = false,
+    // 发送左轮减速辅助项 left_decel_assist。
+    .udp_web_tcp_send_left_decel_assist = false,
+    // 发送右轮减速辅助项 right_decel_assist。
+    .udp_web_tcp_send_right_decel_assist = false,
+    // 发送左轮当前实际输出 duty。
+    .udp_web_tcp_send_left_duty = false,
+    // 发送右轮当前实际输出 duty。
+    .udp_web_tcp_send_right_duty = false,
+    // 发送左轮最终硬件 duty（已包含方向翻转语义）。
+    .udp_web_tcp_send_left_hardware_duty = false,
+    // 发送右轮最终硬件 duty（已包含方向翻转语义）。
+    .udp_web_tcp_send_right_hardware_duty = false,
+    // 发送左轮方向 GPIO 电平。
+    .udp_web_tcp_send_left_dir_level = false,
+    // 发送右轮方向 GPIO 电平。
+    .udp_web_tcp_send_right_dir_level = false,
+    // 发送本帧计算得到的 OTSU 阈值，供网页端灰度图实时二值化。
+    .udp_web_tcp_send_otsu_threshold = true,
+
+    // ==================== TCP 性能统计字段 ====================
+    // 发送等待新图像帧耗时（us）。
+    .udp_web_tcp_send_perf_capture_wait_us = false,
+    // 发送预处理耗时（us），包括去畸变、灰度图生成等。
+    .udp_web_tcp_send_perf_preprocess_us = false,
+    // 发送 OTSU 阶段耗时（us）。
+    .udp_web_tcp_send_perf_otsu_us = false,
+    // 发送迷宫法巡线阶段耗时（us）。
+    .udp_web_tcp_send_perf_maze_us = false,
+    // 发送整帧视觉处理总耗时（us）。
+    .udp_web_tcp_send_perf_total_us = true,
+    // 发送迷宫法真实左边界点数（未做网页显示数组补齐）。
+    .udp_web_tcp_send_maze_left_points_raw = true,
+    // 发送迷宫法真实右边界点数（未做网页显示数组补齐）。
+    .udp_web_tcp_send_maze_right_points_raw = true,
+
+    // ==================== TCP 检测结果字段 ====================
+    // 发送是否检测到红色目标。
+    .udp_web_tcp_send_red_found = false,
+    // 发送红框位置与尺寸 [x, y, w, h, cx, cy]。
+    .udp_web_tcp_send_red_rect = false,
+    // 发送 ncnn ROI 是否有效。
+    .udp_web_tcp_send_roi_valid = false,
+    // 发送 ROI 区域 [x, y, w, h]。
+    .udp_web_tcp_send_roi_rect = false,
+
+    // ==================== TCP 巡线跟踪点字段 ====================
+    // 发送当前 IPM 跟踪点是否有效。
+    .udp_web_tcp_send_ipm_track_valid = false,
+    // 发送 line_error 的取点方式：固定索引 / 加权索引 / 随速度索引。
+    .udp_web_tcp_send_ipm_track_method = false,
+    // 发送当前采用的是左偏移中线还是右偏移中线。
+    .udp_web_tcp_send_ipm_centerline_source = true,
+    // 发送当前实际命中的中线点索引。
+    .udp_web_tcp_send_ipm_track_index = true,
+    // 发送当前实际跟踪点坐标 [x, y]。
+    .udp_web_tcp_send_ipm_track_point = true,
+    // 发送加权模式的首点索引参数。
+    .udp_web_tcp_send_ipm_weighted_first_index = true,
+    // 发送加权模式的决策点索引参数。
+    .udp_web_tcp_send_ipm_weighted_decision_index = true,
+    // 发送加权模式的默认点间距参数。
+    .udp_web_tcp_send_ipm_weighted_default_spacing = true,
+    // 发送加权模式阈值 1。
+    .udp_web_tcp_send_ipm_weighted_spacing_threshold_1 = true,
+    // 发送加权模式阈值 2。
+    .udp_web_tcp_send_ipm_weighted_spacing_threshold_2 = true,
+    // 发送加权模式阈值 3。
+    .udp_web_tcp_send_ipm_weighted_spacing_threshold_3 = true,
+    // 发送阈值 1 触发后的点间距。
+    .udp_web_tcp_send_ipm_weighted_spacing_value_1 = true,
+    // 发送阈值 2 触发后的点间距。
+    .udp_web_tcp_send_ipm_weighted_spacing_value_2 = true,
+    // 发送阈值 3 触发后的点间距。
+    .udp_web_tcp_send_ipm_weighted_spacing_value_3 = true,
+    // 发送首点的当前偏差。
+    .udp_web_tcp_send_ipm_weighted_first_point_error = true,
+    // 发送本帧实际使用的加权点间距。
+    .udp_web_tcp_send_ipm_weighted_current_spacing = true,
+    // 发送逆透视图上的决策点坐标。
+    .udp_web_tcp_send_ipm_weighted_decision_point = true,
+    // 发送原图上的决策点坐标。
+    .udp_web_tcp_send_src_weighted_decision_point = true,
+
+    // ==================== TCP 元素状态机字段 ====================
+    // 发送十字模式是否开启。
+    .udp_web_tcp_send_intersection_mode = false,
+    // 发送十字模式探测到的停止行。
+    .udp_web_tcp_send_intersection_stop_row = false,
+    // 发送十字模式当前使用的起始搜索行。
+    .udp_web_tcp_send_intersection_current_start_row = false,
+    // 发送当前环岛状态机模式值。
+    .udp_web_tcp_send_roundabout_mode = false,
+
+    // ==================== TCP 原图边界点列 ====================
+    // 发送原图坐标系下的左边界点列。
+    .udp_web_tcp_send_left_boundary = true,
+    // 发送原图坐标系下的右边界点列。
+    .udp_web_tcp_send_right_boundary = true,
+
+    // ==================== TCP IPM 边界点列 ====================
+    // 发送逆透视处理后的左边界点列。
+    .udp_web_tcp_send_ipm_left_boundary = true,
+    // 发送逆透视处理后的右边界点列。
+    .udp_web_tcp_send_ipm_right_boundary = true,
+    // 发送逆透视后的原始左边界点列（未做后处理）。
+    .udp_web_tcp_send_ipm_raw_left_boundary = false,
+    // 发送逆透视后的原始右边界点列（未做后处理）。
+    .udp_web_tcp_send_ipm_raw_right_boundary = false,
+
+    // ==================== TCP IPM 角点调试字段 ====================
+    // 发送左侧角点检测使用的边界点列。
+    .udp_web_tcp_send_ipm_corner_left_boundary = false,
+    // 发送右侧角点检测使用的边界点列。
+    .udp_web_tcp_send_ipm_corner_right_boundary = false,
+    // 发送左侧角点原始角度量。
+    .udp_web_tcp_send_ipm_corner_left_raw_angle = false,
+    // 发送右侧角点原始角度量。
+    .udp_web_tcp_send_ipm_corner_right_raw_angle = false,
+    // 发送左侧角点 NMS 后指标。
+    .udp_web_tcp_send_ipm_corner_left_nms = false,
+    // 发送右侧角点 NMS 后指标。
+    .udp_web_tcp_send_ipm_corner_right_nms = false,
+
+    // ==================== TCP 平移中线调试字段 ====================
+    // 发送由左边界法向平移得到的 IPM 中线。
+    .udp_web_tcp_send_ipm_centerline_from_left_shift = true,
+    // 发送由右边界法向平移得到的 IPM 中线。
+    .udp_web_tcp_send_ipm_centerline_from_right_shift = true,
+    // 发送左平移中线回投到原图后的点列。
+    .udp_web_tcp_send_src_centerline_from_left_shift = true,
+    // 发送右平移中线回投到原图后的点列。
+    .udp_web_tcp_send_src_centerline_from_right_shift = true,
+
+    // ==================== TCP 尺寸元数据字段 ====================
+    // 发送灰度图尺寸 [width, height]。
+    .udp_web_tcp_send_gray_size = true,
+    // 发送 IPM 图尺寸 [width, height]。
+    .udp_web_tcp_send_ipm_size = true,
+
+    // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    .udp_web_server_ip = "172.21.79.179",
+    .udp_web_server_ip = "172.21.79.129",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -30,10 +213,14 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .assistant_server_ip = "172.21.79.129",
     // 逐飞助手接收端端口。
     .assistant_server_port = 8899,
+
+    // ==================== 视觉处理运行参数 ====================
     // ROI 抓图模式：检测到红框后周期性保存推理 ROI。
     .roi_capture_mode = false,
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
     .maze_start_row = 90,
+    // 路口识别总开关：开启后允许进入十字/路口状态机。
+    .intersection_enabled = true,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = true,
     // IPM 处理链边界三角滤波开关。
@@ -58,6 +245,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_centerline_resample_step_px = 6.0f,
     // 中线近重复点过滤阈值，单位 px。
     .ipm_centerline_min_point_dist_px = 2.0f,
+    // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。
+    .keep_last_centerline_on_double_loss = true,
     // line_error 使用哪条平移中线：左平移或右平移。
     .ipm_line_error_source = VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT,
     // line_error 计算方法：0=固定索引，1=加权索引，2=随速度索引。
@@ -69,7 +258,25 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // line_error 加权索引点（0-based）。
     .ipm_line_error_point_indices = {4, 8, 12},
     // line_error 各索引点对应权重。
-    .ipm_line_error_weights = {0.4f, 0.4f, 0.2f},
+    .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
+    // 加权模式下固定使用的首点索引。
+    .ipm_line_error_weighted_first_index = 4,
+    // 加权模式下用于决定动态间距的点索引。
+    .ipm_line_error_weighted_decision_index = 4,
+    // 加权模式默认点间距。
+    .ipm_line_error_weighted_default_spacing = 4,
+    // 首点偏差超过 5 时，点间距切到 3。
+    .ipm_line_error_weighted_spacing_threshold_1 = 4,
+    // 首点偏差超过 10 时，点间距切到 2。
+    .ipm_line_error_weighted_spacing_threshold_2 = 7,
+    // 首点偏差超过 15 时，点间距切到 1。
+    .ipm_line_error_weighted_spacing_threshold_3 = 12,
+    // 阈值 1 对应点间距。
+    .ipm_line_error_weighted_spacing_value_1 = 3,
+    // 阈值 2 对应点间距。
+    .ipm_line_error_weighted_spacing_value_2 = 2,
+    // 阈值 3 对应点间距。
+    .ipm_line_error_weighted_spacing_value_3 = 1,
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
     .ipm_line_error_speed_k = 0.02f,
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b。
@@ -99,6 +306,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 };
 
 const vision_processor_config_t g_vision_processor_config = {
+    // ==================== 视觉处理器内部参数 ====================
     // 迷宫法单侧最大输出点数。
     .maze_trace_max_points = 120,
     // 迷宫法允许追踪的纵向区域百分比，100 表示全高。

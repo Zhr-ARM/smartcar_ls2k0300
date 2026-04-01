@@ -36,8 +36,18 @@ std::atomic<float> g_left_filtered_count{0.0f};
 std::atomic<float> g_right_filtered_count{0.0f};
 std::atomic<float> g_left_error{0.0f};
 std::atomic<float> g_right_error{0.0f};
+std::atomic<float> g_left_feedforward{0.0f};
+std::atomic<float> g_right_feedforward{0.0f};
+std::atomic<float> g_left_correction{0.0f};
+std::atomic<float> g_right_correction{0.0f};
+std::atomic<float> g_left_decel_assist{0.0f};
+std::atomic<float> g_right_decel_assist{0.0f};
 std::atomic<float> g_left_duty{0.0f};
 std::atomic<float> g_right_duty{0.0f};
+std::atomic<float> g_left_hardware_duty{0.0f};
+std::atomic<float> g_right_hardware_duty{0.0f};
+std::atomic<int> g_left_dir_level{1};
+std::atomic<int> g_right_dir_level{1};
 
 /**
  * @brief 将调度策略枚举转换为字符串
@@ -164,8 +174,18 @@ void motor_loop()
         g_right_filtered_count.store(control_state.right_feedback);
         g_left_error.store(control_state.left_error);
         g_right_error.store(control_state.right_error);
+        g_left_feedforward.store(control_state.left_feedforward);
+        g_right_feedforward.store(control_state.right_feedforward);
+        g_left_correction.store(control_state.left_correction);
+        g_right_correction.store(control_state.right_correction);
+        g_left_decel_assist.store(control_state.left_decel_assist);
+        g_right_decel_assist.store(control_state.right_decel_assist);
         g_left_duty.store(control_state.left_duty);
         g_right_duty.store(control_state.right_duty);
+        g_left_hardware_duty.store(motor_driver.left_hardware_duty());
+        g_right_hardware_duty.store(motor_driver.right_hardware_duty());
+        g_left_dir_level.store(motor_driver.left_dir_level());
+        g_right_dir_level.store(motor_driver.right_dir_level());
     }
 
     close(fd);
@@ -211,6 +231,56 @@ float motor_thread_right_count()
     return g_right_raw_count.load();
 }
 
+float motor_thread_left_filtered_count()
+{
+    return g_left_filtered_count.load();
+}
+
+float motor_thread_right_filtered_count()
+{
+    return g_right_filtered_count.load();
+}
+
+float motor_thread_left_error()
+{
+    return g_left_error.load();
+}
+
+float motor_thread_right_error()
+{
+    return g_right_error.load();
+}
+
+float motor_thread_left_feedforward()
+{
+    return g_left_feedforward.load();
+}
+
+float motor_thread_right_feedforward()
+{
+    return g_right_feedforward.load();
+}
+
+float motor_thread_left_correction()
+{
+    return g_left_correction.load();
+}
+
+float motor_thread_right_correction()
+{
+    return g_right_correction.load();
+}
+
+float motor_thread_left_decel_assist()
+{
+    return g_left_decel_assist.load();
+}
+
+float motor_thread_right_decel_assist()
+{
+    return g_right_decel_assist.load();
+}
+
 float motor_thread_left_duty()
 {
     return g_left_duty.load();
@@ -219,6 +289,26 @@ float motor_thread_left_duty()
 float motor_thread_right_duty()
 {
     return g_right_duty.load();
+}
+
+float motor_thread_left_hardware_duty()
+{
+    return g_left_hardware_duty.load();
+}
+
+float motor_thread_right_hardware_duty()
+{
+    return g_right_hardware_duty.load();
+}
+
+int motor_thread_left_dir_level()
+{
+    return g_left_dir_level.load();
+}
+
+int motor_thread_right_dir_level()
+{
+    return g_right_dir_level.load();
 }
 
 float motor_thread_left_target_count()
@@ -243,12 +333,24 @@ MotorUartStatus motor_thread_uart_status()
         status.right_target_count = g_target_right_count;
     }
 
+    status.left_feedback = g_left_filtered_count.load();
+    status.right_feedback = g_right_filtered_count.load();
     status.left_error = g_left_error.load();
     status.right_error = g_right_error.load();
+    status.left_feedforward = g_left_feedforward.load();
+    status.right_feedforward = g_right_feedforward.load();
+    status.left_correction = g_left_correction.load();
+    status.right_correction = g_right_correction.load();
+    status.left_decel_assist = g_left_decel_assist.load();
+    status.right_decel_assist = g_right_decel_assist.load();
     status.left_current_count = g_left_raw_count.load();
     status.right_current_count = g_right_raw_count.load();
     status.left_duty = g_left_duty.load();
     status.right_duty = g_right_duty.load();
+    status.left_hardware_duty = g_left_hardware_duty.load();
+    status.right_hardware_duty = g_right_hardware_duty.load();
+    status.left_dir_level = g_left_dir_level.load();
+    status.right_dir_level = g_right_dir_level.load();
     return status;
 }
 

@@ -26,8 +26,88 @@ typedef struct
     bool udp_web_enabled;
     // UDP 网页图传最大发送帧率，0 表示不限速。
     uint32 udp_web_max_fps;
+    // UDP 网页图传是否发送灰度 JPEG。
+    bool udp_web_send_gray_jpeg;
+    // UDP 网页图传是否发送二值 JPEG。
+    bool udp_web_send_binary_jpeg;
     // TCP 状态上报开关：控制是否向电脑端发送 JSON 状态数据。
     bool udp_web_tcp_enabled;
+    // TCP 状态字段开关。
+    bool udp_web_tcp_send_ts_ms;
+    bool udp_web_tcp_send_line_error;
+    bool udp_web_tcp_send_base_speed;
+    bool udp_web_tcp_send_left_target_count;
+    bool udp_web_tcp_send_right_target_count;
+    bool udp_web_tcp_send_left_current_count;
+    bool udp_web_tcp_send_right_current_count;
+    bool udp_web_tcp_send_left_filtered_count;
+    bool udp_web_tcp_send_right_filtered_count;
+    bool udp_web_tcp_send_left_error;
+    bool udp_web_tcp_send_right_error;
+    bool udp_web_tcp_send_left_feedforward;
+    bool udp_web_tcp_send_right_feedforward;
+    bool udp_web_tcp_send_left_correction;
+    bool udp_web_tcp_send_right_correction;
+    bool udp_web_tcp_send_left_decel_assist;
+    bool udp_web_tcp_send_right_decel_assist;
+    bool udp_web_tcp_send_left_duty;
+    bool udp_web_tcp_send_right_duty;
+    bool udp_web_tcp_send_left_hardware_duty;
+    bool udp_web_tcp_send_right_hardware_duty;
+    bool udp_web_tcp_send_left_dir_level;
+    bool udp_web_tcp_send_right_dir_level;
+    bool udp_web_tcp_send_otsu_threshold;
+    bool udp_web_tcp_send_perf_capture_wait_us;
+    bool udp_web_tcp_send_perf_preprocess_us;
+    bool udp_web_tcp_send_perf_otsu_us;
+    bool udp_web_tcp_send_perf_maze_us;
+    bool udp_web_tcp_send_perf_total_us;
+    bool udp_web_tcp_send_maze_left_points_raw;
+    bool udp_web_tcp_send_maze_right_points_raw;
+    bool udp_web_tcp_send_red_found;
+    bool udp_web_tcp_send_red_rect;
+    bool udp_web_tcp_send_roi_valid;
+    bool udp_web_tcp_send_roi_rect;
+    bool udp_web_tcp_send_ipm_track_valid;
+    bool udp_web_tcp_send_ipm_track_method;
+    bool udp_web_tcp_send_ipm_centerline_source;
+    bool udp_web_tcp_send_ipm_track_index;
+    bool udp_web_tcp_send_ipm_track_point;
+    bool udp_web_tcp_send_ipm_weighted_first_index;
+    bool udp_web_tcp_send_ipm_weighted_decision_index;
+    bool udp_web_tcp_send_ipm_weighted_default_spacing;
+    bool udp_web_tcp_send_ipm_weighted_spacing_threshold_1;
+    bool udp_web_tcp_send_ipm_weighted_spacing_threshold_2;
+    bool udp_web_tcp_send_ipm_weighted_spacing_threshold_3;
+    bool udp_web_tcp_send_ipm_weighted_spacing_value_1;
+    bool udp_web_tcp_send_ipm_weighted_spacing_value_2;
+    bool udp_web_tcp_send_ipm_weighted_spacing_value_3;
+    bool udp_web_tcp_send_ipm_weighted_first_point_error;
+    bool udp_web_tcp_send_ipm_weighted_current_spacing;
+    bool udp_web_tcp_send_ipm_weighted_decision_point;
+    bool udp_web_tcp_send_src_weighted_decision_point;
+    bool udp_web_tcp_send_intersection_mode;
+    bool udp_web_tcp_send_intersection_stop_row;
+    bool udp_web_tcp_send_intersection_current_start_row;
+    bool udp_web_tcp_send_roundabout_mode;
+    bool udp_web_tcp_send_left_boundary;
+    bool udp_web_tcp_send_right_boundary;
+    bool udp_web_tcp_send_ipm_left_boundary;
+    bool udp_web_tcp_send_ipm_right_boundary;
+    bool udp_web_tcp_send_ipm_raw_left_boundary;
+    bool udp_web_tcp_send_ipm_raw_right_boundary;
+    bool udp_web_tcp_send_ipm_corner_left_boundary;
+    bool udp_web_tcp_send_ipm_corner_right_boundary;
+    bool udp_web_tcp_send_ipm_corner_left_raw_angle;
+    bool udp_web_tcp_send_ipm_corner_right_raw_angle;
+    bool udp_web_tcp_send_ipm_corner_left_nms;
+    bool udp_web_tcp_send_ipm_corner_right_nms;
+    bool udp_web_tcp_send_ipm_centerline_from_left_shift;
+    bool udp_web_tcp_send_ipm_centerline_from_right_shift;
+    bool udp_web_tcp_send_src_centerline_from_left_shift;
+    bool udp_web_tcp_send_src_centerline_from_right_shift;
+    bool udp_web_tcp_send_gray_size;
+    bool udp_web_tcp_send_ipm_size;
     // 电脑端接收服务 IP（运行 vision_pc_receiver.py 的主机地址）。
     const char *udp_web_server_ip;
     // 电脑端 UDP 视频端口（需与 PC 接收端 --udp-port 一致）。
@@ -44,6 +124,8 @@ typedef struct
     bool roi_capture_mode;
     // 迷宫法左右起点搜索行，固定单行搜索。
     int maze_start_row;
+    // 路口识别开关：true=启用十字/路口状态机，false=完全关闭。
+    bool intersection_enabled;
     // 去畸变开关：true=开启去畸变，false=关闭去畸变直通原图。
     bool undistort_enabled;
     // 逆透视处理链边界三角滤波开关。
@@ -68,6 +150,8 @@ typedef struct
     float ipm_centerline_resample_step_px;
     // 逆透视处理中线近重复点过滤阈值（px）。
     float ipm_centerline_min_point_dist_px;
+    // 双边都丢线时是否保持上一帧平移中线数组。
+    bool keep_last_centerline_on_double_loss;
     // line_error 使用哪条平移中线追踪：左平移或右平移。
     int ipm_line_error_source;
     // line_error 计算方法：0=固定索引，1=加权索引，2=随速度索引。
@@ -80,6 +164,24 @@ typedef struct
     int ipm_line_error_point_indices[VISION_LINE_ERROR_MAX_WEIGHTED_POINTS];
     // line_error 各索引点对应权重。
     float ipm_line_error_weights[VISION_LINE_ERROR_MAX_WEIGHTED_POINTS];
+    // 加权模式下的第一个取点索引。
+    int ipm_line_error_weighted_first_index;
+    // 加权模式下用于决定动态间距的点索引。
+    int ipm_line_error_weighted_decision_index;
+    // 加权模式下默认点间距。
+    int ipm_line_error_weighted_default_spacing;
+    // 第一个点偏差超过该阈值时，点间距切到 spacing_value_1。
+    int ipm_line_error_weighted_spacing_threshold_1;
+    // 第一个点偏差超过该阈值时，点间距切到 spacing_value_2。
+    int ipm_line_error_weighted_spacing_threshold_2;
+    // 第一个点偏差超过该阈值时，点间距切到 spacing_value_3。
+    int ipm_line_error_weighted_spacing_threshold_3;
+    // 偏差超过 threshold_1 时采用的点间距。
+    int ipm_line_error_weighted_spacing_value_1;
+    // 偏差超过 threshold_2 时采用的点间距。
+    int ipm_line_error_weighted_spacing_value_2;
+    // 偏差超过 threshold_3 时采用的点间距。
+    int ipm_line_error_weighted_spacing_value_3;
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
     float ipm_line_error_speed_k;
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b。

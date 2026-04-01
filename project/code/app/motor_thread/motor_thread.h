@@ -23,12 +23,24 @@ struct MotorUartStatus
 {
     float left_target_count;  // 左轮目标计数值
     float right_target_count; // 右轮目标计数值
+    float left_feedback;      // 左轮滤波后反馈值
+    float right_feedback;     // 右轮滤波后反馈值
     float left_error;         // 左轮当前误差
     float right_error;        // 右轮当前误差
+    float left_feedforward;   // 左轮前馈输出
+    float right_feedforward;  // 右轮前馈输出
+    float left_correction;    // 左轮 PID 修正输出
+    float right_correction;   // 右轮 PID 修正输出
+    float left_decel_assist;  // 左轮减速辅助输出
+    float right_decel_assist; // 右轮减速辅助输出
     float left_current_count; // 左轮原始编码器计数值（未滤波）
     float right_current_count;// 右轮原始编码器计数值（未滤波）
     float left_duty;          // 左轮当前占空比
     float right_duty;         // 右轮当前占空比
+    float left_hardware_duty; // 左轮最终硬件 duty
+    float right_hardware_duty;// 右轮最终硬件 duty
+    int left_dir_level;       // 左轮方向 GPIO 电平
+    int right_dir_level;      // 右轮方向 GPIO 电平
 };
 
 /**
@@ -56,6 +68,26 @@ float motor_thread_left_count();
  */
 float motor_thread_right_count();
 
+float motor_thread_left_filtered_count();
+
+float motor_thread_right_filtered_count();
+
+float motor_thread_left_error();
+
+float motor_thread_right_error();
+
+float motor_thread_left_feedforward();
+
+float motor_thread_right_feedforward();
+
+float motor_thread_left_correction();
+
+float motor_thread_right_correction();
+
+float motor_thread_left_decel_assist();
+
+float motor_thread_right_decel_assist();
+
 /**
  * @brief 获取左轮当前占空比
  * @return 左轮输出的PWM占空比
@@ -67,6 +99,14 @@ float motor_thread_left_duty();
  * @return 右轮输出的PWM占空比
  */
 float motor_thread_right_duty();
+
+float motor_thread_left_hardware_duty();
+
+float motor_thread_right_hardware_duty();
+
+int motor_thread_left_dir_level();
+
+int motor_thread_right_dir_level();
 
 /**
  * @brief 获取左轮目标计数值

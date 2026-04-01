@@ -43,4 +43,10 @@ float line_follow_thread_turn_output();
  */
 float line_follow_thread_base_speed();
 
+/**
+ * @brief 获取当前实际参与左右轮目标合成的基础速度
+ * @return 当前降速后的基础速度；若尚未进入有效控制周期则返回基础速度设定值
+ */
+float line_follow_thread_adjusted_base_speed();
+
 #endif

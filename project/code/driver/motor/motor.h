@@ -79,6 +79,18 @@ public:
      */
     float get_duty() const;
 
+    /**
+     * @brief 获取当前最终写给硬件语义的 duty
+     * @return 已包含方向翻转语义的硬件 duty
+     */
+    float get_hardware_duty() const;
+
+    /**
+     * @brief 获取当前方向 GPIO 电平
+     * @return 当前方向引脚电平
+     */
+    int get_dir_level() const;
+
 private:
     /**
      * @brief 读取编码器当前输出值
@@ -113,6 +125,8 @@ private:
     struct pwm_info pwm_info_;
     int32 encoder_5ms_count_;
     float current_duty_percent_;
+    float current_hardware_duty_;
+    int current_dir_level_;
 };
 
 /**
@@ -187,6 +201,14 @@ public:
      * @return 右侧占空比百分比
      */
     float right_duty() const;
+
+    float left_hardware_duty() const;
+
+    float right_hardware_duty() const;
+
+    int left_dir_level() const;
+
+    int right_dir_level() const;
 
 private:
     Motor left_;

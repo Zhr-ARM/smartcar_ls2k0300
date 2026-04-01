@@ -1,6 +1,8 @@
 #include "driver/vision/vision_transport.h"
 
+#include "motor_thread.h"
 #include "line_follow_thread.h"
+#include "driver/vision/vision_config.h"
 #include "driver/vision/vision_image_processor.h"
 
 #include "zf_driver_tcp_client.h"
@@ -45,7 +47,6 @@ constexpr uint32 kUdpMaxFpsUpper = 120;
 constexpr uint32 kMaxUdpPayload = 1200;
 constexpr uint32 kUdpHeaderSize = 20;
 constexpr uint32 kMagic = 0x56535544;
-constexpr uint32 kTcpStatusMinIntervalMs = 100;
 constexpr int kIpmCanvasWidth = VISION_IPM_WIDTH;
 constexpr int kIpmCanvasHeight = VISION_IPM_HEIGHT;
 
@@ -69,7 +70,6 @@ std::atomic<bool> g_tcp_enabled(true);             // TCP 状态发送开关。
 std::atomic<uint32> g_udp_max_fps(kUdpDefaultMaxFps); // UDP 图像限频。
 std::atomic<uint64> g_udp_last_send_tick_us(0);    // UDP 限频时间戳。
 std::atomic<uint32> g_udp_frame_id(0);             // UDP 分片帧号。
-std::atomic<int64_t> g_last_status_tick_ms(0);     // TCP 状态上报节流时间戳。
 
 std::mutex g_init_mutex;      // UDP/TCP 初始化锁。
 bool g_udp_ready = false;     // UDP 初始化是否成功。
@@ -207,13 +207,6 @@ static uint64 now_us()
         std::chrono::steady_clock::now().time_since_epoch()).count());
 }
 
-static int64_t now_ms()
-{
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::steady_clock::now().time_since_epoch())
-        .count();
-}
-
 // 作用：UDP 限频抢占。
 static bool try_acquire_udp_send_slot()
 {
@@ -265,25 +258,6 @@ static bool build_gray_jpeg(std::vector<uint8> *jpeg_out, int *width, int *heigh
     return true;
 }
 
-static bool build_binary_jpeg(std::vector<uint8> *jpeg_out, int *width, int *height, uint8 *mode_out)
-{
-    if (jpeg_out == nullptr || width == nullptr || height == nullptr || mode_out == nullptr)
-    {
-        return false;
-    }
-    const int w = VISION_DOWNSAMPLED_WIDTH;
-    const int h = VISION_DOWNSAMPLED_HEIGHT;
-    const uint8 *binary = vision_image_processor_binary_downsampled_u8_image();
-    if (!encode_jpeg_gray_like(binary, w, h, jpeg_out))
-    {
-        return false;
-    }
-    *width = w;
-    *height = h;
-    *mode_out = 0;
-    return true;
-}
-
 // 作用：发送 UDP 分片帧。
 static void send_udp_frame(const std::vector<uint8> &jpeg, int width, int height, uint8 mode)
 {
@@ -328,20 +302,13 @@ static void send_tcp_status()
         return;
     }
 
-    const int64_t now = now_ms();
-    const int64_t last = g_last_status_tick_ms.load();
-    if (last != 0 && (now - last) < static_cast<int64_t>(kTcpStatusMinIntervalMs))
-    {
-        return;
-    }
-    g_last_status_tick_ms.store(now);
-
     uint32 capture_wait_us = 0;
     uint32 preprocess_us = 0;
     uint32 otsu_us = 0;
     uint32 maze_us = 0;
     uint32 total_us = 0;
     vision_image_processor_get_last_perf_us(&capture_wait_us, &preprocess_us, &otsu_us, &maze_us, &total_us);
+    const uint8 otsu_threshold = vision_image_processor_get_last_otsu_threshold();
 
     bool red_found = false;
     int red_x = 0;
@@ -364,20 +331,29 @@ static void send_tcp_status()
     uint16 *y1 = nullptr;
     uint16 *y3 = nullptr;
     uint16 dot_num = 0;
+    uint16 left_dot_num = 0;
+    uint16 right_dot_num = 0;
     vision_image_processor_get_boundaries(&x1, nullptr, &x3, &y1, nullptr, &y3, &dot_num);
+    vision_image_processor_get_boundary_side_counts(&left_dot_num, &right_dot_num);
 
     uint16 *ipm_x1 = nullptr;
     uint16 *ipm_x3 = nullptr;
     uint16 *ipm_y1 = nullptr;
     uint16 *ipm_y3 = nullptr;
     uint16 ipm_dot_num = 0;
+    uint16 ipm_left_dot_num = 0;
+    uint16 ipm_right_dot_num = 0;
     vision_image_processor_get_ipm_boundaries(&ipm_x1, nullptr, &ipm_x3, &ipm_y1, nullptr, &ipm_y3, &ipm_dot_num);
+    vision_image_processor_get_ipm_boundary_side_counts(&ipm_left_dot_num, &ipm_right_dot_num);
     uint16 *ipm_raw_x1 = nullptr;
     uint16 *ipm_raw_x3 = nullptr;
     uint16 *ipm_raw_y1 = nullptr;
     uint16 *ipm_raw_y3 = nullptr;
     uint16 ipm_raw_dot_num = 0;
+    uint16 ipm_raw_left_dot_num = 0;
+    uint16 ipm_raw_right_dot_num = 0;
     vision_image_processor_get_ipm_boundaries_raw(&ipm_raw_x1, nullptr, &ipm_raw_x3, &ipm_raw_y1, nullptr, &ipm_raw_y3, &ipm_raw_dot_num);
+    vision_image_processor_get_ipm_raw_boundary_side_counts(&ipm_raw_left_dot_num, &ipm_raw_right_dot_num);
     uint16 *ipm_corner_left_x = nullptr;
     uint16 *ipm_corner_left_y = nullptr;
     float *ipm_corner_left_raw_value = nullptr;
@@ -418,64 +394,197 @@ static void send_tcp_status()
     int ipm_track_index = -1;
     int ipm_track_x = 0;
     int ipm_track_y = 0;
+    uint32 maze_setup_us = 0;
+    uint32 maze_start_us = 0;
+    uint32 maze_trace_left_us = 0;
+    uint32 maze_trace_right_us = 0;
+    uint32 maze_post_us = 0;
+    uint16 maze_left_points_raw = 0;
+    uint16 maze_right_points_raw = 0;
+    bool maze_left_ok = false;
+    bool maze_right_ok = false;
     bool intersection_mode = false;
     int intersection_stop_row = -1;
     int intersection_current_start_row = -1;
+    bool ipm_weighted_decision_valid = false;
+    int ipm_weighted_decision_x = 0;
+    int ipm_weighted_decision_y = 0;
+    bool src_weighted_decision_valid = false;
+    int src_weighted_decision_x = 0;
+    int src_weighted_decision_y = 0;
     ipm_track_index = vision_image_processor_ipm_line_error_track_index();
     vision_image_processor_get_ipm_line_error_track_point(&ipm_track_valid, &ipm_track_x, &ipm_track_y);
+    vision_image_processor_get_ipm_weighted_decision_point(&ipm_weighted_decision_valid,
+                                                           &ipm_weighted_decision_x,
+                                                           &ipm_weighted_decision_y);
+    vision_image_processor_get_src_weighted_decision_point(&src_weighted_decision_valid,
+                                                           &src_weighted_decision_x,
+                                                           &src_weighted_decision_y);
+    vision_image_processor_get_last_maze_detail_us(&maze_setup_us,
+                                                   &maze_start_us,
+                                                   &maze_trace_left_us,
+                                                   &maze_trace_right_us,
+                                                   &maze_post_us,
+                                                   &maze_left_points_raw,
+                                                   &maze_right_points_raw,
+                                                   &maze_left_ok,
+                                                   &maze_right_ok);
     vision_image_processor_get_intersection_mode_state(&intersection_mode, &intersection_stop_row, &intersection_current_start_row);
+
+    const int64_t ts_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                              std::chrono::steady_clock::now().time_since_epoch())
+                              .count();
 
     std::string line;
     line.reserve(8192);
-    line += "{\"ts_ms\":";
-    line += std::to_string(static_cast<long long>(now));
-    line += ",\"line_error\":";
-    line += std::to_string(line_error);
-    line += ",\"base_speed\":";
-    line += std::to_string(line_follow_thread_base_speed());
-    line += ",\"capture_wait_us\":";
-    line += std::to_string(capture_wait_us);
-    line += ",\"preprocess_us\":";
-    line += std::to_string(preprocess_us);
-    line += ",\"otsu_us\":";
-    line += std::to_string(otsu_us);
-    line += ",\"maze_us\":";
-    line += std::to_string(maze_us);
-    line += ",\"total_us\":";
-    line += std::to_string(total_us);
-    line += ",\"red_found\":";
-    line += red_found ? "1" : "0";
-    line += ",\"red\":[";
-    line += std::to_string(red_x) + "," + std::to_string(red_y) + "," + std::to_string(red_w) + "," +
-            std::to_string(red_h) + "," + std::to_string(red_cx) + "," + std::to_string(red_cy) + "]";
-    line += ",\"roi_valid\":";
-    line += roi_valid ? "1" : "0";
-    line += ",\"roi\":[";
-    line += std::to_string(roi_x) + "," + std::to_string(roi_y) + "," + std::to_string(roi_w) + "," +
-            std::to_string(roi_h) + "]";
-    line += ",\"ipm_track_valid\":";
-    line += ipm_track_valid ? "1" : "0";
-    line += ",\"ipm_track_method\":";
-    line += std::to_string(static_cast<int>(vision_image_processor_ipm_line_error_method()));
-    line += ",\"ipm_centerline_source\":";
-    line += std::to_string(static_cast<int>(vision_image_processor_ipm_line_error_source()));
-    line += ",\"ipm_track_index\":";
-    line += std::to_string(ipm_track_index);
-    line += ",\"ipm_track_point\":[";
-    line += std::to_string(ipm_track_x) + "," + std::to_string(ipm_track_y) + "]";
-    line += ",\"intersection_mode\":";
-    line += intersection_mode ? "1" : "0";
-    line += ",\"intersection_stop_row\":";
-    line += std::to_string(intersection_stop_row);
-    line += ",\"intersection_current_start_row\":";
-    line += std::to_string(intersection_current_start_row);
-    line += ",\"roundabout_mode\":";
-    line += std::to_string(vision_image_processor_roundabout_mode());
+    line += "{";
+    bool first_field = true;
 
-    auto append_points = [&line](const char *name, uint16 *xs, uint16 *ys, uint16 n, int max_w, int max_h) {
-        line += ",\"";
+    auto append_key = [&line, &first_field](const char *name) {
+        if (!first_field)
+        {
+            line += ",";
+        }
+        first_field = false;
+        line += "\"";
         line += name;
-        line += "\":[";
+        line += "\":";
+    };
+
+    auto append_int = [&append_key, &line](bool enabled, const char *name, long long value) {
+        if (!enabled)
+        {
+            return;
+        }
+        append_key(name);
+        line += std::to_string(value);
+    };
+
+    auto append_float = [&append_key, &line](bool enabled, const char *name, float value) {
+        if (!enabled)
+        {
+            return;
+        }
+        append_key(name);
+        line += std::to_string(value);
+    };
+
+    auto append_bool = [&append_key, &line](bool enabled, const char *name, bool value) {
+        if (!enabled)
+        {
+            return;
+        }
+        append_key(name);
+        line += value ? "1" : "0";
+    };
+
+    auto append_int_array = [&append_key, &line](bool enabled, const char *name, const std::initializer_list<long long> &values) {
+        if (!enabled)
+        {
+            return;
+        }
+        append_key(name);
+        line += "[";
+        bool first = true;
+        for (long long value : values)
+        {
+            if (!first)
+            {
+                line += ",";
+            }
+            first = false;
+            line += std::to_string(value);
+        }
+        line += "]";
+    };
+
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ts_ms, "ts_ms", ts_ms);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_line_error, "line_error", line_error);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_base_speed, "base_speed", line_follow_thread_base_speed());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_base_speed, "adjusted_base_speed", line_follow_thread_adjusted_base_speed());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_left_target_count, "left_target_count", motor_thread_left_target_count());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_right_target_count, "right_target_count", motor_thread_right_target_count());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_left_current_count, "left_current_count", motor_thread_left_count());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_right_current_count, "right_current_count", motor_thread_right_count());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_left_filtered_count, "left_filtered_count", motor_thread_left_filtered_count());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_right_filtered_count, "right_filtered_count", motor_thread_right_filtered_count());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_left_error, "left_error", motor_thread_left_error());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_right_error, "right_error", motor_thread_right_error());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_left_feedforward, "left_feedforward", motor_thread_left_feedforward());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_right_feedforward, "right_feedforward", motor_thread_right_feedforward());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_left_correction, "left_correction", motor_thread_left_correction());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_right_correction, "right_correction", motor_thread_right_correction());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_left_decel_assist, "left_decel_assist", motor_thread_left_decel_assist());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_right_decel_assist, "right_decel_assist", motor_thread_right_decel_assist());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_left_duty, "left_duty", motor_thread_left_duty());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_right_duty, "right_duty", motor_thread_right_duty());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_left_hardware_duty, "left_hardware_duty", motor_thread_left_hardware_duty());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_right_hardware_duty, "right_hardware_duty", motor_thread_right_hardware_duty());
+    append_int(g_vision_runtime_config.udp_web_tcp_send_left_dir_level, "left_dir_level", motor_thread_left_dir_level());
+    append_int(g_vision_runtime_config.udp_web_tcp_send_right_dir_level, "right_dir_level", motor_thread_right_dir_level());
+    append_int(g_vision_runtime_config.udp_web_tcp_send_otsu_threshold, "otsu_threshold", otsu_threshold);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_perf_capture_wait_us, "capture_wait_us", capture_wait_us);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_perf_preprocess_us, "preprocess_us", preprocess_us);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_perf_otsu_us, "otsu_us", otsu_us);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_perf_maze_us, "maze_us", maze_us);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_perf_total_us, "total_us", total_us);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_maze_left_points_raw, "maze_left_points_raw", maze_left_points_raw);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_maze_right_points_raw, "maze_right_points_raw", maze_right_points_raw);
+    append_bool(g_vision_runtime_config.udp_web_tcp_send_red_found, "red_found", red_found);
+    append_int_array(g_vision_runtime_config.udp_web_tcp_send_red_rect, "red",
+                     {red_x, red_y, red_w, red_h, red_cx, red_cy});
+    append_bool(g_vision_runtime_config.udp_web_tcp_send_roi_valid, "roi_valid", roi_valid);
+    append_int_array(g_vision_runtime_config.udp_web_tcp_send_roi_rect, "roi",
+                     {roi_x, roi_y, roi_w, roi_h});
+    append_bool(g_vision_runtime_config.udp_web_tcp_send_ipm_track_valid, "ipm_track_valid", ipm_track_valid);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_method, "ipm_track_method",
+               static_cast<int>(vision_image_processor_ipm_line_error_method()));
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_source, "ipm_centerline_source",
+               static_cast<int>(vision_image_processor_ipm_line_error_source()));
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_index, "ipm_track_index", ipm_track_index);
+    append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_track_point, "ipm_track_point",
+                     {ipm_track_x, ipm_track_y});
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_first_index, "ipm_weighted_first_index",
+               g_vision_runtime_config.ipm_line_error_weighted_first_index);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_decision_index, "ipm_weighted_decision_index",
+               g_vision_runtime_config.ipm_line_error_weighted_decision_index);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_default_spacing, "ipm_weighted_default_spacing",
+               g_vision_runtime_config.ipm_line_error_weighted_default_spacing);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_threshold_1, "ipm_weighted_spacing_threshold_1",
+               g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_1);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_threshold_2, "ipm_weighted_spacing_threshold_2",
+               g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_2);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_threshold_3, "ipm_weighted_spacing_threshold_3",
+               g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_3);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_value_1, "ipm_weighted_spacing_value_1",
+               g_vision_runtime_config.ipm_line_error_weighted_spacing_value_1);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_value_2, "ipm_weighted_spacing_value_2",
+               g_vision_runtime_config.ipm_line_error_weighted_spacing_value_2);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_value_3, "ipm_weighted_spacing_value_3",
+               g_vision_runtime_config.ipm_line_error_weighted_spacing_value_3);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_first_point_error, "ipm_weighted_first_point_error",
+               vision_image_processor_ipm_weighted_first_point_error());
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_current_spacing, "ipm_weighted_current_spacing",
+               vision_image_processor_ipm_weighted_current_spacing());
+    append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_decision_point && ipm_weighted_decision_valid, "ipm_weighted_decision_point",
+                     {ipm_weighted_decision_x, ipm_weighted_decision_y});
+    append_int_array(g_vision_runtime_config.udp_web_tcp_send_src_weighted_decision_point && src_weighted_decision_valid, "src_weighted_decision_point",
+                     {src_weighted_decision_x, src_weighted_decision_y});
+    append_bool(g_vision_runtime_config.udp_web_tcp_send_intersection_mode, "intersection_mode", intersection_mode);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_intersection_stop_row, "intersection_stop_row", intersection_stop_row);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_intersection_current_start_row,
+               "intersection_current_start_row",
+               intersection_current_start_row);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_roundabout_mode, "roundabout_mode",
+               vision_image_processor_roundabout_mode());
+
+    auto append_points = [&append_key, &line](bool enabled, const char *name, uint16 *xs, uint16 *ys, uint16 n, int max_w, int max_h) {
+        if (!enabled)
+        {
+            return;
+        }
+        append_key(name);
+        line += "[";
         for (uint16 i = 0; i < n; ++i)
         {
             if (i > 0)
@@ -495,10 +604,13 @@ static void send_tcp_status()
         line += "]";
     };
 
-    auto append_float_array = [&line](const char *name, float *values, uint16 n) {
-        line += ",\"";
-        line += name;
-        line += "\":[";
+    auto append_float_array = [&append_key, &line](bool enabled, const char *name, float *values, uint16 n) {
+        if (!enabled)
+        {
+            return;
+        }
+        append_key(name);
+        line += "[";
         for (uint16 i = 0; i < n; ++i)
         {
             if (i > 0)
@@ -510,32 +622,44 @@ static void send_tcp_status()
         line += "]";
     };
 
-    append_points("left_boundary", x1, y1, dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
-    append_points("right_boundary", x3, y3, dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
-    append_points("ipm_left_boundary", ipm_x1, ipm_y1, ipm_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points("ipm_right_boundary", ipm_x3, ipm_y3, ipm_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points("ipm_raw_left_boundary", ipm_raw_x1, ipm_raw_y1, ipm_raw_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points("ipm_raw_right_boundary", ipm_raw_x3, ipm_raw_y3, ipm_raw_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points("ipm_corner_left_boundary", ipm_corner_left_x, ipm_corner_left_y, ipm_corner_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points("ipm_corner_right_boundary", ipm_corner_right_x, ipm_corner_right_y, ipm_corner_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_float_array("ipm_corner_left_raw_angle", ipm_corner_left_raw_value, ipm_corner_left_num);
-    append_float_array("ipm_corner_right_raw_angle", ipm_corner_right_raw_value, ipm_corner_right_num);
-    append_float_array("ipm_corner_left_nms", ipm_corner_left_value, ipm_corner_left_num);
-    append_float_array("ipm_corner_right_nms", ipm_corner_right_value, ipm_corner_right_num);
-    append_points("ipm_centerline_from_left_shift", ipm_center_left_x, ipm_center_left_y, ipm_center_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points("ipm_centerline_from_right_shift", ipm_center_right_x, ipm_center_right_y, ipm_center_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points("src_centerline_from_left_shift", src_center_left_x, src_center_left_y, src_center_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
-    append_points("src_centerline_from_right_shift", src_center_right_x, src_center_right_y, src_center_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
+                  "left_boundary", x1, y1, left_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
+                  "right_boundary", x3, y3, right_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary,
+                  "ipm_left_boundary", ipm_x1, ipm_y1, ipm_left_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary,
+                  "ipm_right_boundary", ipm_x3, ipm_y3, ipm_right_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_raw_left_boundary,
+                  "ipm_raw_left_boundary", ipm_raw_x1, ipm_raw_y1, ipm_raw_left_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_raw_right_boundary,
+                  "ipm_raw_right_boundary", ipm_raw_x3, ipm_raw_y3, ipm_raw_right_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_left_boundary,
+                  "ipm_corner_left_boundary", ipm_corner_left_x, ipm_corner_left_y, ipm_corner_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_right_boundary,
+                  "ipm_corner_right_boundary", ipm_corner_right_x, ipm_corner_right_y, ipm_corner_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_left_raw_angle,
+                       "ipm_corner_left_raw_angle", ipm_corner_left_raw_value, ipm_corner_left_num);
+    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_right_raw_angle,
+                       "ipm_corner_right_raw_angle", ipm_corner_right_raw_value, ipm_corner_right_num);
+    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_left_nms,
+                       "ipm_corner_left_nms", ipm_corner_left_value, ipm_corner_left_num);
+    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_right_nms,
+                       "ipm_corner_right_nms", ipm_corner_right_value, ipm_corner_right_num);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_from_left_shift,
+                  "ipm_centerline_from_left_shift", ipm_center_left_x, ipm_center_left_y, ipm_center_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_from_right_shift,
+                  "ipm_centerline_from_right_shift", ipm_center_right_x, ipm_center_right_y, ipm_center_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_src_centerline_from_left_shift,
+                  "src_centerline_from_left_shift", src_center_left_x, src_center_left_y, src_center_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_src_centerline_from_right_shift,
+                  "src_centerline_from_right_shift", src_center_right_x, src_center_right_y, src_center_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_int_array(g_vision_runtime_config.udp_web_tcp_send_gray_size, "gray_size",
+                     {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
+    append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_size, "ipm_size",
+                     {kIpmCanvasWidth, kIpmCanvasHeight});
 
-    line += ",\"gray_size\":[";
-    line += std::to_string(VISION_DOWNSAMPLED_WIDTH);
-    line += ",";
-    line += std::to_string(VISION_DOWNSAMPLED_HEIGHT);
-    line += "],\"ipm_size\":[";
-    line += std::to_string(kIpmCanvasWidth);
-    line += ",";
-    line += std::to_string(kIpmCanvasHeight);
-    line += "]}";
+    line += "}";
     line += "\n";
 
     tcp_client_send_data(reinterpret_cast<const uint8 *>(line.data()), static_cast<uint32>(line.size()));
@@ -592,20 +716,18 @@ void vision_transport_send_step()
             std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count()));
     }
 
-    if (g_udp_enabled.load() && try_acquire_udp_send_slot())
+    if (try_acquire_udp_send_slot())
     {
-        std::vector<uint8> gray_jpeg;
-        std::vector<uint8> binary_jpeg;
-        int width = 0;
-        int height = 0;
-        uint8 mode = 0;
-        if (build_gray_jpeg(&gray_jpeg, &width, &height, &mode))
+        if (g_udp_enabled.load() && g_vision_runtime_config.udp_web_send_gray_jpeg)
         {
-            send_udp_frame(gray_jpeg, width, height, mode);
-        }
-        if (build_binary_jpeg(&binary_jpeg, &width, &height, &mode))
-        {
-            send_udp_frame(binary_jpeg, width, height, mode);
+            std::vector<uint8> gray_jpeg;
+            int width = 0;
+            int height = 0;
+            uint8 mode = 0;
+            if (build_gray_jpeg(&gray_jpeg, &width, &height, &mode))
+            {
+                send_udp_frame(gray_jpeg, width, height, mode);
+            }
         }
         send_tcp_status();
     }
@@ -679,7 +801,6 @@ bool vision_transport_udp_init(const char *server_ip, uint16 video_port, uint16 
     }
 
     g_udp_last_send_tick_us.store(0);
-    g_last_status_tick_ms.store(0);
     return g_udp_ready;
 }
 

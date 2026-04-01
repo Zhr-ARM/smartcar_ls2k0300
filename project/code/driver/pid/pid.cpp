@@ -673,27 +673,27 @@ MotorSpeedControlState MotorSpeedPidController::compute(float left_target, float
     state.left_error = left_target - state.left_feedback;
     state.right_error = right_target - state.right_feedback;
 
-    const float left_feedforward = compute_feedforward_duty(left_target,
-                                                            config_.left_feedforward_gain,
-                                                            config_.left_feedforward_bias);
-    const float right_feedforward = compute_feedforward_duty(right_target,
-                                                             config_.right_feedforward_gain,
-                                                             config_.right_feedforward_bias);
-    const float left_decel_assist = compute_decel_assist_duty(left_target, state.left_feedback);
-    const float right_decel_assist = compute_decel_assist_duty(right_target, state.right_feedback);
+    state.left_feedforward = compute_feedforward_duty(left_target,
+                                                      config_.left_feedforward_gain,
+                                                      config_.left_feedforward_bias);
+    state.right_feedforward = compute_feedforward_duty(right_target,
+                                                       config_.right_feedforward_gain,
+                                                       config_.right_feedforward_bias);
+    state.left_decel_assist = compute_decel_assist_duty(left_target, state.left_feedback);
+    state.right_decel_assist = compute_decel_assist_duty(right_target, state.right_feedback);
 
     pid_.set_target(left_target, right_target);
 
-    float left_correction = 0.0f;
-    float right_correction = 0.0f;
-    pid_.compute(state.left_feedback, state.right_feedback, left_correction, right_correction);
+    state.left_correction = 0.0f;
+    state.right_correction = 0.0f;
+    pid_.compute(state.left_feedback, state.right_feedback, state.left_correction, state.right_correction);
 
-    state.left_duty = left_feedforward + left_correction + left_decel_assist;
-    state.right_duty = right_feedforward + right_correction + right_decel_assist;
+    state.left_duty = state.left_feedforward + state.left_correction + state.left_decel_assist;
+    state.right_duty = state.right_feedforward + state.right_correction + state.right_decel_assist;
     state.left_duty = clamp_float(state.left_duty, -config_.duty_limit, config_.duty_limit);
     state.right_duty = clamp_float(state.right_duty, -config_.duty_limit, config_.duty_limit);
-    pid_.left_pid().track_output(state.left_duty - left_feedforward - left_decel_assist);
-    pid_.right_pid().track_output(state.right_duty - right_feedforward - right_decel_assist);
+    pid_.left_pid().track_output(state.left_duty - state.left_feedforward - state.left_decel_assist);
+    pid_.right_pid().track_output(state.right_duty - state.right_feedforward - state.right_decel_assist);
     return state;
 }
 

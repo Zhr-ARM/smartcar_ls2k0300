@@ -26,7 +26,137 @@
       white-space: nowrap;
     }
     .meta { margin: 8px 0 12px; color: #94a3b8; font-size: 13px; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 16px; }
+    .btn {
+      border: 1px solid #475569;
+      background: #1e293b;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: #0f766e; border-color: #14b8a6; }
+    .btn-danger { background: #7f1d1d; border-color: #ef4444; }
+    .recording-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #ef4444;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .playback-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .playback-item { background: #0b1220; border: 1px solid #273449; border-radius: 8px; padding: 8px; }
+    .playback-item video { width: 100%; display: block; background: #000; border-radius: 6px; }
+    .param-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.82);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .param-panel {
+      width: min(1360px, 98vw);
+      height: min(88vh, 900px);
+      background: #0b1220;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .param-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #1e293b;
+      background: #111827;
+    }
+    .param-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .param-body {
+      flex: 1;
+      overflow: hidden;
+      padding: 16px;
+      background: #020617;
+    }
+    .recording-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
+      gap: 16px;
+      height: 100%;
+      min-height: 0;
+    }
+    .recording-videos {
+      min-height: 0;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .recording-videos .playback-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .recording-side {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .playback-control-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 12px;
+      background: #111827;
+      border: 1px solid #273449;
+      border-radius: 10px;
+    }
+    .playback-control-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .playback-time {
+      color: #cbd5e1;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .recording-status-panel {
+      overflow: auto;
+      min-height: 0;
+      background: #111827;
+      border: 1px solid #273449;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .param-pre {
+      margin: 0;
+      min-height: 100%;
+      color: #c4e1ff;
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
     pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; color: #93c5fd; max-height: 280px; overflow: auto; }
+    @media (max-width: 1100px) {
+      .recording-layout { grid-template-columns: 1fr; }
+    }
     @media (max-width: 900px){ .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -34,6 +164,13 @@
   <div class="wrap">
     <h2>智能车视觉接收端（Node.js）</h2>
     <div class="meta" id="meta">connecting...</div>
+    <div class="toolbar">
+      <button class="btn btn-primary" id="startRecordBtn">开始录制</button>
+      <button class="btn btn-danger" id="stopRecordBtn" disabled>停止录制</button>
+      <button class="btn" id="playRecordBtn" disabled>打开回放界面</button>
+      <button class="btn" id="saveRecordBtn" disabled>保存录制</button>
+      <span class="meta" id="recordingMeta">录制未开始</span>
+    </div>
     <div class="meta">
       <label style="margin-right: 16px;">
         <input type="checkbox" id="toggleMeanCenterline" checked />
@@ -52,37 +189,91 @@
       </span>
     </div>
     <div class="grid">
-      <div class="card">
+      <div class="card" id="grayCard">
         <div class="title">灰度图 + 迷宫左右边线（红/绿）</div>
         <div class="view">
           <canvas id="grayCanvas" width="160" height="120"></canvas>
           <div class="pixel-info" id="grayPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
         </div>
       </div>
-      <div class="card">
-        <div class="title">二值图（不叠加边线）</div>
+      <div class="card" id="binaryCard">
+        <div class="title" id="binaryTitle">二值图（网页端实时二值化）</div>
         <div class="view">
           <canvas id="binaryCanvas" width="160" height="120"></canvas>
           <div class="pixel-info" id="binaryPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="ipmCard">
         <div class="title">透视边界图-处理链数组（可三角滤波）</div>
         <div class="view">
           <canvas id="ipmCanvas" width="400" height="200"></canvas>
           <div class="pixel-info" id="ipmPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="ipmRawCard">
         <div class="title">透视边界图-原始拷贝数组（角点识别）</div>
         <div class="view">
           <canvas id="ipmRawCanvas" width="400" height="200"></canvas>
           <div class="pixel-info" id="ipmRawPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="statusCard">
         <div class="title">状态数据</div>
         <pre id="status">loading...</pre>
+      </div>
+    </div>
+  </div>
+  <div class="param-modal" id="paramModal">
+    <div class="param-panel">
+      <div class="param-header">
+        <div>
+          <div class="title" style="margin-bottom:4px;">录制回放子界面</div>
+          <div class="meta" id="paramPanelMeta" style="margin:0;">打开后会同步显示录制的视频和参数</div>
+        </div>
+        <div class="param-toolbar">
+          <button class="btn" id="closeParamPanelBtn">关闭</button>
+        </div>
+      </div>
+      <div class="param-body" id="paramPanelBody">
+        <div class="recording-layout">
+          <div class="recording-videos">
+            <div class="playback-control-bar">
+              <div class="playback-control-actions">
+                <button class="btn btn-primary" id="playbackToggleBtn">播放</button>
+                <button class="btn" id="playbackRestartBtn">回到开头</button>
+              </div>
+              <div class="playback-time" id="playbackTimeLabel">00:00.00 / 00:00.00</div>
+            </div>
+            <div class="playback-grid" style="margin-top:12px;">
+              <div class="playback-item" id="playbackGrayWrap">
+                <div class="title">灰度图录制</div>
+                <video id="playbackGrayVideo" muted playsinline></video>
+              </div>
+              <div class="playback-item" id="playbackBinaryWrap">
+                <div class="title">二值图录制</div>
+                <video id="playbackBinaryVideo" muted playsinline></video>
+              </div>
+              <div class="playback-item" id="playbackIpmWrap">
+                <div class="title">透视图录制</div>
+                <video id="playbackIpmVideo" muted playsinline></video>
+              </div>
+              <div class="playback-item" id="playbackIpmRawWrap">
+                <div class="title">透视原始图录制</div>
+                <video id="playbackIpmRawVideo" muted playsinline></video>
+              </div>
+            </div>
+          </div>
+          <div class="recording-side">
+            <div class="recording-status-panel">
+              <div class="title">录制状态</div>
+              <pre id="playbackStatus">暂无录制</pre>
+            </div>
+            <div class="recording-status-panel" style="flex:1;">
+              <div class="title">同步参数</div>
+              <pre class="param-pre" id="paramPanelContent">waiting...</pre>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -101,16 +292,460 @@
     const ipmRawPixelInfo = document.getElementById('ipmRawPixelInfo');
     const statusEl = document.getElementById('status');
     const metaEl = document.getElementById('meta');
+    const startRecordBtn = document.getElementById('startRecordBtn');
+    const stopRecordBtn = document.getElementById('stopRecordBtn');
+    const playRecordBtn = document.getElementById('playRecordBtn');
+    const saveRecordBtn = document.getElementById('saveRecordBtn');
+    const closeParamPanelBtn = document.getElementById('closeParamPanelBtn');
+    const playbackToggleBtn = document.getElementById('playbackToggleBtn');
+    const playbackRestartBtn = document.getElementById('playbackRestartBtn');
+    const playbackTimeLabel = document.getElementById('playbackTimeLabel');
+    const recordingMeta = document.getElementById('recordingMeta');
+    const binaryCard = document.getElementById('binaryCard');
+    const binaryTitle = document.getElementById('binaryTitle');
+    const ipmCard = document.getElementById('ipmCard');
+    const ipmRawCard = document.getElementById('ipmRawCard');
+    const playbackStatus = document.getElementById('playbackStatus');
+    const playbackGrayWrap = document.getElementById('playbackGrayWrap');
+    const playbackBinaryWrap = document.getElementById('playbackBinaryWrap');
+    const playbackIpmWrap = document.getElementById('playbackIpmWrap');
+    const playbackIpmRawWrap = document.getElementById('playbackIpmRawWrap');
+    const playbackGrayVideo = document.getElementById('playbackGrayVideo');
+    const playbackBinaryVideo = document.getElementById('playbackBinaryVideo');
+    const playbackIpmVideo = document.getElementById('playbackIpmVideo');
+    const playbackIpmRawVideo = document.getElementById('playbackIpmRawVideo');
+    const paramModal = document.getElementById('paramModal');
+    const paramPanelMeta = document.getElementById('paramPanelMeta');
+    const paramPanelBody = document.getElementById('paramPanelBody');
+    const paramPanelContent = document.getElementById('paramPanelContent');
     const toggleMeanCenterline = document.getElementById('toggleMeanCenterline');
     const toggleIpmAnchorDot = document.getElementById('toggleIpmAnchorDot');
     const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
     const ipmCenterlineSourceLabel = document.getElementById('ipmCenterlineSourceLabel');
     const grayImg = new Image();
-    const binaryImg = new Image();
     let latestStatus = {};
     let showMeanCenterline = true;
     let showIpmAnchorDot = true;
     let boundaryPointMode = false;
+    let recordingState = null;
+    let lastRecording = null;
+    let paramPanelOpen = false;
+    let isSyncingPlayback = false;
+
+    function hasValue(value) {
+      return value !== undefined && value !== null;
+    }
+
+    function hasPointArray(value) {
+      return Array.isArray(value) && value.length > 0;
+    }
+
+    function setCardVisible(el, visible) {
+      if (!el) return;
+      el.style.display = visible ? '' : 'none';
+    }
+
+    function formatStatusForPanel(status) {
+      const sections = [];
+      const addSection = (title, rows) => {
+        if (rows.length > 0) sections.push(`【${title}】\n${rows.join('\n')}`);
+      };
+      const push = (rows, name, value) => {
+        if (hasValue(value)) rows.push(`${name}: ${value}`);
+      };
+      const pushArray = (rows, name, value) => {
+        if (Array.isArray(value)) rows.push(`${name}: ${fmtArrayInline(value)}`);
+      };
+      const pushCount = (rows, name, value) => {
+        if (Array.isArray(value)) rows.push(`${name}: count=${value.length}`);
+      };
+
+      const basicRows = [];
+      push(basicRows, 'ts_ms', status.ts_ms);
+      if (hasValue(status.roundabout_mode) || hasValue(status.intersection_mode)) {
+        push(basicRows, 'current_mode', fmtCurrentMode(status));
+      }
+      push(basicRows, 'line_error', status.line_error);
+      push(basicRows, 'base_speed', status.base_speed);
+      push(basicRows, 'adjusted_base_speed', status.adjusted_base_speed);
+      push(basicRows, 'left_target_count', status.left_target_count);
+      push(basicRows, 'right_target_count', status.right_target_count);
+      push(basicRows, 'left_current_count', status.left_current_count);
+      push(basicRows, 'right_current_count', status.right_current_count);
+      push(basicRows, 'otsu_threshold', status.otsu_threshold);
+      pushArray(basicRows, 'gray_size', status.gray_size);
+      pushArray(basicRows, 'ipm_size', status.ipm_size);
+      addSection('基础状态', basicRows);
+
+      const motorRows = [];
+      push(motorRows, 'left_current_count', status.left_current_count);
+      push(motorRows, 'right_current_count', status.right_current_count);
+      push(motorRows, 'left_filtered_count', status.left_filtered_count);
+      push(motorRows, 'right_filtered_count', status.right_filtered_count);
+      push(motorRows, 'left_error', status.left_error);
+      push(motorRows, 'right_error', status.right_error);
+      push(motorRows, 'left_feedforward', status.left_feedforward);
+      push(motorRows, 'right_feedforward', status.right_feedforward);
+      push(motorRows, 'left_correction', status.left_correction);
+      push(motorRows, 'right_correction', status.right_correction);
+      push(motorRows, 'left_decel_assist', status.left_decel_assist);
+      push(motorRows, 'right_decel_assist', status.right_decel_assist);
+      push(motorRows, 'left_duty', status.left_duty);
+      push(motorRows, 'right_duty', status.right_duty);
+      push(motorRows, 'left_hardware_duty', status.left_hardware_duty);
+      push(motorRows, 'right_hardware_duty', status.right_hardware_duty);
+      push(motorRows, 'left_dir_level', status.left_dir_level);
+      push(motorRows, 'right_dir_level', status.right_dir_level);
+      addSection('速度环链路', motorRows);
+
+      const perfRows = [];
+      push(perfRows, 'capture_wait_us', status.capture_wait_us);
+      push(perfRows, 'preprocess_us', status.preprocess_us);
+      push(perfRows, 'otsu_us', status.otsu_us);
+      push(perfRows, 'maze_us', status.maze_us);
+      push(perfRows, 'total_us', status.total_us);
+      push(perfRows, 'maze_left_points_raw', status.maze_left_points_raw);
+      push(perfRows, 'maze_right_points_raw', status.maze_right_points_raw);
+      addSection('性能统计', perfRows);
+
+      const detectRows = [];
+      push(detectRows, 'red_found', status.red_found);
+      pushArray(detectRows, 'red', status.red);
+      push(detectRows, 'roi_valid', status.roi_valid);
+      pushArray(detectRows, 'roi', status.roi);
+      addSection('检测结果', detectRows);
+
+      const trackRows = [];
+      push(trackRows, 'ipm_track_valid', status.ipm_track_valid);
+      if (hasValue(status.ipm_track_method)) {
+        push(trackRows, 'ipm_track_method', fmtTrackMethod(status.ipm_track_method));
+      }
+      if (hasValue(status.ipm_centerline_source)) {
+        push(trackRows, 'ipm_centerline_source', fmtCenterlineSource(status.ipm_centerline_source));
+      }
+      push(trackRows, 'ipm_track_index', status.ipm_track_index);
+      pushArray(trackRows, 'ipm_track_point', status.ipm_track_point);
+      push(trackRows, 'ipm_weighted_first_index', status.ipm_weighted_first_index);
+      push(trackRows, 'ipm_weighted_decision_index', status.ipm_weighted_decision_index);
+      push(trackRows, 'ipm_weighted_default_spacing', status.ipm_weighted_default_spacing);
+      push(trackRows, 'ipm_weighted_spacing_threshold_1', status.ipm_weighted_spacing_threshold_1);
+      push(trackRows, 'ipm_weighted_spacing_threshold_2', status.ipm_weighted_spacing_threshold_2);
+      push(trackRows, 'ipm_weighted_spacing_threshold_3', status.ipm_weighted_spacing_threshold_3);
+      push(trackRows, 'ipm_weighted_spacing_value_1', status.ipm_weighted_spacing_value_1);
+      push(trackRows, 'ipm_weighted_spacing_value_2', status.ipm_weighted_spacing_value_2);
+      push(trackRows, 'ipm_weighted_spacing_value_3', status.ipm_weighted_spacing_value_3);
+      push(trackRows, 'ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
+      push(trackRows, 'ipm_weighted_current_spacing', status.ipm_weighted_current_spacing);
+      pushArray(trackRows, 'ipm_weighted_decision_point', status.ipm_weighted_decision_point);
+      pushArray(trackRows, 'src_weighted_decision_point', status.src_weighted_decision_point);
+      addSection('巡线跟踪', trackRows);
+
+      const modeRows = [];
+      push(modeRows, 'intersection_mode', status.intersection_mode);
+      push(modeRows, 'intersection_stop_row', status.intersection_stop_row);
+      push(modeRows, 'intersection_current_start_row', status.intersection_current_start_row);
+      if (hasValue(status.roundabout_mode)) {
+        push(modeRows, 'roundabout_mode', fmtRoundaboutMode(status.roundabout_mode));
+      }
+      addSection('元素状态机', modeRows);
+
+      const arrayRows = [];
+      pushCount(arrayRows, 'left_boundary', status.left_boundary);
+      pushCount(arrayRows, 'right_boundary', status.right_boundary);
+      pushCount(arrayRows, 'ipm_left_boundary', status.ipm_left_boundary);
+      pushCount(arrayRows, 'ipm_right_boundary', status.ipm_right_boundary);
+      pushCount(arrayRows, 'ipm_raw_left_boundary', status.ipm_raw_left_boundary);
+      pushCount(arrayRows, 'ipm_raw_right_boundary', status.ipm_raw_right_boundary);
+      pushCount(arrayRows, 'ipm_corner_left_boundary', status.ipm_corner_left_boundary);
+      pushCount(arrayRows, 'ipm_corner_right_boundary', status.ipm_corner_right_boundary);
+      pushCount(arrayRows, 'ipm_centerline_from_left_shift', status.ipm_centerline_from_left_shift);
+      pushCount(arrayRows, 'ipm_centerline_from_right_shift', status.ipm_centerline_from_right_shift);
+      pushCount(arrayRows, 'src_centerline_from_left_shift', status.src_centerline_from_left_shift);
+      pushCount(arrayRows, 'src_centerline_from_right_shift', status.src_centerline_from_right_shift);
+      addSection('点列数量', arrayRows);
+
+      return sections.length > 0 ? sections.join('\n\n') : 'waiting...';
+    }
+
+    function setParamPanelText(text) {
+      paramPanelContent.textContent = text;
+    }
+
+    function currentPlaybackVideo() {
+      const candidates = [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo];
+      for (const video of candidates) {
+        if (video && video.src && video.parentElement.style.display !== 'none') return video;
+      }
+      return null;
+    }
+
+    function allPlaybackVideos() {
+      return [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo].filter(
+        (video) => video && video.src && video.parentElement.style.display !== 'none'
+      );
+    }
+
+    function fmtPlaybackTime(sec) {
+      const safeSec = Math.max(0, Number(sec) || 0);
+      const minutes = Math.floor(safeSec / 60);
+      const seconds = Math.floor(safeSec % 60);
+      const centiseconds = Math.floor((safeSec - Math.floor(safeSec)) * 100);
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`;
+    }
+
+    function syncPlaybackVideos(sourceVideo) {
+      const videos = allPlaybackVideos();
+      if (!sourceVideo || videos.length < 2) return;
+      isSyncingPlayback = true;
+      try {
+        for (const video of videos) {
+          if (video === sourceVideo) continue;
+          if (Math.abs((video.currentTime || 0) - (sourceVideo.currentTime || 0)) > 0.08) {
+            video.currentTime = sourceVideo.currentTime || 0;
+          }
+          if (sourceVideo.paused && !video.paused) {
+            video.pause();
+          }
+        }
+      } finally {
+        isSyncingPlayback = false;
+      }
+    }
+
+    async function setPlaybackPlaying(playing) {
+      const videos = allPlaybackVideos();
+      if (videos.length < 1) return;
+      if (playing) {
+        for (const video of videos) {
+          try {
+            await video.play();
+          } catch (_) {
+            video.pause();
+          }
+        }
+      } else {
+        videos.forEach((video) => video.pause());
+      }
+      refreshParamPanel();
+    }
+
+    function playbackStatusAt(timeSec) {
+      if (!lastRecording || !Array.isArray(lastRecording.statusFrames) || lastRecording.statusFrames.length === 0) return null;
+      const durationMs = Math.max(1, Number(lastRecording.durationMs) || 1);
+      const targetMs = Math.max(0, timeSec * 1000);
+      let best = lastRecording.statusFrames[0];
+      let bestDiff = Number.POSITIVE_INFINITY;
+      for (const frame of lastRecording.statusFrames) {
+        const frameOffset = Math.max(0, Number(frame.client_ts_ms) - Number(lastRecording.startedAtMs));
+        const diff = Math.abs(frameOffset - targetMs);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          best = frame;
+        }
+      }
+      return best ? best.status : null;
+    }
+
+    function refreshParamPanel() {
+      if (!paramPanelOpen) return;
+      const video = currentPlaybackVideo();
+      if (video && lastRecording) {
+        const synced = playbackStatusAt(video.currentTime || 0);
+        const duration = Number.isFinite(video.duration) ? video.duration : (Number(lastRecording.durationMs) || 0) / 1000;
+        paramPanelMeta.textContent = video.paused
+          ? `回放已暂停，当前时间 ${fmtPlaybackTime(video.currentTime || 0)}`
+          : `回放中，当前时间 ${fmtPlaybackTime(video.currentTime || 0)}`;
+        playbackTimeLabel.textContent = `${fmtPlaybackTime(video.currentTime || 0)} / ${fmtPlaybackTime(duration)}`;
+        playbackToggleBtn.textContent = video.paused ? '播放' : '暂停';
+        setParamPanelText(formatStatusForPanel(synced || {}));
+        return;
+      }
+      playbackTimeLabel.textContent = '00:00.00 / 00:00.00';
+      playbackToggleBtn.textContent = '播放';
+      paramPanelMeta.textContent = '还没有可播放的录制内容';
+      setParamPanelText('waiting...');
+    }
+
+    function detectRecordMimeType() {
+      if (typeof MediaRecorder === 'undefined') return '';
+      const candidates = [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm'
+      ];
+      for (const mime of candidates) {
+        if (MediaRecorder.isTypeSupported(mime)) return mime;
+      }
+      return '';
+    }
+
+    function updateRecordingUi() {
+      const isRecording = !!(recordingState && recordingState.active);
+      startRecordBtn.disabled = isRecording || typeof MediaRecorder === 'undefined';
+      stopRecordBtn.disabled = !isRecording;
+      playRecordBtn.disabled = !lastRecording;
+      saveRecordBtn.disabled = !lastRecording;
+      if (isRecording) {
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - recordingState.startedAtMs) / 1000));
+        recordingMeta.innerHTML = `<span class="recording-dot"></span>录制中 ${elapsedSec}s，全部在网页端本地缓存`;
+      } else if (lastRecording) {
+        recordingMeta.textContent = `最近一次录制：${lastRecording.frameCount} 条状态快照，${lastRecording.durationSec}s`;
+      } else if (typeof MediaRecorder === 'undefined') {
+        recordingMeta.textContent = '当前浏览器不支持录制功能';
+      } else {
+        recordingMeta.textContent = '录制未开始';
+      }
+    }
+
+    function cloneStatus(status) {
+      return JSON.parse(JSON.stringify(status || {}));
+    }
+
+    function createCanvasRecorder(key, canvas, enabled) {
+      if (!enabled || typeof MediaRecorder === 'undefined') return null;
+      const mimeType = detectRecordMimeType();
+      if (!mimeType) return null;
+      const stream = canvas.captureStream(15);
+      const chunks = [];
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const stopped = new Promise((resolve) => {
+        recorder.ondataavailable = (ev) => {
+          if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+        };
+        recorder.onstop = () => {
+          resolve({
+            key,
+            mimeType,
+            blob: chunks.length > 0 ? new Blob(chunks, { type: mimeType }) : null
+          });
+        };
+      });
+      recorder.start(1000);
+      return { key, recorder, stopped };
+    }
+
+    async function startRecording() {
+      if (recordingState || typeof MediaRecorder === 'undefined') return;
+      const recorders = [];
+      const grayRecorder = createCanvasRecorder('gray', grayCanvas, true);
+      const binaryRecorder = createCanvasRecorder('binary', binaryCanvas, binaryCard.style.display !== 'none');
+      const ipmRecorder = createCanvasRecorder('ipm', ipmCanvas, ipmCard.style.display !== 'none');
+      const ipmRawRecorder = createCanvasRecorder('ipm_raw', ipmRawCanvas, ipmRawCard.style.display !== 'none');
+      [grayRecorder, binaryRecorder, ipmRecorder, ipmRawRecorder].forEach((item) => {
+        if (item) recorders.push(item);
+      });
+      recordingState = {
+        active: true,
+        startedAtMs: Date.now(),
+        recorders,
+        statusFrames: []
+      };
+      updateRecordingUi();
+    }
+
+    function revokeRecordingUrls(recording) {
+      if (!recording || !recording.urls) return;
+      Object.values(recording.urls).forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    }
+
+    async function stopRecording() {
+      if (!recordingState || !recordingState.active) return;
+      const state = recordingState;
+      recordingState = null;
+      updateRecordingUi();
+      state.recorders.forEach(({ recorder }) => recorder.stop());
+      const results = await Promise.all(state.recorders.map((item) => item.stopped));
+      if (lastRecording) revokeRecordingUrls(lastRecording);
+
+      const videos = {};
+      const urls = {};
+      for (const result of results) {
+        videos[result.key] = result.blob;
+        urls[result.key] = result.blob ? URL.createObjectURL(result.blob) : '';
+      }
+
+      const savedAtMs = Date.now();
+      const statusPayload = {
+        recorded_at_ms: savedAtMs,
+        duration_ms: savedAtMs - state.startedAtMs,
+        frame_count: state.statusFrames.length,
+        statuses: state.statusFrames
+      };
+      const statusBlob = new Blob([JSON.stringify(statusPayload, null, 2)], { type: 'application/json' });
+      urls.status = URL.createObjectURL(statusBlob);
+
+      lastRecording = {
+        savedAtMs,
+        startedAtMs: state.startedAtMs,
+        durationMs: savedAtMs - state.startedAtMs,
+        frameCount: state.statusFrames.length,
+        durationSec: ((savedAtMs - state.startedAtMs) / 1000).toFixed(1),
+        statusFrames: state.statusFrames,
+        statusBlob,
+        videos,
+        urls
+      };
+      updateRecordingUi();
+
+      if (confirm('录制完成，是否立即查看回放？')) {
+        playLastRecording();
+      } else if (confirm('是否立即保存录制到本地？')) {
+        saveLastRecording();
+      }
+    }
+
+    function setPlaybackVideo(videoEl, wrapEl, url) {
+      if (!videoEl || !wrapEl) return;
+      const visible = !!url;
+      wrapEl.style.display = visible ? '' : 'none';
+      if (visible) {
+        videoEl.src = url;
+        videoEl.currentTime = 0;
+      } else {
+        videoEl.removeAttribute('src');
+        videoEl.load();
+      }
+    }
+
+    function playLastRecording() {
+      if (!lastRecording) return;
+      playbackStatus.textContent = JSON.stringify({
+        recorded_at_ms: lastRecording.savedAtMs,
+        duration_sec: lastRecording.durationSec,
+        frame_count: lastRecording.frameCount
+      }, null, 2);
+      setPlaybackVideo(playbackGrayVideo, playbackGrayWrap, lastRecording.urls.gray);
+      setPlaybackVideo(playbackBinaryVideo, playbackBinaryWrap, lastRecording.urls.binary);
+      setPlaybackVideo(playbackIpmVideo, playbackIpmWrap, lastRecording.urls.ipm);
+      setPlaybackVideo(playbackIpmRawVideo, playbackIpmRawWrap, lastRecording.urls.ipm_raw);
+      paramPanelOpen = true;
+      paramModal.style.display = 'flex';
+      refreshParamPanel();
+    }
+
+    function downloadBlob(name, blob) {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function saveLastRecording() {
+      if (!lastRecording) return;
+      const prefix = `vision_record_${lastRecording.savedAtMs}`;
+      downloadBlob(`${prefix}_status.json`, lastRecording.statusBlob);
+      downloadBlob(`${prefix}_gray.webm`, lastRecording.videos.gray);
+      downloadBlob(`${prefix}_binary.webm`, lastRecording.videos.binary);
+      downloadBlob(`${prefix}_ipm.webm`, lastRecording.videos.ipm);
+      downloadBlob(`${prefix}_ipm_raw.webm`, lastRecording.videos.ipm_raw);
+    }
     function drawPolyline(ctx, pts, color, lineWidth) {
       if (!Array.isArray(pts) || pts.length < 2) return;
       ctx.strokeStyle = color;
@@ -142,6 +777,21 @@
       } else {
         drawPolyline(ctx, pts, color, lineWidth);
       }
+    }
+
+    function drawDecisionPoint(ctx, point) {
+      if (!Array.isArray(point) || point.length < 2) return;
+      const px = point[0] | 0;
+      const py = point[1] | 0;
+      ctx.fillStyle = '#c084fc';
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#faf5ff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     function scalarToColor(value, maxAbs) {
@@ -258,6 +908,7 @@
         ctx.stroke();
         drawPointSet(ctx, [[cx, cy], [tx, ty], [tx, cy]], '#93c5fd', 2);
       }
+      drawDecisionPoint(ctx, status.ipm_weighted_decision_point);
       if (showIpmAnchorDot) {
         const cx = Math.max(0, Math.min(w - 1, 200));
         const cy = Math.max(0, Math.min(h - 1, 200));
@@ -269,11 +920,23 @@
     }
 
     function drawIpmBoundaries(status) {
+      const hasIpmMain = hasPointArray(status.ipm_left_boundary) || hasPointArray(status.ipm_right_boundary) ||
+        hasPointArray(status.ipm_centerline_from_left_shift) || hasPointArray(status.ipm_centerline_from_right_shift) ||
+        hasValue(status.ipm_track_valid);
+      const hasIpmRaw = hasPointArray(status.ipm_raw_left_boundary) || hasPointArray(status.ipm_raw_right_boundary) ||
+        hasPointArray(status.ipm_corner_left_boundary) || hasPointArray(status.ipm_corner_right_boundary);
+      setCardVisible(ipmCard, hasIpmMain);
+      setCardVisible(ipmRawCard, hasIpmRaw);
+      if (!hasIpmMain && !hasIpmRaw) return;
       const centerKey = (status.ipm_centerline_source === 1)
         ? 'ipm_centerline_from_right_shift'
         : 'ipm_centerline_from_left_shift';
-      drawIpmBoundariesToCanvas(status, ipmCanvas, ipmCtx, 'ipm_left_boundary', 'ipm_right_boundary', centerKey);
-      drawIpmBoundariesToCanvas(status, ipmRawCanvas, ipmRawCtx, 'ipm_raw_left_boundary', 'ipm_raw_right_boundary', '');
+      if (hasIpmMain) {
+        drawIpmBoundariesToCanvas(status, ipmCanvas, ipmCtx, 'ipm_left_boundary', 'ipm_right_boundary', centerKey);
+      }
+      if (hasIpmRaw) {
+        drawIpmBoundariesToCanvas(status, ipmRawCanvas, ipmRawCtx, 'ipm_raw_left_boundary', 'ipm_raw_right_boundary', '');
+      }
     }
 
     function renderGrayFrame() {
@@ -307,6 +970,41 @@
           : (latestStatus.src_centerline_from_left_shift || []);
         drawSeries(grayCtx, selectedCenterline, '#facc15', 2, 1);
       }
+      drawDecisionPoint(grayCtx, latestStatus.src_weighted_decision_point);
+      renderBinaryFromGray();
+    }
+
+    function renderBinaryFromGray() {
+      const threshold = Number(latestStatus.otsu_threshold);
+      if (!Number.isFinite(threshold)) {
+        setCardVisible(binaryCard, false);
+        return;
+      }
+
+      setCardVisible(binaryCard, true);
+      binaryTitle.textContent = `二值图（网页端实时二值化，OTSU=${Math.round(threshold)}）`;
+
+      const w = grayCanvas.width;
+      const h = grayCanvas.height;
+      if (binaryCanvas.width !== w) binaryCanvas.width = w;
+      if (binaryCanvas.height !== h) binaryCanvas.height = h;
+
+      const grayImage = grayCtx.getImageData(0, 0, w, h);
+      const binaryImage = binaryCtx.createImageData(w, h);
+      const src = grayImage.data;
+      const dst = binaryImage.data;
+      const thr = Math.max(0, Math.min(255, Math.round(threshold)));
+
+      for (let i = 0; i < src.length; i += 4) {
+        const gray = src[i];
+        const out = gray > thr ? 255 : 0;
+        dst[i] = out;
+        dst[i + 1] = out;
+        dst[i + 2] = out;
+        dst[i + 3] = 255;
+      }
+      binaryCtx.putImageData(binaryImage, 0, 0);
+      drawDecisionPoint(binaryCtx, latestStatus.src_weighted_decision_point);
     }
 
     function getCanvasPoint(ev, canvas) {
@@ -360,15 +1058,6 @@
 
     grayImg.onload = () => { renderGrayFrame(); };
 
-    binaryImg.onload = () => {
-      const size = latestStatus.gray_size || [160, 120];
-      const w = size[0] || 160;
-      const h = size[1] || 120;
-      if (binaryCanvas.width !== w) binaryCanvas.width = w;
-      if (binaryCanvas.height !== h) binaryCanvas.height = h;
-      binaryCtx.drawImage(binaryImg, 0, 0, w, h);
-    };
-
     function fmtArrayInline(arr) {
       if (!Array.isArray(arr)) return '[]';
       return `[${arr.map((v) => Array.isArray(v) ? `[${v.join(', ')}]` : String(v)).join(', ')}]`;
@@ -420,45 +1109,92 @@
     }
 
     function buildStatusSummary(status) {
-      const summary = {
-        ts_ms: status.ts_ms,
-        current_mode: fmtCurrentMode(status),
-        intersection_mode: status.intersection_mode,
-        intersection_stop_row: status.intersection_stop_row,
-        intersection_current_start_row: status.intersection_current_start_row,
-        roundabout_mode: fmtRoundaboutMode(status.roundabout_mode),
-        line_error: status.line_error,
-        base_speed: status.base_speed,
-        capture_wait_us: status.capture_wait_us,
-        preprocess_us: status.preprocess_us,
-        otsu_us: status.otsu_us,
-        maze_us: status.maze_us,
-        total_us: status.total_us,
-        red_found: status.red_found,
-        red: fmtArrayInline(status.red),
-        roi_valid: status.roi_valid,
-        roi: fmtArrayInline(status.roi),
-        ipm_track_valid: status.ipm_track_valid,
-        ipm_track_method: fmtTrackMethod(status.ipm_track_method),
-        ipm_centerline_source: fmtCenterlineSource(status.ipm_centerline_source),
-        ipm_track_index: status.ipm_track_index,
-        ipm_track_point: fmtArrayInline(status.ipm_track_point),
-        gray_size: fmtArrayInline(status.gray_size),
-        ipm_size: fmtArrayInline(status.ipm_size),
-        left_boundary_count: Array.isArray(status.left_boundary) ? status.left_boundary.length : 0,
-        right_boundary_count: Array.isArray(status.right_boundary) ? status.right_boundary.length : 0,
-        ipm_left_boundary_count: Array.isArray(status.ipm_left_boundary) ? status.ipm_left_boundary.length : 0,
-        ipm_right_boundary_count: Array.isArray(status.ipm_right_boundary) ? status.ipm_right_boundary.length : 0,
-        ipm_raw_left_boundary_count: Array.isArray(status.ipm_raw_left_boundary) ? status.ipm_raw_left_boundary.length : 0,
-        ipm_raw_right_boundary_count: Array.isArray(status.ipm_raw_right_boundary) ? status.ipm_raw_right_boundary.length : 0,
-        ipm_corner_left_boundary_count: Array.isArray(status.ipm_corner_left_boundary) ? status.ipm_corner_left_boundary.length : 0,
-        ipm_corner_right_boundary_count: Array.isArray(status.ipm_corner_right_boundary) ? status.ipm_corner_right_boundary.length : 0,
-        ipm_centerline_from_left_shift_count: Array.isArray(status.ipm_centerline_from_left_shift) ? status.ipm_centerline_from_left_shift.length : 0,
-        ipm_centerline_from_right_shift_count: Array.isArray(status.ipm_centerline_from_right_shift) ? status.ipm_centerline_from_right_shift.length : 0,
-        src_centerline_from_left_shift_count: Array.isArray(status.src_centerline_from_left_shift) ? status.src_centerline_from_left_shift.length : 0,
-        src_centerline_from_right_shift_count: Array.isArray(status.src_centerline_from_right_shift) ? status.src_centerline_from_right_shift.length : 0
+      const lines = [];
+      const push = (name, value) => {
+        if (hasValue(value)) lines.push(`${name}: ${value}`);
       };
-      return Object.entries(summary).map(([k, v]) => `${k}: ${v}`).join('\n');
+      const pushCount = (name, value) => {
+        if (Array.isArray(value)) lines.push(`${name}: ${value.length}`);
+      };
+
+      push('ts_ms', status.ts_ms);
+      if (hasValue(status.roundabout_mode) || hasValue(status.intersection_mode)) {
+        push('current_mode', fmtCurrentMode(status));
+      }
+      push('intersection_mode', status.intersection_mode);
+      push('intersection_stop_row', status.intersection_stop_row);
+      push('intersection_current_start_row', status.intersection_current_start_row);
+      if (hasValue(status.roundabout_mode)) {
+        push('roundabout_mode', fmtRoundaboutMode(status.roundabout_mode));
+      }
+      push('line_error', status.line_error);
+      push('base_speed', status.base_speed);
+      push('adjusted_base_speed', status.adjusted_base_speed);
+      push('left_target_count', status.left_target_count);
+      push('right_target_count', status.right_target_count);
+      push('left_current_count', status.left_current_count);
+      push('right_current_count', status.right_current_count);
+      push('left_filtered_count', status.left_filtered_count);
+      push('right_filtered_count', status.right_filtered_count);
+      push('left_error', status.left_error);
+      push('right_error', status.right_error);
+      push('left_feedforward', status.left_feedforward);
+      push('right_feedforward', status.right_feedforward);
+      push('left_correction', status.left_correction);
+      push('right_correction', status.right_correction);
+      push('left_decel_assist', status.left_decel_assist);
+      push('right_decel_assist', status.right_decel_assist);
+      push('left_duty', status.left_duty);
+      push('right_duty', status.right_duty);
+      push('left_hardware_duty', status.left_hardware_duty);
+      push('right_hardware_duty', status.right_hardware_duty);
+      push('left_dir_level', status.left_dir_level);
+      push('right_dir_level', status.right_dir_level);
+      push('ipm_weighted_first_index', status.ipm_weighted_first_index);
+      push('ipm_weighted_decision_index', status.ipm_weighted_decision_index);
+      push('ipm_weighted_default_spacing', status.ipm_weighted_default_spacing);
+      push('ipm_weighted_spacing_threshold_1', status.ipm_weighted_spacing_threshold_1);
+      push('ipm_weighted_spacing_threshold_2', status.ipm_weighted_spacing_threshold_2);
+      push('ipm_weighted_spacing_threshold_3', status.ipm_weighted_spacing_threshold_3);
+      push('ipm_weighted_spacing_value_1', status.ipm_weighted_spacing_value_1);
+      push('ipm_weighted_spacing_value_2', status.ipm_weighted_spacing_value_2);
+      push('ipm_weighted_spacing_value_3', status.ipm_weighted_spacing_value_3);
+      push('ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
+      push('ipm_weighted_current_spacing', status.ipm_weighted_current_spacing);
+      if (Array.isArray(status.ipm_weighted_decision_point)) push('ipm_weighted_decision_point', fmtArrayInline(status.ipm_weighted_decision_point));
+      if (Array.isArray(status.src_weighted_decision_point)) push('src_weighted_decision_point', fmtArrayInline(status.src_weighted_decision_point));
+      push('otsu_threshold', status.otsu_threshold);
+      push('capture_wait_us', status.capture_wait_us);
+      push('preprocess_us', status.preprocess_us);
+      push('otsu_us', status.otsu_us);
+      push('maze_us', status.maze_us);
+      push('total_us', status.total_us);
+      push('maze_left_points_raw', status.maze_left_points_raw);
+      push('maze_right_points_raw', status.maze_right_points_raw);
+      push('red_found', status.red_found);
+      if (Array.isArray(status.red)) push('red', fmtArrayInline(status.red));
+      push('roi_valid', status.roi_valid);
+      if (Array.isArray(status.roi)) push('roi', fmtArrayInline(status.roi));
+      push('ipm_track_valid', status.ipm_track_valid);
+      if (hasValue(status.ipm_track_method)) push('ipm_track_method', fmtTrackMethod(status.ipm_track_method));
+      if (hasValue(status.ipm_centerline_source)) push('ipm_centerline_source', fmtCenterlineSource(status.ipm_centerline_source));
+      push('ipm_track_index', status.ipm_track_index);
+      if (Array.isArray(status.ipm_track_point)) push('ipm_track_point', fmtArrayInline(status.ipm_track_point));
+      if (Array.isArray(status.gray_size)) push('gray_size', fmtArrayInline(status.gray_size));
+      if (Array.isArray(status.ipm_size)) push('ipm_size', fmtArrayInline(status.ipm_size));
+      pushCount('left_boundary_count', status.left_boundary);
+      pushCount('right_boundary_count', status.right_boundary);
+      pushCount('ipm_left_boundary_count', status.ipm_left_boundary);
+      pushCount('ipm_right_boundary_count', status.ipm_right_boundary);
+      pushCount('ipm_raw_left_boundary_count', status.ipm_raw_left_boundary);
+      pushCount('ipm_raw_right_boundary_count', status.ipm_raw_right_boundary);
+      pushCount('ipm_corner_left_boundary_count', status.ipm_corner_left_boundary);
+      pushCount('ipm_corner_right_boundary_count', status.ipm_corner_right_boundary);
+      pushCount('ipm_centerline_from_left_shift_count', status.ipm_centerline_from_left_shift);
+      pushCount('ipm_centerline_from_right_shift_count', status.ipm_centerline_from_right_shift);
+      pushCount('src_centerline_from_left_shift_count', status.src_centerline_from_left_shift);
+      pushCount('src_centerline_from_right_shift_count', status.src_centerline_from_right_shift);
+      return lines.length > 0 ? lines.join('\n') : 'waiting...';
     }
 
     async function pullStatus() {
@@ -466,9 +1202,20 @@
         const r = await fetch('/api/status', { cache: 'no-store' });
         const j = await r.json();
         latestStatus = j;
+        if (recordingState && recordingState.active) {
+          recordingState.statusFrames.push({
+            client_ts_ms: Date.now(),
+            status: cloneStatus(j)
+          });
+        }
         statusEl.textContent = buildStatusSummary(j);
         drawIpmBoundaries(j);
-        ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(j.ipm_centerline_source);
+        if (hasValue(j.ipm_centerline_source)) {
+          ipmCenterlineSourceLabel.style.display = '';
+          ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(j.ipm_centerline_source);
+        } else {
+          ipmCenterlineSourceLabel.style.display = 'none';
+        }
         metaEl.textContent = `status ok @ ${new Date().toLocaleTimeString()}`;
       } catch (e) {
         metaEl.textContent = `status error: ${e}`;
@@ -477,7 +1224,6 @@
 
     function pullFrames() {
       grayImg.src = `/api/frame_gray.jpg?t=${Date.now()}`;
-      binaryImg.src = `/api/frame_binary.jpg?t=${Date.now()}`;
     }
 
     bindPixelProbe(grayCanvas, grayCtx, grayPixelInfo);
@@ -485,6 +1231,47 @@
     bindPixelProbe(ipmCanvas, ipmCtx, ipmPixelInfo);
     bindPixelProbe(ipmRawCanvas, ipmRawCtx, ipmRawPixelInfo);
 
+    startRecordBtn.addEventListener('click', () => {
+      startRecording().catch((err) => {
+        recordingMeta.textContent = `录制启动失败：${err}`;
+      });
+    });
+    stopRecordBtn.addEventListener('click', () => {
+      stopRecording().catch((err) => {
+        recordingMeta.textContent = `录制停止失败：${err}`;
+      });
+    });
+    playRecordBtn.addEventListener('click', () => {
+      playLastRecording();
+    });
+    saveRecordBtn.addEventListener('click', () => {
+      saveLastRecording();
+    });
+    closeParamPanelBtn.addEventListener('click', () => {
+      setPlaybackPlaying(false);
+      paramPanelOpen = false;
+      paramModal.style.display = 'none';
+    });
+    paramModal.addEventListener('click', (ev) => {
+      if (ev.target === paramModal) {
+        setPlaybackPlaying(false);
+        paramPanelOpen = false;
+        paramModal.style.display = 'none';
+      }
+    });
+    playbackToggleBtn.addEventListener('click', async () => {
+      const video = currentPlaybackVideo();
+      if (!video) return;
+      await setPlaybackPlaying(video.paused);
+    });
+    playbackRestartBtn.addEventListener('click', () => {
+      const videos = allPlaybackVideos();
+      videos.forEach((video) => {
+        video.pause();
+        video.currentTime = 0;
+      });
+      refreshParamPanel();
+    });
     toggleMeanCenterline.addEventListener('change', () => {
       showMeanCenterline = !!toggleMeanCenterline.checked;
       if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
@@ -498,8 +1285,45 @@
       drawIpmBoundaries(latestStatus);
       if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
     });
+    [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo].forEach((video) => {
+      video.addEventListener('timeupdate', () => {
+        if (isSyncingPlayback) return;
+        if (video === currentPlaybackVideo()) {
+          syncPlaybackVideos(video);
+          refreshParamPanel();
+        }
+      });
+      video.addEventListener('seeked', () => {
+        if (isSyncingPlayback) return;
+        if (video === currentPlaybackVideo()) {
+          syncPlaybackVideos(video);
+          refreshParamPanel();
+        }
+      });
+      video.addEventListener('play', () => {
+        if (isSyncingPlayback) return;
+        if (video === currentPlaybackVideo()) {
+          syncPlaybackVideos(video);
+          refreshParamPanel();
+        }
+      });
+      video.addEventListener('pause', () => {
+        if (isSyncingPlayback) return;
+        if (video === currentPlaybackVideo()) {
+          syncPlaybackVideos(video);
+          refreshParamPanel();
+        }
+      });
+      video.addEventListener('ended', () => {
+        if (video === currentPlaybackVideo()) {
+          setPlaybackPlaying(false);
+        }
+      });
+    });
     setInterval(pullStatus, 120);
     setInterval(pullFrames, 60);
+    setInterval(updateRecordingUi, 500);
+    updateRecordingUi();
     pullStatus();
     pullFrames();
   </script>

@@ -173,7 +173,7 @@ int main(int, char**)
     uart_thread_init();
 
     // 巡线基础速度配置（控制线程会在此基础上叠加转向差速）。
-    line_follow_thread_set_base_speed(300.0f);
+    line_follow_thread_set_base_speed(400.0f);
     
     // 为motor_thread设置目标计数，单位 counts/5ms。
     // 固定左右轮目标值为 800，便于速度环调参。

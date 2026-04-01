@@ -1,5 +1,6 @@
 #include "line_follow_thread.h"
 
+#include "driver/vision/vision_config.h"
 #include "driver/vision/vision_image_processor.h"
 #include "motor_thread.h"
 #include "pid.h"
@@ -15,7 +16,7 @@
 namespace
 {
 // 控制周期：10ms(100Hz)。巡线环频率高于电机速度环(5ms)的整数倍，能持续给出平滑转向目标。
-constexpr int32 LINE_FOLLOW_PERIOD_MS = 10;
+constexpr int32 LINE_FOLLOW_PERIOD_MS = 20;
 // 调度优先级：巡线线程作为中高优先级实时任务执行。
 constexpr int32 LINE_FOLLOW_THREAD_PRIORITY = 8;
 
@@ -31,6 +32,8 @@ std::atomic<float> g_turn_output(0.0f);
 // 滤波后的归一化误差状态，跨周期保留。
 // 这里刻意保留“状态记忆”，因为巡线不是单次运算，而是连续控制。
 float g_filtered_error = 0.0f;
+// 误差降速后的基础速度状态：把“理想基础速度”做成缓增缓降，避免一帧一跳。
+float g_adjusted_base_speed_state = -1.0f;
 
 const char *sched_policy_name(int32 policy)
 {
@@ -150,7 +153,26 @@ void line_follow_loop()
                 1.0f);
             speed_scale = 1.0f - slowdown_ratio * (1.0f - pid_tuning::line_follow::kTurnMinSpeedScale);
         }
-        const float adjusted_base_speed = current_base_speed * speed_scale;
+        const float desired_base_speed = current_base_speed * speed_scale;
+        if (g_adjusted_base_speed_state < 0.0f)
+        {
+            g_adjusted_base_speed_state = desired_base_speed;
+        }
+        else
+        {
+            const float max_drop = std::max(0.0f,
+                                            g_adjusted_base_speed_state *
+                                            pid_tuning::line_follow::kTurnSlowdownMaxDropRatioPerCycle);
+            const float max_rise = std::max(0.0f,
+                                            g_adjusted_base_speed_state *
+                                            pid_tuning::line_follow::kTurnSlowdownMaxRiseRatioPerCycle);
+            const float min_allowed = g_adjusted_base_speed_state - max_drop;
+            const float max_allowed = g_adjusted_base_speed_state + max_rise;
+            g_adjusted_base_speed_state = std::clamp(desired_base_speed, min_allowed, max_allowed);
+        }
+        const float adjusted_base_speed = std::clamp(g_adjusted_base_speed_state,
+                                                     pid_tuning::line_follow::kTargetCountMin,
+                                                     pid_tuning::line_follow::kTargetCountMax);
 
         // 差速映射：左轮=base-out，右轮=base+out。
         // steering_output 为正时，右轮更快、左轮更慢，车体会朝左修正；
@@ -191,6 +213,7 @@ bool line_follow_thread_init()
     g_line_error_px.store(0.0f);
     g_turn_output.store(0.0f);
     g_filtered_error = 0.0f;
+    g_adjusted_base_speed_state = -1.0f;
 
     // 目标固定为 0：希望赛道中线最终回到图像中心，也就是“小车正对赛道”。
     position_pid1.init(pid_tuning::line_follow::kPidKp,
@@ -225,6 +248,7 @@ void line_follow_thread_cleanup()
     g_line_error_px.store(0.0f);
     g_turn_output.store(0.0f);
     g_filtered_error = 0.0f;
+    g_adjusted_base_speed_state = -1.0f;
 }
 
 void line_follow_thread_print_info()
@@ -263,5 +287,14 @@ float line_follow_thread_turn_output()
 
 float line_follow_thread_base_speed()
 {
+    return g_base_speed.load();
+}
+
+float line_follow_thread_adjusted_base_speed()
+{
+    if (g_adjusted_base_speed_state >= 0.0f)
+    {
+        return g_adjusted_base_speed_state;
+    }
     return g_base_speed.load();
 }

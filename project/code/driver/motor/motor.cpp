@@ -13,7 +13,9 @@ Motor::Motor(const char *dir_path, const char *pwm_path, const char *encoder_pat
       encoder_path_(encoder_path),
       encoder_sign_(encoder_sign),
       encoder_5ms_count_(0),
-      current_duty_percent_(0)
+      current_duty_percent_(0),
+      current_hardware_duty_(0),
+      current_dir_level_(1)
 {
     memset(&pwm_info_, 0, sizeof(pwm_info_));
 }
@@ -82,6 +84,16 @@ float Motor::get_duty() const
     return current_duty_percent_;
 }
 
+float Motor::get_hardware_duty() const
+{
+    return current_hardware_duty_;
+}
+
+int Motor::get_dir_level() const
+{
+    return current_dir_level_;
+}
+
 /**
  * @brief 读取编码器当前输出值
  * @return 编码器当前速度测量值
@@ -127,9 +139,10 @@ uint32 Motor::percent_to_raw_duty(float duty_percent) const
 void Motor::apply_output(float duty_percent)
 {
     current_duty_percent_ = clamp_percent(duty_percent);
-    float hardware_duty = -current_duty_percent_;
-    gpio_set_level(dir_path_, (hardware_duty >= 0.0f) ? 1 : 0);
-    pwm_set_duty(pwm_path_, percent_to_raw_duty(hardware_duty));
+    current_hardware_duty_ = -current_duty_percent_;
+    current_dir_level_ = (current_hardware_duty_ >= 0.0f) ? 1 : 0;
+    gpio_set_level(dir_path_, current_dir_level_);
+    pwm_set_duty(pwm_path_, percent_to_raw_duty(current_hardware_duty_));
 }
 
 /**
@@ -238,6 +251,26 @@ float MotorDriver::left_duty() const
 float MotorDriver::right_duty() const
 {
     return right_.get_duty();
+}
+
+float MotorDriver::left_hardware_duty() const
+{
+    return left_.get_hardware_duty();
+}
+
+float MotorDriver::right_hardware_duty() const
+{
+    return right_.get_hardware_duty();
+}
+
+int MotorDriver::left_dir_level() const
+{
+    return left_.get_dir_level();
+}
+
+int MotorDriver::right_dir_level() const
+{
+    return right_.get_dir_level();
 }
 
 MotorDriver motor_driver;

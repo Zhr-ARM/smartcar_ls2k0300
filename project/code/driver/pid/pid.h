@@ -242,6 +242,12 @@ struct MotorSpeedControlState
     float right_feedback;
     float left_error;
     float right_error;
+    float left_feedforward;
+    float right_feedforward;
+    float left_correction;
+    float right_correction;
+    float left_decel_assist;
+    float right_decel_assist;
     float left_duty;
     float right_duty;
 };
