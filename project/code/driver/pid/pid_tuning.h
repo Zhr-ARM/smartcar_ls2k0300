@@ -79,9 +79,12 @@ inline constexpr float kTargetCountMax = 1000.0f;
 // 大弯降速起点：误差超过这个像素后，开始按比例降低基础速度。
 inline constexpr float kTurnSlowdownStartPx = 1.0f;
 // 大弯降速满量程点：误差超过这个像素后，降速比例达到上限。
-inline constexpr float kTurnSlowdownFullPx = 15.0f;
+inline constexpr float kTurnSlowdownFullPx = 12.0f;
 // 大弯最低速度比例：基础速度最低会保留到这个比例，不会无限降。
-inline constexpr float kTurnMinSpeedScale = 0.20f;
+inline constexpr float kTurnMinSpeedScale = 0.10f;
+
+// 基础速度加速到满速的时间（ms）：用于连续弯出弯时缓慢回到直道速度。
+inline constexpr int32 kBaseSpeedRampTimeMs = 100;
 
 // 归一化误差保护限幅：防止视觉异常值把控制链一下子打爆。
 inline constexpr float kNormalizedErrorLimit = 1.2f;

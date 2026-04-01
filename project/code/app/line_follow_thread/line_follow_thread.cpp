@@ -15,7 +15,7 @@
 namespace
 {
 // 控制周期：10ms(100Hz)。巡线环频率高于电机速度环(5ms)的整数倍，能持续给出平滑转向目标。
-constexpr int32 LINE_FOLLOW_PERIOD_MS = 10;
+constexpr int32 LINE_FOLLOW_PERIOD_MS = 5;
 // 调度优先级：巡线线程作为中高优先级实时任务执行。
 constexpr int32 LINE_FOLLOW_THREAD_PRIORITY = 8;
 
@@ -27,6 +27,8 @@ std::atomic<int32> g_thread_priority(0);
 std::atomic<float> g_base_speed(500.0f);
 std::atomic<float> g_line_error_px(0.0f);
 std::atomic<float> g_turn_output(0.0f);
+
+float g_ramped_base_speed = 0.0f;
 
 // 滤波后的归一化误差状态，跨周期保留。
 // 这里刻意保留“状态记忆”，因为巡线不是单次运算，而是连续控制。
@@ -150,7 +152,21 @@ void line_follow_loop()
                 1.0f);
             speed_scale = 1.0f - slowdown_ratio * (1.0f - pid_tuning::line_follow::kTurnMinSpeedScale);
         }
-        const float adjusted_base_speed = current_base_speed * speed_scale;
+        const float target_base_speed = current_base_speed * speed_scale;
+
+        // 对基础速度做“慢加速”限制：只限制加速，减速保持及时响应。
+        const float ramp_time_ms = std::max(1.0f, (float)pid_tuning::line_follow::kBaseSpeedRampTimeMs);
+        const float max_step = current_base_speed * ((float)LINE_FOLLOW_PERIOD_MS / ramp_time_ms);
+        if (target_base_speed > g_ramped_base_speed)
+        {
+            g_ramped_base_speed = std::min(target_base_speed, g_ramped_base_speed + max_step);
+        }
+        else
+        {
+            g_ramped_base_speed = target_base_speed;
+        }
+
+        const float adjusted_base_speed = g_ramped_base_speed;
 
         // 差速映射：左轮=base-out，右轮=base+out。
         // steering_output 为正时，右轮更快、左轮更慢，车体会朝左修正；
@@ -191,6 +207,7 @@ bool line_follow_thread_init()
     g_line_error_px.store(0.0f);
     g_turn_output.store(0.0f);
     g_filtered_error = 0.0f;
+    g_ramped_base_speed = 0.0f;
 
     // 目标固定为 0：希望赛道中线最终回到图像中心，也就是“小车正对赛道”。
     position_pid1.init(pid_tuning::line_follow::kPidKp,
