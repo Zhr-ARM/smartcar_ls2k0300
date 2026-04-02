@@ -169,6 +169,7 @@
       <button class="btn btn-danger" id="stopRecordBtn" disabled>停止录制</button>
       <button class="btn" id="playRecordBtn" disabled>打开回放界面</button>
       <button class="btn" id="saveRecordBtn" disabled>保存录制</button>
+      <button class="btn" id="openSavedModalBtn">已保存回放</button>
       <span class="meta" id="recordingMeta">录制未开始</span>
     </div>
     <div class="meta">
@@ -183,6 +184,14 @@
       <label style="margin-left: 16px;">
         <input type="checkbox" id="toggleBoundaryPointMode" />
         边界/中线按采样点显示（关闭=连线）
+      </label>
+      <label style="margin-left: 16px;">
+        曲率Y最小
+        <input id="curvatureYMinInput" type="number" step="0.01" value="-0.3" style="width: 72px; margin-left: 4px;" />
+      </label>
+      <label>
+        曲率Y最大
+        <input id="curvatureYMaxInput" type="number" step="0.01" value="0.3" style="width: 72px; margin-left: 4px;" />
       </label>
       <span id="ipmCenterlineSourceLabel" style="margin-left: 16px;">
         透视中线来源：自动
@@ -220,6 +229,12 @@
       <div class="card" id="statusCard">
         <div class="title">状态数据</div>
         <pre id="status">loading...</pre>
+      </div>
+      <div class="card" id="curvatureCard">
+        <div class="title">中线曲率图（横轴=索引，纵轴=曲率）</div>
+        <div class="view">
+          <canvas id="curvatureCanvas" width="480" height="220"></canvas>
+        </div>
       </div>
     </div>
   </div>
@@ -261,6 +276,10 @@
                 <div class="title">透视原始图录制</div>
                 <video id="playbackIpmRawVideo" muted playsinline></video>
               </div>
+              <div class="playback-item" id="playbackCurvatureWrap">
+                <div class="title">曲率图录制</div>
+                <video id="playbackCurvatureVideo" muted playsinline></video>
+              </div>
             </div>
           </div>
           <div class="recording-side">
@@ -277,6 +296,38 @@
       </div>
     </div>
   </div>
+  <div class="param-modal" id="savedModal">
+    <div class="param-panel" style="height:min(72vh,760px);">
+      <div class="param-header">
+        <div>
+          <div class="title" style="margin-bottom:4px;">已保存回放子界面</div>
+          <div class="meta" id="savedPanelMeta" style="margin:0;">输入文件夹名，加载对应录制内容</div>
+        </div>
+        <div class="param-toolbar">
+          <button class="btn" id="closeSavedModalBtn">关闭</button>
+        </div>
+      </div>
+      <div class="param-body">
+        <div class="playback-control-bar">
+          <div class="playback-control-actions">
+            <input class="btn" id="savedFolderInput" placeholder="例如 vision_record_123456789" style="cursor:text;width:280px;" />
+            <button class="btn btn-primary" id="loadSavedFolderBtn">加载文件夹</button>
+            <button class="btn" id="refreshSavedFoldersBtn">刷新列表</button>
+          </div>
+        </div>
+        <div class="recording-layout" style="margin-top:12px;">
+          <div class="recording-status-panel">
+            <div class="title">已保存文件夹列表</div>
+            <pre id="savedFoldersList">loading...</pre>
+          </div>
+          <div class="recording-status-panel">
+            <div class="title">加载信息</div>
+            <pre id="savedLoadInfo">waiting...</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <script>
     const grayCanvas = document.getElementById('grayCanvas');
     const grayCtx = grayCanvas.getContext('2d');
@@ -286,6 +337,8 @@
     const ipmCtx = ipmCanvas.getContext('2d');
     const ipmRawCanvas = document.getElementById('ipmRawCanvas');
     const ipmRawCtx = ipmRawCanvas.getContext('2d');
+    const curvatureCanvas = document.getElementById('curvatureCanvas');
+    const curvatureCtx = curvatureCanvas.getContext('2d');
     const grayPixelInfo = document.getElementById('grayPixelInfo');
     const binaryPixelInfo = document.getElementById('binaryPixelInfo');
     const ipmPixelInfo = document.getElementById('ipmPixelInfo');
@@ -296,7 +349,9 @@
     const stopRecordBtn = document.getElementById('stopRecordBtn');
     const playRecordBtn = document.getElementById('playRecordBtn');
     const saveRecordBtn = document.getElementById('saveRecordBtn');
+    const openSavedModalBtn = document.getElementById('openSavedModalBtn');
     const closeParamPanelBtn = document.getElementById('closeParamPanelBtn');
+    const closeSavedModalBtn = document.getElementById('closeSavedModalBtn');
     const playbackToggleBtn = document.getElementById('playbackToggleBtn');
     const playbackRestartBtn = document.getElementById('playbackRestartBtn');
     const playbackTimeLabel = document.getElementById('playbackTimeLabel');
@@ -305,22 +360,34 @@
     const binaryTitle = document.getElementById('binaryTitle');
     const ipmCard = document.getElementById('ipmCard');
     const ipmRawCard = document.getElementById('ipmRawCard');
+    const curvatureCard = document.getElementById('curvatureCard');
     const playbackStatus = document.getElementById('playbackStatus');
     const playbackGrayWrap = document.getElementById('playbackGrayWrap');
     const playbackBinaryWrap = document.getElementById('playbackBinaryWrap');
     const playbackIpmWrap = document.getElementById('playbackIpmWrap');
     const playbackIpmRawWrap = document.getElementById('playbackIpmRawWrap');
+    const playbackCurvatureWrap = document.getElementById('playbackCurvatureWrap');
     const playbackGrayVideo = document.getElementById('playbackGrayVideo');
     const playbackBinaryVideo = document.getElementById('playbackBinaryVideo');
     const playbackIpmVideo = document.getElementById('playbackIpmVideo');
     const playbackIpmRawVideo = document.getElementById('playbackIpmRawVideo');
+    const playbackCurvatureVideo = document.getElementById('playbackCurvatureVideo');
     const paramModal = document.getElementById('paramModal');
+    const savedModal = document.getElementById('savedModal');
     const paramPanelMeta = document.getElementById('paramPanelMeta');
     const paramPanelBody = document.getElementById('paramPanelBody');
     const paramPanelContent = document.getElementById('paramPanelContent');
+    const savedPanelMeta = document.getElementById('savedPanelMeta');
+    const savedFolderInput = document.getElementById('savedFolderInput');
+    const loadSavedFolderBtn = document.getElementById('loadSavedFolderBtn');
+    const refreshSavedFoldersBtn = document.getElementById('refreshSavedFoldersBtn');
+    const savedFoldersList = document.getElementById('savedFoldersList');
+    const savedLoadInfo = document.getElementById('savedLoadInfo');
     const toggleMeanCenterline = document.getElementById('toggleMeanCenterline');
     const toggleIpmAnchorDot = document.getElementById('toggleIpmAnchorDot');
     const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
+    const curvatureYMinInput = document.getElementById('curvatureYMinInput');
+    const curvatureYMaxInput = document.getElementById('curvatureYMaxInput');
     const ipmCenterlineSourceLabel = document.getElementById('ipmCenterlineSourceLabel');
     const grayImg = new Image();
     let latestStatus = {};
@@ -330,7 +397,10 @@
     let recordingState = null;
     let lastRecording = null;
     let paramPanelOpen = false;
+    let savedPanelOpen = false;
     let isSyncingPlayback = false;
+    let curvatureYMin = -0.3;
+    let curvatureYMax = 0.3;
 
     function hasValue(value) {
       return value !== undefined && value !== null;
@@ -340,9 +410,39 @@
       return Array.isArray(value) && value.length > 0;
     }
 
+    function getSelectedIpmCenterline(status) {
+      if (Array.isArray(status.ipm_centerline_selected_shift)) return status.ipm_centerline_selected_shift;
+      if (status.ipm_centerline_source === 1) return status.ipm_centerline_from_right_shift || [];
+      return status.ipm_centerline_from_left_shift || [];
+    }
+
+    function getSelectedSrcCenterline(status) {
+      if (Array.isArray(status.src_centerline_selected_shift)) return status.src_centerline_selected_shift;
+      if (status.ipm_centerline_source === 1) return status.src_centerline_from_right_shift || [];
+      return status.src_centerline_from_left_shift || [];
+    }
+
+    function getSelectedCurvature(status) {
+      if (Array.isArray(status.ipm_centerline_selected_curvature)) return status.ipm_centerline_selected_curvature;
+      return [];
+    }
+
     function setCardVisible(el, visible) {
       if (!el) return;
       el.style.display = visible ? '' : 'none';
+    }
+
+    function applyCurvatureYRangeFromInput() {
+      const minVal = Number(curvatureYMinInput.value);
+      const maxVal = Number(curvatureYMaxInput.value);
+      if (!Number.isFinite(minVal) || !Number.isFinite(maxVal) || minVal >= maxVal) {
+        curvatureYMinInput.value = String(curvatureYMin);
+        curvatureYMaxInput.value = String(curvatureYMax);
+        return;
+      }
+      curvatureYMin = minVal;
+      curvatureYMax = maxVal;
+      drawCurvatureChart(latestStatus || {});
     }
 
     function formatStatusForPanel(status) {
@@ -438,6 +538,19 @@
       push(trackRows, 'ipm_weighted_current_spacing', status.ipm_weighted_current_spacing);
       pushArray(trackRows, 'ipm_weighted_decision_point', status.ipm_weighted_decision_point);
       pushArray(trackRows, 'src_weighted_decision_point', status.src_weighted_decision_point);
+      push(trackRows, 'ipm_curvature_speed_v', status.ipm_curvature_speed_v);
+      push(trackRows, 'ipm_curvature_k_eff', status.ipm_curvature_k_eff);
+      push(trackRows, 'ipm_curvature_eta', status.ipm_curvature_eta);
+      push(trackRows, 'ipm_curvature_lookahead_index', status.ipm_curvature_lookahead_index);
+      pushArray(trackRows, 'ipm_curvature_lookahead_point', status.ipm_curvature_lookahead_point);
+      push(trackRows, 'ipm_curvature_weighted_error', status.ipm_curvature_weighted_error);
+      push(trackRows, 'ipm_curvature_kappa_max', status.ipm_curvature_kappa_max);
+      push(trackRows, 'ipm_curvature_delta_kappa_max', status.ipm_curvature_delta_kappa_max);
+      push(trackRows, 'ipm_curvature_base_speed_curve', status.ipm_curvature_base_speed_curve);
+      push(trackRows, 'ipm_curvature_v_curve_raw', status.ipm_curvature_v_curve_raw);
+      push(trackRows, 'ipm_curvature_v_curve_after_dkappa', status.ipm_curvature_v_curve_after_dkappa);
+      push(trackRows, 'ipm_curvature_v_error_limit', status.ipm_curvature_v_error_limit);
+      push(trackRows, 'ipm_curvature_v_target', status.ipm_curvature_v_target);
       addSection('巡线跟踪', trackRows);
 
       const modeRows = [];
@@ -458,10 +571,11 @@
       pushCount(arrayRows, 'ipm_raw_right_boundary', status.ipm_raw_right_boundary);
       pushCount(arrayRows, 'ipm_corner_left_boundary', status.ipm_corner_left_boundary);
       pushCount(arrayRows, 'ipm_corner_right_boundary', status.ipm_corner_right_boundary);
-      pushCount(arrayRows, 'ipm_centerline_from_left_shift', status.ipm_centerline_from_left_shift);
-      pushCount(arrayRows, 'ipm_centerline_from_right_shift', status.ipm_centerline_from_right_shift);
-      pushCount(arrayRows, 'src_centerline_from_left_shift', status.src_centerline_from_left_shift);
-      pushCount(arrayRows, 'src_centerline_from_right_shift', status.src_centerline_from_right_shift);
+      pushCount(arrayRows, 'ipm_centerline_selected_shift', getSelectedIpmCenterline(status));
+      pushCount(arrayRows, 'src_centerline_selected_shift', getSelectedSrcCenterline(status));
+      push(arrayRows, 'ipm_centerline_selected_count', status.ipm_centerline_selected_count);
+      push(arrayRows, 'src_centerline_selected_count', status.src_centerline_selected_count);
+      pushCount(arrayRows, 'ipm_centerline_selected_curvature', getSelectedCurvature(status));
       addSection('点列数量', arrayRows);
 
       return sections.length > 0 ? sections.join('\n\n') : 'waiting...';
@@ -472,7 +586,7 @@
     }
 
     function currentPlaybackVideo() {
-      const candidates = [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo];
+      const candidates = [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo, playbackCurvatureVideo];
       for (const video of candidates) {
         if (video && video.src && video.parentElement.style.display !== 'none') return video;
       }
@@ -480,7 +594,7 @@
     }
 
     function allPlaybackVideos() {
-      return [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo].filter(
+      return [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo, playbackCurvatureVideo].filter(
         (video) => video && video.src && video.parentElement.style.display !== 'none'
       );
     }
@@ -584,12 +698,16 @@
       startRecordBtn.disabled = isRecording || typeof MediaRecorder === 'undefined';
       stopRecordBtn.disabled = !isRecording;
       playRecordBtn.disabled = !lastRecording;
-      saveRecordBtn.disabled = !lastRecording;
+      saveRecordBtn.disabled = !lastRecording || !!(lastRecording && lastRecording.folder);
       if (isRecording) {
         const elapsedSec = Math.max(0, Math.floor((Date.now() - recordingState.startedAtMs) / 1000));
         recordingMeta.innerHTML = `<span class="recording-dot"></span>录制中 ${elapsedSec}s，全部在网页端本地缓存`;
       } else if (lastRecording) {
-        recordingMeta.textContent = `最近一次录制：${lastRecording.frameCount} 条状态快照，${lastRecording.durationSec}s`;
+        if (lastRecording.folder) {
+          recordingMeta.textContent = `已加载保存目录：${lastRecording.folder}，${lastRecording.durationSec}s`;
+        } else {
+          recordingMeta.textContent = `最近一次录制：${lastRecording.frameCount} 条状态快照，${lastRecording.durationSec}s`;
+        }
       } else if (typeof MediaRecorder === 'undefined') {
         recordingMeta.textContent = '当前浏览器不支持录制功能';
       } else {
@@ -631,7 +749,8 @@
       const binaryRecorder = createCanvasRecorder('binary', binaryCanvas, binaryCard.style.display !== 'none');
       const ipmRecorder = createCanvasRecorder('ipm', ipmCanvas, ipmCard.style.display !== 'none');
       const ipmRawRecorder = createCanvasRecorder('ipm_raw', ipmRawCanvas, ipmRawCard.style.display !== 'none');
-      [grayRecorder, binaryRecorder, ipmRecorder, ipmRawRecorder].forEach((item) => {
+      const curvatureRecorder = createCanvasRecorder('curvature', curvatureCanvas, curvatureCard.style.display !== 'none');
+      [grayRecorder, binaryRecorder, ipmRecorder, ipmRawRecorder, curvatureRecorder].forEach((item) => {
         if (item) recorders.push(item);
       });
       recordingState = {
@@ -646,7 +765,7 @@
     function revokeRecordingUrls(recording) {
       if (!recording || !recording.urls) return;
       Object.values(recording.urls).forEach((url) => {
-        if (url) URL.revokeObjectURL(url);
+        if (typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url);
       });
     }
 
@@ -720,31 +839,150 @@
       setPlaybackVideo(playbackBinaryVideo, playbackBinaryWrap, lastRecording.urls.binary);
       setPlaybackVideo(playbackIpmVideo, playbackIpmWrap, lastRecording.urls.ipm);
       setPlaybackVideo(playbackIpmRawVideo, playbackIpmRawWrap, lastRecording.urls.ipm_raw);
+      setPlaybackVideo(playbackCurvatureVideo, playbackCurvatureWrap, lastRecording.urls.curvature);
       paramPanelOpen = true;
       paramModal.style.display = 'flex';
       refreshParamPanel();
     }
 
-    function downloadBlob(name, blob) {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        if (!blob) {
+          resolve('');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error || new Error('read blob failed'));
+        reader.onload = () => {
+          const result = String(reader.result || '');
+          const commaIdx = result.indexOf(',');
+          resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : '');
+        };
+        reader.readAsDataURL(blob);
+      });
     }
 
-    function saveLastRecording() {
+    async function saveLastRecording() {
       if (!lastRecording) return;
-      const prefix = `vision_record_${lastRecording.savedAtMs}`;
-      downloadBlob(`${prefix}_status.json`, lastRecording.statusBlob);
-      downloadBlob(`${prefix}_gray.webm`, lastRecording.videos.gray);
-      downloadBlob(`${prefix}_binary.webm`, lastRecording.videos.binary);
-      downloadBlob(`${prefix}_ipm.webm`, lastRecording.videos.ipm);
-      downloadBlob(`${prefix}_ipm_raw.webm`, lastRecording.videos.ipm_raw);
+      if (!lastRecording.videos || Object.keys(lastRecording.videos).length < 1) {
+        alert('当前回放来自已保存目录，无法再次打包保存。');
+        return;
+      }
+
+      saveRecordBtn.disabled = true;
+      try {
+        const keys = ['gray', 'binary', 'ipm', 'ipm_raw', 'curvature'];
+        const videos = {};
+        for (const key of keys) {
+          const blob = lastRecording.videos[key];
+          if (!blob) continue;
+          videos[key] = {
+            mime: blob.type || 'video/webm',
+            data_b64: await blobToBase64(blob)
+          };
+        }
+
+        const payload = {
+          recorded_at_ms: lastRecording.startedAtMs,
+          duration_ms: lastRecording.durationMs,
+          frame_count: lastRecording.frameCount,
+          statuses: lastRecording.statusFrames || [],
+          videos
+        };
+
+        const r = await fetch('/api/recordings/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const j = await r.json();
+        if (!r.ok || !j.ok) {
+          throw new Error(j.error || `save failed ${r.status}`);
+        }
+        savedFolderInput.value = j.folder || '';
+        savedLoadInfo.textContent = `保存成功\nfolder: ${j.folder}\n时长: ${lastRecording.durationSec}s\n帧数: ${lastRecording.frameCount}`;
+        await refreshSavedFolders();
+      } catch (err) {
+        alert(`保存失败: ${err}`);
+      } finally {
+        saveRecordBtn.disabled = false;
+      }
+    }
+
+    async function refreshSavedFolders() {
+      try {
+        const r = await fetch('/api/recordings/list', { cache: 'no-store' });
+        const j = await r.json();
+        if (!r.ok || !j.ok || !Array.isArray(j.folders)) {
+          throw new Error(j.error || `list failed ${r.status}`);
+        }
+        if (j.folders.length < 1) {
+          savedFoldersList.textContent = '暂无已保存目录';
+          return;
+        }
+        savedFoldersList.textContent = j.folders
+          .map((item) => `${item.folder}\n  更新时间: ${new Date(item.mtime_ms).toLocaleString()}`)
+          .join('\n\n');
+      } catch (err) {
+        savedFoldersList.textContent = `加载失败: ${err}`;
+      }
+    }
+
+    async function loadSavedFolder(folderName) {
+      const folder = String(folderName || '').trim();
+      if (!folder) {
+        savedLoadInfo.textContent = '请输入文件夹名';
+        return;
+      }
+      try {
+        const r = await fetch(`/api/recordings/load?folder=${encodeURIComponent(folder)}`, { cache: 'no-store' });
+        const j = await r.json();
+        if (!r.ok || !j.ok) {
+          throw new Error(j.error || `load failed ${r.status}`);
+        }
+
+        const loadedStatus = j.status || {};
+        const statusFrames = Array.isArray(loadedStatus.statuses) ? loadedStatus.statuses : [];
+        const durationMs = Number(loadedStatus.duration_ms) || 0;
+        const startedAtMs = Number(loadedStatus.recorded_at_ms) || Date.now();
+        const frameCount = Number(loadedStatus.frame_count) || statusFrames.length;
+
+        const urls = Object.assign({}, j.videos || {});
+        if (lastRecording) revokeRecordingUrls(lastRecording);
+        lastRecording = {
+          savedAtMs: Date.now(),
+          startedAtMs,
+          durationMs,
+          frameCount,
+          durationSec: (durationMs / 1000).toFixed(1),
+          statusFrames,
+          statusBlob: null,
+          videos: {},
+          urls,
+          folder
+        };
+        updateRecordingUi();
+
+        savedLoadInfo.textContent = `加载成功\nfolder: ${folder}\n时长: ${(durationMs / 1000).toFixed(1)}s\n帧数: ${frameCount}`;
+        playbackStatus.textContent = JSON.stringify({
+          folder,
+          recorded_at_ms: loadedStatus.recorded_at_ms,
+          duration_sec: (durationMs / 1000).toFixed(1),
+          frame_count: frameCount
+        }, null, 2);
+
+        setPlaybackVideo(playbackGrayVideo, playbackGrayWrap, urls.gray || '');
+        setPlaybackVideo(playbackBinaryVideo, playbackBinaryWrap, urls.binary || '');
+        setPlaybackVideo(playbackIpmVideo, playbackIpmWrap, urls.ipm || '');
+        setPlaybackVideo(playbackIpmRawVideo, playbackIpmRawWrap, urls.ipm_raw || '');
+        setPlaybackVideo(playbackCurvatureVideo, playbackCurvatureWrap, urls.curvature || '');
+
+        paramPanelOpen = true;
+        paramModal.style.display = 'flex';
+        refreshParamPanel();
+      } catch (err) {
+        savedLoadInfo.textContent = `加载失败: ${err}`;
+      }
     }
     function drawPolyline(ctx, pts, color, lineWidth) {
       if (!Array.isArray(pts) || pts.length < 2) return;
@@ -876,7 +1114,7 @@
       return best;
     }
 
-    function drawIpmBoundariesToCanvas(status, canvas, ctx, leftKey, rightKey, centerKey) {
+    function drawIpmBoundariesToCanvas(status, canvas, ctx, leftKey, rightKey, centerData) {
       const ipmSize = status.ipm_size || [400, 200];
       const w = ipmSize[0] || 400;
       const h = ipmSize[1] || 200;
@@ -890,8 +1128,8 @@
         drawSeries(ctx, status[leftKey] || [], '#ff4d4f', 2, 1);
         drawSeries(ctx, status[rightKey] || [], '#22c55e', 2, 1);
       }
-      if (centerKey) {
-        drawSeries(ctx, status[centerKey] || [], '#facc15', 2, 1);
+      if (Array.isArray(centerData) && centerData.length > 0) {
+        drawSeries(ctx, centerData, '#facc15', 2, 1);
       }
       if (canvas === ipmCanvas && status.ipm_track_valid) {
         const tp = Array.isArray(status.ipm_track_point) ? status.ipm_track_point : [0, 0];
@@ -909,6 +1147,19 @@
         drawPointSet(ctx, [[cx, cy], [tx, ty], [tx, cy]], '#93c5fd', 2);
       }
       drawDecisionPoint(ctx, status.ipm_weighted_decision_point);
+      if (Array.isArray(status.ipm_curvature_lookahead_point) && status.ipm_curvature_lookahead_point.length >= 2) {
+        const px = Math.max(0, Math.min(w - 1, status.ipm_curvature_lookahead_point[0] | 0));
+        const py = Math.max(0, Math.min(h - 1, status.ipm_curvature_lookahead_point[1] | 0));
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fff7ed';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(px, py, 5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       if (showIpmAnchorDot) {
         const cx = Math.max(0, Math.min(w - 1, 200));
         const cy = Math.max(0, Math.min(h - 1, 200));
@@ -921,22 +1172,119 @@
 
     function drawIpmBoundaries(status) {
       const hasIpmMain = hasPointArray(status.ipm_left_boundary) || hasPointArray(status.ipm_right_boundary) ||
-        hasPointArray(status.ipm_centerline_from_left_shift) || hasPointArray(status.ipm_centerline_from_right_shift) ||
+        hasPointArray(getSelectedIpmCenterline(status)) ||
         hasValue(status.ipm_track_valid);
       const hasIpmRaw = hasPointArray(status.ipm_raw_left_boundary) || hasPointArray(status.ipm_raw_right_boundary) ||
         hasPointArray(status.ipm_corner_left_boundary) || hasPointArray(status.ipm_corner_right_boundary);
       setCardVisible(ipmCard, hasIpmMain);
       setCardVisible(ipmRawCard, hasIpmRaw);
       if (!hasIpmMain && !hasIpmRaw) return;
-      const centerKey = (status.ipm_centerline_source === 1)
-        ? 'ipm_centerline_from_right_shift'
-        : 'ipm_centerline_from_left_shift';
+      const selectedCenterline = getSelectedIpmCenterline(status);
       if (hasIpmMain) {
-        drawIpmBoundariesToCanvas(status, ipmCanvas, ipmCtx, 'ipm_left_boundary', 'ipm_right_boundary', centerKey);
+        drawIpmBoundariesToCanvas(status, ipmCanvas, ipmCtx, 'ipm_left_boundary', 'ipm_right_boundary', selectedCenterline);
       }
       if (hasIpmRaw) {
-        drawIpmBoundariesToCanvas(status, ipmRawCanvas, ipmRawCtx, 'ipm_raw_left_boundary', 'ipm_raw_right_boundary', '');
+        drawIpmBoundariesToCanvas(status, ipmRawCanvas, ipmRawCtx, 'ipm_raw_left_boundary', 'ipm_raw_right_boundary', []);
       }
+    }
+
+    function drawCurvatureChart(status) {
+      const rawValues = getSelectedCurvature(status);
+      const w = curvatureCanvas.width;
+      const h = curvatureCanvas.height;
+      curvatureCtx.fillStyle = '#020617';
+      curvatureCtx.fillRect(0, 0, w, h);
+
+      if (!Array.isArray(rawValues) || rawValues.length < 1) {
+        setCardVisible(curvatureCard, false);
+        return;
+      }
+      setCardVisible(curvatureCard, true);
+      const values = rawValues.map((v) => Math.max(curvatureYMin, Math.min(curvatureYMax, Number(v) || 0)));
+
+      const marginLeft = 36;
+      const marginRight = 10;
+      const marginTop = 10;
+      const marginBottom = 24;
+      const plotW = Math.max(1, w - marginLeft - marginRight);
+      const plotH = Math.max(1, h - marginTop - marginBottom);
+
+      const minY = curvatureYMin;
+      const maxY = curvatureYMax;
+
+      const xAt = (idx) => marginLeft + (idx * plotW) / Math.max(1, values.length - 1);
+      const yAt = (v) => marginTop + ((maxY - v) * plotH) / (maxY - minY);
+      const yZero = yAt(0);
+
+      curvatureCtx.strokeStyle = '#334155';
+      curvatureCtx.lineWidth = 1;
+      curvatureCtx.beginPath();
+      curvatureCtx.moveTo(marginLeft, marginTop);
+      curvatureCtx.lineTo(marginLeft, marginTop + plotH);
+      curvatureCtx.lineTo(marginLeft + plotW, marginTop + plotH);
+      curvatureCtx.stroke();
+
+      curvatureCtx.strokeStyle = '#64748b';
+      curvatureCtx.beginPath();
+      curvatureCtx.moveTo(marginLeft, yZero);
+      curvatureCtx.lineTo(marginLeft + plotW, yZero);
+      curvatureCtx.stroke();
+
+      // 参考网格与轴刻度点：X/Y 轴都按 5 等分
+      const divs = 5;
+      curvatureCtx.setLineDash([3, 3]);
+      curvatureCtx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+      curvatureCtx.lineWidth = 1;
+      for (let i = 0; i <= divs; i += 1) {
+        const t = i / divs;
+        const gx = marginLeft + t * plotW;
+        const gy = marginTop + t * plotH;
+
+        curvatureCtx.beginPath();
+        curvatureCtx.moveTo(gx, marginTop);
+        curvatureCtx.lineTo(gx, marginTop + plotH);
+        curvatureCtx.stroke();
+
+        curvatureCtx.beginPath();
+        curvatureCtx.moveTo(marginLeft, gy);
+        curvatureCtx.lineTo(marginLeft + plotW, gy);
+        curvatureCtx.stroke();
+      }
+      curvatureCtx.setLineDash([]);
+
+      curvatureCtx.fillStyle = '#94a3b8';
+      for (let i = 0; i <= divs; i += 1) {
+        const t = i / divs;
+        const gx = marginLeft + t * plotW;
+        const gy = marginTop + t * plotH;
+
+        curvatureCtx.beginPath();
+        curvatureCtx.arc(gx, marginTop + plotH, 2, 0, Math.PI * 2);
+        curvatureCtx.fill();
+
+        curvatureCtx.beginPath();
+        curvatureCtx.arc(marginLeft, gy, 2, 0, Math.PI * 2);
+        curvatureCtx.fill();
+      }
+
+      curvatureCtx.strokeStyle = '#38bdf8';
+      curvatureCtx.lineWidth = 1.5;
+      curvatureCtx.beginPath();
+      for (let i = 0; i < values.length; i += 1) {
+        const x = xAt(i);
+        const y = yAt(Number(values[i]) || 0);
+        if (i === 0) curvatureCtx.moveTo(x, y);
+        else curvatureCtx.lineTo(x, y);
+      }
+      curvatureCtx.stroke();
+
+      curvatureCtx.fillStyle = '#94a3b8';
+      curvatureCtx.font = '12px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+      curvatureCtx.fillText('0', marginLeft - 10, marginTop + plotH + 16);
+      curvatureCtx.fillText(String(values.length - 1), marginLeft + plotW - 22, marginTop + plotH + 16);
+      curvatureCtx.fillText(maxY.toFixed(3), 6, marginTop + 8);
+      curvatureCtx.fillText('0', 12, yZero + 4);
+      curvatureCtx.fillText(minY.toFixed(3), 2, marginTop + plotH);
     }
 
     function renderGrayFrame() {
@@ -965,9 +1313,7 @@
       drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
       drawSeries(grayCtx, right, '#22c55e', 2, 1);
       if (showMeanCenterline) {
-        const selectedCenterline = (latestStatus.ipm_centerline_source === 1)
-          ? (latestStatus.src_centerline_from_right_shift || [])
-          : (latestStatus.src_centerline_from_left_shift || []);
+        const selectedCenterline = getSelectedSrcCenterline(latestStatus);
         drawSeries(grayCtx, selectedCenterline, '#facc15', 2, 1);
       }
       drawDecisionPoint(grayCtx, latestStatus.src_weighted_decision_point);
@@ -1163,6 +1509,19 @@
       push('ipm_weighted_current_spacing', status.ipm_weighted_current_spacing);
       if (Array.isArray(status.ipm_weighted_decision_point)) push('ipm_weighted_decision_point', fmtArrayInline(status.ipm_weighted_decision_point));
       if (Array.isArray(status.src_weighted_decision_point)) push('src_weighted_decision_point', fmtArrayInline(status.src_weighted_decision_point));
+      push('ipm_curvature_speed_v', status.ipm_curvature_speed_v);
+      push('ipm_curvature_k_eff', status.ipm_curvature_k_eff);
+      push('ipm_curvature_eta', status.ipm_curvature_eta);
+      push('ipm_curvature_lookahead_index', status.ipm_curvature_lookahead_index);
+      if (Array.isArray(status.ipm_curvature_lookahead_point)) push('ipm_curvature_lookahead_point', fmtArrayInline(status.ipm_curvature_lookahead_point));
+      push('ipm_curvature_weighted_error', status.ipm_curvature_weighted_error);
+      push('ipm_curvature_kappa_max', status.ipm_curvature_kappa_max);
+      push('ipm_curvature_delta_kappa_max', status.ipm_curvature_delta_kappa_max);
+      push('ipm_curvature_base_speed_curve', status.ipm_curvature_base_speed_curve);
+      push('ipm_curvature_v_curve_raw', status.ipm_curvature_v_curve_raw);
+      push('ipm_curvature_v_curve_after_dkappa', status.ipm_curvature_v_curve_after_dkappa);
+      push('ipm_curvature_v_error_limit', status.ipm_curvature_v_error_limit);
+      push('ipm_curvature_v_target', status.ipm_curvature_v_target);
       push('otsu_threshold', status.otsu_threshold);
       push('capture_wait_us', status.capture_wait_us);
       push('preprocess_us', status.preprocess_us);
@@ -1190,10 +1549,11 @@
       pushCount('ipm_raw_right_boundary_count', status.ipm_raw_right_boundary);
       pushCount('ipm_corner_left_boundary_count', status.ipm_corner_left_boundary);
       pushCount('ipm_corner_right_boundary_count', status.ipm_corner_right_boundary);
-      pushCount('ipm_centerline_from_left_shift_count', status.ipm_centerline_from_left_shift);
-      pushCount('ipm_centerline_from_right_shift_count', status.ipm_centerline_from_right_shift);
-      pushCount('src_centerline_from_left_shift_count', status.src_centerline_from_left_shift);
-      pushCount('src_centerline_from_right_shift_count', status.src_centerline_from_right_shift);
+      pushCount('ipm_centerline_selected_shift_count', getSelectedIpmCenterline(status));
+      pushCount('src_centerline_selected_shift_count', getSelectedSrcCenterline(status));
+      push('ipm_centerline_selected_count', status.ipm_centerline_selected_count);
+      push('src_centerline_selected_count', status.src_centerline_selected_count);
+      pushCount('ipm_centerline_selected_curvature_count', getSelectedCurvature(status));
       return lines.length > 0 ? lines.join('\n') : 'waiting...';
     }
 
@@ -1210,6 +1570,7 @@
         }
         statusEl.textContent = buildStatusSummary(j);
         drawIpmBoundaries(j);
+        drawCurvatureChart(j);
         if (hasValue(j.ipm_centerline_source)) {
           ipmCenterlineSourceLabel.style.display = '';
           ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(j.ipm_centerline_source);
@@ -1247,16 +1608,43 @@
     saveRecordBtn.addEventListener('click', () => {
       saveLastRecording();
     });
+    openSavedModalBtn.addEventListener('click', () => {
+      savedPanelOpen = true;
+      savedModal.style.display = 'flex';
+      savedPanelMeta.textContent = '输入文件夹名，加载对应录制内容';
+      refreshSavedFolders();
+    });
     closeParamPanelBtn.addEventListener('click', () => {
       setPlaybackPlaying(false);
       paramPanelOpen = false;
       paramModal.style.display = 'none';
+    });
+    closeSavedModalBtn.addEventListener('click', () => {
+      savedPanelOpen = false;
+      savedModal.style.display = 'none';
     });
     paramModal.addEventListener('click', (ev) => {
       if (ev.target === paramModal) {
         setPlaybackPlaying(false);
         paramPanelOpen = false;
         paramModal.style.display = 'none';
+      }
+    });
+    savedModal.addEventListener('click', (ev) => {
+      if (ev.target === savedModal) {
+        savedPanelOpen = false;
+        savedModal.style.display = 'none';
+      }
+    });
+    refreshSavedFoldersBtn.addEventListener('click', () => {
+      refreshSavedFolders();
+    });
+    loadSavedFolderBtn.addEventListener('click', () => {
+      loadSavedFolder(savedFolderInput.value);
+    });
+    savedFolderInput.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        loadSavedFolder(savedFolderInput.value);
       }
     });
     playbackToggleBtn.addEventListener('click', async () => {
@@ -1285,7 +1673,11 @@
       drawIpmBoundaries(latestStatus);
       if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
     });
-    [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo].forEach((video) => {
+    curvatureYMinInput.addEventListener('change', applyCurvatureYRangeFromInput);
+    curvatureYMaxInput.addEventListener('change', applyCurvatureYRangeFromInput);
+    curvatureYMinInput.addEventListener('blur', applyCurvatureYRangeFromInput);
+    curvatureYMaxInput.addEventListener('blur', applyCurvatureYRangeFromInput);
+    [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo, playbackCurvatureVideo].forEach((video) => {
       video.addEventListener('timeupdate', () => {
         if (isSyncingPlayback) return;
         if (video === currentPlaybackVideo()) {

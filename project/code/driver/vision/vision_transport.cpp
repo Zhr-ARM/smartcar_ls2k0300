@@ -390,6 +390,39 @@ static void send_tcp_status()
     uint16 *src_center_right_y = nullptr;
     uint16 src_center_right_num = 0;
     vision_image_processor_get_src_shifted_centerline_from_right(&src_center_right_x, &src_center_right_y, &src_center_right_num);
+    const float *selected_ipm_curvature = nullptr;
+    int selected_ipm_curvature_count = 0;
+    vision_image_processor_get_ipm_selected_centerline_curvature(&selected_ipm_curvature, &selected_ipm_curvature_count);
+    float curvature_speed_v = 0.0f;
+    float curvature_k_eff = 0.0f;
+    float curvature_eta = 0.0f;
+    int curvature_lookahead_index = -1;
+    float curvature_weighted_error = 0.0f;
+    bool curvature_lookahead_point_valid = false;
+    int curvature_lookahead_point_x = 0;
+    int curvature_lookahead_point_y = 0;
+    float curvature_kappa_max = 0.0f;
+    float curvature_delta_kappa_max = 0.0f;
+    float curvature_base_speed_curve = 0.0f;
+    float curvature_v_curve_raw = 0.0f;
+    float curvature_v_curve_after_dkappa = 0.0f;
+    float curvature_v_error_limit = 0.0f;
+    float curvature_v_target = 0.0f;
+    vision_image_processor_get_ipm_curvature_lookahead_debug(&curvature_speed_v,
+                                                             &curvature_k_eff,
+                                                             &curvature_eta,
+                                                             &curvature_lookahead_index);
+    vision_image_processor_get_ipm_curvature_weighted_error_debug(&curvature_weighted_error,
+                                                                  &curvature_lookahead_point_valid,
+                                                                  &curvature_lookahead_point_x,
+                                                                  &curvature_lookahead_point_y);
+    vision_image_processor_get_ipm_curvature_speed_limit_debug(&curvature_kappa_max,
+                                                               &curvature_delta_kappa_max,
+                                                               &curvature_base_speed_curve,
+                                                               &curvature_v_curve_raw,
+                                                               &curvature_v_curve_after_dkappa,
+                                                               &curvature_v_error_limit,
+                                                               &curvature_v_target);
     bool ipm_track_valid = false;
     int ipm_track_index = -1;
     int ipm_track_x = 0;
@@ -604,7 +637,7 @@ static void send_tcp_status()
         line += "]";
     };
 
-    auto append_float_array = [&append_key, &line](bool enabled, const char *name, float *values, uint16 n) {
+    auto append_float_array = [&append_key, &line](bool enabled, const char *name, const float *values, uint16 n) {
         if (!enabled)
         {
             return;
@@ -646,14 +679,85 @@ static void send_tcp_status()
                        "ipm_corner_left_nms", ipm_corner_left_value, ipm_corner_left_num);
     append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_right_nms,
                        "ipm_corner_right_nms", ipm_corner_right_value, ipm_corner_right_num);
-    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_from_left_shift,
-                  "ipm_centerline_from_left_shift", ipm_center_left_x, ipm_center_left_y, ipm_center_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_from_right_shift,
-                  "ipm_centerline_from_right_shift", ipm_center_right_x, ipm_center_right_y, ipm_center_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points(g_vision_runtime_config.udp_web_tcp_send_src_centerline_from_left_shift,
-                  "src_centerline_from_left_shift", src_center_left_x, src_center_left_y, src_center_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
-    append_points(g_vision_runtime_config.udp_web_tcp_send_src_centerline_from_right_shift,
-                  "src_centerline_from_right_shift", src_center_right_x, src_center_right_y, src_center_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+
+    const bool selected_is_right =
+        (vision_image_processor_ipm_line_error_source() == VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT);
+    uint16 *selected_ipm_center_x = selected_is_right ? ipm_center_right_x : ipm_center_left_x;
+    uint16 *selected_ipm_center_y = selected_is_right ? ipm_center_right_y : ipm_center_left_y;
+    uint16 selected_ipm_center_num = selected_is_right ? ipm_center_right_num : ipm_center_left_num;
+    uint16 *selected_src_center_x = selected_is_right ? src_center_right_x : src_center_left_x;
+    uint16 *selected_src_center_y = selected_is_right ? src_center_right_y : src_center_left_y;
+    uint16 selected_src_center_num = selected_is_right ? src_center_right_num : src_center_left_num;
+
+    const bool send_selected_ipm_centerline =
+        g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_shift;
+    const bool send_selected_src_centerline =
+        g_vision_runtime_config.udp_web_tcp_send_src_centerline_selected_shift;
+
+    append_points(send_selected_ipm_centerline,
+                  "ipm_centerline_selected_shift",
+                  selected_ipm_center_x,
+                  selected_ipm_center_y,
+                  selected_ipm_center_num,
+                  kIpmCanvasWidth,
+                  kIpmCanvasHeight);
+    append_points(send_selected_src_centerline,
+                  "src_centerline_selected_shift",
+                  selected_src_center_x,
+                  selected_src_center_y,
+                  selected_src_center_num,
+                  VISION_DOWNSAMPLED_WIDTH,
+                  VISION_DOWNSAMPLED_HEIGHT);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_count,
+               "ipm_centerline_selected_count",
+               selected_ipm_center_num);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_src_centerline_selected_count,
+               "src_centerline_selected_count",
+               selected_src_center_num);
+    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
+                       "ipm_centerline_selected_curvature",
+                       selected_ipm_curvature,
+                       static_cast<uint16>(std::clamp(selected_ipm_curvature_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_speed_v,
+                 "ipm_curvature_speed_v",
+                 curvature_speed_v);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_effective,
+                 "ipm_curvature_k_eff",
+                 curvature_k_eff);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_eta,
+                 "ipm_curvature_eta",
+                 curvature_eta);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_lookahead_index,
+               "ipm_curvature_lookahead_index",
+               curvature_lookahead_index);
+    append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_lookahead_point && curvature_lookahead_point_valid,
+                     "ipm_curvature_lookahead_point",
+                     {curvature_lookahead_point_x, curvature_lookahead_point_y});
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_weighted_error,
+                 "ipm_curvature_weighted_error",
+                 curvature_weighted_error);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_kappa_max,
+                 "ipm_curvature_kappa_max",
+                 curvature_kappa_max);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_delta_kappa_max,
+                 "ipm_curvature_delta_kappa_max",
+                 curvature_delta_kappa_max);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_base_speed_curve,
+                 "ipm_curvature_base_speed_curve",
+                 curvature_base_speed_curve);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_v_curve_raw,
+                 "ipm_curvature_v_curve_raw",
+                 curvature_v_curve_raw);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_v_curve_after_dkappa,
+                 "ipm_curvature_v_curve_after_dkappa",
+                 curvature_v_curve_after_dkappa);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_v_error_limit,
+                 "ipm_curvature_v_error_limit",
+                 curvature_v_error_limit);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_v_target,
+                 "ipm_curvature_v_target",
+                 curvature_v_target);
+
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_gray_size, "gray_size",
                      {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_size, "ipm_size",

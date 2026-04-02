@@ -102,10 +102,24 @@ typedef struct
     bool udp_web_tcp_send_ipm_corner_right_raw_angle;
     bool udp_web_tcp_send_ipm_corner_left_nms;
     bool udp_web_tcp_send_ipm_corner_right_nms;
-    bool udp_web_tcp_send_ipm_centerline_from_left_shift;
-    bool udp_web_tcp_send_ipm_centerline_from_right_shift;
-    bool udp_web_tcp_send_src_centerline_from_left_shift;
-    bool udp_web_tcp_send_src_centerline_from_right_shift;
+    bool udp_web_tcp_send_ipm_centerline_selected_shift;
+    bool udp_web_tcp_send_src_centerline_selected_shift;
+    bool udp_web_tcp_send_ipm_centerline_selected_count;
+    bool udp_web_tcp_send_src_centerline_selected_count;
+    bool udp_web_tcp_send_ipm_centerline_selected_curvature;
+    bool udp_web_tcp_send_ipm_curvature_speed_v;
+    bool udp_web_tcp_send_ipm_curvature_effective;
+    bool udp_web_tcp_send_ipm_curvature_eta;
+    bool udp_web_tcp_send_ipm_curvature_lookahead_index;
+    bool udp_web_tcp_send_ipm_curvature_lookahead_point;
+    bool udp_web_tcp_send_ipm_curvature_weighted_error;
+    bool udp_web_tcp_send_ipm_curvature_kappa_max;
+    bool udp_web_tcp_send_ipm_curvature_delta_kappa_max;
+    bool udp_web_tcp_send_ipm_curvature_base_speed_curve;
+    bool udp_web_tcp_send_ipm_curvature_v_curve_raw;
+    bool udp_web_tcp_send_ipm_curvature_v_curve_after_dkappa;
+    bool udp_web_tcp_send_ipm_curvature_v_error_limit;
+    bool udp_web_tcp_send_ipm_curvature_v_target;
     bool udp_web_tcp_send_gray_size;
     bool udp_web_tcp_send_ipm_size;
     // 电脑端接收服务 IP（运行 vision_pc_receiver.py 的主机地址）。
@@ -150,6 +164,8 @@ typedef struct
     float ipm_centerline_resample_step_px;
     // 逆透视处理中线近重复点过滤阈值（px）。
     float ipm_centerline_min_point_dist_px;
+    // 所选偏移中线曲率计算步长（索引步长，默认3）。
+    int ipm_centerline_curvature_step;
     // 双边都丢线时是否保持上一帧平移中线数组。
     bool keep_last_centerline_on_double_loss;
     // line_error 使用哪条平移中线追踪：左平移或右平移。
@@ -190,6 +206,28 @@ typedef struct
     int ipm_line_error_index_min;
     // 随速度索引模式允许的最大索引。
     int ipm_line_error_index_max;
+    // 曲率前瞻索引中的指数衰减系数 lambda（越大越看重近处曲率）。
+    float ipm_curvature_lookahead_lambda;
+    // 曲率前瞻索引中的曲率抑制系数 mu（越大曲率越大时前瞻越短）。
+    float ipm_curvature_lookahead_mu;
+    // 曲率前瞻索引中的速度归一化上限 v_max（编码器 count/5ms）。
+    float ipm_curvature_lookahead_v_max;
+    // 曲率限速法的横向加速度允许值 a_y_allow（工程安全值）。
+    float ipm_curve_speed_ay_allow;
+    // 曲率限速法中的 epsilon，防止 kappa_max 接近 0 时速度发散。
+    float ipm_curve_speed_kappa_epsilon;
+    // 曲率变化惩罚系数 K_delta_kappa。
+    float ipm_curve_speed_delta_kappa_gain;
+    // 曲率速度映射缩放系数（把 sqrt(a/kappa) 映射到速度量级）。
+    float ipm_curve_speed_gain;
+    // 误差限速系数（越大越容易因横向误差降速）。
+    float ipm_curve_speed_error_gain;
+    // 误差限速死区（小误差不触发限速）。
+    float ipm_curve_speed_error_deadband;
+    // 速度规划最小保护速度。
+    float ipm_curve_speed_v_min_global;
+    // 风险评估窗口扩展点数（在 look_idx 基础上额外前看）。
+    int ipm_curve_speed_extra_plan_points;
     // 环岛入口判定时，“角点到对侧边界点”的目标距离（IPM 像素）。
     // 作用：在检测到一侧直角后，只在对侧边界上寻找与该角点距离接近本值的点集做环岛候选判断。
     float roundabout_corner_match_distance_px;

@@ -24,3 +24,6 @@ Makefile
 
 # Logs
 *.log
+
+# Web receiver saved recordings
+/tools/pc_receiver_js/recordings/

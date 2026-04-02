@@ -1,7 +1,7 @@
 #include "driver/vision/vision_image_processor.h"
 #include "driver/vision/vision_config.h"
 #include "driver/vision/vision_frame_capture.h"
-#include "line_follow_thread.h"
+#include "driver/vision/vision_line_error_layer.h"
 
 #include <opencv2/opencv.hpp>
 
@@ -75,7 +75,6 @@ static constexpr int kIntersectionCornerYMin = 185;
 static constexpr int kIntersectionEntryStartRow = 35;
 static constexpr int kIntersectionProbeRowOffset = 5;
 static constexpr int kIntersectionExitStopRow = 100;
-static constexpr int kIntersectionFixedIndex = 4;
 static constexpr int kMazeTraceYFallbackStopDelta = 8;
 static constexpr int kMazeStartMinBoundaryGapPx = 5;
 static constexpr int kRoundaboutOutSearchRow = 80;
@@ -150,8 +149,6 @@ static int g_intersection_probe_row = kIntersectionEntryStartRow;
 static int g_intersection_last_stop_row = 0;
 static int g_intersection_current_start_row = -1;
 static int g_intersection_probe_x = kProcWidth / 2;
-static int g_saved_line_error_method_before_intersection = static_cast<int>(VISION_IPM_LINE_ERROR_WEIGHTED_INDEX);
-static bool g_saved_line_error_method_valid = false;
 static std::atomic<int> g_roundabout_mode(ROUNDABOUT_MODE_NONE);
 
 static bool roundabout_mode_forces_right_centerline(int mode);
@@ -251,37 +248,6 @@ static std::atomic<bool> g_ipm_centerline_resample_enabled(g_vision_runtime_conf
 static std::atomic<float> g_ipm_centerline_resample_step_px(g_vision_runtime_config.ipm_centerline_resample_step_px);
 static std::atomic<float> g_ipm_centerline_min_point_dist_px(g_vision_runtime_config.ipm_centerline_min_point_dist_px);
 static std::atomic<bool> g_keep_last_centerline_on_double_loss(g_vision_runtime_config.keep_last_centerline_on_double_loss);
-static std::atomic<int> g_ipm_line_error_source(static_cast<int>(g_vision_runtime_config.ipm_line_error_source));
-static std::atomic<int> g_ipm_line_error_method(static_cast<int>(g_vision_runtime_config.ipm_line_error_method));
-static std::atomic<int> g_ipm_line_error_fixed_index(g_vision_runtime_config.ipm_line_error_fixed_index);
-static std::atomic<float> g_ipm_line_error_speed_k(g_vision_runtime_config.ipm_line_error_speed_k);
-static std::atomic<float> g_ipm_line_error_speed_b(g_vision_runtime_config.ipm_line_error_speed_b);
-static std::atomic<int> g_ipm_line_error_index_min(g_vision_runtime_config.ipm_line_error_index_min);
-static std::atomic<int> g_ipm_line_error_index_max(g_vision_runtime_config.ipm_line_error_index_max);
-static std::mutex g_ipm_line_error_weighted_points_mutex;
-static std::array<int, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> g_ipm_line_error_point_indices = {
-    g_vision_runtime_config.ipm_line_error_point_indices[0],
-    g_vision_runtime_config.ipm_line_error_point_indices[1],
-    g_vision_runtime_config.ipm_line_error_point_indices[2]
-};
-static std::array<float, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> g_ipm_line_error_weights = {
-    g_vision_runtime_config.ipm_line_error_weights[0],
-    g_vision_runtime_config.ipm_line_error_weights[1],
-    g_vision_runtime_config.ipm_line_error_weights[2]
-};
-static size_t g_ipm_line_error_weighted_point_count = g_vision_runtime_config.ipm_line_error_weighted_point_count;
-static std::atomic<int> g_ipm_line_error_weighted_first_point_error(0);
-static std::atomic<int> g_ipm_line_error_weighted_current_spacing(g_vision_runtime_config.ipm_line_error_weighted_default_spacing);
-static bool g_ipm_weighted_decision_point_valid = false;
-static int g_ipm_weighted_decision_point_x = 0;
-static int g_ipm_weighted_decision_point_y = 0;
-static bool g_src_weighted_decision_point_valid = false;
-static int g_src_weighted_decision_point_x = 0;
-static int g_src_weighted_decision_point_y = 0;
-static bool g_ipm_line_error_track_valid = false;
-static int g_ipm_line_error_track_index = -1;
-static int g_ipm_line_error_track_x = 0;
-static int g_ipm_line_error_track_y = 0;
 
 // 对外暴露控制量（line_follow_thread 直接读取）。
 int line_error = 0;
@@ -303,9 +269,7 @@ static void resample_boundary_points_equal_spacing_inplace(maze_point_t *pts, in
 static bool init_undistort_remap_table();
 static bool init_ipm_forward_matrix();
 static bool ipm_point_to_src_point(int ipm_x, int ipm_y, int *src_x, int *src_y);
-static int compute_line_error_from_ipm_shifted_centerline();
 static void get_maze_trace_x_range_clamped(int *x_min, int *x_max);
-static void reset_ipm_line_error_weighted_points_to_default();
 static void trim_last_point_and_extend_tail_inplace(maze_point_t *pts, int *num, int width, int height);
 static void update_corner_state_from_current_frame(int left_first_corner_idx, int right_first_corner_idx);
 static bool find_maze_start_from_row(const uint8 *classify_img,
@@ -380,7 +344,7 @@ static void get_maze_trace_x_range_clamped(int *x_min, int *x_max)
 
 static int previous_src_centerline_first_x()
 {
-    const int preferred_source = g_ipm_line_error_source.load();
+    const int preferred_source = vision_line_error_layer_source();
     if (preferred_source == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT))
     {
         if (g_src_shift_right_center_count > 0)
@@ -1278,176 +1242,6 @@ static void shift_boundary_along_normal(const maze_point_t *src,
     *dst_num = num;
 }
 
-static int compute_line_error_from_ipm_shifted_centerline()
-{
-    g_ipm_line_error_track_valid = false;
-    g_ipm_line_error_track_index = -1;
-    g_ipm_line_error_track_x = 0;
-    g_ipm_line_error_track_y = 0;
-    g_ipm_weighted_decision_point_valid = false;
-    g_ipm_weighted_decision_point_x = 0;
-    g_ipm_weighted_decision_point_y = 0;
-    g_src_weighted_decision_point_valid = false;
-    g_src_weighted_decision_point_x = 0;
-    g_src_weighted_decision_point_y = 0;
-
-    const int left_count = g_ipm_shift_left_center_count;
-    const int right_count = g_ipm_shift_right_center_count;
-    const int roundabout_mode = g_roundabout_mode.load();
-    bool use_right = false;
-    if (left_count <= 0 && right_count <= 0)
-    {
-        return 0;
-    }
-    else if (roundabout_mode_forces_right_centerline(roundabout_mode))
-    {
-        use_right = (right_count > 0) || (left_count <= 0);
-    }
-    else if (roundabout_mode_forces_left_centerline(roundabout_mode))
-    {
-        use_right = !(left_count > 0) && (right_count > 0);
-    }
-    else if (left_count <= 0)
-    {
-        use_right = true;
-    }
-    else if (right_count <= 0)
-    {
-        use_right = false;
-    }
-    else
-    {
-        use_right = (right_count > left_count);
-    }
-
-    const uint16 *xs = use_right ? g_ipm_shift_right_center_x : g_ipm_shift_left_center_x;
-    const uint16 *ys = use_right ? g_ipm_shift_right_center_y : g_ipm_shift_left_center_y;
-    const int count = use_right ? g_ipm_shift_right_center_count : g_ipm_shift_left_center_count;
-    const uint16 *src_xs = use_right ? g_src_shift_right_center_x : g_src_shift_left_center_x;
-    const uint16 *src_ys = use_right ? g_src_shift_right_center_y : g_src_shift_left_center_y;
-    const int src_count = use_right ? g_src_shift_right_center_count : g_src_shift_left_center_count;
-    if (xs == nullptr || ys == nullptr || count <= 0)
-    {
-        return 0;
-    }
-
-    g_ipm_line_error_source.store(use_right ? static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT)
-                                            : static_cast<int>(VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT));
-
-    float x = 0.0f;
-    float y = 0.0f;
-    const vision_ipm_line_error_method_enum method =
-        static_cast<vision_ipm_line_error_method_enum>(g_ipm_line_error_method.load());
-    if (method == VISION_IPM_LINE_ERROR_FIXED_INDEX)
-    {
-        const int idx = std::clamp(g_ipm_line_error_fixed_index.load(), 0, count - 1);
-        g_ipm_line_error_track_index = idx;
-        x = static_cast<float>(xs[idx]);
-        y = static_cast<float>(ys[idx]);
-    }
-    else if (method == VISION_IPM_LINE_ERROR_SPEED_INDEX)
-    {
-        const float speed_k = g_ipm_line_error_speed_k.load();
-        const float speed_b = g_ipm_line_error_speed_b.load();
-        const float current_speed = line_follow_thread_base_speed();
-        const int cfg_index_min = g_ipm_line_error_index_min.load();
-        const int cfg_index_max = g_ipm_line_error_index_max.load();
-        const int range_min = std::min(cfg_index_min, cfg_index_max);
-        const int range_max = std::max(cfg_index_min, cfg_index_max);
-        const float idx_by_speed = speed_k * current_speed + speed_b;
-        const int idx = std::clamp(static_cast<int>(std::lround(idx_by_speed)),
-                                   range_min,
-                                   std::min(range_max, count - 1));
-        g_ipm_line_error_track_index = idx;
-        x = static_cast<float>(xs[idx]);
-        y = static_cast<float>(ys[idx]);
-    }
-    else
-    {
-        std::array<int, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> point_indices = {};
-        std::array<float, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> weights = {};
-        size_t point_count = 0;
-        {
-            const std::lock_guard<std::mutex> lock(g_ipm_line_error_weighted_points_mutex);
-            point_indices = g_ipm_line_error_point_indices;
-            weights = g_ipm_line_error_weights;
-            point_count = g_ipm_line_error_weighted_point_count;
-        }
-
-        const int first_index = std::clamp(g_vision_runtime_config.ipm_line_error_weighted_first_index, 0, count - 1);
-        const int decision_index = std::clamp(g_vision_runtime_config.ipm_line_error_weighted_decision_index, 0, count - 1);
-        const int decision_point_error = static_cast<int>(xs[decision_index]) - 200;
-        const int abs_decision_point_error = std::abs(decision_point_error);
-        int spacing = g_vision_runtime_config.ipm_line_error_weighted_default_spacing;
-        if (abs_decision_point_error > g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_3)
-        {
-            spacing = g_vision_runtime_config.ipm_line_error_weighted_spacing_value_3;
-        }
-        else if (abs_decision_point_error > g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_2)
-        {
-            spacing = g_vision_runtime_config.ipm_line_error_weighted_spacing_value_2;
-        }
-        else if (abs_decision_point_error > g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_1)
-        {
-            spacing = g_vision_runtime_config.ipm_line_error_weighted_spacing_value_1;
-        }
-        spacing = std::max(spacing, 1);
-        g_ipm_line_error_weighted_first_point_error.store(decision_point_error);
-        g_ipm_line_error_weighted_current_spacing.store(spacing);
-        g_ipm_weighted_decision_point_valid = true;
-        g_ipm_weighted_decision_point_x = static_cast<int>(xs[decision_index]);
-        g_ipm_weighted_decision_point_y = static_cast<int>(ys[decision_index]);
-        if (src_xs != nullptr && src_ys != nullptr && decision_index < src_count)
-        {
-            g_src_weighted_decision_point_valid = true;
-            g_src_weighted_decision_point_x = static_cast<int>(src_xs[decision_index]);
-            g_src_weighted_decision_point_y = static_cast<int>(src_ys[decision_index]);
-        }
-
-        for (size_t i = 0; i < point_count; ++i)
-        {
-            const int dynamic_idx = first_index + static_cast<int>(i) * spacing;
-            point_indices[i] = (dynamic_idx < count) ? dynamic_idx : -1;
-        }
-
-        float total_weight = 0.0f;
-        float valid_weight = 0.0f;
-        for (size_t i = 0; i < point_count; ++i)
-        {
-            total_weight += weights[i];
-            if (point_indices[i] >= 0 && point_indices[i] < count)
-            {
-                valid_weight += weights[i];
-            }
-        }
-        if (point_count == 0 || std::fabs(valid_weight) <= 1e-6f)
-        {
-            return 0;
-        }
-
-        const float weight_scale = total_weight / valid_weight;
-        float weighted_index = 0.0f;
-        for (size_t i = 0; i < point_count; ++i)
-        {
-            const int idx = point_indices[i];
-            if (idx < 0 || idx >= count)
-            {
-                continue;
-            }
-            const float effective_weight = weights[i] * weight_scale;
-            weighted_index += static_cast<float>(idx) * effective_weight;
-            x += static_cast<float>(xs[idx]) * effective_weight;
-            y += static_cast<float>(ys[idx]) * effective_weight;
-        }
-        g_ipm_line_error_track_index = std::clamp(static_cast<int>(std::lround(weighted_index)), 0, count - 1);
-    }
-
-    g_ipm_line_error_track_valid = true;
-    g_ipm_line_error_track_x = static_cast<int>(std::lround(x));
-    g_ipm_line_error_track_y = static_cast<int>(std::lround(y));
-    return static_cast<int>(std::lround(x - 200.0f));
-}
-
 static int transform_boundary_points_to_ipm(const maze_point_t *src_pts, int src_num, maze_point_t *dst_pts, int max_pts)
 {
     if (src_pts == nullptr || dst_pts == nullptr || src_num <= 0 || max_pts <= 0)
@@ -1864,11 +1658,6 @@ static void reset_intersection_mode_state()
     g_intersection_last_stop_row = 0;
     g_intersection_current_start_row = -1;
     g_intersection_probe_x = kProcWidth / 2;
-    if (g_saved_line_error_method_valid)
-    {
-        g_ipm_line_error_method.store(g_saved_line_error_method_before_intersection);
-        g_saved_line_error_method_valid = false;
-    }
 }
 
 static void enter_intersection_mode_if_needed()
@@ -1901,10 +1690,6 @@ static void enter_intersection_mode_if_needed()
     g_intersection_last_stop_row = kIntersectionEntryStartRow;
     g_intersection_current_start_row = kIntersectionEntryStartRow;
     g_intersection_probe_x = compute_intersection_probe_x_from_corners();
-    g_saved_line_error_method_before_intersection = g_ipm_line_error_method.load();
-    g_saved_line_error_method_valid = true;
-    g_ipm_line_error_method.store(static_cast<int>(VISION_IPM_LINE_ERROR_FIXED_INDEX));
-    g_ipm_line_error_fixed_index.store(kIntersectionFixedIndex);
 }
 
 static void maybe_exit_intersection_mode(int stop_row)
@@ -2629,8 +2414,7 @@ bool vision_image_processor_init(const char *camera_path)
     g_intersection_current_start_row = -1;
     g_intersection_probe_x = kProcWidth / 2;
     g_roundabout_mode.store(ROUNDABOUT_MODE_NONE);
-    g_saved_line_error_method_before_intersection = g_ipm_line_error_method.load();
-    g_saved_line_error_method_valid = false;
+    vision_line_error_layer_reset();
     line_error = 0;
     g_last_otsu_threshold = 127;
     return true;
@@ -2899,7 +2683,54 @@ bool vision_image_processor_process_step()
         render_ipm_boundary_image_and_update_boundaries(left_pts.data(), left_num, right_pts.data(), right_num);
         enter_roundabout_mode_if_needed();
         update_roundabout_mode_after_current_frame(left_ok && left_num > 0, right_ok && right_num > 0);
-        line_error = compute_line_error_from_ipm_shifted_centerline();
+
+        const int roundabout_mode = g_roundabout_mode.load();
+        const bool force_use_right = roundabout_mode_forces_right_centerline(roundabout_mode);
+        const bool force_use_left = roundabout_mode_forces_left_centerline(roundabout_mode);
+        const int left_count = g_ipm_shift_left_center_count;
+        const int right_count = g_ipm_shift_right_center_count;
+        bool use_right = false;
+        if (left_count <= 0 && right_count <= 0)
+        {
+            use_right = false;
+        }
+        else if (force_use_right)
+        {
+            use_right = (right_count > 0) || (left_count <= 0);
+        }
+        else if (force_use_left)
+        {
+            use_right = !(left_count > 0) && (right_count > 0);
+        }
+        else if (left_count <= 0)
+        {
+            use_right = true;
+        }
+        else if (right_count <= 0)
+        {
+            use_right = false;
+        }
+        else
+        {
+            use_right = (right_count > left_count);
+        }
+
+        const uint16 *sel_ipm_x = use_right ? g_ipm_shift_right_center_x : g_ipm_shift_left_center_x;
+        const uint16 *sel_ipm_y = use_right ? g_ipm_shift_right_center_y : g_ipm_shift_left_center_y;
+        const int sel_ipm_count = use_right ? right_count : left_count;
+        const uint16 *sel_src_x = use_right ? g_src_shift_right_center_x : g_src_shift_left_center_x;
+        const uint16 *sel_src_y = use_right ? g_src_shift_right_center_y : g_src_shift_left_center_y;
+        const int sel_src_count = use_right ? g_src_shift_right_center_count : g_src_shift_left_center_count;
+
+        vision_line_error_layer_set_source(use_right ? static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT)
+                                                     : static_cast<int>(VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT));
+        line_error = vision_line_error_layer_compute_from_ipm_shifted_centerline(sel_ipm_x,
+                                                                                  sel_ipm_y,
+                                                                                  sel_ipm_count,
+                                                                                  sel_src_x,
+                                                                                  sel_src_y,
+                                                                                  sel_src_count,
+                                                                                  kIpmOutputWidth / 2);
     }
     else
     {
@@ -3079,37 +2910,24 @@ float vision_image_processor_ipm_centerline_min_point_dist_px()
 
 void vision_image_processor_set_ipm_line_error_source(vision_ipm_line_error_source_enum source)
 {
-    const int s = static_cast<int>(source);
-    if (s == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT))
-    {
-        g_ipm_line_error_source.store(s);
-        return;
-    }
-    g_ipm_line_error_source.store(static_cast<int>(VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT));
+    vision_line_error_layer_set_source(static_cast<int>(source));
 }
 
 vision_ipm_line_error_source_enum vision_image_processor_ipm_line_error_source()
 {
-    return (g_ipm_line_error_source.load() == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT))
+    return (vision_line_error_layer_source() == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT))
                ? VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT
                : VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT;
 }
 
 void vision_image_processor_set_ipm_line_error_method(vision_ipm_line_error_method_enum method)
 {
-    const int m = static_cast<int>(method);
-    if (m >= static_cast<int>(VISION_IPM_LINE_ERROR_FIXED_INDEX) &&
-        m <= static_cast<int>(VISION_IPM_LINE_ERROR_SPEED_INDEX))
-    {
-        g_ipm_line_error_method.store(m);
-        return;
-    }
-    g_ipm_line_error_method.store(static_cast<int>(VISION_IPM_LINE_ERROR_WEIGHTED_INDEX));
+    vision_line_error_layer_set_method(static_cast<int>(method));
 }
 
 vision_ipm_line_error_method_enum vision_image_processor_ipm_line_error_method()
 {
-    const int m = g_ipm_line_error_method.load();
+    const int m = vision_line_error_layer_method();
     if (m == static_cast<int>(VISION_IPM_LINE_ERROR_FIXED_INDEX))
     {
         return VISION_IPM_LINE_ERROR_FIXED_INDEX;
@@ -3123,95 +2941,120 @@ vision_ipm_line_error_method_enum vision_image_processor_ipm_line_error_method()
 
 void vision_image_processor_set_ipm_line_error_fixed_index(int point_index)
 {
-    g_ipm_line_error_fixed_index.store(std::max(0, point_index));
+    vision_line_error_layer_set_fixed_index(point_index);
 }
 
 int vision_image_processor_ipm_line_error_fixed_index()
 {
-    return g_ipm_line_error_fixed_index.load();
+    return vision_line_error_layer_fixed_index();
 }
 
 void vision_image_processor_set_ipm_line_error_weighted_points(const int *point_indices,
                                                               const float *weights,
                                                               size_t count)
 {
-    if (point_indices == nullptr || weights == nullptr || count == 0)
-    {
-        reset_ipm_line_error_weighted_points_to_default();
-        return;
-    }
-
-    const size_t clamped_count = std::min(count, static_cast<size_t>(VISION_LINE_ERROR_MAX_WEIGHTED_POINTS));
-    const std::lock_guard<std::mutex> lock(g_ipm_line_error_weighted_points_mutex);
-    g_ipm_line_error_point_indices.fill(0);
-    g_ipm_line_error_weights.fill(0.0f);
-    for (size_t i = 0; i < clamped_count; ++i)
-    {
-        g_ipm_line_error_point_indices[i] = std::max(0, point_indices[i]);
-        g_ipm_line_error_weights[i] = weights[i];
-    }
-    g_ipm_line_error_weighted_point_count = clamped_count;
+    vision_line_error_layer_set_weighted_points(point_indices, weights, count);
 }
 
 size_t vision_image_processor_ipm_line_error_weighted_point_count()
 {
-    const std::lock_guard<std::mutex> lock(g_ipm_line_error_weighted_points_mutex);
-    return g_ipm_line_error_weighted_point_count;
+    return vision_line_error_layer_weighted_point_count();
 }
 
 void vision_image_processor_set_ipm_line_error_speed_formula(float speed_k, float speed_b)
 {
-    g_ipm_line_error_speed_k.store(speed_k);
-    g_ipm_line_error_speed_b.store(speed_b);
+    vision_line_error_layer_set_speed_formula(speed_k, speed_b);
 }
 
 void vision_image_processor_get_ipm_line_error_speed_formula(float *speed_k, float *speed_b)
 {
-    if (speed_k) *speed_k = g_ipm_line_error_speed_k.load();
-    if (speed_b) *speed_b = g_ipm_line_error_speed_b.load();
+    vision_line_error_layer_get_speed_formula(speed_k, speed_b);
 }
 
 void vision_image_processor_set_ipm_line_error_index_range(int index_min, int index_max)
 {
-    g_ipm_line_error_index_min.store(index_min);
-    g_ipm_line_error_index_max.store(index_max);
+    vision_line_error_layer_set_index_range(index_min, index_max);
 }
 
 void vision_image_processor_get_ipm_line_error_index_range(int *index_min, int *index_max)
 {
-    if (index_min) *index_min = g_ipm_line_error_index_min.load();
-    if (index_max) *index_max = g_ipm_line_error_index_max.load();
+    vision_line_error_layer_get_index_range(index_min, index_max);
 }
 
 void vision_image_processor_get_ipm_line_error_track_point(bool *valid, int *x, int *y)
 {
-    if (valid) *valid = g_ipm_line_error_track_valid;
-    if (x) *x = g_ipm_line_error_track_x;
-    if (y) *y = g_ipm_line_error_track_y;
+    vision_line_error_layer_get_track_point(valid, x, y);
+}
+
+void vision_image_processor_set_ipm_centerline_curvature_step(int step)
+{
+    vision_line_error_layer_set_curvature_step(step);
+}
+
+int vision_image_processor_ipm_centerline_curvature_step()
+{
+    return vision_line_error_layer_curvature_step();
+}
+
+void vision_image_processor_get_ipm_selected_centerline_curvature(const float **curvature, int *count)
+{
+    vision_line_error_layer_get_selected_centerline_curvature(curvature, count);
+}
+
+void vision_image_processor_get_ipm_curvature_lookahead_debug(float *speed_v,
+                                                              float *k_eff,
+                                                              float *eta,
+                                                              int *lookahead_index)
+{
+    vision_line_error_layer_get_curvature_lookahead_debug(speed_v, k_eff, eta, lookahead_index);
+}
+
+void vision_image_processor_get_ipm_curvature_weighted_error_debug(float *weighted_error,
+                                                                   bool *lookahead_point_valid,
+                                                                   int *lookahead_point_x,
+                                                                   int *lookahead_point_y)
+{
+    vision_line_error_layer_get_curvature_weighted_error_debug(weighted_error,
+                                                               lookahead_point_valid,
+                                                               lookahead_point_x,
+                                                               lookahead_point_y);
+}
+
+void vision_image_processor_get_ipm_curvature_speed_limit_debug(float *kappa_max,
+                                                                float *delta_kappa_max,
+                                                                float *curve_base_speed,
+                                                                float *v_curve_raw,
+                                                                float *v_curve_after_dkappa,
+                                                                float *v_error_limit,
+                                                                float *v_target)
+{
+    vision_line_error_layer_get_curvature_speed_limit_debug(kappa_max,
+                                                            delta_kappa_max,
+                                                            curve_base_speed,
+                                                            v_curve_raw,
+                                                            v_curve_after_dkappa,
+                                                            v_error_limit,
+                                                            v_target);
 }
 
 int vision_image_processor_ipm_weighted_first_point_error()
 {
-    return g_ipm_line_error_weighted_first_point_error.load();
+    return vision_line_error_layer_weighted_first_point_error();
 }
 
 int vision_image_processor_ipm_weighted_current_spacing()
 {
-    return g_ipm_line_error_weighted_current_spacing.load();
+    return vision_line_error_layer_weighted_current_spacing();
 }
 
 void vision_image_processor_get_ipm_weighted_decision_point(bool *valid, int *x, int *y)
 {
-    if (valid) *valid = g_ipm_weighted_decision_point_valid;
-    if (x) *x = g_ipm_weighted_decision_point_x;
-    if (y) *y = g_ipm_weighted_decision_point_y;
+    vision_line_error_layer_get_ipm_weighted_decision_point(valid, x, y);
 }
 
 void vision_image_processor_get_src_weighted_decision_point(bool *valid, int *x, int *y)
 {
-    if (valid) *valid = g_src_weighted_decision_point_valid;
-    if (x) *x = g_src_weighted_decision_point_x;
-    if (y) *y = g_src_weighted_decision_point_y;
+    vision_line_error_layer_get_src_weighted_decision_point(valid, x, y);
 }
 
 void vision_image_processor_get_intersection_mode_state(bool *enabled, int *stop_row, int *current_start_row)
@@ -3228,7 +3071,7 @@ int vision_image_processor_roundabout_mode()
 
 int vision_image_processor_ipm_line_error_track_index()
 {
-    return g_ipm_line_error_track_index;
+    return vision_line_error_layer_track_index();
 }
 
 void vision_image_processor_get_last_perf_us(uint32 *capture_wait_us,
@@ -3497,16 +3340,4 @@ void vision_image_processor_get_ncnn_roi(bool *valid, int *x, int *y, int *w, in
     if (y) *y = g_ncnn_roi_y;
     if (w) *w = g_ncnn_roi_w;
     if (h) *h = g_ncnn_roi_h;
-}
-static void reset_ipm_line_error_weighted_points_to_default()
-{
-    const std::lock_guard<std::mutex> lock(g_ipm_line_error_weighted_points_mutex);
-    g_ipm_line_error_point_indices.fill(0);
-    g_ipm_line_error_weights.fill(0.0f);
-    for (size_t i = 0; i < g_vision_runtime_config.ipm_line_error_weighted_point_count; ++i)
-    {
-        g_ipm_line_error_point_indices[i] = std::max(0, g_vision_runtime_config.ipm_line_error_point_indices[i]);
-        g_ipm_line_error_weights[i] = g_vision_runtime_config.ipm_line_error_weights[i];
-    }
-    g_ipm_line_error_weighted_point_count = g_vision_runtime_config.ipm_line_error_weighted_point_count;
 }

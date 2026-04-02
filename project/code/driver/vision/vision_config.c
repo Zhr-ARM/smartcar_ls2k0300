@@ -16,7 +16,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端 UDP 视频发送配置 ====================
     // UDP 网页图传总开关。
-    .udp_web_enabled = false,
+    .udp_web_enabled = true,
     // UDP 网页图传发送上限帧率，0 表示不限速。
     .udp_web_max_fps = 30,
     // 是否向网页端发送灰度 JPEG。
@@ -28,7 +28,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端 TCP 状态发送总开关 ====================
     // TCP 状态上报开关。
-    .udp_web_tcp_enabled = false,
+    .udp_web_tcp_enabled = true,
 
     // ==================== TCP 基础状态字段 ====================
     // 发送主板当前时间戳（ms）。
@@ -118,23 +118,23 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 发送当前实际跟踪点坐标 [x, y]。
     .udp_web_tcp_send_ipm_track_point = true,
     // 发送加权模式的首点索引参数。
-    .udp_web_tcp_send_ipm_weighted_first_index = true,
+    .udp_web_tcp_send_ipm_weighted_first_index = false,
     // 发送加权模式的决策点索引参数。
-    .udp_web_tcp_send_ipm_weighted_decision_index = true,
+    .udp_web_tcp_send_ipm_weighted_decision_index = false,
     // 发送加权模式的默认点间距参数。
-    .udp_web_tcp_send_ipm_weighted_default_spacing = true,
+    .udp_web_tcp_send_ipm_weighted_default_spacing = false,
     // 发送加权模式阈值 1。
-    .udp_web_tcp_send_ipm_weighted_spacing_threshold_1 = true,
+    .udp_web_tcp_send_ipm_weighted_spacing_threshold_1 = false,
     // 发送加权模式阈值 2。
-    .udp_web_tcp_send_ipm_weighted_spacing_threshold_2 = true,
+    .udp_web_tcp_send_ipm_weighted_spacing_threshold_2 = false,
     // 发送加权模式阈值 3。
-    .udp_web_tcp_send_ipm_weighted_spacing_threshold_3 = true,
+    .udp_web_tcp_send_ipm_weighted_spacing_threshold_3 = false,
     // 发送阈值 1 触发后的点间距。
-    .udp_web_tcp_send_ipm_weighted_spacing_value_1 = true,
+    .udp_web_tcp_send_ipm_weighted_spacing_value_1 = false,
     // 发送阈值 2 触发后的点间距。
-    .udp_web_tcp_send_ipm_weighted_spacing_value_2 = true,
+    .udp_web_tcp_send_ipm_weighted_spacing_value_2 = false,
     // 发送阈值 3 触发后的点间距。
-    .udp_web_tcp_send_ipm_weighted_spacing_value_3 = true,
+    .udp_web_tcp_send_ipm_weighted_spacing_value_3 = false,
     // 发送首点的当前偏差。
     .udp_web_tcp_send_ipm_weighted_first_point_error = true,
     // 发送本帧实际使用的加权点间距。
@@ -185,14 +185,42 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .udp_web_tcp_send_ipm_corner_right_nms = false,
 
     // ==================== TCP 平移中线调试字段 ====================
-    // 发送由左边界法向平移得到的 IPM 中线。
-    .udp_web_tcp_send_ipm_centerline_from_left_shift = true,
-    // 发送由右边界法向平移得到的 IPM 中线。
-    .udp_web_tcp_send_ipm_centerline_from_right_shift = true,
-    // 发送左平移中线回投到原图后的点列。
-    .udp_web_tcp_send_src_centerline_from_left_shift = true,
-    // 发送右平移中线回投到原图后的点列。
-    .udp_web_tcp_send_src_centerline_from_right_shift = true,
+    // 发送当前被 line_error 选择使用的 IPM 平移中线。
+    .udp_web_tcp_send_ipm_centerline_selected_shift = true,
+    // 发送当前被 line_error 选择使用的回投原图平移中线。
+    .udp_web_tcp_send_src_centerline_selected_shift = true,
+    // 发送当前被 line_error 选择使用的 IPM 平移中线总点数。
+    .udp_web_tcp_send_ipm_centerline_selected_count = true,
+    // 发送当前被 line_error 选择使用的回投原图平移中线总点数。
+    .udp_web_tcp_send_src_centerline_selected_count = true,
+    // 发送当前被 line_error 选择使用的 IPM 平移中线曲率数组。
+    .udp_web_tcp_send_ipm_centerline_selected_curvature = true,
+    // 发送曲率前瞻中的当前编码器平均速度 v。
+    .udp_web_tcp_send_ipm_curvature_speed_v = true,
+    // 发送曲率前瞻中的指数加权有效曲率 k_eff。
+    .udp_web_tcp_send_ipm_curvature_effective = true,
+    // 发送曲率前瞻中的归一化前瞻系数 eta。
+    .udp_web_tcp_send_ipm_curvature_eta = true,
+    // 发送曲率前瞻计算得到的实际前瞻索引。
+    .udp_web_tcp_send_ipm_curvature_lookahead_index = true,
+    // 发送曲率前瞻索引对应的 IPM 点坐标 [x, y]。
+    .udp_web_tcp_send_ipm_curvature_lookahead_point = true,
+    // 发送基于 eta 中心的高斯加权积分偏移 error。
+    .udp_web_tcp_send_ipm_curvature_weighted_error = true,
+    // 发送窗口内最大绝对曲率 kappa_max。
+    .udp_web_tcp_send_ipm_curvature_kappa_max = true,
+    // 发送窗口内最大曲率变化强度 delta_kappa_max。
+    .udp_web_tcp_send_ipm_curvature_delta_kappa_max = true,
+    // 发送曲率限速法计算得到的建议基准速度 v_curve（仅调试显示）。
+    .udp_web_tcp_send_ipm_curvature_base_speed_curve = true,
+    // 发送曲率限速原始值（未加曲率变化惩罚、未限幅）。
+    .udp_web_tcp_send_ipm_curvature_v_curve_raw = true,
+    // 发送曲率限速加曲率变化惩罚后的值。
+    .udp_web_tcp_send_ipm_curvature_v_curve_after_dkappa = true,
+    // 发送误差限速值。
+    .udp_web_tcp_send_ipm_curvature_v_error_limit = true,
+    // 发送最终目标基准速度（min(curve,error) 后）。
+    .udp_web_tcp_send_ipm_curvature_v_target = true,
 
     // ==================== TCP 尺寸元数据字段 ====================
     // 发送灰度图尺寸 [width, height]。
@@ -220,7 +248,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
     .maze_start_row = 90,
     // 路口识别总开关：开启后允许进入十字/路口状态机。
-    .intersection_enabled = true,
+    .intersection_enabled = false,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = true,
     // IPM 处理链边界三角滤波开关。
@@ -245,6 +273,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_centerline_resample_step_px = 6.0f,
     // 中线近重复点过滤阈值，单位 px。
     .ipm_centerline_min_point_dist_px = 2.0f,
+    // 所选偏移中线曲率计算步长（索引步长）。
+    .ipm_centerline_curvature_step = 3,
     // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。
     .keep_last_centerline_on_double_loss = true,
     // line_error 使用哪条平移中线：左平移或右平移。
@@ -285,6 +315,28 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_line_error_index_min = 0,
     // 随速度索引模式允许的最大索引。
     .ipm_line_error_index_max = 30,
+    // 曲率前瞻索引指数加权衰减系数 lambda。
+    .ipm_curvature_lookahead_lambda = 0.08f,
+    // 曲率前瞻索引曲率抑制系数 mu。
+    .ipm_curvature_lookahead_mu = 1.20f,
+    // 曲率前瞻索引速度归一化上限 v_max（编码器 count/5ms）。
+    .ipm_curvature_lookahead_v_max = 60.0f,
+    // 曲率限速法横向加速度允许值（工程安全值）。
+    .ipm_curve_speed_ay_allow = 12.0f,
+    // 曲率限速法 epsilon，防止除零和直道速度发散。
+    .ipm_curve_speed_kappa_epsilon = 0.02f,
+    // 曲率变化惩罚系数 K_delta_kappa（越大对 S 弯越保守）。
+    .ipm_curve_speed_delta_kappa_gain = 8.0f,
+    // 曲率速度映射缩放系数。
+    .ipm_curve_speed_gain = 220.0f,
+    // 误差限速系数。
+    .ipm_curve_speed_error_gain = 0.025f,
+    // 误差限速死区。
+    .ipm_curve_speed_error_deadband = 3.0f,
+    // 规划最小保护速度。
+    .ipm_curve_speed_v_min_global = 120.0f,
+    // 在 look_idx 基础上额外前看的点数。
+    .ipm_curve_speed_extra_plan_points = 8,
     // 环岛入口判定时，一侧直角点到对侧边界候选点的目标距离，单位为逆透视坐标 px。
     // 距离越大，表示越倾向于在更“外圈”的对侧边界区域寻找环岛特征。
     .roundabout_corner_match_distance_px = 45.0f,

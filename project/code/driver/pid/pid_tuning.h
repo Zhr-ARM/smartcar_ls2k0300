@@ -59,6 +59,11 @@ inline constexpr float kFeedbackLowPassAlpha = 0.80f;
 
 namespace line_follow
 {
+// 基准速度策略选择：
+// 0 = 使用当前“按横向误差缩放 + 单周期升降限幅”的机制；
+// 1 = 使用 vision_line_error_layer 计算出的曲率/前瞻加权基准速度（v_target）。
+inline constexpr int32 kBaseSpeedPlanMode = 1;
+
 // 视觉误差低通系数：越大越跟当前帧，越小越重视历史趋势。
 inline constexpr float kErrorFilterAlpha = 0.80f;
 

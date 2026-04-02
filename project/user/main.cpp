@@ -130,6 +130,7 @@ int main(int, char**)
     vision_image_processor_set_ipm_centerline_resample_enabled(g_vision_runtime_config.ipm_centerline_resample_enabled); // 中线等距采样
     vision_image_processor_set_ipm_centerline_resample_step_px(g_vision_runtime_config.ipm_centerline_resample_step_px); // 中线采样步长
     vision_image_processor_set_ipm_centerline_min_point_dist_px(g_vision_runtime_config.ipm_centerline_min_point_dist_px); // 中线去近重复阈值
+    vision_image_processor_set_ipm_centerline_curvature_step(g_vision_runtime_config.ipm_centerline_curvature_step); // 中线曲率计算步长
     vision_image_processor_set_ipm_line_error_source(static_cast<vision_ipm_line_error_source_enum>(g_vision_runtime_config.ipm_line_error_source)); // line_error 中线来源
     vision_image_processor_set_ipm_line_error_method(static_cast<vision_ipm_line_error_method_enum>(g_vision_runtime_config.ipm_line_error_method)); // line_error 计算方法
     vision_image_processor_set_ipm_line_error_fixed_index(g_vision_runtime_config.ipm_line_error_fixed_index); // line_error 固定索引
@@ -173,7 +174,7 @@ int main(int, char**)
     uart_thread_init();
 
     // 巡线基础速度配置（控制线程会在此基础上叠加转向差速）。
-    line_follow_thread_set_base_speed(400.0f);
+    line_follow_thread_set_base_speed(350.0f);
     
     // 为motor_thread设置目标计数，单位 counts/5ms。
     // 固定左右轮目标值为 800，便于速度环调参。

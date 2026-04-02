@@ -100,9 +100,25 @@ void line_follow_loop()
         // 真正送到电机线程的值，还会被后面的弯道降速逻辑二次修正。
         const float current_base_speed = g_base_speed.load();
 
-        // 方向约定：vision中的line_error定义为“中线x-图像中心x”，
-        // 与本控制器历史约定（正值表示赛道中心偏左）相反，因此取负后再进入控制链路。
-        const float raw_error_px = -(float)line_error;
+        // 误差来源也随基准速度策略模式切换：
+        // mode=0 使用当前 line_error；
+        // mode=1 使用视觉层计算的加权积分偏差。
+        float selected_offset_error = static_cast<float>(line_error);
+        if (pid_tuning::line_follow::kBaseSpeedPlanMode == 1)
+        {
+            float weighted_error = 0.0f;
+            bool lookahead_point_valid = false;
+            int lookahead_point_x = 0;
+            int lookahead_point_y = 0;
+            vision_image_processor_get_ipm_curvature_weighted_error_debug(&weighted_error,
+                                                                           &lookahead_point_valid,
+                                                                           &lookahead_point_x,
+                                                                           &lookahead_point_y);
+            selected_offset_error = weighted_error;
+        }
+
+        // 方向约定：正偏差表示中线偏右（x_ref右侧），与控制器内部正方向相反，统一取负。
+        const float raw_error_px = -selected_offset_error;
 
         // 以半幅宽度归一化到近似[-1,1]范围，并对异常值做保护限幅。
         // 这样 PID 参数可以脱离具体分辨率，后续改摄像头宽度时更容易复用。
@@ -141,19 +157,48 @@ void line_follow_loop()
                                      -pid_tuning::line_follow::kPidMaxOutput,
                                      pid_tuning::line_follow::kPidMaxOutput);
 
-        // 大弯主动降基础速度：
-        // 如果还按直道速度冲，内外轮目标会跳得很大，速度环很容易跟不上，车体就会发飘。
-        float speed_scale = 1.0f;
-        if (abs_filtered_error_px > pid_tuning::line_follow::kTurnSlowdownStartPx)
+        // 基准速度规划策略切换：
+        // mode=0 使用当前误差降速机制；
+        // mode=1 使用视觉层提供的曲率/前瞻加权速度建议。
+        float desired_base_speed = current_base_speed;
+        if (pid_tuning::line_follow::kBaseSpeedPlanMode == 0)
         {
-            const float slowdown_ratio = std::clamp(
-                (abs_filtered_error_px - pid_tuning::line_follow::kTurnSlowdownStartPx) /
-                (pid_tuning::line_follow::kTurnSlowdownFullPx - pid_tuning::line_follow::kTurnSlowdownStartPx),
-                0.0f,
-                1.0f);
-            speed_scale = 1.0f - slowdown_ratio * (1.0f - pid_tuning::line_follow::kTurnMinSpeedScale);
+            // 大弯主动降基础速度：
+            // 如果还按直道速度冲，内外轮目标会跳得很大，速度环很容易跟不上，车体就会发飘。
+            float speed_scale = 1.0f;
+            if (abs_filtered_error_px > pid_tuning::line_follow::kTurnSlowdownStartPx)
+            {
+                const float slowdown_ratio = std::clamp(
+                    (abs_filtered_error_px - pid_tuning::line_follow::kTurnSlowdownStartPx) /
+                    (pid_tuning::line_follow::kTurnSlowdownFullPx - pid_tuning::line_follow::kTurnSlowdownStartPx),
+                    0.0f,
+                    1.0f);
+                speed_scale = 1.0f - slowdown_ratio * (1.0f - pid_tuning::line_follow::kTurnMinSpeedScale);
+            }
+            desired_base_speed = current_base_speed * speed_scale;
         }
-        const float desired_base_speed = current_base_speed * speed_scale;
+        else
+        {
+            float kappa_max = 0.0f;
+            float delta_kappa_max = 0.0f;
+            float curve_base_speed = 0.0f;
+            float v_curve_raw = 0.0f;
+            float v_curve_after_dkappa = 0.0f;
+            float v_error_limit = 0.0f;
+            float v_target = 0.0f;
+            vision_image_processor_get_ipm_curvature_speed_limit_debug(&kappa_max,
+                                                                       &delta_kappa_max,
+                                                                       &curve_base_speed,
+                                                                       &v_curve_raw,
+                                                                       &v_curve_after_dkappa,
+                                                                       &v_error_limit,
+                                                                       &v_target);
+            if (v_target > 0.0f)
+            {
+                desired_base_speed = v_target;
+            }
+        }
+
         if (g_adjusted_base_speed_state < 0.0f)
         {
             g_adjusted_base_speed_state = desired_base_speed;
