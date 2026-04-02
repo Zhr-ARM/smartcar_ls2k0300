@@ -288,7 +288,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // line_error 加权索引点（0-based）。
     .ipm_line_error_point_indices = {4, 8, 12},
     // line_error 各索引点对应权重。
-    .ipm_line_error_weights = {0.4f, 0.3f, 0.3f},
+    .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
     // 加权模式下固定使用的首点索引。
     .ipm_line_error_weighted_first_index = 4,
     // 加权模式下用于决定动态间距的点索引。
