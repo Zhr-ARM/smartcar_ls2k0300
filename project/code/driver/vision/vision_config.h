@@ -107,18 +107,34 @@ typedef struct
     bool udp_web_tcp_send_ipm_centerline_selected_count;
     bool udp_web_tcp_send_src_centerline_selected_count;
     bool udp_web_tcp_send_ipm_centerline_selected_curvature;
+    // ==================== TCP 动态前瞻速度调试字段 ====================
+    // 说明：以下字段用于网页端调试“曲率+前瞻+误差限速”的完整链路，建议先全部打开。
+    // 若带宽紧张，可先保留：kappa_max / delta_kappa_max / v_target / weighted_error。
+    // 当前编码器平均速度 v=(vL+vR)/2。
     bool udp_web_tcp_send_ipm_curvature_speed_v;
+    // 指数加权有效曲率 k_eff（用于 eta 计算）。
     bool udp_web_tcp_send_ipm_curvature_effective;
+    // 前瞻归一化系数 eta。
     bool udp_web_tcp_send_ipm_curvature_eta;
+    // 前瞻中心索引离散后的 lookahead_index。
     bool udp_web_tcp_send_ipm_curvature_lookahead_index;
+    // lookahead_index 对应的 IPM 点坐标 [x,y]。
     bool udp_web_tcp_send_ipm_curvature_lookahead_point;
+    // 以 i_center 为中心做高斯加权后的偏移误差（误差限速输入）。
     bool udp_web_tcp_send_ipm_curvature_weighted_error;
+    // 风险窗口内最大绝对曲率 max|kappa|。
     bool udp_web_tcp_send_ipm_curvature_kappa_max;
+    // 风险窗口内最大曲率变化 max|kappa[i]-kappa[i-1]|。
     bool udp_web_tcp_send_ipm_curvature_delta_kappa_max;
+    // 最终建议基准速度（v_target）。
     bool udp_web_tcp_send_ipm_curvature_base_speed_curve;
+    // 曲率限速原始值：sqrt(a/(kappa+eps))*gain。
     bool udp_web_tcp_send_ipm_curvature_v_curve_raw;
+    // 曲率变化惩罚后速度：v_curve_raw/(1+k*dkappa)。
     bool udp_web_tcp_send_ipm_curvature_v_curve_after_dkappa;
+    // 误差限速值（由 weighted_error 计算）。
     bool udp_web_tcp_send_ipm_curvature_v_error_limit;
+    // 曲率限速与误差限速取 min 后的目标速度。
     bool udp_web_tcp_send_ipm_curvature_v_target;
     bool udp_web_tcp_send_gray_size;
     bool udp_web_tcp_send_ipm_size;
@@ -206,27 +222,44 @@ typedef struct
     int ipm_line_error_index_min;
     // 随速度索引模式允许的最大索引。
     int ipm_line_error_index_max;
-    // 曲率前瞻索引中的指数衰减系数 lambda（越大越看重近处曲率）。
+    // ==================== 动态前瞻速度参数（集中配置区） ====================
+    // 调参建议顺序：
+    // 1) 先调 ay_allow + speed_gain + v_min_global，让直道/急弯速度量级合理；
+    // 2) 再调 delta_kappa_gain，控制 S 弯/复合弯额外降速强度；
+    // 3) 最后调 error_gain + error_deadband，抑制“偏离中线时过快”。
+    //
+    // 曲率前瞻中的指数衰减系数 lambda（越大越看重近处曲率，远处权重衰减更快）。
+    // 增大：前瞻更“短视”，对近处急弯更敏感；减小：更看重远处趋势。
     float ipm_curvature_lookahead_lambda;
-    // 曲率前瞻索引中的曲率抑制系数 mu（越大曲率越大时前瞻越短）。
+    // 曲率前瞻中的曲率抑制系数 mu（越大则曲率一大 eta 降得更快）。
+    // 增大：lookahead_index 更保守；减小：前瞻更激进。
     float ipm_curvature_lookahead_mu;
-    // 曲率前瞻索引中的速度归一化上限 v_max（编码器 count/5ms）。
+    // 历史保留参数：前瞻中的速度归一化上限 v_max。
+    // 当前代码已改为使用 line_follow 的 base_speed 作为归一化速度上限，此值暂未生效。
     float ipm_curvature_lookahead_v_max;
-    // 曲率限速法的横向加速度允许值 a_y_allow（工程安全值）。
+    // 曲率限速横向加速度允许值 a_y_allow（工程安全值，不是理论极限）。
+    // 增大：全局更快；减小：全局更保守（更不易推头/打滑）。
     float ipm_curve_speed_ay_allow;
-    // 曲率限速法中的 epsilon，防止 kappa_max 接近 0 时速度发散。
+    // 曲率限速 epsilon，防止 kappa_max 接近 0 时速度发散。
+    // 增大：直道速度被抑制、波动更小；减小：直道更容易拉高速度。
     float ipm_curve_speed_kappa_epsilon;
-    // 曲率变化惩罚系数 K_delta_kappa。
+    // 曲率变化惩罚系数 K_delta_kappa（专门抑制 S 弯/复合弯）。
+    // 增大：连续弯更保守；减小：连续弯通过速度更高。
     float ipm_curve_speed_delta_kappa_gain;
-    // 曲率速度映射缩放系数（把 sqrt(a/kappa) 映射到速度量级）。
+    // 曲率速度映射缩放系数（把 sqrt(a/kappa) 映射到电机速度量级）。
+    // 增大：整体速度档位上移；减小：整体速度档位下移。
     float ipm_curve_speed_gain;
-    // 误差限速系数（越大越容易因横向误差降速）。
+    // 误差限速系数（越大越容易因偏离中线而降速）。
+    // 增大：纠偏更稳但可能偏慢；减小：纠偏阶段速度更高。
     float ipm_curve_speed_error_gain;
     // 误差限速死区（小误差不触发限速）。
+    // 增大：直道轻微抖动不降速；减小：更敏感，轻微偏差也开始降速。
     float ipm_curve_speed_error_deadband;
-    // 速度规划最小保护速度。
+    // 速度规划最小保护速度（防止弯道速度掉得过低导致“爬行”）。
+    // 增大：弯道最低速度更高；减小：弯道可更慢更稳。
     float ipm_curve_speed_v_min_global;
     // 风险评估窗口扩展点数（在 look_idx 基础上额外前看）。
+    // 增大：提前感知更远风险，更保守；减小：更关注近处，响应更直接。
     int ipm_curve_speed_extra_plan_points;
     // 环岛入口判定时，“角点到对侧边界点”的目标距离（IPM 像素）。
     // 作用：在检测到一侧直角后，只在对侧边界上寻找与该角点距离接近本值的点集做环岛候选判断。

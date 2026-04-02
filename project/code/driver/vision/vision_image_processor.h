@@ -149,6 +149,7 @@ void vision_image_processor_get_ipm_curvature_speed_limit_debug(float *kappa_max
                                                                 float *v_curve_after_dkappa,
                                                                 float *v_error_limit,
                                                                 float *v_target);
+float vision_image_processor_ipm_mean_abs_offset_error();
 int vision_image_processor_ipm_weighted_first_point_error();
 int vision_image_processor_ipm_weighted_current_spacing();
 void vision_image_processor_get_ipm_weighted_decision_point(bool *valid, int *x, int *y);

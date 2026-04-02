@@ -56,6 +56,7 @@ void vision_line_error_layer_get_curvature_speed_limit_debug(float *kappa_max,
                                                              float *v_curve_after_dkappa,
                                                              float *v_error_limit,
                                                              float *v_target);
+float vision_line_error_layer_mean_abs_offset();
 
 int vision_line_error_layer_weighted_first_point_error();
 int vision_line_error_layer_weighted_current_spacing();

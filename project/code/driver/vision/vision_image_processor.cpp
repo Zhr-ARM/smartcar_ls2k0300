@@ -3037,6 +3037,11 @@ void vision_image_processor_get_ipm_curvature_speed_limit_debug(float *kappa_max
                                                             v_target);
 }
 
+float vision_image_processor_ipm_mean_abs_offset_error()
+{
+    return vision_line_error_layer_mean_abs_offset();
+}
+
 int vision_image_processor_ipm_weighted_first_point_error()
 {
     return vision_line_error_layer_weighted_first_point_error();

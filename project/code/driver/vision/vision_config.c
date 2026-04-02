@@ -288,7 +288,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // line_error 加权索引点（0-based）。
     .ipm_line_error_point_indices = {4, 8, 12},
     // line_error 各索引点对应权重。
-    .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
+    .ipm_line_error_weights = {0.4f, 0.3f, 0.3f},
     // 加权模式下固定使用的首点索引。
     .ipm_line_error_weighted_first_index = 4,
     // 加权模式下用于决定动态间距的点索引。
@@ -315,27 +315,53 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_line_error_index_min = 0,
     // 随速度索引模式允许的最大索引。
     .ipm_line_error_index_max = 30,
-    // 曲率前瞻索引指数加权衰减系数 lambda。
-    .ipm_curvature_lookahead_lambda = 0.08f,
-    // 曲率前瞻索引曲率抑制系数 mu。
-    .ipm_curvature_lookahead_mu = 1.20f,
-    // 曲率前瞻索引速度归一化上限 v_max（编码器 count/5ms）。
-    .ipm_curvature_lookahead_v_max = 60.0f,
-    // 曲率限速法横向加速度允许值（工程安全值）。
-    .ipm_curve_speed_ay_allow = 12.0f,
-    // 曲率限速法 epsilon，防止除零和直道速度发散。
+    // ==================== 动态前瞻速度参数（集中配置区） ====================
+    // 调参建议顺序（先粗后细）：
+    // 1) 先调 ay_allow / speed_gain / v_min_global，确定“速度上下边界与量级”；
+    // 2) 再调 delta_kappa_gain，压住 S 弯/复合弯；
+    // 3) 最后调 error_gain / error_deadband，处理偏离中线时的保守程度。
+    //
+    // 曲率前瞻指数权重衰减 lambda：
+    // - 调大：更看近处，lookahead更保守；
+    // - 调小：更看远处，lookahead更平滑。
+    .ipm_curvature_lookahead_lambda = 2.0f,
+    // 曲率前瞻曲率抑制 mu：
+    // - 调大：eta 更容易被曲率压低（前瞻变短）；
+    // - 调小：eta 更高（前瞻更长）。
+    .ipm_curvature_lookahead_mu = 50.20f,
+    // 历史保留参数（当前不生效，代码已改为用 line_follow base_speed）。
+    .ipm_curvature_lookahead_v_max = 70.0f,
+    // 曲率限速横向加速度允许值 ay_allow（工程安全值）：
+    // - 调大：整体更快；
+    // - 调小：整体更稳。
+    .ipm_curve_speed_ay_allow = 2.0f,
+    // 曲率限速 epsilon（防直道发散）：
+    // - 调大：直道速度峰值更低更稳；
+    // - 调小：直道速度更高但更敏感。
     .ipm_curve_speed_kappa_epsilon = 0.02f,
-    // 曲率变化惩罚系数 K_delta_kappa（越大对 S 弯越保守）。
+    // 曲率变化惩罚 K_delta_kappa：
+    // - 调大：S 弯/复合弯更保守；
+    // - 调小：连续弯更激进。
     .ipm_curve_speed_delta_kappa_gain = 8.0f,
-    // 曲率速度映射缩放系数。
-    .ipm_curve_speed_gain = 220.0f,
-    // 误差限速系数。
-    .ipm_curve_speed_error_gain = 0.025f,
-    // 误差限速死区。
+    // 曲率速度映射缩放 speed_gain：
+    // - 调大：整体速度档位上移；
+    // - 调小：整体速度档位下移。
+    .ipm_curve_speed_gain = 140.0f,
+    // 误差限速系数 error_gain：
+    // - 调大：偏离中线时降速更明显；
+    // - 调小：偏离中线时速度保留更多。
+    .ipm_curve_speed_error_gain = 0.01f,
+    // 误差限速死区 error_deadband：
+    // - 调大：小偏差不降速，直道更顺；
+    // - 调小：更敏感，更早降速。
     .ipm_curve_speed_error_deadband = 3.0f,
-    // 规划最小保护速度。
-    .ipm_curve_speed_v_min_global = 120.0f,
-    // 在 look_idx 基础上额外前看的点数。
+    // 最低保护速度 v_min_global：
+    // - 调大：弯道不会太慢；
+    // - 调小：允许更慢通过复杂弯道。
+    .ipm_curve_speed_v_min_global = 80.0f,
+    // 额外前看点数 extra_plan_points：
+    // - 调大：提前预判更远风险，偏保守；
+    // - 调小：更关注近处，响应更直接。
     .ipm_curve_speed_extra_plan_points = 8,
     // 环岛入口判定时，一侧直角点到对侧边界候选点的目标距离，单位为逆透视坐标 px。
     // 距离越大，表示越倾向于在更“外圈”的对侧边界区域寻找环岛特征。

@@ -161,21 +161,33 @@ void line_follow_loop()
         // mode=0 使用当前误差降速机制；
         // mode=1 使用视觉层提供的曲率/前瞻加权速度建议。
         float desired_base_speed = current_base_speed;
+        bool force_full_speed = false;
         if (pid_tuning::line_follow::kBaseSpeedPlanMode == 0)
         {
+            const float mean_abs_path_error = vision_image_processor_ipm_mean_abs_offset_error();
+            // 若整条路径绝对偏差均值很小，认为处于稳定直道，直接给满基础速度。
+            if (mean_abs_path_error < 2.0f)
+            {
+                desired_base_speed = current_base_speed;
+                force_full_speed = true;
+            }
+
             // 大弯主动降基础速度：
             // 如果还按直道速度冲，内外轮目标会跳得很大，速度环很容易跟不上，车体就会发飘。
-            float speed_scale = 1.0f;
-            if (abs_filtered_error_px > pid_tuning::line_follow::kTurnSlowdownStartPx)
+            if (!force_full_speed)
             {
-                const float slowdown_ratio = std::clamp(
-                    (abs_filtered_error_px - pid_tuning::line_follow::kTurnSlowdownStartPx) /
-                    (pid_tuning::line_follow::kTurnSlowdownFullPx - pid_tuning::line_follow::kTurnSlowdownStartPx),
-                    0.0f,
-                    1.0f);
-                speed_scale = 1.0f - slowdown_ratio * (1.0f - pid_tuning::line_follow::kTurnMinSpeedScale);
+                float speed_scale = 1.0f;
+                if (abs_filtered_error_px > pid_tuning::line_follow::kTurnSlowdownStartPx)
+                {
+                    const float slowdown_ratio = std::clamp(
+                        (abs_filtered_error_px - pid_tuning::line_follow::kTurnSlowdownStartPx) /
+                        (pid_tuning::line_follow::kTurnSlowdownFullPx - pid_tuning::line_follow::kTurnSlowdownStartPx),
+                        0.0f,
+                        1.0f);
+                    speed_scale = 1.0f - slowdown_ratio * (1.0f - pid_tuning::line_follow::kTurnMinSpeedScale);
+                }
+                desired_base_speed = current_base_speed * speed_scale;
             }
-            desired_base_speed = current_base_speed * speed_scale;
         }
         else
         {
@@ -202,6 +214,11 @@ void line_follow_loop()
         if (g_adjusted_base_speed_state < 0.0f)
         {
             g_adjusted_base_speed_state = desired_base_speed;
+        }
+        else if (force_full_speed)
+        {
+            // 满速直通分支：本周期直接拉到基础速度上限，不再走缓升限制。
+            g_adjusted_base_speed_state = current_base_speed;
         }
         else
         {

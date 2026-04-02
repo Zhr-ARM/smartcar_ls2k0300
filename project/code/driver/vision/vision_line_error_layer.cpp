@@ -69,6 +69,7 @@ float g_curvature_v_curve_raw = 0.0f;
 float g_curvature_v_curve_after_dkappa = 0.0f;
 float g_curvature_v_error_limit = 0.0f;
 float g_curvature_v_target = 0.0f;
+float g_mean_abs_offset = 0.0f;
 
 static void compute_selected_centerline_curvature(const uint16 *xs, const uint16 *ys, int count)
 {
@@ -316,6 +317,7 @@ void vision_line_error_layer_reset()
     g_curvature_v_curve_after_dkappa = 0.0f;
     g_curvature_v_error_limit = 0.0f;
     g_curvature_v_target = 0.0f;
+    g_mean_abs_offset = 0.0f;
 }
 
 int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ipm_center_x,
@@ -352,7 +354,17 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     {
         g_selected_centerline_curvature.fill(0.0f);
         g_selected_centerline_curvature_count = 0;
+        g_mean_abs_offset = 0.0f;
         return 0;
+    }
+
+    {
+        double sum_abs = 0.0;
+        for (int i = 0; i < count; ++i)
+        {
+            sum_abs += std::fabs(static_cast<double>(xs[i]) - static_cast<double>(ipm_center_x_ref));
+        }
+        g_mean_abs_offset = (count > 0) ? static_cast<float>(sum_abs / static_cast<double>(count)) : 0.0f;
     }
 
     compute_selected_centerline_curvature(xs, ys, count);
@@ -637,6 +649,11 @@ void vision_line_error_layer_get_curvature_speed_limit_debug(float *kappa_max,
     if (v_curve_after_dkappa) *v_curve_after_dkappa = g_curvature_v_curve_after_dkappa;
     if (v_error_limit) *v_error_limit = g_curvature_v_error_limit;
     if (v_target) *v_target = g_curvature_v_target;
+}
+
+float vision_line_error_layer_mean_abs_offset()
+{
+    return g_mean_abs_offset;
 }
 
 int vision_line_error_layer_weighted_first_point_error()

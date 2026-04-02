@@ -62,35 +62,35 @@ namespace line_follow
 // 基准速度策略选择：
 // 0 = 使用当前“按横向误差缩放 + 单周期升降限幅”的机制；
 // 1 = 使用 vision_line_error_layer 计算出的曲率/前瞻加权基准速度（v_target）。
-inline constexpr int32 kBaseSpeedPlanMode = 1;
+inline constexpr int32 kBaseSpeedPlanMode = 0;
 
 // 视觉误差低通系数：越大越跟当前帧，越小越重视历史趋势。
 inline constexpr float kErrorFilterAlpha = 0.80f;
 
 // 巡线位置环比例项：横向误差一出现就打方向，越大回正越快。
-inline constexpr float kPidKp = 1200.0f;
+inline constexpr float kPidKp = 1200.0f; //1200
 // 巡线位置环积分项：用于消除长期偏差，当前默认关闭。
 inline constexpr float kPidKi = 0.0f;
 // 巡线位置环微分项：抑制误差变化过快，缓和转向过冲。
-inline constexpr float kPidKd = 800.0f;
+inline constexpr float kPidKd = 800.0f; //800
 // 巡线位置环输出限幅：限制最终差速大小，避免大舵过猛。
 inline constexpr float kPidMaxOutput = 800.0f;
 
 // 左右轮目标最小值：允许轻微反转，方便大误差时快速拧回车头。
-inline constexpr float kTargetCountMin = 20.0f;
+inline constexpr float kTargetCountMin = 40.0f;
 // 左右轮目标最大值：限制巡线线程下发给速度环的目标上限。
 inline constexpr float kTargetCountMax = 1000.0f;
 
 // 大弯降速起点：误差超过这个像素后，开始按比例降低基础速度。
-inline constexpr float kTurnSlowdownStartPx = 2.0f;
+inline constexpr float kTurnSlowdownStartPx = 1.0f;
 // 大弯降速满量程点：误差超过这个像素后，降速比例达到上限。
-inline constexpr float kTurnSlowdownFullPx = 20.0f;
+inline constexpr float kTurnSlowdownFullPx = 18.0f;
 // 大弯最低速度比例：基础速度最低会保留到这个比例，不会无限降。
 inline constexpr float kTurnMinSpeedScale = 0.30f;
 // 单周期最大降速比例：每次循环最多只允许比上一周期再降这么多。
 inline constexpr float kTurnSlowdownMaxDropRatioPerCycle = 0.50f;
 // 单周期最大加速比例：每次循环最多只允许比上一周期再升这么多。
-inline constexpr float kTurnSlowdownMaxRiseRatioPerCycle = 0.10f;
+inline constexpr float kTurnSlowdownMaxRiseRatioPerCycle = 0.02f;
 
 // 归一化误差保护限幅：防止视觉异常值把控制链一下子打爆。
 inline constexpr float kNormalizedErrorLimit = 1.2f;

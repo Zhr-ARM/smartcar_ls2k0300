@@ -256,6 +256,8 @@
               <div class="playback-control-actions">
                 <button class="btn btn-primary" id="playbackToggleBtn">播放</button>
                 <button class="btn" id="playbackRestartBtn">回到开头</button>
+                <button class="btn" id="playbackBackwardBtn">后退1s</button>
+                <button class="btn" id="playbackForwardBtn">快进1s</button>
               </div>
               <div class="playback-time" id="playbackTimeLabel">00:00.00 / 00:00.00</div>
             </div>
@@ -354,6 +356,8 @@
     const closeSavedModalBtn = document.getElementById('closeSavedModalBtn');
     const playbackToggleBtn = document.getElementById('playbackToggleBtn');
     const playbackRestartBtn = document.getElementById('playbackRestartBtn');
+    const playbackBackwardBtn = document.getElementById('playbackBackwardBtn');
+    const playbackForwardBtn = document.getElementById('playbackForwardBtn');
     const playbackTimeLabel = document.getElementById('playbackTimeLabel');
     const recordingMeta = document.getElementById('recordingMeta');
     const binaryCard = document.getElementById('binaryCard');
@@ -624,6 +628,18 @@
       } finally {
         isSyncingPlayback = false;
       }
+    }
+
+    function seekPlaybackBy(deltaSec) {
+      const sourceVideo = currentPlaybackVideo();
+      if (!sourceVideo) return;
+      const fallbackDuration = ((Number(lastRecording && lastRecording.durationMs) || 0) / 1000);
+      const duration = Number.isFinite(sourceVideo.duration) ? sourceVideo.duration : fallbackDuration;
+      const maxTime = Math.max(0, Number.isFinite(duration) ? duration : 0);
+      const nextTime = Math.max(0, Math.min(maxTime, (sourceVideo.currentTime || 0) + deltaSec));
+      sourceVideo.currentTime = nextTime;
+      syncPlaybackVideos(sourceVideo);
+      refreshParamPanel();
     }
 
     async function setPlaybackPlaying(playing) {
@@ -1659,6 +1675,12 @@
         video.currentTime = 0;
       });
       refreshParamPanel();
+    });
+    playbackBackwardBtn.addEventListener('click', () => {
+      seekPlaybackBy(-1.0);
+    });
+    playbackForwardBtn.addEventListener('click', () => {
+      seekPlaybackBy(1.0);
     });
     toggleMeanCenterline.addEventListener('change', () => {
       showMeanCenterline = !!toggleMeanCenterline.checked;
