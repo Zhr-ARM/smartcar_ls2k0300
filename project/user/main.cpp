@@ -111,13 +111,16 @@ int main(int, char**)
         return -1;
     }
 
-    // 下发视觉配置参数。
-    vision_thread_set_send_mode(static_cast<vision_thread_send_mode_enum>(g_vision_runtime_config.send_mode));                       // 图像模式
-    vision_thread_set_send_max_fps(g_vision_runtime_config.send_max_fps);                 // 客户端发送限频
-    vision_thread_set_infer_enabled(g_vision_runtime_config.infer_enabled);               // 推理开关
+    // 下发视觉配置参数（按“网页发送 / 视觉处理 / 偏差计算”分组）。
+    // [网页发送]
+    vision_thread_set_send_mode(static_cast<vision_thread_send_mode_enum>(g_vision_runtime_config.send_mode)); // 图像模式
+    vision_thread_set_send_max_fps(g_vision_runtime_config.send_max_fps); // 客户端发送限频
+    vision_thread_set_infer_enabled(g_vision_runtime_config.infer_enabled); // 推理开关
     vision_thread_set_client_sender_enabled(g_vision_runtime_config.client_sender_enabled); // 逐飞发送开关
-    vision_thread_set_roi_capture_mode(g_vision_runtime_config.roi_capture_mode);         // ROI 抓图开关
-    vision_image_processor_set_maze_start_row(g_vision_runtime_config.maze_start_row);    // 迷宫法起始搜索行
+    vision_thread_set_roi_capture_mode(g_vision_runtime_config.roi_capture_mode); // ROI 抓图开关
+
+    // [视觉处理]
+    vision_image_processor_set_maze_start_row(g_vision_runtime_config.maze_start_row); // 迷宫法起始搜索行
     vision_image_processor_set_undistort_enabled(g_vision_runtime_config.undistort_enabled); // 去畸变开关
     vision_image_processor_set_ipm_triangle_filter_enabled(g_vision_runtime_config.ipm_triangle_filter_enabled); // IPM三角滤波
     vision_image_processor_set_ipm_min_point_dist_filter_enabled(g_vision_runtime_config.ipm_min_point_dist_filter_enabled); // IPM边界近重复点过滤
@@ -131,6 +134,8 @@ int main(int, char**)
     vision_image_processor_set_ipm_centerline_resample_step_px(g_vision_runtime_config.ipm_centerline_resample_step_px); // 中线采样步长
     vision_image_processor_set_ipm_centerline_min_point_dist_px(g_vision_runtime_config.ipm_centerline_min_point_dist_px); // 中线去近重复阈值
     vision_image_processor_set_ipm_centerline_curvature_step(g_vision_runtime_config.ipm_centerline_curvature_step); // 中线曲率计算步长
+
+    // [偏差计算]
     vision_image_processor_set_ipm_line_error_source(static_cast<vision_ipm_line_error_source_enum>(g_vision_runtime_config.ipm_line_error_source)); // line_error 中线来源
     vision_image_processor_set_ipm_line_error_method(static_cast<vision_ipm_line_error_method_enum>(g_vision_runtime_config.ipm_line_error_method)); // line_error 计算方法
     vision_image_processor_set_ipm_line_error_fixed_index(g_vision_runtime_config.ipm_line_error_fixed_index); // line_error 固定索引

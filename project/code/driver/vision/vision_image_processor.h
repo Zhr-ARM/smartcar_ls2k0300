@@ -134,28 +134,10 @@ void vision_image_processor_get_ipm_line_error_track_point(bool *valid, int *x, 
 void vision_image_processor_set_ipm_centerline_curvature_step(int step);
 int vision_image_processor_ipm_centerline_curvature_step();
 void vision_image_processor_get_ipm_selected_centerline_curvature(const float **curvature, int *count);
-void vision_image_processor_get_ipm_curvature_lookahead_debug(float *speed_v,
-                                                              float *k_eff,
-                                                              float *eta,
-                                                              int *lookahead_index);
-void vision_image_processor_get_ipm_curvature_weighted_error_debug(float *weighted_error,
-                                                                   bool *lookahead_point_valid,
-                                                                   int *lookahead_point_x,
-                                                                   int *lookahead_point_y);
-void vision_image_processor_get_ipm_curvature_speed_limit_debug(float *kappa_max,
-                                                                float *delta_kappa_max,
-                                                                float *curve_base_speed,
-                                                                float *v_curve_raw,
-                                                                float *v_curve_after_dkappa,
-                                                                float *v_error_limit,
-                                                                float *v_target);
 float vision_image_processor_ipm_mean_abs_offset_error();
 int vision_image_processor_ipm_weighted_first_point_error();
-int vision_image_processor_ipm_weighted_current_spacing();
 void vision_image_processor_get_ipm_weighted_decision_point(bool *valid, int *x, int *y);
 void vision_image_processor_get_src_weighted_decision_point(bool *valid, int *x, int *y);
-void vision_image_processor_get_intersection_mode_state(bool *enabled, int *stop_row, int *current_start_row);
-int vision_image_processor_roundabout_mode();
 
 // 读取最近一帧处理耗时（单位：us）
 // capture_wait_us: 等待相机新帧
@@ -228,9 +210,6 @@ void vision_image_processor_get_ipm_boundaries_raw(uint16 **x1, uint16 **x2, uin
                                                    uint16 **y1, uint16 **y2, uint16 **y3,
                                                    uint16 *dot_num);
 void vision_image_processor_get_ipm_raw_boundary_side_counts(uint16 *left_dot_num, uint16 *right_dot_num);
-// 角点识别专用边界（对原始逆透视边界做平滑、等距采样与角度/NMS处理）。
-void vision_image_processor_get_ipm_corner_debug_left(uint16 **x, uint16 **y, float **raw_value, float **nms_value, uint16 *dot_num);
-void vision_image_processor_get_ipm_corner_debug_right(uint16 **x, uint16 **y, float **raw_value, float **nms_value, uint16 *dot_num);
 // 逆透视处理链“平移中线”结果：
 // - from_left : 左边界向右法向平移得到；
 // - from_right: 右边界向左法向平移得到。

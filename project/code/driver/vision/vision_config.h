@@ -11,6 +11,8 @@
 
 typedef struct
 {
+    // ==================== 参数区域 3: 网页发送 ====================
+    // 包括逐飞助手发送、UDP 视频发送、TCP 状态发送及其字段开关。
     // 图传输出模式：
     // VISION_THREAD_SEND_BINARY / VISION_THREAD_SEND_GRAY / VISION_THREAD_SEND_RGB565。
     int send_mode;
@@ -32,9 +34,11 @@ typedef struct
     bool udp_web_send_binary_jpeg;
     // TCP 状态上报开关：控制是否向电脑端发送 JSON 状态数据。
     bool udp_web_tcp_enabled;
-    // TCP 状态字段开关。
+    // TCP 状态字段开关（通用）。
     bool udp_web_tcp_send_ts_ms;
+    // TCP 状态字段开关（视觉相关）。
     bool udp_web_tcp_send_line_error;
+    // TCP 状态字段开关（电机相关）。
     bool udp_web_tcp_send_base_speed;
     bool udp_web_tcp_send_left_target_count;
     bool udp_web_tcp_send_right_target_count;
@@ -56,6 +60,8 @@ typedef struct
     bool udp_web_tcp_send_right_hardware_duty;
     bool udp_web_tcp_send_left_dir_level;
     bool udp_web_tcp_send_right_dir_level;
+    // TCP 状态字段开关（视觉相关）。
+    // OTSU / 性能 / 迷宫结果。
     bool udp_web_tcp_send_otsu_threshold;
     bool udp_web_tcp_send_perf_capture_wait_us;
     bool udp_web_tcp_send_perf_preprocess_us;
@@ -64,69 +70,33 @@ typedef struct
     bool udp_web_tcp_send_perf_total_us;
     bool udp_web_tcp_send_maze_left_points_raw;
     bool udp_web_tcp_send_maze_right_points_raw;
+    // 视觉检测结果。
     bool udp_web_tcp_send_red_found;
     bool udp_web_tcp_send_red_rect;
     bool udp_web_tcp_send_roi_valid;
     bool udp_web_tcp_send_roi_rect;
+    // 巡线/偏差调试结果。
     bool udp_web_tcp_send_ipm_track_valid;
     bool udp_web_tcp_send_ipm_track_method;
     bool udp_web_tcp_send_ipm_centerline_source;
     bool udp_web_tcp_send_ipm_track_index;
     bool udp_web_tcp_send_ipm_track_point;
-    bool udp_web_tcp_send_ipm_weighted_first_index;
     bool udp_web_tcp_send_ipm_weighted_first_point_error;
     bool udp_web_tcp_send_ipm_weighted_decision_point;
     bool udp_web_tcp_send_src_weighted_decision_point;
-    bool udp_web_tcp_send_intersection_mode;
-    bool udp_web_tcp_send_intersection_stop_row;
-    bool udp_web_tcp_send_intersection_current_start_row;
-    bool udp_web_tcp_send_roundabout_mode;
+    // 边界/中线点列。
     bool udp_web_tcp_send_left_boundary;
     bool udp_web_tcp_send_right_boundary;
     bool udp_web_tcp_send_ipm_left_boundary;
     bool udp_web_tcp_send_ipm_right_boundary;
     bool udp_web_tcp_send_ipm_raw_left_boundary;
     bool udp_web_tcp_send_ipm_raw_right_boundary;
-    bool udp_web_tcp_send_ipm_corner_left_boundary;
-    bool udp_web_tcp_send_ipm_corner_right_boundary;
-    bool udp_web_tcp_send_ipm_corner_left_raw_angle;
-    bool udp_web_tcp_send_ipm_corner_right_raw_angle;
-    bool udp_web_tcp_send_ipm_corner_left_nms;
-    bool udp_web_tcp_send_ipm_corner_right_nms;
     bool udp_web_tcp_send_ipm_centerline_selected_shift;
     bool udp_web_tcp_send_src_centerline_selected_shift;
     bool udp_web_tcp_send_ipm_centerline_selected_count;
     bool udp_web_tcp_send_src_centerline_selected_count;
     bool udp_web_tcp_send_ipm_centerline_selected_curvature;
-    // ==================== TCP 动态前瞻速度调试字段 ====================
-    // 说明：以下字段用于网页端调试“曲率+前瞻+误差限速”的完整链路，建议先全部打开。
-    // 若带宽紧张，可先保留：kappa_max / delta_kappa_max / v_target / weighted_error。
-    // 当前编码器平均速度 v=(vL+vR)/2。
-    bool udp_web_tcp_send_ipm_curvature_speed_v;
-    // 指数加权有效曲率 k_eff（用于 eta 计算）。
-    bool udp_web_tcp_send_ipm_curvature_effective;
-    // 前瞻归一化系数 eta。
-    bool udp_web_tcp_send_ipm_curvature_eta;
-    // 前瞻中心索引离散后的 lookahead_index。
-    bool udp_web_tcp_send_ipm_curvature_lookahead_index;
-    // lookahead_index 对应的 IPM 点坐标 [x,y]。
-    bool udp_web_tcp_send_ipm_curvature_lookahead_point;
-    // 以 i_center 为中心做高斯加权后的偏移误差（误差限速输入）。
-    bool udp_web_tcp_send_ipm_curvature_weighted_error;
-    // 风险窗口内最大绝对曲率 max|kappa|。
-    bool udp_web_tcp_send_ipm_curvature_kappa_max;
-    // 风险窗口内最大曲率变化 max|kappa[i]-kappa[i-1]|。
-    bool udp_web_tcp_send_ipm_curvature_delta_kappa_max;
-    // 最终建议基准速度（v_target）。
-    bool udp_web_tcp_send_ipm_curvature_base_speed_curve;
-    // 曲率限速原始值：sqrt(a/(kappa+eps))*gain。
-    bool udp_web_tcp_send_ipm_curvature_v_curve_raw;
-    // 曲率变化惩罚后速度：v_curve_raw/(1+k*dkappa)。
-    bool udp_web_tcp_send_ipm_curvature_v_curve_after_dkappa;
-    // 误差限速值（由 weighted_error 计算）。
-    bool udp_web_tcp_send_ipm_curvature_v_error_limit;
-    // 曲率限速与误差限速取 min 后的目标速度。
-    bool udp_web_tcp_send_ipm_curvature_v_target;
+    // 尺寸元数据（视觉相关）。
     bool udp_web_tcp_send_gray_size;
     bool udp_web_tcp_send_ipm_size;
     // 电脑端接收服务 IP（运行 vision_pc_receiver.py 的主机地址）。
@@ -141,12 +111,13 @@ typedef struct
     const char *assistant_server_ip;
     // 逐飞客户端接收端端口。
     uint16 assistant_server_port;
+
+    // ==================== 参数区域 1: 视觉处理 ====================
+    // 包括迷宫法起点、去畸变、IPM 边界/中线后处理。
     // 采图模式：检测到红色矩形后，每 1s 保存一次推理 ROI 彩图。
     bool roi_capture_mode;
     // 迷宫法左右起点搜索行，固定单行搜索。
     int maze_start_row;
-    // 路口识别开关：true=启用十字/路口状态机，false=完全关闭。
-    bool intersection_enabled;
     // 去畸变开关：true=开启去畸变，false=关闭去畸变直通原图。
     bool undistort_enabled;
     // 逆透视处理链边界三角滤波开关。
@@ -175,6 +146,9 @@ typedef struct
     int ipm_centerline_curvature_step;
     // 双边都丢线时是否保持上一帧平移中线数组。
     bool keep_last_centerline_on_double_loss;
+
+    // ==================== 参数区域 2: 偏差计算 ====================
+    // 包括 line_error 取点策略与索引范围约束参数。
     // line_error 使用哪条平移中线追踪：左平移或右平移。
     int ipm_line_error_source;
     // line_error 计算方法：0=固定索引，1=加权索引，2=随速度索引。
@@ -187,8 +161,6 @@ typedef struct
     int ipm_line_error_point_indices[VISION_LINE_ERROR_MAX_WEIGHTED_POINTS];
     // line_error 各索引点对应权重。
     float ipm_line_error_weights[VISION_LINE_ERROR_MAX_WEIGHTED_POINTS];
-    // 加权模式下的第一个取点索引。
-    int ipm_line_error_weighted_first_index;
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
     float ipm_line_error_speed_k;
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b。
@@ -197,63 +169,6 @@ typedef struct
     int ipm_line_error_index_min;
     // 随速度索引模式允许的最大索引。
     int ipm_line_error_index_max;
-    // ==================== 动态前瞻速度参数（集中配置区） ====================
-    // 调参建议顺序：
-    // 1) 先调 ay_allow + speed_gain + v_min_global，让直道/急弯速度量级合理；
-    // 2) 再调 delta_kappa_gain，控制 S 弯/复合弯额外降速强度；
-    // 3) 最后调 error_gain + error_deadband，抑制“偏离中线时过快”。
-    //
-    // 曲率前瞻中的指数衰减系数 lambda（越大越看重近处曲率，远处权重衰减更快）。
-    // 增大：前瞻更“短视”，对近处急弯更敏感；减小：更看重远处趋势。
-    float ipm_curvature_lookahead_lambda;
-    // 曲率前瞻中的曲率抑制系数 mu（越大则曲率一大 eta 降得更快）。
-    // 增大：lookahead_index 更保守；减小：前瞻更激进。
-    float ipm_curvature_lookahead_mu;
-    // 历史保留参数：前瞻中的速度归一化上限 v_max。
-    // 当前代码已改为使用 line_follow 的 base_speed 作为归一化速度上限，此值暂未生效。
-    float ipm_curvature_lookahead_v_max;
-    // 曲率限速横向加速度允许值 a_y_allow（工程安全值，不是理论极限）。
-    // 增大：全局更快；减小：全局更保守（更不易推头/打滑）。
-    float ipm_curve_speed_ay_allow;
-    // 曲率限速 epsilon，防止 kappa_max 接近 0 时速度发散。
-    // 增大：直道速度被抑制、波动更小；减小：直道更容易拉高速度。
-    float ipm_curve_speed_kappa_epsilon;
-    // 曲率变化惩罚系数 K_delta_kappa（专门抑制 S 弯/复合弯）。
-    // 增大：连续弯更保守；减小：连续弯通过速度更高。
-    float ipm_curve_speed_delta_kappa_gain;
-    // 曲率速度映射缩放系数（把 sqrt(a/kappa) 映射到电机速度量级）。
-    // 增大：整体速度档位上移；减小：整体速度档位下移。
-    float ipm_curve_speed_gain;
-    // 误差限速系数（越大越容易因偏离中线而降速）。
-    // 增大：纠偏更稳但可能偏慢；减小：纠偏阶段速度更高。
-    float ipm_curve_speed_error_gain;
-    // 误差限速死区（小误差不触发限速）。
-    // 增大：直道轻微抖动不降速；减小：更敏感，轻微偏差也开始降速。
-    float ipm_curve_speed_error_deadband;
-    // 速度规划最小保护速度（防止弯道速度掉得过低导致“爬行”）。
-    // 增大：弯道最低速度更高；减小：弯道可更慢更稳。
-    float ipm_curve_speed_v_min_global;
-    // 风险评估窗口扩展点数（在 look_idx 基础上额外前看）。
-    // 增大：提前感知更远风险，更保守；减小：更关注近处，响应更直接。
-    int ipm_curve_speed_extra_plan_points;
-    // 环岛入口判定时，“角点到对侧边界点”的目标距离（IPM 像素）。
-    // 作用：在检测到一侧直角后，只在对侧边界上寻找与该角点距离接近本值的点集做环岛候选判断。
-    float roundabout_corner_match_distance_px;
-    // 环岛入口判定的距离容差（IPM 像素）。
-    // 作用：允许实际距离在 [distance - tolerance, distance + tolerance] 内浮动，增强对采样抖动的鲁棒性。
-    float roundabout_corner_match_tolerance_px;
-    // 环岛相关“直线/平稳段”判定的 NMS 绝对值阈值。
-    // 作用：当前代码中仅使用“低 NMS”判断，若一段边界前缀内所有点的 |nms| 都小于该值，则认为该段足够平稳。
-    float roundabout_straight_nms_abs_max;
-    // 环岛入环/出环阶段前缀检查长度（沿边界累计长度，单位 px）。
-    // 作用：在 running/exit 等状态中，只检查从边界起始点开始前这么长的一段边界是否持续低 NMS。
-    float roundabout_straight_span_px;
-    // 非环岛 running 状态下的边界法向平移距离（px）。
-    // 作用：环岛状态机未进入 running 时，IPM 偏移中线生成使用该平移值。
-    float roundabout_normal_shift_distance_px;
-    // 环岛 running 状态下的边界法向平移距离（px）。
-    // 作用：当 roundabout_mode 为 left_running/right_running 时，临时改用该平移值生成偏移中线。
-    float roundabout_running_shift_distance_px;
 } vision_runtime_config_t;
 
 typedef struct

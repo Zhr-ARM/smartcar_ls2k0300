@@ -494,9 +494,6 @@
 
       const basicRows = [];
       push(basicRows, 'ts_ms', status.ts_ms);
-      if (hasValue(status.roundabout_mode) || hasValue(status.intersection_mode)) {
-        push(basicRows, 'current_mode', fmtCurrentMode(status));
-      }
       push(basicRows, 'line_error', status.line_error);
       push(basicRows, 'base_speed', status.base_speed);
       push(basicRows, 'adjusted_base_speed', status.adjusted_base_speed);
@@ -557,33 +554,10 @@
       }
       push(trackRows, 'ipm_track_index', status.ipm_track_index);
       pushArray(trackRows, 'ipm_track_point', status.ipm_track_point);
-      push(trackRows, 'ipm_weighted_first_index', status.ipm_weighted_first_index);
       push(trackRows, 'ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
       pushArray(trackRows, 'ipm_weighted_decision_point', status.ipm_weighted_decision_point);
       pushArray(trackRows, 'src_weighted_decision_point', status.src_weighted_decision_point);
-      push(trackRows, 'ipm_curvature_speed_v', status.ipm_curvature_speed_v);
-      push(trackRows, 'ipm_curvature_k_eff', status.ipm_curvature_k_eff);
-      push(trackRows, 'ipm_curvature_eta', status.ipm_curvature_eta);
-      push(trackRows, 'ipm_curvature_lookahead_index', status.ipm_curvature_lookahead_index);
-      pushArray(trackRows, 'ipm_curvature_lookahead_point', status.ipm_curvature_lookahead_point);
-      push(trackRows, 'ipm_curvature_weighted_error', status.ipm_curvature_weighted_error);
-      push(trackRows, 'ipm_curvature_kappa_max', status.ipm_curvature_kappa_max);
-      push(trackRows, 'ipm_curvature_delta_kappa_max', status.ipm_curvature_delta_kappa_max);
-      push(trackRows, 'ipm_curvature_base_speed_curve', status.ipm_curvature_base_speed_curve);
-      push(trackRows, 'ipm_curvature_v_curve_raw', status.ipm_curvature_v_curve_raw);
-      push(trackRows, 'ipm_curvature_v_curve_after_dkappa', status.ipm_curvature_v_curve_after_dkappa);
-      push(trackRows, 'ipm_curvature_v_error_limit', status.ipm_curvature_v_error_limit);
-      push(trackRows, 'ipm_curvature_v_target', status.ipm_curvature_v_target);
       addSection('巡线跟踪', trackRows);
-
-      const modeRows = [];
-      push(modeRows, 'intersection_mode', status.intersection_mode);
-      push(modeRows, 'intersection_stop_row', status.intersection_stop_row);
-      push(modeRows, 'intersection_current_start_row', status.intersection_current_start_row);
-      if (hasValue(status.roundabout_mode)) {
-        push(modeRows, 'roundabout_mode', fmtRoundaboutMode(status.roundabout_mode));
-      }
-      addSection('元素状态机', modeRows);
 
       const arrayRows = [];
       pushCount(arrayRows, 'left_boundary', status.left_boundary);
@@ -592,8 +566,6 @@
       pushCount(arrayRows, 'ipm_right_boundary', status.ipm_right_boundary);
       pushCount(arrayRows, 'ipm_raw_left_boundary', status.ipm_raw_left_boundary);
       pushCount(arrayRows, 'ipm_raw_right_boundary', status.ipm_raw_right_boundary);
-      pushCount(arrayRows, 'ipm_corner_left_boundary', status.ipm_corner_left_boundary);
-      pushCount(arrayRows, 'ipm_corner_right_boundary', status.ipm_corner_right_boundary);
       pushCount(arrayRows, 'ipm_centerline_selected_shift', getSelectedIpmCenterline(status));
       pushCount(arrayRows, 'src_centerline_selected_shift', getSelectedSrcCenterline(status));
       push(arrayRows, 'ipm_centerline_selected_count', status.ipm_centerline_selected_count);
@@ -1067,88 +1039,6 @@
       ctx.stroke();
     }
 
-    function scalarToColor(value, maxAbs) {
-      const scale = Math.max(1e-6, maxAbs || 1);
-      const t = Math.max(-1, Math.min(1, value / scale));
-      if (t >= 0) {
-        const r = 255;
-        const g = Math.round(220 - 120 * t);
-        const b = Math.round(80 - 60 * t);
-        return `rgb(${r},${Math.max(80, g)},${Math.max(20, b)})`;
-      }
-      const u = -t;
-      const r = Math.round(80 - 40 * u);
-      const g = Math.round(200 + 30 * u);
-      const b = 255;
-      return `rgb(${Math.max(20, r)},${Math.min(255, g)},${b})`;
-    }
-
-    function combinedCornerSamples(status) {
-      const leftPts = Array.isArray(status.ipm_corner_left_boundary) ? status.ipm_corner_left_boundary : [];
-      const leftRaw = Array.isArray(status.ipm_corner_left_raw_angle) ? status.ipm_corner_left_raw_angle : [];
-      const leftVals = Array.isArray(status.ipm_corner_left_nms) ? status.ipm_corner_left_nms : [];
-      const rightPts = Array.isArray(status.ipm_corner_right_boundary) ? status.ipm_corner_right_boundary : [];
-      const rightRaw = Array.isArray(status.ipm_corner_right_raw_angle) ? status.ipm_corner_right_raw_angle : [];
-      const rightVals = Array.isArray(status.ipm_corner_right_nms) ? status.ipm_corner_right_nms : [];
-      const samples = [];
-      for (let i = 0; i < leftPts.length && i < leftVals.length; i += 1) {
-        samples.push({
-          point: leftPts[i],
-          raw: (i < leftRaw.length) ? (Number(leftRaw[i]) || 0) : 0,
-          value: Number(leftVals[i]) || 0
-        });
-      }
-      for (let i = 0; i < rightPts.length && i < rightVals.length; i += 1) {
-        samples.push({
-          point: rightPts[i],
-          raw: (i < rightRaw.length) ? (Number(rightRaw[i]) || 0) : 0,
-          value: Number(rightVals[i]) || 0
-        });
-      }
-      return samples;
-    }
-
-    function drawCornerDebugBoundary(ctx, status, w, h) {
-      const samples = combinedCornerSamples(status);
-      if (samples.length < 1) return;
-      let maxAbs = 0;
-      for (const sample of samples) {
-        maxAbs = Math.max(maxAbs, Math.abs(sample.value));
-      }
-      for (const sample of samples) {
-        const p = sample.point;
-        if (!Array.isArray(p) || p.length < 2) continue;
-        ctx.fillStyle = scalarToColor(sample.value, maxAbs);
-        ctx.beginPath();
-        ctx.arc(
-          Math.max(0, Math.min(w - 1, p[0] | 0)),
-          Math.max(0, Math.min(h - 1, p[1] | 0)),
-          boundaryPointMode ? 2 : 2,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
-      }
-    }
-
-    function findNearestCornerSample(status, x, y) {
-      const samples = combinedCornerSamples(status);
-      let best = null;
-      let bestD2 = 36;
-      for (const sample of samples) {
-        const p = sample.point;
-        if (!Array.isArray(p) || p.length < 2) continue;
-        const dx = (p[0] | 0) - x;
-        const dy = (p[1] | 0) - y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 <= bestD2) {
-          bestD2 = d2;
-          best = sample;
-        }
-      }
-      return best;
-    }
-
     function drawIpmBoundariesToCanvas(status, canvas, ctx, leftKey, rightKey, centerData) {
       const ipmSize = status.ipm_size || [280, 140];
       const w = ipmSize[0] || 280;
@@ -1157,12 +1047,8 @@
       if (canvas.height !== h) canvas.height = h;
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, w, h);
-      if (canvas === ipmRawCanvas) {
-        drawCornerDebugBoundary(ctx, status, w, h);
-      } else {
-        drawSeries(ctx, status[leftKey] || [], '#ff4d4f', 2, 1);
-        drawSeries(ctx, status[rightKey] || [], '#22c55e', 2, 1);
-      }
+      drawSeries(ctx, status[leftKey] || [], '#ff4d4f', 2, 1);
+      drawSeries(ctx, status[rightKey] || [], '#22c55e', 2, 1);
       if (Array.isArray(centerData) && centerData.length > 0) {
         drawSeries(ctx, centerData, '#facc15', 2, 1);
       }
@@ -1182,19 +1068,6 @@
         drawPointSet(ctx, [[cx, cy], [tx, ty], [tx, cy]], '#93c5fd', 2);
       }
       drawDecisionPoint(ctx, status.ipm_weighted_decision_point);
-      if (Array.isArray(status.ipm_curvature_lookahead_point) && status.ipm_curvature_lookahead_point.length >= 2) {
-        const px = Math.max(0, Math.min(w - 1, status.ipm_curvature_lookahead_point[0] | 0));
-        const py = Math.max(0, Math.min(h - 1, status.ipm_curvature_lookahead_point[1] | 0));
-        ctx.fillStyle = '#f97316';
-        ctx.beginPath();
-        ctx.arc(px, py, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#fff7ed';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(px, py, 5, 0, Math.PI * 2);
-        ctx.stroke();
-      }
       if (showIpmAnchorDot) {
         const cx = Math.max(0, Math.min(w - 1, Math.floor(w / 2)));
         const cy = Math.max(0, Math.min(h - 1, h));
@@ -1210,7 +1083,7 @@
         hasPointArray(getSelectedIpmCenterline(status)) ||
         hasValue(status.ipm_track_valid);
       const hasIpmRaw = hasPointArray(status.ipm_raw_left_boundary) || hasPointArray(status.ipm_raw_right_boundary) ||
-        hasPointArray(status.ipm_corner_left_boundary) || hasPointArray(status.ipm_corner_right_boundary);
+        false;
       setCardVisible(ipmCard, hasIpmMain);
       setCardVisible(ipmRawCard, hasIpmRaw);
       if (!hasIpmMain && !hasIpmRaw) return;
@@ -1422,12 +1295,6 @@
       const gray = Math.round((gr + gg + gb) / 3);
       const binaryGray = Math.round((br + bg + bb) / 3);
       const bin = binaryGray >= 128 ? 1 : 0;
-      if (activeCanvas === ipmRawCanvas) {
-        const sample = findNearestCornerSample(latestStatus, x, y);
-        if (sample) {
-          return `x:${x} y:${y} | Gray:${gray} Bin:${bin} RGB:(${ar},${ag},${ab}) | Raw:${sample.raw.toFixed(4)} NMS:${sample.value.toFixed(4)}`;
-        }
-      }
       return `x:${x} y:${y} | Gray:${gray} Bin:${bin} RGB:(${ar},${ag},${ab})`;
     }
 
@@ -1467,32 +1334,6 @@
       return '透视中线来源：自动选择（未知）';
     }
 
-    function fmtIntersectionMode(enabled) {
-      return enabled ? 'intersection' : 'normal';
-    }
-
-    function fmtRoundaboutMode(mode) {
-      if (mode === 1) return 'left_approach';
-      if (mode === 2) return 'left_loop';
-      if (mode === 3) return 'left_entry';
-      if (mode === 4) return 'left_running';
-      if (mode === 5) return 'left_exit';
-      if (mode === 6) return 'left_out';
-      if (mode === 7) return 'right_approach';
-      if (mode === 8) return 'right_loop';
-      if (mode === 9) return 'right_entry';
-      if (mode === 10) return 'right_running';
-      if (mode === 11) return 'right_exit';
-      if (mode === 12) return 'right_out';
-      return 'normal';
-    }
-
-    function fmtCurrentMode(status) {
-      const roundabout = Number(status.roundabout_mode) || 0;
-      if (roundabout !== 0) return fmtRoundaboutMode(roundabout);
-      return fmtIntersectionMode(!!status.intersection_mode);
-    }
-
     function buildStatusSummary(status) {
       const lines = [];
       const push = (name, value) => {
@@ -1503,15 +1344,6 @@
       };
 
       push('ts_ms', status.ts_ms);
-      if (hasValue(status.roundabout_mode) || hasValue(status.intersection_mode)) {
-        push('current_mode', fmtCurrentMode(status));
-      }
-      push('intersection_mode', status.intersection_mode);
-      push('intersection_stop_row', status.intersection_stop_row);
-      push('intersection_current_start_row', status.intersection_current_start_row);
-      if (hasValue(status.roundabout_mode)) {
-        push('roundabout_mode', fmtRoundaboutMode(status.roundabout_mode));
-      }
       push('line_error', status.line_error);
       push('base_speed', status.base_speed);
       push('adjusted_base_speed', status.adjusted_base_speed);
@@ -1535,23 +1367,9 @@
       push('right_hardware_duty', status.right_hardware_duty);
       push('left_dir_level', status.left_dir_level);
       push('right_dir_level', status.right_dir_level);
-      push('ipm_weighted_first_index', status.ipm_weighted_first_index);
       push('ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
       if (Array.isArray(status.ipm_weighted_decision_point)) push('ipm_weighted_decision_point', fmtArrayInline(status.ipm_weighted_decision_point));
       if (Array.isArray(status.src_weighted_decision_point)) push('src_weighted_decision_point', fmtArrayInline(status.src_weighted_decision_point));
-      push('ipm_curvature_speed_v', status.ipm_curvature_speed_v);
-      push('ipm_curvature_k_eff', status.ipm_curvature_k_eff);
-      push('ipm_curvature_eta', status.ipm_curvature_eta);
-      push('ipm_curvature_lookahead_index', status.ipm_curvature_lookahead_index);
-      if (Array.isArray(status.ipm_curvature_lookahead_point)) push('ipm_curvature_lookahead_point', fmtArrayInline(status.ipm_curvature_lookahead_point));
-      push('ipm_curvature_weighted_error', status.ipm_curvature_weighted_error);
-      push('ipm_curvature_kappa_max', status.ipm_curvature_kappa_max);
-      push('ipm_curvature_delta_kappa_max', status.ipm_curvature_delta_kappa_max);
-      push('ipm_curvature_base_speed_curve', status.ipm_curvature_base_speed_curve);
-      push('ipm_curvature_v_curve_raw', status.ipm_curvature_v_curve_raw);
-      push('ipm_curvature_v_curve_after_dkappa', status.ipm_curvature_v_curve_after_dkappa);
-      push('ipm_curvature_v_error_limit', status.ipm_curvature_v_error_limit);
-      push('ipm_curvature_v_target', status.ipm_curvature_v_target);
       push('otsu_threshold', status.otsu_threshold);
       push('capture_wait_us', status.capture_wait_us);
       push('preprocess_us', status.preprocess_us);
@@ -1577,8 +1395,6 @@
       pushCount('ipm_right_boundary_count', status.ipm_right_boundary);
       pushCount('ipm_raw_left_boundary_count', status.ipm_raw_left_boundary);
       pushCount('ipm_raw_right_boundary_count', status.ipm_raw_right_boundary);
-      pushCount('ipm_corner_left_boundary_count', status.ipm_corner_left_boundary);
-      pushCount('ipm_corner_right_boundary_count', status.ipm_corner_right_boundary);
       pushCount('ipm_centerline_selected_shift_count', getSelectedIpmCenterline(status));
       pushCount('src_centerline_selected_shift_count', getSelectedSrcCenterline(status));
       push('ipm_centerline_selected_count', status.ipm_centerline_selected_count);

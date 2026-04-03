@@ -1,6 +1,8 @@
 #include "driver/vision/vision_config.h"
 
 const vision_runtime_config_t g_vision_runtime_config = {
+    // ==================== 参数区域 3: 网页发送 ====================
+    // 说明：发送相关参数集中在最前，包含逐飞助手、UDP 视频、TCP 状态上报。
     // ==================== 本地显示与逐飞助手链路 ====================
     // 图传输出模式：
     // 0=binary 二值图，1=gray 灰度图(带线)，2=rgb565 彩图。
@@ -30,11 +32,15 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // TCP 状态上报开关。
     .udp_web_tcp_enabled = true,
 
-    // ==================== TCP 基础状态字段 ====================
+    // ==================== TCP 基础状态字段（通用） ====================
     // 发送主板当前时间戳（ms）。
     .udp_web_tcp_send_ts_ms = false,
+
+    // ==================== TCP 字段（视觉相关） ====================
     // 发送当前巡线误差 line_error。
     .udp_web_tcp_send_line_error = true,
+
+    // ==================== TCP 字段（电机相关） ====================
     // 发送当前基础巡航速度 base_speed。
     .udp_web_tcp_send_base_speed = true,
     // 发送左轮实时目标速度 left_target_count。
@@ -42,9 +48,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 发送右轮实时目标速度 right_target_count。
     .udp_web_tcp_send_right_target_count = true,
     // 发送左轮编码器实时速度 left_current_count。
-    .udp_web_tcp_send_left_current_count = true,
+    .udp_web_tcp_send_left_current_count = false,
     // 发送右轮编码器实时速度 right_current_count。
-    .udp_web_tcp_send_right_current_count = true,
+    .udp_web_tcp_send_right_current_count = false,
     // 发送左轮滤波后的速度反馈 left_filtered_count。
     .udp_web_tcp_send_left_filtered_count = false,
     // 发送右轮滤波后的速度反馈 right_filtered_count。
@@ -112,29 +118,17 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 发送 line_error 的取点方式：固定索引 / 加权索引 / 随速度索引。
     .udp_web_tcp_send_ipm_track_method = false,
     // 发送当前采用的是左偏移中线还是右偏移中线。
-    .udp_web_tcp_send_ipm_centerline_source = true,
+    .udp_web_tcp_send_ipm_centerline_source = false,
     // 发送当前实际命中的中线点索引。
-    .udp_web_tcp_send_ipm_track_index = true,
+    .udp_web_tcp_send_ipm_track_index = false,
     // 发送当前实际跟踪点坐标 [x, y]。
-    .udp_web_tcp_send_ipm_track_point = true,
-    // 发送加权模式的首点索引参数。
-    .udp_web_tcp_send_ipm_weighted_first_index = false,
+    .udp_web_tcp_send_ipm_track_point = false,
     // 发送首点的当前偏差。
-    .udp_web_tcp_send_ipm_weighted_first_point_error = true,
+    .udp_web_tcp_send_ipm_weighted_first_point_error = false,
     // 发送逆透视图上的决策点坐标。
-    .udp_web_tcp_send_ipm_weighted_decision_point = true,
+    .udp_web_tcp_send_ipm_weighted_decision_point = false,
     // 发送原图上的决策点坐标。
-    .udp_web_tcp_send_src_weighted_decision_point = true,
-
-    // ==================== TCP 元素状态机字段 ====================
-    // 发送十字模式是否开启。
-    .udp_web_tcp_send_intersection_mode = false,
-    // 发送十字模式探测到的停止行。
-    .udp_web_tcp_send_intersection_stop_row = false,
-    // 发送十字模式当前使用的起始搜索行。
-    .udp_web_tcp_send_intersection_current_start_row = false,
-    // 发送当前环岛状态机模式值。
-    .udp_web_tcp_send_roundabout_mode = false,
+    .udp_web_tcp_send_src_weighted_decision_point = false,
 
     // ==================== TCP 原图边界点列 ====================
     // 发送原图坐标系下的左边界点列。
@@ -148,23 +142,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 发送逆透视处理后的右边界点列。
     .udp_web_tcp_send_ipm_right_boundary = true,
     // 发送逆透视后的原始左边界点列（未做后处理）。
-    .udp_web_tcp_send_ipm_raw_left_boundary = false,
+    .udp_web_tcp_send_ipm_raw_left_boundary = true,
     // 发送逆透视后的原始右边界点列（未做后处理）。
-    .udp_web_tcp_send_ipm_raw_right_boundary = false,
-
-    // ==================== TCP IPM 角点调试字段 ====================
-    // 发送左侧角点检测使用的边界点列。
-    .udp_web_tcp_send_ipm_corner_left_boundary = false,
-    // 发送右侧角点检测使用的边界点列。
-    .udp_web_tcp_send_ipm_corner_right_boundary = false,
-    // 发送左侧角点原始角度量。
-    .udp_web_tcp_send_ipm_corner_left_raw_angle = false,
-    // 发送右侧角点原始角度量。
-    .udp_web_tcp_send_ipm_corner_right_raw_angle = false,
-    // 发送左侧角点 NMS 后指标。
-    .udp_web_tcp_send_ipm_corner_left_nms = false,
-    // 发送右侧角点 NMS 后指标。
-    .udp_web_tcp_send_ipm_corner_right_nms = false,
+    .udp_web_tcp_send_ipm_raw_right_boundary = true,
 
     // ==================== TCP 平移中线调试字段 ====================
     // 发送当前被 line_error 选择使用的 IPM 平移中线。
@@ -177,33 +157,6 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .udp_web_tcp_send_src_centerline_selected_count = true,
     // 发送当前被 line_error 选择使用的 IPM 平移中线曲率数组。
     .udp_web_tcp_send_ipm_centerline_selected_curvature = true,
-    // 发送曲率前瞻中的当前编码器平均速度 v。
-    .udp_web_tcp_send_ipm_curvature_speed_v = true,
-    // 发送曲率前瞻中的指数加权有效曲率 k_eff。
-    .udp_web_tcp_send_ipm_curvature_effective = true,
-    // 发送曲率前瞻中的归一化前瞻系数 eta。
-    .udp_web_tcp_send_ipm_curvature_eta = true,
-    // 发送曲率前瞻计算得到的实际前瞻索引。
-    .udp_web_tcp_send_ipm_curvature_lookahead_index = true,
-    // 发送曲率前瞻索引对应的 IPM 点坐标 [x, y]。
-    .udp_web_tcp_send_ipm_curvature_lookahead_point = true,
-    // 发送基于 eta 中心的高斯加权积分偏移 error。
-    .udp_web_tcp_send_ipm_curvature_weighted_error = true,
-    // 发送窗口内最大绝对曲率 kappa_max。
-    .udp_web_tcp_send_ipm_curvature_kappa_max = true,
-    // 发送窗口内最大曲率变化强度 delta_kappa_max。
-    .udp_web_tcp_send_ipm_curvature_delta_kappa_max = true,
-    // 发送曲率限速法计算得到的建议基准速度 v_curve（仅调试显示）。
-    .udp_web_tcp_send_ipm_curvature_base_speed_curve = true,
-    // 发送曲率限速原始值（未加曲率变化惩罚、未限幅）。
-    .udp_web_tcp_send_ipm_curvature_v_curve_raw = true,
-    // 发送曲率限速加曲率变化惩罚后的值。
-    .udp_web_tcp_send_ipm_curvature_v_curve_after_dkappa = true,
-    // 发送误差限速值。
-    .udp_web_tcp_send_ipm_curvature_v_error_limit = true,
-    // 发送最终目标基准速度（min(curve,error) 后）。
-    .udp_web_tcp_send_ipm_curvature_v_target = true,
-
     // ==================== TCP 尺寸元数据字段 ====================
     // 发送灰度图尺寸 [width, height]。
     .udp_web_tcp_send_gray_size = true,
@@ -224,13 +177,12 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 逐飞助手接收端端口。
     .assistant_server_port = 8899,
 
-    // ==================== 视觉处理运行参数 ====================
+    // ==================== 参数区域 1: 视觉处理 ====================
+    // 说明：视觉处理链参数（迷宫法、去畸变、IPM 边界/中线后处理）集中在这里。
     // ROI 抓图模式：检测到红框后周期性保存推理 ROI。
     .roi_capture_mode = false,
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
     .maze_start_row = 85,
-    // 路口识别总开关：开启后允许进入十字/路口状态机。
-    .intersection_enabled = false,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = false,
     // IPM 处理链边界三角滤波开关。
@@ -259,6 +211,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_centerline_curvature_step = 3,
     // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。
     .keep_last_centerline_on_double_loss = true,
+    // ==================== 参数区域 2: 偏差计算 ====================
+    // 说明：line_error 取点参数集中在这里。
     // line_error 使用哪条平移中线：左平移或右平移。
     .ipm_line_error_source = VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT,
     // line_error 计算方法：0=固定索引，1=加权索引，2=随速度索引。
@@ -271,8 +225,6 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_line_error_point_indices = {0, 4, 8},
     // line_error 各索引点对应权重。
     .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
-    // 加权模式下固定使用的首点索引。
-    .ipm_line_error_weighted_first_index = 1,
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
     .ipm_line_error_speed_k = 0.02f,
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b。
@@ -281,72 +233,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_line_error_index_min = 0,
     // 随速度索引模式允许的最大索引。
     .ipm_line_error_index_max = 30,
-    // ==================== 动态前瞻速度参数（集中配置区） ====================
-    // 调参建议顺序（先粗后细）：
-    // 1) 先调 ay_allow / speed_gain / v_min_global，确定“速度上下边界与量级”；
-    // 2) 再调 delta_kappa_gain，压住 S 弯/复合弯；
-    // 3) 最后调 error_gain / error_deadband，处理偏离中线时的保守程度。
-    //
-    // 曲率前瞻指数权重衰减 lambda：
-    // - 调大：更看近处，lookahead更保守；
-    // - 调小：更看远处，lookahead更平滑。
-    .ipm_curvature_lookahead_lambda = 2.0f,
-    // 曲率前瞻曲率抑制 mu：
-    // - 调大：eta 更容易被曲率压低（前瞻变短）；
-    // - 调小：eta 更高（前瞻更长）。
-    .ipm_curvature_lookahead_mu = 50.20f,
-    // 历史保留参数（当前不生效，代码已改为用 line_follow base_speed）。
-    .ipm_curvature_lookahead_v_max = 70.0f,
-    // 曲率限速横向加速度允许值 ay_allow（工程安全值）：
-    // - 调大：整体更快；
-    // - 调小：整体更稳。
-    .ipm_curve_speed_ay_allow = 2.0f,
-    // 曲率限速 epsilon（防直道发散）：
-    // - 调大：直道速度峰值更低更稳；
-    // - 调小：直道速度更高但更敏感。
-    .ipm_curve_speed_kappa_epsilon = 0.02f,
-    // 曲率变化惩罚 K_delta_kappa：
-    // - 调大：S 弯/复合弯更保守；
-    // - 调小：连续弯更激进。
-    .ipm_curve_speed_delta_kappa_gain = 8.0f,
-    // 曲率速度映射缩放 speed_gain：
-    // - 调大：整体速度档位上移；
-    // - 调小：整体速度档位下移。
-    .ipm_curve_speed_gain = 140.0f,
-    // 误差限速系数 error_gain：
-    // - 调大：偏离中线时降速更明显；
-    // - 调小：偏离中线时速度保留更多。
-    .ipm_curve_speed_error_gain = 0.01f,
-    // 误差限速死区 error_deadband：
-    // - 调大：小偏差不降速，直道更顺；
-    // - 调小：更敏感，更早降速。
-    .ipm_curve_speed_error_deadband = 3.0f,
-    // 最低保护速度 v_min_global：
-    // - 调大：弯道不会太慢；
-    // - 调小：允许更慢通过复杂弯道。
-    .ipm_curve_speed_v_min_global = 80.0f,
-    // 额外前看点数 extra_plan_points：
-    // - 调大：提前预判更远风险，偏保守；
-    // - 调小：更关注近处，响应更直接。
-    .ipm_curve_speed_extra_plan_points = 8,
-    // 环岛入口判定时，一侧直角点到对侧边界候选点的目标距离，单位为逆透视坐标 px。
-    // 距离越大，表示越倾向于在更“外圈”的对侧边界区域寻找环岛特征。
-    .roundabout_corner_match_distance_px = 45.0f,
-    // 环岛入口判定的距离容差，单位 px。
-    // 实际会在 [45 - 5, 45 + 5] 这样的范围内收集候选点；数值越大越宽松。
-    .roundabout_corner_match_tolerance_px = 5.0f,
-    // 环岛状态机里“平稳段”判断的 NMS 绝对值上限。
-    // 当前逻辑已不再使用“近似共线”兜底，只有当前缀内所有点 |nms| 都小于该值才算满足条件。
-    .roundabout_straight_nms_abs_max = 0.2f,
-    // 环岛 running / exit 阶段检查的边界前缀长度，单位 px。
-    // 从边界起始点开始沿边界累计这么长，只要这段内全部点的 |nms| 都足够小，就认为进入下一阶段。
-    .roundabout_straight_span_px = 100.0f,
-    // 普通状态下的边界法向平移距离，单位 px。
-    // 当不处于环岛 running 状态时，偏移中线生成统一回到这个值。
-    .roundabout_normal_shift_distance_px = 15.0f,
-    // 环岛 running 状态下临时使用的边界法向平移距离，单位 px。
-    // 进入 left_running / right_running 后会覆盖普通平移距离，退出后恢复为上面的 normal 值。
-    .roundabout_running_shift_distance_px = 25.0f
+    // 基准速度方案B已移除，偏差层仅保留方案A所需参数。
 };
 
 const vision_processor_config_t g_vision_processor_config = {
