@@ -35,7 +35,7 @@ std::array<float, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> g_ipm_line_error_weight
 size_t g_ipm_line_error_weighted_point_count = g_vision_runtime_config.ipm_line_error_weighted_point_count;
 
 std::atomic<int> g_ipm_line_error_weighted_first_point_error(0);
-std::atomic<int> g_ipm_line_error_weighted_current_spacing(g_vision_runtime_config.ipm_line_error_weighted_default_spacing);
+std::atomic<int> g_ipm_line_error_weighted_current_spacing(1);
 std::atomic<int> g_centerline_curvature_step(std::max(1, g_vision_runtime_config.ipm_centerline_curvature_step));
 std::atomic<float> g_curvature_lookahead_lambda(std::max(0.0f, g_vision_runtime_config.ipm_curvature_lookahead_lambda));
 std::atomic<float> g_curvature_lookahead_mu(std::max(0.0f, g_vision_runtime_config.ipm_curvature_lookahead_mu));
@@ -286,7 +286,7 @@ void vision_line_error_layer_reset()
     g_ipm_line_error_index_max.store(g_vision_runtime_config.ipm_line_error_index_max);
     reset_ipm_line_error_weighted_points_to_default();
     g_ipm_line_error_weighted_first_point_error.store(0);
-    g_ipm_line_error_weighted_current_spacing.store(g_vision_runtime_config.ipm_line_error_weighted_default_spacing);
+    g_ipm_line_error_weighted_current_spacing.store(1);
     g_centerline_curvature_step.store(std::max(1, g_vision_runtime_config.ipm_centerline_curvature_step));
     g_curvature_lookahead_lambda.store(std::max(0.0f, g_vision_runtime_config.ipm_curvature_lookahead_lambda));
     g_curvature_lookahead_mu.store(std::max(0.0f, g_vision_runtime_config.ipm_curvature_lookahead_mu));
@@ -417,40 +417,36 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
             point_count = g_ipm_line_error_weighted_point_count;
         }
 
-        const int first_index = std::clamp(g_vision_runtime_config.ipm_line_error_weighted_first_index, 0, count - 1);
-        const int decision_index = std::clamp(g_vision_runtime_config.ipm_line_error_weighted_decision_index, 0, count - 1);
-        const int decision_point_error = static_cast<int>(xs[decision_index]) - ipm_center_x_ref;
-        const int abs_decision_point_error = std::abs(decision_point_error);
-        int spacing = g_vision_runtime_config.ipm_line_error_weighted_default_spacing;
-        if (abs_decision_point_error > g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_3)
-        {
-            spacing = g_vision_runtime_config.ipm_line_error_weighted_spacing_value_3;
-        }
-        else if (abs_decision_point_error > g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_2)
-        {
-            spacing = g_vision_runtime_config.ipm_line_error_weighted_spacing_value_2;
-        }
-        else if (abs_decision_point_error > g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_1)
-        {
-            spacing = g_vision_runtime_config.ipm_line_error_weighted_spacing_value_1;
-        }
-        spacing = std::max(spacing, 1);
-        g_ipm_line_error_weighted_first_point_error.store(decision_point_error);
-        g_ipm_line_error_weighted_current_spacing.store(spacing);
-        g_ipm_weighted_decision_point_valid = true;
-        g_ipm_weighted_decision_point_x = static_cast<int>(xs[decision_index]);
-        g_ipm_weighted_decision_point_y = static_cast<int>(ys[decision_index]);
-        if (src_xs != nullptr && src_ys != nullptr && decision_index < src_count)
-        {
-            g_src_weighted_decision_point_valid = true;
-            g_src_weighted_decision_point_x = static_cast<int>(src_xs[decision_index]);
-            g_src_weighted_decision_point_y = static_cast<int>(src_ys[decision_index]);
-        }
-
+        int decision_index = -1;
         for (size_t i = 0; i < point_count; ++i)
         {
-            const int dynamic_idx = first_index + static_cast<int>(i) * spacing;
-            point_indices[i] = (dynamic_idx < count) ? dynamic_idx : -1;
+            const int idx = point_indices[i];
+            if (idx >= 0 && idx < count)
+            {
+                decision_index = idx;
+                break;
+            }
+        }
+        if (decision_index >= 0)
+        {
+            const int decision_point_error = static_cast<int>(xs[decision_index]) - ipm_center_x_ref;
+            g_ipm_line_error_weighted_first_point_error.store(decision_point_error);
+            // 动态间距模式已移除：原始加权模式固定使用配置索引点。
+            g_ipm_line_error_weighted_current_spacing.store(1);
+            g_ipm_weighted_decision_point_valid = true;
+            g_ipm_weighted_decision_point_x = static_cast<int>(xs[decision_index]);
+            g_ipm_weighted_decision_point_y = static_cast<int>(ys[decision_index]);
+            if (src_xs != nullptr && src_ys != nullptr && decision_index < src_count)
+            {
+                g_src_weighted_decision_point_valid = true;
+                g_src_weighted_decision_point_x = static_cast<int>(src_xs[decision_index]);
+                g_src_weighted_decision_point_y = static_cast<int>(src_ys[decision_index]);
+            }
+        }
+        else
+        {
+            g_ipm_line_error_weighted_first_point_error.store(0);
+            g_ipm_line_error_weighted_current_spacing.store(1);
         }
 
         float total_weight = 0.0f;

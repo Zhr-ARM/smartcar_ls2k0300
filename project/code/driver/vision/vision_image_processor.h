@@ -6,8 +6,8 @@
 
 #define VISION_DOWNSAMPLED_WIDTH 160
 #define VISION_DOWNSAMPLED_HEIGHT 120
-#define VISION_IPM_WIDTH 400
-#define VISION_IPM_HEIGHT 200
+#define VISION_IPM_WIDTH 280
+#define VISION_IPM_HEIGHT 140
 
 // 轮廓线误差：在图像高度 line_sample_ratio 处，
 // 中线 x 与图像中心 x 的差值（右偏为正，左偏为负）。

@@ -174,12 +174,16 @@
     </div>
     <div class="meta">
       <label style="margin-right: 16px;">
-        <input type="checkbox" id="toggleMeanCenterline" checked />
-        灰度图显示所选偏移中线
+        <input type="checkbox" id="toggleGrayBoundaries" checked />
+        灰度图显示左右边界
+      </label>
+      <label style="margin-right: 16px;">
+        <input type="checkbox" id="toggleMeanCenterline" />
+        灰度图显示左右均值中线
       </label>
       <label>
         <input type="checkbox" id="toggleIpmAnchorDot" checked />
-        透视图显示锚点圆 (x=200,y=200,r=1)
+        透视图显示锚点圆 (x=140,y=140,r=1)
       </label>
       <label style="margin-left: 16px;">
         <input type="checkbox" id="toggleBoundaryPointMode" />
@@ -215,14 +219,14 @@
       <div class="card" id="ipmCard">
         <div class="title">透视边界图-处理链数组（可三角滤波）</div>
         <div class="view">
-          <canvas id="ipmCanvas" width="400" height="200"></canvas>
+          <canvas id="ipmCanvas" width="280" height="140"></canvas>
           <div class="pixel-info" id="ipmPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
         </div>
       </div>
       <div class="card" id="ipmRawCard">
         <div class="title">透视边界图-原始拷贝数组（角点识别）</div>
         <div class="view">
-          <canvas id="ipmRawCanvas" width="400" height="200"></canvas>
+          <canvas id="ipmRawCanvas" width="280" height="140"></canvas>
           <div class="pixel-info" id="ipmRawPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
         </div>
       </div>
@@ -388,14 +392,18 @@
     const savedFoldersList = document.getElementById('savedFoldersList');
     const savedLoadInfo = document.getElementById('savedLoadInfo');
     const toggleMeanCenterline = document.getElementById('toggleMeanCenterline');
+    const toggleGrayBoundaries = document.getElementById('toggleGrayBoundaries');
     const toggleIpmAnchorDot = document.getElementById('toggleIpmAnchorDot');
     const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
     const curvatureYMinInput = document.getElementById('curvatureYMinInput');
     const curvatureYMaxInput = document.getElementById('curvatureYMaxInput');
     const ipmCenterlineSourceLabel = document.getElementById('ipmCenterlineSourceLabel');
     const grayImg = new Image();
+    const rawGrayCanvas = document.createElement('canvas');
+    const rawGrayCtx = rawGrayCanvas.getContext('2d');
     let latestStatus = {};
-    let showMeanCenterline = true;
+    let showGrayBoundaries = true;
+    let showMeanCenterline = false;
     let showIpmAnchorDot = true;
     let boundaryPointMode = false;
     let recordingState = null;
@@ -424,6 +432,26 @@
       if (Array.isArray(status.src_centerline_selected_shift)) return status.src_centerline_selected_shift;
       if (status.ipm_centerline_source === 1) return status.src_centerline_from_right_shift || [];
       return status.src_centerline_from_left_shift || [];
+    }
+
+    function getMeanCenterlineFromBoundaries(status) {
+      const left = Array.isArray(status.left_boundary) ? status.left_boundary : [];
+      const right = Array.isArray(status.right_boundary) ? status.right_boundary : [];
+      const n = Math.min(left.length, right.length);
+      if (n < 1) return [];
+      const mid = [];
+      for (let i = 0; i < n; i += 1) {
+        const lp = left[i];
+        const rp = right[i];
+        if (!Array.isArray(lp) || lp.length < 2 || !Array.isArray(rp) || rp.length < 2) continue;
+        const lx = Number(lp[0]);
+        const ly = Number(lp[1]);
+        const rx = Number(rp[0]);
+        const ry = Number(rp[1]);
+        if (!Number.isFinite(lx) || !Number.isFinite(ly) || !Number.isFinite(rx) || !Number.isFinite(ry)) continue;
+        mid.push([Math.round((lx + rx) * 0.5), Math.round((ly + ry) * 0.5)]);
+      }
+      return mid;
     }
 
     function getSelectedCurvature(status) {
@@ -530,16 +558,7 @@
       push(trackRows, 'ipm_track_index', status.ipm_track_index);
       pushArray(trackRows, 'ipm_track_point', status.ipm_track_point);
       push(trackRows, 'ipm_weighted_first_index', status.ipm_weighted_first_index);
-      push(trackRows, 'ipm_weighted_decision_index', status.ipm_weighted_decision_index);
-      push(trackRows, 'ipm_weighted_default_spacing', status.ipm_weighted_default_spacing);
-      push(trackRows, 'ipm_weighted_spacing_threshold_1', status.ipm_weighted_spacing_threshold_1);
-      push(trackRows, 'ipm_weighted_spacing_threshold_2', status.ipm_weighted_spacing_threshold_2);
-      push(trackRows, 'ipm_weighted_spacing_threshold_3', status.ipm_weighted_spacing_threshold_3);
-      push(trackRows, 'ipm_weighted_spacing_value_1', status.ipm_weighted_spacing_value_1);
-      push(trackRows, 'ipm_weighted_spacing_value_2', status.ipm_weighted_spacing_value_2);
-      push(trackRows, 'ipm_weighted_spacing_value_3', status.ipm_weighted_spacing_value_3);
       push(trackRows, 'ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
-      push(trackRows, 'ipm_weighted_current_spacing', status.ipm_weighted_current_spacing);
       pushArray(trackRows, 'ipm_weighted_decision_point', status.ipm_weighted_decision_point);
       pushArray(trackRows, 'src_weighted_decision_point', status.src_weighted_decision_point);
       push(trackRows, 'ipm_curvature_speed_v', status.ipm_curvature_speed_v);
@@ -1131,9 +1150,9 @@
     }
 
     function drawIpmBoundariesToCanvas(status, canvas, ctx, leftKey, rightKey, centerData) {
-      const ipmSize = status.ipm_size || [400, 200];
-      const w = ipmSize[0] || 400;
-      const h = ipmSize[1] || 200;
+      const ipmSize = status.ipm_size || [280, 140];
+      const w = ipmSize[0] || 280;
+      const h = ipmSize[1] || 140;
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
       ctx.fillStyle = '#000';
@@ -1151,8 +1170,8 @@
         const tp = Array.isArray(status.ipm_track_point) ? status.ipm_track_point : [0, 0];
         const tx = Math.max(0, Math.min(w - 1, tp[0] | 0));
         const ty = Math.max(0, Math.min(h - 1, tp[1] | 0));
-        const cx = Math.max(0, Math.min(w - 1, 200));
-        const cy = Math.max(0, Math.min(h - 1, 200));
+        const cx = Math.max(0, Math.min(w - 1, Math.floor(w / 2)));
+        const cy = Math.max(0, Math.min(h - 1, h));
         ctx.strokeStyle = '#93c5fd';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1177,8 +1196,8 @@
         ctx.stroke();
       }
       if (showIpmAnchorDot) {
-        const cx = Math.max(0, Math.min(w - 1, 200));
-        const cy = Math.max(0, Math.min(h - 1, 200));
+        const cx = Math.max(0, Math.min(w - 1, Math.floor(w / 2)));
+        const cy = Math.max(0, Math.min(h - 1, h));
         ctx.fillStyle = '#38bdf8';
         ctx.beginPath();
         ctx.arc(cx, cy, 1, 0, Math.PI * 2);
@@ -1307,6 +1326,9 @@
       const size = latestStatus.gray_size || [160, 120];
       const w = size[0] || 160;
       const h = size[1] || 120;
+      if (rawGrayCanvas.width !== w) rawGrayCanvas.width = w;
+      if (rawGrayCanvas.height !== h) rawGrayCanvas.height = h;
+      rawGrayCtx.drawImage(grayImg, 0, 0, w, h);
       if (grayCanvas.width !== w) grayCanvas.width = w;
       if (grayCanvas.height !== h) grayCanvas.height = h;
       grayCtx.drawImage(grayImg, 0, 0, w, h);
@@ -1317,7 +1339,7 @@
       grayCtx.moveTo(centerX + 0.5, 0);
       grayCtx.lineTo(centerX + 0.5, h);
       grayCtx.stroke();
-      const guideY = Math.max(0, Math.min(h - 1, 105));
+      const guideY = Math.max(0, Math.min(h - 1, 100));
       grayCtx.strokeStyle = '#ffffff';
       grayCtx.lineWidth = 1;
       grayCtx.beginPath();
@@ -1326,11 +1348,13 @@
       grayCtx.stroke();
       const left = latestStatus.left_boundary || [];
       const right = latestStatus.right_boundary || [];
-      drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
-      drawSeries(grayCtx, right, '#22c55e', 2, 1);
+      if (showGrayBoundaries) {
+        drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
+        drawSeries(grayCtx, right, '#22c55e', 2, 1);
+      }
       if (showMeanCenterline) {
-        const selectedCenterline = getSelectedSrcCenterline(latestStatus);
-        drawSeries(grayCtx, selectedCenterline, '#facc15', 2, 1);
+        const meanCenterline = getMeanCenterlineFromBoundaries(latestStatus);
+        drawSeries(grayCtx, meanCenterline, '#facc15', 2, 1);
       }
       drawDecisionPoint(grayCtx, latestStatus.src_weighted_decision_point);
       renderBinaryFromGray();
@@ -1351,7 +1375,7 @@
       if (binaryCanvas.width !== w) binaryCanvas.width = w;
       if (binaryCanvas.height !== h) binaryCanvas.height = h;
 
-      const grayImage = grayCtx.getImageData(0, 0, w, h);
+      const grayImage = rawGrayCtx.getImageData(0, 0, w, h);
       const binaryImage = binaryCtx.createImageData(w, h);
       const src = grayImage.data;
       const dst = binaryImage.data;
@@ -1366,7 +1390,6 @@
         dst[i + 3] = 255;
       }
       binaryCtx.putImageData(binaryImage, 0, 0);
-      drawDecisionPoint(binaryCtx, latestStatus.src_weighted_decision_point);
     }
 
     function getCanvasPoint(ev, canvas) {
@@ -1513,16 +1536,7 @@
       push('left_dir_level', status.left_dir_level);
       push('right_dir_level', status.right_dir_level);
       push('ipm_weighted_first_index', status.ipm_weighted_first_index);
-      push('ipm_weighted_decision_index', status.ipm_weighted_decision_index);
-      push('ipm_weighted_default_spacing', status.ipm_weighted_default_spacing);
-      push('ipm_weighted_spacing_threshold_1', status.ipm_weighted_spacing_threshold_1);
-      push('ipm_weighted_spacing_threshold_2', status.ipm_weighted_spacing_threshold_2);
-      push('ipm_weighted_spacing_threshold_3', status.ipm_weighted_spacing_threshold_3);
-      push('ipm_weighted_spacing_value_1', status.ipm_weighted_spacing_value_1);
-      push('ipm_weighted_spacing_value_2', status.ipm_weighted_spacing_value_2);
-      push('ipm_weighted_spacing_value_3', status.ipm_weighted_spacing_value_3);
       push('ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
-      push('ipm_weighted_current_spacing', status.ipm_weighted_current_spacing);
       if (Array.isArray(status.ipm_weighted_decision_point)) push('ipm_weighted_decision_point', fmtArrayInline(status.ipm_weighted_decision_point));
       if (Array.isArray(status.src_weighted_decision_point)) push('src_weighted_decision_point', fmtArrayInline(status.src_weighted_decision_point));
       push('ipm_curvature_speed_v', status.ipm_curvature_speed_v);
@@ -1684,6 +1698,10 @@
     });
     toggleMeanCenterline.addEventListener('change', () => {
       showMeanCenterline = !!toggleMeanCenterline.checked;
+      if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
+    });
+    toggleGrayBoundaries.addEventListener('change', () => {
+      showGrayBoundaries = !!toggleGrayBoundaries.checked;
       if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
     });
     toggleIpmAnchorDot.addEventListener('change', () => {

@@ -74,16 +74,7 @@ typedef struct
     bool udp_web_tcp_send_ipm_track_index;
     bool udp_web_tcp_send_ipm_track_point;
     bool udp_web_tcp_send_ipm_weighted_first_index;
-    bool udp_web_tcp_send_ipm_weighted_decision_index;
-    bool udp_web_tcp_send_ipm_weighted_default_spacing;
-    bool udp_web_tcp_send_ipm_weighted_spacing_threshold_1;
-    bool udp_web_tcp_send_ipm_weighted_spacing_threshold_2;
-    bool udp_web_tcp_send_ipm_weighted_spacing_threshold_3;
-    bool udp_web_tcp_send_ipm_weighted_spacing_value_1;
-    bool udp_web_tcp_send_ipm_weighted_spacing_value_2;
-    bool udp_web_tcp_send_ipm_weighted_spacing_value_3;
     bool udp_web_tcp_send_ipm_weighted_first_point_error;
-    bool udp_web_tcp_send_ipm_weighted_current_spacing;
     bool udp_web_tcp_send_ipm_weighted_decision_point;
     bool udp_web_tcp_send_src_weighted_decision_point;
     bool udp_web_tcp_send_intersection_mode;
@@ -198,22 +189,6 @@ typedef struct
     float ipm_line_error_weights[VISION_LINE_ERROR_MAX_WEIGHTED_POINTS];
     // 加权模式下的第一个取点索引。
     int ipm_line_error_weighted_first_index;
-    // 加权模式下用于决定动态间距的点索引。
-    int ipm_line_error_weighted_decision_index;
-    // 加权模式下默认点间距。
-    int ipm_line_error_weighted_default_spacing;
-    // 第一个点偏差超过该阈值时，点间距切到 spacing_value_1。
-    int ipm_line_error_weighted_spacing_threshold_1;
-    // 第一个点偏差超过该阈值时，点间距切到 spacing_value_2。
-    int ipm_line_error_weighted_spacing_threshold_2;
-    // 第一个点偏差超过该阈值时，点间距切到 spacing_value_3。
-    int ipm_line_error_weighted_spacing_threshold_3;
-    // 偏差超过 threshold_1 时采用的点间距。
-    int ipm_line_error_weighted_spacing_value_1;
-    // 偏差超过 threshold_2 时采用的点间距。
-    int ipm_line_error_weighted_spacing_value_2;
-    // 偏差超过 threshold_3 时采用的点间距。
-    int ipm_line_error_weighted_spacing_value_3;
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
     float ipm_line_error_speed_k;
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b。

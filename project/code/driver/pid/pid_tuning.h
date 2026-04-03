@@ -68,11 +68,11 @@ inline constexpr int32 kBaseSpeedPlanMode = 0;
 inline constexpr float kErrorFilterAlpha = 0.80f;
 
 // 巡线位置环比例项：横向误差一出现就打方向，越大回正越快。
-inline constexpr float kPidKp = 1200.0f; //1200
+inline constexpr float kPidKp = 700.0f; //1200
 // 巡线位置环积分项：用于消除长期偏差，当前默认关闭。
 inline constexpr float kPidKi = 0.0f;
 // 巡线位置环微分项：抑制误差变化过快，缓和转向过冲。
-inline constexpr float kPidKd = 800.0f; //800
+inline constexpr float kPidKd = 500.0f; //800
 // 巡线位置环输出限幅：限制最终差速大小，避免大舵过猛。
 inline constexpr float kPidMaxOutput = 800.0f;
 
@@ -82,9 +82,9 @@ inline constexpr float kTargetCountMin = 40.0f;
 inline constexpr float kTargetCountMax = 1000.0f;
 
 // 大弯降速起点：误差超过这个像素后，开始按比例降低基础速度。
-inline constexpr float kTurnSlowdownStartPx = 1.0f;
+inline constexpr float kTurnSlowdownStartPx = 50.0f;
 // 大弯降速满量程点：误差超过这个像素后，降速比例达到上限。
-inline constexpr float kTurnSlowdownFullPx = 18.0f;
+inline constexpr float kTurnSlowdownFullPx = 60.0f;
 // 大弯最低速度比例：基础速度最低会保留到这个比例，不会无限降。
 inline constexpr float kTurnMinSpeedScale = 0.30f;
 // 单周期最大降速比例：每次循环最多只允许比上一周期再降这么多。

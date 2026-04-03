@@ -119,26 +119,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .udp_web_tcp_send_ipm_track_point = true,
     // 发送加权模式的首点索引参数。
     .udp_web_tcp_send_ipm_weighted_first_index = false,
-    // 发送加权模式的决策点索引参数。
-    .udp_web_tcp_send_ipm_weighted_decision_index = false,
-    // 发送加权模式的默认点间距参数。
-    .udp_web_tcp_send_ipm_weighted_default_spacing = false,
-    // 发送加权模式阈值 1。
-    .udp_web_tcp_send_ipm_weighted_spacing_threshold_1 = false,
-    // 发送加权模式阈值 2。
-    .udp_web_tcp_send_ipm_weighted_spacing_threshold_2 = false,
-    // 发送加权模式阈值 3。
-    .udp_web_tcp_send_ipm_weighted_spacing_threshold_3 = false,
-    // 发送阈值 1 触发后的点间距。
-    .udp_web_tcp_send_ipm_weighted_spacing_value_1 = false,
-    // 发送阈值 2 触发后的点间距。
-    .udp_web_tcp_send_ipm_weighted_spacing_value_2 = false,
-    // 发送阈值 3 触发后的点间距。
-    .udp_web_tcp_send_ipm_weighted_spacing_value_3 = false,
     // 发送首点的当前偏差。
     .udp_web_tcp_send_ipm_weighted_first_point_error = true,
-    // 发送本帧实际使用的加权点间距。
-    .udp_web_tcp_send_ipm_weighted_current_spacing = true,
     // 发送逆透视图上的决策点坐标。
     .udp_web_tcp_send_ipm_weighted_decision_point = true,
     // 发送原图上的决策点坐标。
@@ -246,11 +228,11 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // ROI 抓图模式：检测到红框后周期性保存推理 ROI。
     .roi_capture_mode = false,
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
-    .maze_start_row = 90,
+    .maze_start_row = 85,
     // 路口识别总开关：开启后允许进入十字/路口状态机。
     .intersection_enabled = false,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
-    .undistort_enabled = true,
+    .undistort_enabled = false,
     // IPM 处理链边界三角滤波开关。
     .ipm_triangle_filter_enabled = true,
     // IPM 处理链边界近重复点过滤开关。
@@ -282,31 +264,15 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // line_error 计算方法：0=固定索引，1=加权索引，2=随速度索引。
     .ipm_line_error_method = 1,
     // 固定索引模式下默认使用的中线点索引。
-    .ipm_line_error_fixed_index = 4,
+    .ipm_line_error_fixed_index = 1,
     // line_error 加权点数量。
     .ipm_line_error_weighted_point_count = 3,
     // line_error 加权索引点（0-based）。
-    .ipm_line_error_point_indices = {4, 8, 12},
+    .ipm_line_error_point_indices = {0, 4, 8},
     // line_error 各索引点对应权重。
     .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
     // 加权模式下固定使用的首点索引。
-    .ipm_line_error_weighted_first_index = 4,
-    // 加权模式下用于决定动态间距的点索引。
-    .ipm_line_error_weighted_decision_index = 4,
-    // 加权模式默认点间距。
-    .ipm_line_error_weighted_default_spacing = 4,
-    // 首点偏差超过 5 时，点间距切到 3。
-    .ipm_line_error_weighted_spacing_threshold_1 = 4,
-    // 首点偏差超过 10 时，点间距切到 2。
-    .ipm_line_error_weighted_spacing_threshold_2 = 7,
-    // 首点偏差超过 15 时，点间距切到 1。
-    .ipm_line_error_weighted_spacing_threshold_3 = 12,
-    // 阈值 1 对应点间距。
-    .ipm_line_error_weighted_spacing_value_1 = 3,
-    // 阈值 2 对应点间距。
-    .ipm_line_error_weighted_spacing_value_2 = 2,
-    // 阈值 3 对应点间距。
-    .ipm_line_error_weighted_spacing_value_3 = 1,
+    .ipm_line_error_weighted_first_index = 1,
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
     .ipm_line_error_speed_k = 0.02f,
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b。
@@ -401,9 +367,9 @@ const vision_processor_config_t g_vision_processor_config = {
     .ipm_output_height = VISION_IPM_HEIGHT,
     // 逆透视矩阵（标定参数）。
     .change_un_mat = {
-        {0.077734, -0.064964, -0.133337},
-        {-0.003830, 0.006425, 2.751086},
-        {-0.000113, -0.000825, 0.217794}
+        {0.029630, -0.024954, -0.117149},
+        {-0.000000, 0.000207, 0.607059},
+        {-0.000000, -0.000323, 0.051471}
     },
     // 相机内参矩阵（标定参数）。
     .camera_matrix = {
@@ -420,7 +386,7 @@ const vision_processor_config_t g_vision_processor_config = {
     // line_error 默认采样行比例。
     .default_line_sample_ratio = 0.55f,
     // 迷宫法默认允许搜索的最小 x，屏蔽左侧黑边。
-    .default_maze_trace_x_min = 10,
+    .default_maze_trace_x_min = 1,
     // 迷宫法默认允许搜索的最大 x，屏蔽右侧黑边。
-    .default_maze_trace_x_max = 150
+    .default_maze_trace_x_max = 159
 };

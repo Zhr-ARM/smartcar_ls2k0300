@@ -579,26 +579,8 @@ static void send_tcp_status()
                      {ipm_track_x, ipm_track_y});
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_first_index, "ipm_weighted_first_index",
                g_vision_runtime_config.ipm_line_error_weighted_first_index);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_decision_index, "ipm_weighted_decision_index",
-               g_vision_runtime_config.ipm_line_error_weighted_decision_index);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_default_spacing, "ipm_weighted_default_spacing",
-               g_vision_runtime_config.ipm_line_error_weighted_default_spacing);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_threshold_1, "ipm_weighted_spacing_threshold_1",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_1);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_threshold_2, "ipm_weighted_spacing_threshold_2",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_2);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_threshold_3, "ipm_weighted_spacing_threshold_3",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_3);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_value_1, "ipm_weighted_spacing_value_1",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_value_1);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_value_2, "ipm_weighted_spacing_value_2",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_value_2);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_value_3, "ipm_weighted_spacing_value_3",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_value_3);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_first_point_error, "ipm_weighted_first_point_error",
                vision_image_processor_ipm_weighted_first_point_error());
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_current_spacing, "ipm_weighted_current_spacing",
-               vision_image_processor_ipm_weighted_current_spacing());
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_decision_point && ipm_weighted_decision_valid, "ipm_weighted_decision_point",
                      {ipm_weighted_decision_x, ipm_weighted_decision_y});
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_src_weighted_decision_point && src_weighted_decision_valid, "src_weighted_decision_point",
