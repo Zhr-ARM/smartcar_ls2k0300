@@ -63,7 +63,7 @@ namespace line_follow
 inline constexpr float kErrorFilterAlpha = 0.80f;
 
 // 巡线位置环比例项：横向误差一出现就打方向，越大回正越快。
-inline constexpr float kPidKp = 700.0f; //1200
+inline constexpr float kPidKp = 750.0f; //1200
 // 巡线位置环积分项：用于消除长期偏差，当前默认关闭。
 inline constexpr float kPidKi = 0.0f;
 // 巡线位置环微分项：抑制误差变化过快，缓和转向过冲。

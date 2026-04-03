@@ -89,8 +89,6 @@ typedef struct
     bool udp_web_tcp_send_right_boundary;
     bool udp_web_tcp_send_ipm_left_boundary;
     bool udp_web_tcp_send_ipm_right_boundary;
-    bool udp_web_tcp_send_ipm_raw_left_boundary;
-    bool udp_web_tcp_send_ipm_raw_right_boundary;
     bool udp_web_tcp_send_ipm_centerline_selected_shift;
     bool udp_web_tcp_send_src_centerline_selected_shift;
     bool udp_web_tcp_send_ipm_centerline_selected_count;
@@ -118,20 +116,48 @@ typedef struct
     bool roi_capture_mode;
     // 迷宫法左右起点搜索行，固定单行搜索。
     int maze_start_row;
+    // 迷宫法巡线回退停止阈值：若后续 y > 当前最小 y + 阈值，则停止巡线。
+    int maze_trace_y_fallback_stop_delta;
     // 去畸变开关：true=开启去畸变，false=关闭去畸变直通原图。
     bool undistort_enabled;
-    // 逆透视处理链边界三角滤波开关。
+    // ---------- 边界双处理流水线：共同预处理 ----------
+    // 逆透视处理链边界三角滤波开关（作用于角点支路，单次平滑）。
     bool ipm_triangle_filter_enabled;
-    // 逆透视处理链边界近重复点过滤开关。
-    bool ipm_min_point_dist_filter_enabled;
-    // 逆透视处理链边界近重复点过滤阈值（px）。
-    float ipm_min_point_dist_px;
     // 逆透视处理链边界等距采样开关。
     bool ipm_resample_enabled;
     // 逆透视处理链边界等距采样步长（px）。
     float ipm_resample_step_px;
+    // 边界顺序近点去重阈值（px）。
+    float ipm_boundary_min_point_dist_px;
+    // 边界回跳毛刺抑制：短段长度阈值（px）。
+    float ipm_boundary_spike_short_seg_max_px;
+    // 边界回跳毛刺抑制：反向判定 cos 阈值（<=阈值视为反向）。
+    float ipm_boundary_spike_reverse_cos_threshold;
+
+    // ---------- 边界双处理流水线：曲率支路 ----------
+    // 边界 SG 曲率计算采样间距 h（cm）。
+    float ipm_boundary_kappa_sample_spacing_cm;
+
+    // ---------- 边界双处理流水线：角点支路 ----------
+    // 边界三点法夹角 cos 计算步长（索引步长，默认3）。
+    int ipm_boundary_angle_step;
+    // 角点候选 cos 阈值（<=阈值进入局部极小值检测）。
+    float ipm_boundary_corner_cos_threshold;
+    // 角点 NMS 半径（索引半径）。
+    int ipm_boundary_corner_nms_radius;
+
+    // ---------- 边界双处理流水线：中线生成 ----------
     // 逆透视处理链边界法向平移距离（px），用于生成平移中线。
     float ipm_boundary_shift_distance_px;
+    // ---------- 角点触发辅助线 ----------
+    // 辅助线起始点相对角点的 X 偏移（右侧为 +offset，左侧为 -offset）。
+    int ipm_aux_seed_offset_x;
+    // 辅助线起始点相对角点的 Y 偏移（向上为正，实际使用 y - offset）。
+    int ipm_aux_seed_offset_y;
+    // 辅助线向上探测时，至少经过的白点数。
+    int ipm_aux_vertical_min_white_count;
+    // 辅助线迷宫法爬线最大点数。
+    int ipm_aux_trace_max_points;
     // 逆透视处理中线独立后处理总开关（去重/平滑/重采样）。
     bool ipm_centerline_postprocess_enabled;
     // 逆透视处理中线三角滤波开关。
@@ -140,8 +166,6 @@ typedef struct
     bool ipm_centerline_resample_enabled;
     // 逆透视处理中线等距采样步长（px）。
     float ipm_centerline_resample_step_px;
-    // 逆透视处理中线近重复点过滤阈值（px）。
-    float ipm_centerline_min_point_dist_px;
     // 所选偏移中线曲率计算步长（索引步长，默认3）。
     int ipm_centerline_curvature_step;
     // 双边都丢线时是否保持上一帧平移中线数组。

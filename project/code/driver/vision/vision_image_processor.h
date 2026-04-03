@@ -23,7 +23,8 @@ extern float line_sample_ratio;
 typedef enum
 {
     VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT = 0,
-    VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT = 1
+    VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT = 1,
+    VISION_IPM_LINE_ERROR_FROM_AUTO = 2
 } vision_ipm_line_error_source_enum;
 
 typedef enum
@@ -71,14 +72,7 @@ bool vision_image_processor_undistort_enabled();
 // 说明：关闭仅跳过该平滑步骤，不影响后续处理链。
 void vision_image_processor_set_ipm_triangle_filter_enabled(bool enabled);
 bool vision_image_processor_ipm_triangle_filter_enabled();
-// 逆透视后边界近重复点过滤开关与阈值（px）。
-// 处理顺序：三角滤波之后执行该过滤。
-void vision_image_processor_set_ipm_min_point_dist_filter_enabled(bool enabled);
-bool vision_image_processor_ipm_min_point_dist_filter_enabled();
-void vision_image_processor_set_ipm_min_point_dist_px(float dist_px);
-float vision_image_processor_ipm_min_point_dist_px();
-
-// 逆透视后边界等距采样开关（作用于处理链边界，不影响 raw 边界）。
+// 逆透视后边界等距采样开关（作用于处理链边界）。
 // true : 开启按弧长等距重采样；
 // false: 关闭，保留当前点序列。
 void vision_image_processor_set_ipm_resample_enabled(bool enabled);
@@ -87,6 +81,12 @@ bool vision_image_processor_ipm_resample_enabled();
 // 建议 >= 1.0；数值越小点更密、越大点更稀。
 void vision_image_processor_set_ipm_resample_step_px(float step_px);
 float vision_image_processor_ipm_resample_step_px();
+// 边界 SG 曲率计算采样间距 h（单位：cm）。
+void vision_image_processor_set_ipm_boundary_kappa_sample_spacing_cm(float spacing_cm);
+float vision_image_processor_ipm_boundary_kappa_sample_spacing_cm();
+// 边界三点法夹角 cos 计算步长（索引步长，>=1）。
+void vision_image_processor_set_ipm_boundary_angle_step(int step);
+int vision_image_processor_ipm_boundary_angle_step();
 
 // 逆透视处理链边界“法向平移距离”参数（单位：像素，默认15）。
 // 约定：左边界向右平移、右边界向左平移。
@@ -104,11 +104,8 @@ void vision_image_processor_set_ipm_centerline_resample_enabled(bool enabled);
 bool vision_image_processor_ipm_centerline_resample_enabled();
 void vision_image_processor_set_ipm_centerline_resample_step_px(float step_px);
 float vision_image_processor_ipm_centerline_resample_step_px();
-// 逆透视处理中线近重复点过滤阈值（px）。
-void vision_image_processor_set_ipm_centerline_min_point_dist_px(float dist_px);
-float vision_image_processor_ipm_centerline_min_point_dist_px();
 // line_error 跟踪点配置：
-// - source: 选左边界平移中线或右边界平移中线；
+// - source: 偏好左/偏好右/无偏好自动（按边界点数择优）；
 // - method: 固定索引 / 加权索引 / 随速度索引；
 // - fixed_index: 固定索引模式下使用的点索引；
 // - point_indices/weights: 加权索引模式下使用的索引与权重；
@@ -134,6 +131,10 @@ void vision_image_processor_get_ipm_line_error_track_point(bool *valid, int *x, 
 void vision_image_processor_set_ipm_centerline_curvature_step(int step);
 int vision_image_processor_ipm_centerline_curvature_step();
 void vision_image_processor_get_ipm_selected_centerline_curvature(const float **curvature, int *count);
+void vision_image_processor_get_ipm_left_boundary_curvature(const float **curvature, int *count);
+void vision_image_processor_get_ipm_right_boundary_curvature(const float **curvature, int *count);
+void vision_image_processor_get_ipm_left_boundary_angle_cos(const float **angle_cos, int *count);
+void vision_image_processor_get_ipm_right_boundary_angle_cos(const float **angle_cos, int *count);
 float vision_image_processor_ipm_mean_abs_offset_error();
 int vision_image_processor_ipm_weighted_first_point_error();
 void vision_image_processor_get_ipm_weighted_decision_point(bool *valid, int *x, int *y);
@@ -198,18 +199,22 @@ void vision_image_processor_get_boundaries(uint16 **x1, uint16 **x2, uint16 **x3
                                            uint16 **y1, uint16 **y2, uint16 **y3,
                                            uint16 *dot_num);
 void vision_image_processor_get_boundary_side_counts(uint16 *left_dot_num, uint16 *right_dot_num);
+// 原图坐标系角点触发辅助线及其偏移起始点。
+void vision_image_processor_get_src_auxiliary_lines(uint16 **left_x, uint16 **left_y, uint16 *left_num,
+                                                    uint16 **right_x, uint16 **right_y, uint16 *right_num);
+void vision_image_processor_get_src_auxiliary_seed_points(uint16 **left_x, uint16 **left_y, uint16 *left_num,
+                                                          uint16 **right_x, uint16 **right_y, uint16 *right_num);
 
 // 逆透视后边界数据（另存，供控制等后续模块使用）
 void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
                                                uint16 **y1, uint16 **y2, uint16 **y3,
                                                uint16 *dot_num);
 void vision_image_processor_get_ipm_boundary_side_counts(uint16 *left_dot_num, uint16 *right_dot_num);
-// 逆透视后“原始拷贝”边界数据（未做三角滤波）。
-// 用途：角点识别等需要保留原始几何形态的流程。
-void vision_image_processor_get_ipm_boundaries_raw(uint16 **x1, uint16 **x2, uint16 **x3,
-                                                   uint16 **y1, uint16 **y2, uint16 **y3,
-                                                   uint16 *dot_num);
-void vision_image_processor_get_ipm_raw_boundary_side_counts(uint16 *left_dot_num, uint16 *right_dot_num);
+// 左右边界角点（由 angle-cos 局部极小值 + NMS 选出），分别提供原图和 IPM 坐标。
+void vision_image_processor_get_src_boundary_corners(uint16 **left_x, uint16 **left_y, uint16 *left_num,
+                                                     uint16 **right_x, uint16 **right_y, uint16 *right_num);
+void vision_image_processor_get_ipm_boundary_corners(uint16 **left_x, uint16 **left_y, uint16 *left_num,
+                                                     uint16 **right_x, uint16 **right_y, uint16 *right_num);
 // 逆透视处理链“平移中线”结果：
 // - from_left : 左边界向右法向平移得到；
 // - from_right: 右边界向左法向平移得到。
@@ -218,9 +223,6 @@ void vision_image_processor_get_ipm_shifted_centerline_from_right(uint16 **x, ui
 // 将左右偏移中线从 IPM 坐标回投到原图后的结果。
 void vision_image_processor_get_src_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_src_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
-
-// 逆透视后拟合中线（另存）
-void vision_image_processor_get_ipm_fitted_centerline(uint16 **x, uint16 **y, uint16 *dot_num);
 
 // 红色实心矩形检测结果（坐标与尺寸）。
 // set_* 接口由 infer 模块写入，get_* 接口供发送/UI读取。

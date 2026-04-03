@@ -18,7 +18,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端 UDP 视频发送配置 ====================
     // UDP 网页图传总开关。
-    .udp_web_enabled = true,
+    .udp_web_enabled = false,
     // UDP 网页图传发送上限帧率，0 表示不限速。
     .udp_web_max_fps = 30,
     // 是否向网页端发送灰度 JPEG。
@@ -30,7 +30,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端 TCP 状态发送总开关 ====================
     // TCP 状态上报开关。
-    .udp_web_tcp_enabled = true,
+    .udp_web_tcp_enabled = false,
 
     // ==================== TCP 基础状态字段（通用） ====================
     // 发送主板当前时间戳（ms）。
@@ -141,10 +141,6 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .udp_web_tcp_send_ipm_left_boundary = true,
     // 发送逆透视处理后的右边界点列。
     .udp_web_tcp_send_ipm_right_boundary = true,
-    // 发送逆透视后的原始左边界点列（未做后处理）。
-    .udp_web_tcp_send_ipm_raw_left_boundary = true,
-    // 发送逆透视后的原始右边界点列（未做后处理）。
-    .udp_web_tcp_send_ipm_raw_right_boundary = true,
 
     // ==================== TCP 平移中线调试字段 ====================
     // 发送当前被 line_error 选择使用的 IPM 平移中线。
@@ -183,20 +179,45 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .roi_capture_mode = false,
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
     .maze_start_row = 85,
+    // 迷宫法巡线回退停止阈值（y > min_y + 阈值即停）。
+    .maze_trace_y_fallback_stop_delta = 15,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = false,
-    // IPM 处理链边界三角滤波开关。
+    // ---------- 边界双处理流水线：共同预处理 ----------
+    // IPM 处理链边界三角滤波开关（作用于角点支路，单次平滑）。
     .ipm_triangle_filter_enabled = true,
-    // IPM 处理链边界近重复点过滤开关。
-    .ipm_min_point_dist_filter_enabled = true,
-    // IPM 处理链边界近重复点过滤阈值，单位 px。
-    .ipm_min_point_dist_px = 2.0f,
     // IPM 处理链边界等距采样开关。
     .ipm_resample_enabled = true,
     // IPM 处理链边界等距采样步长，单位 px。
-    .ipm_resample_step_px = 1.0f,
+    .ipm_resample_step_px = 3.0f,
+    // 边界顺序近点去重阈值，单位 px。
+    .ipm_boundary_min_point_dist_px = 1.4f,
+    // 边界回跳毛刺抑制：短段长度阈值，单位 px。
+    .ipm_boundary_spike_short_seg_max_px = 2.0f,
+    // 边界回跳毛刺抑制：反向判定 cos 阈值。
+    .ipm_boundary_spike_reverse_cos_threshold = -0.2f,
+    // ---------- 边界双处理流水线：曲率支路 ----------
+    // 边界 SG 曲率计算采样间距 h，单位 cm。
+    .ipm_boundary_kappa_sample_spacing_cm = 1.5f,
+    // ---------- 边界双处理流水线：角点支路 ----------
+    // 边界三点法夹角 cos 计算步长（索引步长）。
+    .ipm_boundary_angle_step = 3,
+    // 角点候选 cos 阈值（<=阈值进入局部极小值检测）。
+    .ipm_boundary_corner_cos_threshold = 0.55f,
+    // 角点 NMS 半径（索引半径）。
+    .ipm_boundary_corner_nms_radius = 3,
+    // ---------- 边界双处理流水线：中线生成 ----------
     // 边界法向平移距离，单位 px，用于生成平移中线。
     .ipm_boundary_shift_distance_px = 15.0f,
+    // ---------- 角点触发辅助线 ----------
+    // 辅助线起始点相对角点的 X 偏移（右侧 +offset，左侧 -offset）。
+    .ipm_aux_seed_offset_x = 12,
+    // 辅助线起始点相对角点的 Y 偏移（向上 y - offset）。
+    .ipm_aux_seed_offset_y = 6,
+    // 辅助线向上探测时至少经过 1 个白点。
+    .ipm_aux_vertical_min_white_count = 1,
+    // 辅助线迷宫法爬线最大点数。
+    .ipm_aux_trace_max_points = 30,
     // 中线独立后处理总开关。
     .ipm_centerline_postprocess_enabled = true,
     // 中线三角滤波开关。
@@ -204,17 +225,15 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 中线等距采样开关。
     .ipm_centerline_resample_enabled = true,
     // 中线等距采样步长，单位 px。
-    .ipm_centerline_resample_step_px = 6.0f,
-    // 中线近重复点过滤阈值，单位 px。
-    .ipm_centerline_min_point_dist_px = 2.0f,
+    .ipm_centerline_resample_step_px = 3.0f,
     // 所选偏移中线曲率计算步长（索引步长）。
     .ipm_centerline_curvature_step = 3,
     // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。
     .keep_last_centerline_on_double_loss = true,
     // ==================== 参数区域 2: 偏差计算 ====================
     // 说明：line_error 取点参数集中在这里。
-    // line_error 使用哪条平移中线：左平移或右平移。
-    .ipm_line_error_source = VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT,
+    // line_error 平移中线偏好源：0=偏好左，1=偏好右，2=无偏好(自动按边界点数)。
+    .ipm_line_error_source = VISION_IPM_LINE_ERROR_FROM_AUTO,
     // line_error 计算方法：0=固定索引，1=加权索引，2=随速度索引。
     .ipm_line_error_method = 1,
     // 固定索引模式下默认使用的中线点索引。
@@ -222,7 +241,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // line_error 加权点数量。
     .ipm_line_error_weighted_point_count = 3,
     // line_error 加权索引点（0-based）。
-    .ipm_line_error_point_indices = {0, 4, 8},
+    .ipm_line_error_point_indices = {2, 6, 10},
     // line_error 各索引点对应权重。
     .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。

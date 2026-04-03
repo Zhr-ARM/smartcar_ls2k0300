@@ -305,7 +305,9 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
 
 void vision_line_error_layer_set_source(int source)
 {
-    if (source == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT))
+    if (source == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT) ||
+        source == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT) ||
+        source == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_AUTO))
     {
         g_ipm_line_error_source.store(source);
         return;
