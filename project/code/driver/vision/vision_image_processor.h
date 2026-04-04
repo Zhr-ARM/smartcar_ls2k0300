@@ -82,6 +82,8 @@ bool vision_image_processor_ipm_resample_enabled();
 void vision_image_processor_set_ipm_resample_step_px(float step_px);
 float vision_image_processor_ipm_resample_step_px();
 // 边界 SG 曲率计算采样间距 h（单位：cm）。
+void vision_image_processor_set_ipm_boundary_curvature_enabled(bool enabled);
+bool vision_image_processor_ipm_boundary_curvature_enabled();
 void vision_image_processor_set_ipm_boundary_kappa_sample_spacing_cm(float spacing_cm);
 float vision_image_processor_ipm_boundary_kappa_sample_spacing_cm();
 // 边界三点法夹角 cos 计算步长（索引步长，>=1）。
@@ -104,6 +106,8 @@ void vision_image_processor_set_ipm_centerline_resample_enabled(bool enabled);
 bool vision_image_processor_ipm_centerline_resample_enabled();
 void vision_image_processor_set_ipm_centerline_resample_step_px(float step_px);
 float vision_image_processor_ipm_centerline_resample_step_px();
+void vision_image_processor_set_ipm_centerline_curvature_enabled(bool enabled);
+bool vision_image_processor_ipm_centerline_curvature_enabled();
 // line_error 跟踪点配置：
 // - source: 偏好左/偏好右/无偏好自动（按边界点数择优）；
 // - method: 固定索引 / 加权索引 / 随速度索引；

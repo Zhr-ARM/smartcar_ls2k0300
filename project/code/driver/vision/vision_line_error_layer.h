@@ -40,6 +40,8 @@ int vision_line_error_layer_track_index();
 
 void vision_line_error_layer_set_curvature_step(int step);
 int vision_line_error_layer_curvature_step();
+void vision_line_error_layer_set_curvature_enabled(bool enabled);
+bool vision_line_error_layer_curvature_enabled();
 void vision_line_error_layer_get_selected_centerline_curvature(const float **curvature, int *count);
 float vision_line_error_layer_mean_abs_offset();
 

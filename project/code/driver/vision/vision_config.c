@@ -18,7 +18,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端 UDP 视频发送配置 ====================
     // UDP 网页图传总开关。
-    .udp_web_enabled = false,
+    .udp_web_enabled = true,
     // UDP 网页图传发送上限帧率，0 表示不限速。
     .udp_web_max_fps = 30,
     // 是否向网页端发送灰度 JPEG。
@@ -27,10 +27,15 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 是否向网页端发送二值 JPEG。
     // 当前需求为停发二值图，因此默认关闭。
     .udp_web_send_binary_jpeg = false,
+    // 是否向网页端发送原始 BGR 彩图 JPEG。
+    .udp_web_send_rgb_jpeg = true,
+    // 网页端 TCP 数据模式：
+    // 0=全量调试数据，1=仅原始图像 + 最小原始状态。
+    .udp_web_data_profile = VISION_WEB_DATA_PROFILE_FULL,
 
     // ==================== 网页端 TCP 状态发送总开关 ====================
     // TCP 状态上报开关。
-    .udp_web_tcp_enabled = false,
+    .udp_web_tcp_enabled = true,
 
     // ==================== TCP 基础状态字段（通用） ====================
     // 发送主板当前时间戳（ms）。
@@ -161,7 +166,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    .udp_web_server_ip = "10.131.211.102",
+    .udp_web_server_ip = "172.21.79.179",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -169,7 +174,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 逐飞助手独立 UDP 通道开关。
     .assistant_udp_enabled = false,
     // 逐飞助手接收端 IP。
-    .assistant_server_ip = "172.21.79.129",
+    .assistant_server_ip = "172.21.79.138",
     // 逐飞助手接收端端口。
     .assistant_server_port = 8899,
 
@@ -197,6 +202,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 边界回跳毛刺抑制：反向判定 cos 阈值。
     .ipm_boundary_spike_reverse_cos_threshold = -0.2f,
     // ---------- 边界双处理流水线：曲率支路 ----------
+    // 边界曲率计算总开关。
+    .ipm_boundary_curvature_enabled = false,
     // 边界 SG 曲率计算采样间距 h，单位 cm。
     .ipm_boundary_kappa_sample_spacing_cm = 1.5f,
     // ---------- 边界双处理流水线：角点支路 ----------
@@ -226,6 +233,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_centerline_resample_enabled = true,
     // 中线等距采样步长，单位 px。
     .ipm_centerline_resample_step_px = 3.0f,
+    // 中线曲率计算总开关。
+    .ipm_centerline_curvature_enabled = true,
     // 所选偏移中线曲率计算步长（索引步长）。
     .ipm_centerline_curvature_step = 3,
     // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。

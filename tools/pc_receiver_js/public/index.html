@@ -190,6 +190,18 @@
         边界/中线按采样点显示（关闭=连线）
       </label>
       <label style="margin-left: 16px;">
+        <input type="checkbox" id="toggleCenterlineCurvatureChart" checked />
+        显示中线曲率图
+      </label>
+      <label style="margin-left: 16px;">
+        <input type="checkbox" id="toggleBoundaryCurvatureCharts" checked />
+        显示边界曲率图
+      </label>
+      <label style="margin-left: 16px;">
+        <input type="checkbox" id="toggleBoundaryAngleCosCharts" checked />
+        显示边界角点cos图
+      </label>
+      <label style="margin-left: 16px;">
         曲率Y最小
         <input id="curvatureYMinInput" type="number" step="0.01" value="-0.3" style="width: 72px; margin-left: 4px;" />
       </label>
@@ -337,6 +349,7 @@
       </div>
     </div>
   </div>
+  <script src="/shared_receiver_core.js"></script>
   <script>
     const grayCanvas = document.getElementById('grayCanvas');
     const grayCtx = grayCanvas.getContext('2d');
@@ -401,17 +414,24 @@
     const toggleGrayBoundaries = document.getElementById('toggleGrayBoundaries');
     const toggleIpmAnchorDot = document.getElementById('toggleIpmAnchorDot');
     const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
+    const toggleCenterlineCurvatureChart = document.getElementById('toggleCenterlineCurvatureChart');
+    const toggleBoundaryCurvatureCharts = document.getElementById('toggleBoundaryCurvatureCharts');
+    const toggleBoundaryAngleCosCharts = document.getElementById('toggleBoundaryAngleCosCharts');
     const curvatureYMinInput = document.getElementById('curvatureYMinInput');
     const curvatureYMaxInput = document.getElementById('curvatureYMaxInput');
     const ipmCenterlineSourceLabel = document.getElementById('ipmCenterlineSourceLabel');
     const grayImg = new Image();
     const rawGrayCanvas = document.createElement('canvas');
     const rawGrayCtx = rawGrayCanvas.getContext('2d');
+    const receiverCore = window.SharedReceiverCore;
     let latestStatus = {};
     let showGrayBoundaries = true;
     let showMeanCenterline = false;
     let showIpmAnchorDot = true;
     let boundaryPointMode = false;
+    let showCenterlineCurvatureChart = true;
+    let showBoundaryCurvatureCharts = true;
+    let showBoundaryAngleCosCharts = true;
     let recordingState = null;
     let lastRecording = null;
     let paramPanelOpen = false;
@@ -1074,10 +1094,9 @@
 
     async function refreshSavedFolders() {
       try {
-        const r = await fetch('/api/recordings/list', { cache: 'no-store' });
-        const j = await r.json();
-        if (!r.ok || !j.ok || !Array.isArray(j.folders)) {
-          throw new Error(j.error || `list failed ${r.status}`);
+        const j = await receiverCore.fetchJsonNoStore('/api/recordings/list');
+        if (!j.ok || !Array.isArray(j.folders)) {
+          throw new Error(j.error || 'list failed');
         }
         if (j.folders.length < 1) {
           savedFoldersList.textContent = '暂无已保存目录';
@@ -1098,10 +1117,9 @@
         return;
       }
       try {
-        const r = await fetch(`/api/recordings/load?folder=${encodeURIComponent(folder)}`, { cache: 'no-store' });
-        const j = await r.json();
-        if (!r.ok || !j.ok) {
-          throw new Error(j.error || `load failed ${r.status}`);
+        const j = await receiverCore.fetchJsonNoStore(`/api/recordings/load?folder=${encodeURIComponent(folder)}`);
+        if (!j.ok) {
+          throw new Error(j.error || 'load failed');
         }
 
         const loadedStatus = j.status || {};
@@ -1206,8 +1224,8 @@
       drawSeries(ctx, status[leftKey] || [], '#ff4d4f', 2, 1);
       drawSeries(ctx, status[rightKey] || [], '#22c55e', 2, 1);
       if (canvas === ipmCanvas) {
-        drawPointSet(ctx, status.ipm_left_boundary_corner || [], '#facc15', 3);
-        drawPointSet(ctx, status.ipm_right_boundary_corner || [], '#fb923c', 3);
+        drawPointSet(ctx, status.ipm_left_boundary_corner || [], '#facc15', 1);
+        drawPointSet(ctx, status.ipm_right_boundary_corner || [], '#fb923c', 1);
       }
       if (Array.isArray(centerData) && centerData.length > 0) {
         drawSeries(ctx, centerData, '#facc15', 2, 1);
@@ -1262,12 +1280,11 @@
       const h = canvas.height;
       ctx.fillStyle = '#020617';
       ctx.fillRect(0, 0, w, h);
-      if (!Array.isArray(rawValues) || rawValues.length < 1) return false;
 
       const minY = Number.isFinite(yMinOverride) ? yMinOverride : curvatureYMin;
       const maxY = Number.isFinite(yMaxOverride) ? yMaxOverride : curvatureYMax;
       if (minY >= maxY) return false;
-      const values = rawValues.map((v) => Math.max(minY, Math.min(maxY, Number(v) || 0)));
+      const series = Array.isArray(rawValues) ? rawValues : [];
 
       const marginLeft = 36;
       const marginRight = 10;
@@ -1276,7 +1293,6 @@
       const plotW = Math.max(1, w - marginLeft - marginRight);
       const plotH = Math.max(1, h - marginTop - marginBottom);
 
-      const xAt = (idx) => marginLeft + (idx * plotW) / Math.max(1, values.length - 1);
       const yAt = (v) => marginTop + ((maxY - v) * plotH) / (maxY - minY);
       const yZero = yAt(0);
 
@@ -1331,6 +1347,23 @@
         ctx.fill();
       }
 
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '12px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText('0', marginLeft - 10, marginTop + plotH + 16);
+      ctx.fillText(series.length > 0 ? String(series.length - 1) : 'N/A', marginLeft + plotW - 28, marginTop + plotH + 16);
+      ctx.fillText(maxY.toFixed(3), 6, marginTop + 8);
+      ctx.fillText('0', 12, yZero + 4);
+      ctx.fillText(minY.toFixed(3), 2, marginTop + plotH);
+
+      if (series.length < 1) {
+        ctx.fillStyle = '#64748b';
+        ctx.fillText('No data', marginLeft + plotW * 0.5 - 20, marginTop + plotH * 0.5);
+        return false;
+      }
+
+      const values = series.map((v) => Math.max(minY, Math.min(maxY, Number(v) || 0)));
+      const xAt = (idx) => marginLeft + (idx * plotW) / Math.max(1, values.length - 1);
+
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -1341,34 +1374,29 @@
         else ctx.lineTo(x, y);
       }
       ctx.stroke();
-
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '12px "Noto Sans SC", "Microsoft YaHei", sans-serif';
-      ctx.fillText('0', marginLeft - 10, marginTop + plotH + 16);
-      ctx.fillText(String(values.length - 1), marginLeft + plotW - 22, marginTop + plotH + 16);
-      ctx.fillText(maxY.toFixed(3), 6, marginTop + 8);
-      ctx.fillText('0', 12, yZero + 4);
-      ctx.fillText(minY.toFixed(3), 2, marginTop + plotH);
       return true;
     }
 
     function drawCurvatureChart(status) {
-      const ok = drawCurveChartToCanvas(curvatureCanvas, curvatureCtx, getSelectedCurvature(status));
-      setCardVisible(curvatureCard, ok);
+      setCardVisible(curvatureCard, showCenterlineCurvatureChart);
+      if (!showCenterlineCurvatureChart) return;
+      drawCurveChartToCanvas(curvatureCanvas, curvatureCtx, getSelectedCurvature(status));
     }
 
     function drawBoundaryCurvatureCharts(status) {
-      const leftOk = drawCurveChartToCanvas(leftBoundaryCurvatureCanvas, leftBoundaryCurvatureCtx, getLeftBoundaryKappa(status));
-      const rightOk = drawCurveChartToCanvas(rightBoundaryCurvatureCanvas, rightBoundaryCurvatureCtx, getRightBoundaryKappa(status));
-      setCardVisible(leftBoundaryCurvatureCard, leftOk);
-      setCardVisible(rightBoundaryCurvatureCard, rightOk);
+      setCardVisible(leftBoundaryCurvatureCard, showBoundaryCurvatureCharts);
+      setCardVisible(rightBoundaryCurvatureCard, showBoundaryCurvatureCharts);
+      if (!showBoundaryCurvatureCharts) return;
+      drawCurveChartToCanvas(leftBoundaryCurvatureCanvas, leftBoundaryCurvatureCtx, getLeftBoundaryKappa(status));
+      drawCurveChartToCanvas(rightBoundaryCurvatureCanvas, rightBoundaryCurvatureCtx, getRightBoundaryKappa(status));
     }
 
     function drawBoundaryAngleCosCharts(status) {
-      const leftOk = drawCurveChartToCanvas(leftBoundaryAngleCosCanvas, leftBoundaryAngleCosCtx, getLeftBoundaryAngleCos(status), -1.0, 1.0);
-      const rightOk = drawCurveChartToCanvas(rightBoundaryAngleCosCanvas, rightBoundaryAngleCosCtx, getRightBoundaryAngleCos(status), -1.0, 1.0);
-      setCardVisible(leftBoundaryAngleCosCard, leftOk);
-      setCardVisible(rightBoundaryAngleCosCard, rightOk);
+      setCardVisible(leftBoundaryAngleCosCard, showBoundaryAngleCosCharts);
+      setCardVisible(rightBoundaryAngleCosCard, showBoundaryAngleCosCharts);
+      if (!showBoundaryAngleCosCharts) return;
+      drawCurveChartToCanvas(leftBoundaryAngleCosCanvas, leftBoundaryAngleCosCtx, getLeftBoundaryAngleCos(status), -1.0, 1.0);
+      drawCurveChartToCanvas(rightBoundaryAngleCosCanvas, rightBoundaryAngleCosCtx, getRightBoundaryAngleCos(status), -1.0, 1.0);
     }
 
     function renderGrayFrame() {
@@ -1404,12 +1432,12 @@
       if (showGrayBoundaries) {
         drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
         drawSeries(grayCtx, right, '#22c55e', 2, 1);
-        drawSeries(grayCtx, leftAux, '#2563eb', 2, 2);
-        drawSeries(grayCtx, rightAux, '#f59e0b', 2, 2);
-        drawPointSet(grayCtx, leftAuxSeed, '#60a5fa', 3);
-        drawPointSet(grayCtx, rightAuxSeed, '#fbbf24', 3);
-        drawPointSet(grayCtx, latestStatus.left_boundary_corner || [], '#facc15', 3);
-        drawPointSet(grayCtx, latestStatus.right_boundary_corner || [], '#fb923c', 3);
+        drawSeries(grayCtx, leftAux, '#2563eb', 2, 1);
+        drawSeries(grayCtx, rightAux, '#f59e0b', 2, 1);
+        drawPointSet(grayCtx, leftAuxSeed, '#60a5fa', 1);
+        drawPointSet(grayCtx, rightAuxSeed, '#fbbf24', 1);
+        drawPointSet(grayCtx, latestStatus.left_boundary_corner || [], '#facc15', 1);
+        drawPointSet(grayCtx, latestStatus.right_boundary_corner || [], '#fb923c', 1);
       }
       if (showMeanCenterline) {
         const meanCenterline = getMeanCenterlineFromBoundaries(latestStatus);
@@ -1563,7 +1591,7 @@
 
     function fmtArrayInline(arr) {
       if (!Array.isArray(arr)) return '[]';
-      return `[${arr.map((v) => Array.isArray(v) ? `[${v.join(', ')}]` : String(v)).join(', ')}]`;
+      return `[${arr.map((v) => Array.isArray(v) ? `[${v.join(', ')}]` : receiverCore.formatValue(v)).join(', ')}]`;
     }
 
     function fmtTrackMethod(method) {
@@ -1590,7 +1618,7 @@
     function buildStatusSummary(status) {
       const lines = [];
       const push = (name, value) => {
-        if (hasValue(value)) lines.push(`${name}: ${value}`);
+        if (hasValue(value)) lines.push(`${name}: ${receiverCore.formatValue(value)}`);
       };
       const pushCount = (name, value) => {
         if (Array.isArray(value)) lines.push(`${name}: ${value.length}`);
@@ -1670,8 +1698,7 @@
 
     async function pullStatus() {
       try {
-        const r = await fetch('/api/status', { cache: 'no-store' });
-        const j = await r.json();
+        const j = await receiverCore.fetchJsonNoStore('/api/status');
         latestStatus = j;
         if (recordingState && recordingState.active) {
           recordingState.statusFrames.push({
@@ -1697,7 +1724,7 @@
     }
 
     function pullFrames() {
-      grayImg.src = `/api/frame_gray.jpg?t=${Date.now()}`;
+      grayImg.src = receiverCore.frameUrlForMode('gray');
     }
 
     bindPixelProbe(grayCanvas, grayCtx, grayPixelInfo);
@@ -1796,10 +1823,25 @@
       drawIpmBoundaries(latestStatus);
       if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
     });
+    toggleCenterlineCurvatureChart.addEventListener('change', () => {
+      showCenterlineCurvatureChart = !!toggleCenterlineCurvatureChart.checked;
+      drawCurvatureChart(latestStatus || {});
+    });
+    toggleBoundaryCurvatureCharts.addEventListener('change', () => {
+      showBoundaryCurvatureCharts = !!toggleBoundaryCurvatureCharts.checked;
+      drawBoundaryCurvatureCharts(latestStatus || {});
+    });
+    toggleBoundaryAngleCosCharts.addEventListener('change', () => {
+      showBoundaryAngleCosCharts = !!toggleBoundaryAngleCosCharts.checked;
+      drawBoundaryAngleCosCharts(latestStatus || {});
+    });
     curvatureYMinInput.addEventListener('change', applyCurvatureYRangeFromInput);
     curvatureYMaxInput.addEventListener('change', applyCurvatureYRangeFromInput);
     curvatureYMinInput.addEventListener('blur', applyCurvatureYRangeFromInput);
     curvatureYMaxInput.addEventListener('blur', applyCurvatureYRangeFromInput);
+    showCenterlineCurvatureChart = !!toggleCenterlineCurvatureChart.checked;
+    showBoundaryCurvatureCharts = !!toggleBoundaryCurvatureCharts.checked;
+    showBoundaryAngleCosCharts = !!toggleBoundaryAngleCosCharts.checked;
     rebuildPlaybackGrid({}, {});
     setInterval(pullStatus, 120);
     setInterval(pullFrames, 60);

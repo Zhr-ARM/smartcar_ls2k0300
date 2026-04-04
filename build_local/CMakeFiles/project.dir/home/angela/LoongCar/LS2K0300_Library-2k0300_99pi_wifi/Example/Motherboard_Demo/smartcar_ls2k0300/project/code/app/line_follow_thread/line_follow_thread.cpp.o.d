@@ -308,7 +308,11 @@ CMakeFiles/project.dir/home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Ex
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_device/zf_device_imu963ra.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_components/seekfree_assistant.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../../libraries/zf_components/seekfree_assistant_interface.h \
+ /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/imu_thread/imu_thread.h \
+ /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/imu660ra/imu660ra.h \
+ /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_config.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/vision/vision_image_processor.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/cstddef \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/app/motor_thread/motor_thread.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/pid/pid.h \
  /home/angela/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/project/user/../code/driver/pid/pid_tuning.h \

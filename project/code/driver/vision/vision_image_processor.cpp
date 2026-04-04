@@ -212,6 +212,7 @@ static std::atomic<float> g_ipm_resample_step_px(g_vision_runtime_config.ipm_res
 static std::atomic<float> g_ipm_boundary_min_point_dist_px(g_vision_runtime_config.ipm_boundary_min_point_dist_px);
 static std::atomic<float> g_ipm_boundary_spike_short_seg_max_px(g_vision_runtime_config.ipm_boundary_spike_short_seg_max_px);
 static std::atomic<float> g_ipm_boundary_spike_reverse_cos_threshold(g_vision_runtime_config.ipm_boundary_spike_reverse_cos_threshold);
+static std::atomic<bool> g_ipm_boundary_curvature_enabled(g_vision_runtime_config.ipm_boundary_curvature_enabled);
 static std::atomic<float> g_ipm_boundary_kappa_sample_spacing_cm(g_vision_runtime_config.ipm_boundary_kappa_sample_spacing_cm);
 static std::atomic<int> g_ipm_boundary_angle_step(g_vision_runtime_config.ipm_boundary_angle_step);
 static std::atomic<float> g_ipm_boundary_corner_cos_threshold(g_vision_runtime_config.ipm_boundary_corner_cos_threshold);
@@ -226,6 +227,7 @@ static std::atomic<bool> g_ipm_centerline_postprocess_enabled(g_vision_runtime_c
 static std::atomic<bool> g_ipm_centerline_triangle_filter_enabled(g_vision_runtime_config.ipm_centerline_triangle_filter_enabled);
 static std::atomic<bool> g_ipm_centerline_resample_enabled(g_vision_runtime_config.ipm_centerline_resample_enabled);
 static std::atomic<float> g_ipm_centerline_resample_step_px(g_vision_runtime_config.ipm_centerline_resample_step_px);
+static std::atomic<bool> g_ipm_centerline_curvature_enabled(g_vision_runtime_config.ipm_centerline_curvature_enabled);
 static std::atomic<bool> g_keep_last_centerline_on_double_loss(g_vision_runtime_config.keep_last_centerline_on_double_loss);
 // 平移中线偏好源（左/右/无偏好自动），用于每帧选边。
 static std::atomic<int> g_ipm_line_error_preferred_source(static_cast<int>(g_vision_runtime_config.ipm_line_error_source));
@@ -1521,7 +1523,7 @@ static void truncate_by_first_corner_inplace(maze_point_t *proc_pts,
         return;
     }
 
-    int first_idx = std::clamp(corner_indices[0], 0, n - 1);
+    int first_idx = std::clamp(corner_indices[0] - 1, 0, n - 1);
     *proc_num = std::min(n_proc, first_idx + 1);
     *angle_num = std::min(n_ang, first_idx + 1);
     *angle_cos_count = std::min(n_cos, first_idx + 1);
@@ -1897,7 +1899,7 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
         }
 
         // 保留辅助线角点及其后段（删除角点前段）。
-        const int keep_from = std::clamp(aux_corner_idx[0], 0, aux_ipm_num - 1);
+        const int keep_from = std::clamp(aux_corner_idx[0] + 1, 0, aux_ipm_num - 1);
         const int keep_num = std::max(0, aux_ipm_num - keep_from);
         if (keep_num <= 0)
         {
@@ -1914,7 +1916,7 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                           main_num,
                                           aux_tail.data(),
                                           keep_num,
-                                          1.4f,
+                                          3.0f,
                                           kIpmOutputWidth,
                                           kIpmOutputHeight);
     };
@@ -1923,17 +1925,20 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
     merge_aux_line_if_has_corner(false, right_proc.data(), &right_proc_num);
 
     // 弯道支路：i±5（跨度10点）曲率 + 三点平滑。
-    const float kBoundarySampleSpacingCm = g_ipm_boundary_kappa_sample_spacing_cm.load();
-    compute_span10_boundary_curvature_inplace(left_proc.data(),
-                                              left_proc_num,
-                                              kBoundarySampleSpacingCm,
-                                              g_ipm_left_boundary_sg_curvature,
-                                              &g_ipm_left_boundary_sg_curvature_count);
-    compute_span10_boundary_curvature_inplace(right_proc.data(),
-                                              right_proc_num,
-                                              kBoundarySampleSpacingCm,
-                                              g_ipm_right_boundary_sg_curvature,
-                                              &g_ipm_right_boundary_sg_curvature_count);
+    if (g_ipm_boundary_curvature_enabled.load())
+    {
+        const float kBoundarySampleSpacingCm = g_ipm_boundary_kappa_sample_spacing_cm.load();
+        compute_span10_boundary_curvature_inplace(left_proc.data(),
+                                                  left_proc_num,
+                                                  kBoundarySampleSpacingCm,
+                                                  g_ipm_left_boundary_sg_curvature,
+                                                  &g_ipm_left_boundary_sg_curvature_count);
+        compute_span10_boundary_curvature_inplace(right_proc.data(),
+                                                  right_proc_num,
+                                                  kBoundarySampleSpacingCm,
+                                                  g_ipm_right_boundary_sg_curvature,
+                                                  &g_ipm_right_boundary_sg_curvature_count);
+    }
 
     // 处理链边界法向平移中线：
     // 先看偏好源，再按左右边界点数择优，只计算并保留一条平移中线。
@@ -2594,8 +2599,42 @@ static void append_points_with_bridge_inplace(maze_point_t *base_pts,
     const float seg_len = std::sqrt(vx * vx + vy * vy);
     if (seg_len > 1e-6f)
     {
-        float d = step;
-        while (d < seg_len && out < VISION_BOUNDARY_NUM)
+        const float tail_gap = [&]() -> float {
+            if (out >= 2)
+            {
+                const maze_point_t &prev = base_pts[out - 2];
+                const float dx = static_cast<float>(tail.x - prev.x);
+                const float dy = static_cast<float>(tail.y - prev.y);
+                const float dist = std::sqrt(dx * dx + dy * dy);
+                if (dist > 1e-6f)
+                {
+                    return dist;
+                }
+            }
+            return step;
+        }();
+        const float head_gap = [&]() -> float {
+            if (in_extra >= 2)
+            {
+                const maze_point_t &next = extra_pts[1];
+                const float dx = static_cast<float>(next.x - head.x);
+                const float dy = static_cast<float>(next.y - head.y);
+                const float dist = std::sqrt(dx * dx + dy * dy);
+                if (dist > 1e-6f)
+                {
+                    return dist;
+                }
+            }
+            return step;
+        }();
+
+        // 桥接补点不要贴着主边界尾点和辅助线首点。
+        // 首个/末个补点分别向内让开与各自原始采样间距相当的距离；
+        // 若中间净空不足，则直接不补，避免角点附近出现跳变。
+        const float bridge_start = std::min(seg_len, std::max(step, tail_gap));
+        const float bridge_end = std::max(0.0f, seg_len - std::max(step, head_gap));
+        float d = bridge_start;
+        while (d < bridge_end && out < VISION_BOUNDARY_NUM)
         {
             const float t = d / seg_len;
             const int px = std::clamp(static_cast<int>(std::lround(ax + vx * t)), 0, max_x);
@@ -3105,6 +3144,16 @@ float vision_image_processor_ipm_resample_step_px()
     return g_ipm_resample_step_px.load();
 }
 
+void vision_image_processor_set_ipm_boundary_curvature_enabled(bool enabled)
+{
+    g_ipm_boundary_curvature_enabled.store(enabled);
+}
+
+bool vision_image_processor_ipm_boundary_curvature_enabled()
+{
+    return g_ipm_boundary_curvature_enabled.load();
+}
+
 void vision_image_processor_set_ipm_boundary_kappa_sample_spacing_cm(float spacing_cm)
 {
     g_ipm_boundary_kappa_sample_spacing_cm.store(std::max(1e-3f, spacing_cm));
@@ -3173,6 +3222,17 @@ void vision_image_processor_set_ipm_centerline_resample_step_px(float step_px)
 float vision_image_processor_ipm_centerline_resample_step_px()
 {
     return g_ipm_centerline_resample_step_px.load();
+}
+
+void vision_image_processor_set_ipm_centerline_curvature_enabled(bool enabled)
+{
+    g_ipm_centerline_curvature_enabled.store(enabled);
+    vision_line_error_layer_set_curvature_enabled(enabled);
+}
+
+bool vision_image_processor_ipm_centerline_curvature_enabled()
+{
+    return g_ipm_centerline_curvature_enabled.load();
 }
 
 void vision_image_processor_set_ipm_line_error_source(vision_ipm_line_error_source_enum source)

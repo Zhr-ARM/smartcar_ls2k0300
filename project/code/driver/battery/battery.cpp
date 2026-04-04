@@ -3,8 +3,9 @@
 namespace
 {
 // 参考逐飞蜂鸣器例程：低电平点亮蜂鸣器，高电平关闭蜂鸣器。
-constexpr const char *kBatteryBeepDevicePath = "/dev/zf_driver_gpio_beep";
-constexpr float kBatteryLowVoltageThresholdV = 11.3f;
+// constexpr const char *kBatteryBeepDevicePath = "/dev/zf_driver_gpio_beep";
+constexpr bool kBatteryAlarmEnabled = false;
+constexpr float kBatteryLowVoltageThresholdV = 10.3f;
 constexpr float kBatteryVoltageFilterAlpha = 0.35f;
 constexpr int kBatteryLowVoltageConfirmCount = 3;
 constexpr int kBatteryCheckPeriodMs =1000;
@@ -17,7 +18,8 @@ bool g_low_voltage_latched = false;
 
 void battery_buzzer_set_enabled(bool enabled)
 {
-    gpio_set_level(kBatteryBeepDevicePath, enabled ? 0x0 : 0x1);
+    (void)enabled;
+    // gpio_set_level(kBatteryBeepDevicePath, (kBatteryAlarmEnabled && enabled) ? 0x0 : 0x1);
 }
 
 bool battery_exit_requested(volatile sig_atomic_t *exit_flag)
@@ -136,7 +138,7 @@ void battery_low_voltage_protection_init()
     g_battery_filter_initialized = true;
     g_low_voltage_latched = (g_filtered_battery_voltage_v < kBatteryLowVoltageThresholdV);
     g_low_voltage_confirm_count = g_low_voltage_latched ? kBatteryLowVoltageConfirmCount : 0;
-    battery_buzzer_set_enabled(false);
+    // battery_buzzer_set_enabled(false);
 }
 
 bool battery_low_voltage_protection_update()
@@ -195,7 +197,7 @@ int battery_low_voltage_protection_check_period_ms()
 
 void battery_low_voltage_protection_silence_buzzer()
 {
-    battery_buzzer_set_enabled(false);
+    // battery_buzzer_set_enabled(false);
 }
 
 void battery_low_voltage_protection_run_alarm_loop(volatile sig_atomic_t *exit_flag)
@@ -217,13 +219,13 @@ void battery_low_voltage_protection_run_alarm_loop(volatile sig_atomic_t *exit_f
         // 报警节奏：三声短鸣，再停顿一下，便于听觉上明显区分“低压告警”。
         for (int i = 0; (i < 3) && !battery_exit_requested(exit_flag); ++i)
         {
-            battery_buzzer_set_enabled(true);
+            // battery_buzzer_set_enabled(true);
             if (!battery_alarm_delay_ms(140, exit_flag))
             {
                 break;
             }
 
-            battery_buzzer_set_enabled(false);
+            // battery_buzzer_set_enabled(false);
             if (!battery_alarm_delay_ms(120, exit_flag))
             {
                 break;
@@ -244,5 +246,5 @@ void battery_low_voltage_protection_run_alarm_loop(volatile sig_atomic_t *exit_f
         elapsed_since_print_ms += 700;
     }
 
-    battery_buzzer_set_enabled(false);
+    // battery_buzzer_set_enabled(false);
 }

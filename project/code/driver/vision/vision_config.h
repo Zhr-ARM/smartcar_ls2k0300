@@ -9,6 +9,12 @@
 // 作用：限定配置数组容量，避免运行时传入过多采样点。
 #define VISION_LINE_ERROR_MAX_WEIGHTED_POINTS 16
 
+typedef enum
+{
+    VISION_WEB_DATA_PROFILE_FULL = 0,
+    VISION_WEB_DATA_PROFILE_RAW_MINIMAL = 1
+} vision_web_data_profile_enum;
+
 typedef struct
 {
     // ==================== 参数区域 3: 网页发送 ====================
@@ -32,6 +38,10 @@ typedef struct
     bool udp_web_send_gray_jpeg;
     // UDP 网页图传是否发送二值 JPEG。
     bool udp_web_send_binary_jpeg;
+    // UDP 网页图传是否发送原始 BGR 彩图 JPEG。
+    bool udp_web_send_rgb_jpeg;
+    // 网页端 TCP 数据模式：0=全量调试数据，1=仅原始最小状态。
+    int udp_web_data_profile;
     // TCP 状态上报开关：控制是否向电脑端发送 JSON 状态数据。
     bool udp_web_tcp_enabled;
     // TCP 状态字段开关（通用）。
@@ -135,6 +145,8 @@ typedef struct
     float ipm_boundary_spike_reverse_cos_threshold;
 
     // ---------- 边界双处理流水线：曲率支路 ----------
+    // 边界曲率计算总开关。
+    bool ipm_boundary_curvature_enabled;
     // 边界 SG 曲率计算采样间距 h（cm）。
     float ipm_boundary_kappa_sample_spacing_cm;
 
@@ -166,6 +178,8 @@ typedef struct
     bool ipm_centerline_resample_enabled;
     // 逆透视处理中线等距采样步长（px）。
     float ipm_centerline_resample_step_px;
+    // 所选偏移中线曲率计算总开关。
+    bool ipm_centerline_curvature_enabled;
     // 所选偏移中线曲率计算步长（索引步长，默认3）。
     int ipm_centerline_curvature_step;
     // 双边都丢线时是否保持上一帧平移中线数组。

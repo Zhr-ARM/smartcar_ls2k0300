@@ -258,6 +258,31 @@ static bool build_gray_jpeg(std::vector<uint8> *jpeg_out, int *width, int *heigh
     return true;
 }
 
+static bool build_rgb_jpeg(std::vector<uint8> *jpeg_out, int *width, int *height, uint8 *mode_out)
+{
+    if (jpeg_out == nullptr || width == nullptr || height == nullptr || mode_out == nullptr)
+    {
+        return false;
+    }
+    const int w = VISION_DOWNSAMPLED_WIDTH;
+    const int h = VISION_DOWNSAMPLED_HEIGHT;
+    const uint8 *bgr = vision_image_processor_bgr_downsampled_image();
+    if (bgr == nullptr)
+    {
+        return false;
+    }
+    cv::Mat img(h, w, CV_8UC3, const_cast<uint8 *>(bgr));
+    std::vector<int> enc_params = {cv::IMWRITE_JPEG_QUALITY, 80};
+    if (!cv::imencode(".jpg", img, *jpeg_out, enc_params))
+    {
+        return false;
+    }
+    *width = w;
+    *height = h;
+    *mode_out = 2;
+    return true;
+}
+
 // 作用：发送 UDP 分片帧。
 static void send_udp_frame(const std::vector<uint8> &jpeg, int width, int height, uint8 mode)
 {
@@ -309,6 +334,8 @@ static void send_tcp_status()
     uint32 total_us = 0;
     vision_image_processor_get_last_perf_us(&capture_wait_us, &preprocess_us, &otsu_us, &maze_us, &total_us);
     const uint8 otsu_threshold = vision_image_processor_get_last_otsu_threshold();
+    const int data_profile = g_vision_runtime_config.udp_web_data_profile;
+    const bool send_full_debug = (data_profile == static_cast<int>(VISION_WEB_DATA_PROFILE_FULL));
 
     bool red_found = false;
     int red_x = 0;
@@ -519,6 +546,29 @@ static void send_tcp_status()
         }
         line += "]";
     };
+
+    append_int(true, "web_data_profile", data_profile);
+    append_int(true, "web_full_debug", send_full_debug ? 1 : 0);
+
+    if (!send_full_debug)
+    {
+        append_int(true, "ts_ms", ts_ms);
+        append_float(true, "base_speed", line_follow_thread_base_speed());
+        append_float(true, "adjusted_base_speed", line_follow_thread_adjusted_base_speed());
+        append_float(true, "left_target_count", motor_thread_left_target_count());
+        append_float(true, "right_target_count", motor_thread_right_target_count());
+        append_float(true, "left_current_count", motor_thread_left_count());
+        append_float(true, "right_current_count", motor_thread_right_count());
+        append_float(true, "left_filtered_count", motor_thread_left_filtered_count());
+        append_float(true, "right_filtered_count", motor_thread_right_filtered_count());
+        append_int(true, "otsu_threshold", otsu_threshold);
+        append_int_array(true, "gray_size",
+                         {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
+        line += "}";
+        line += "\n";
+        tcp_client_send_data(reinterpret_cast<const uint8 *>(line.data()), static_cast<uint32>(line.size()));
+        return;
+    }
 
     append_int(g_vision_runtime_config.udp_web_tcp_send_ts_ms, "ts_ms", ts_ms);
     append_int(g_vision_runtime_config.udp_web_tcp_send_line_error, "line_error", line_error);
@@ -770,6 +820,17 @@ void vision_transport_send_step()
             if (build_gray_jpeg(&gray_jpeg, &width, &height, &mode))
             {
                 send_udp_frame(gray_jpeg, width, height, mode);
+            }
+        }
+        if (g_udp_enabled.load() && g_vision_runtime_config.udp_web_send_rgb_jpeg)
+        {
+            std::vector<uint8> rgb_jpeg;
+            int width = 0;
+            int height = 0;
+            uint8 mode = 0;
+            if (build_rgb_jpeg(&rgb_jpeg, &width, &height, &mode))
+            {
+                send_udp_frame(rgb_jpeg, width, height, mode);
             }
         }
         send_tcp_status();

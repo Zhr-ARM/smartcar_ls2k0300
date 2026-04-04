@@ -19,6 +19,7 @@ std::atomic<float> g_ipm_line_error_speed_k(g_vision_runtime_config.ipm_line_err
 std::atomic<float> g_ipm_line_error_speed_b(g_vision_runtime_config.ipm_line_error_speed_b);
 std::atomic<int> g_ipm_line_error_index_min(g_vision_runtime_config.ipm_line_error_index_min);
 std::atomic<int> g_ipm_line_error_index_max(g_vision_runtime_config.ipm_line_error_index_max);
+std::atomic<bool> g_centerline_curvature_enabled(g_vision_runtime_config.ipm_centerline_curvature_enabled);
 
 std::mutex g_ipm_line_error_weighted_points_mutex;
 std::array<int, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> g_ipm_line_error_point_indices = {
@@ -54,53 +55,54 @@ float g_mean_abs_offset = 0.0f;
 static void compute_selected_centerline_curvature(const uint16 *xs, const uint16 *ys, int count)
 {
     g_selected_centerline_curvature.fill(0.0f);
-    g_selected_centerline_curvature_count = std::clamp(count, 0, static_cast<int>(g_selected_centerline_curvature.size()));
-    if (xs == nullptr || ys == nullptr || count <= 0)
+    g_selected_centerline_curvature_count = 0;
+    if (!g_centerline_curvature_enabled.load() || xs == nullptr || ys == nullptr || count <= 0)
     {
         return;
     }
 
-    const int step = std::max(1, g_centerline_curvature_step.load());
-    const int start_idx = step;
-    const int end_idx = count - step;
-    if (start_idx >= end_idx)
+    const int n = std::clamp(count, 0, static_cast<int>(g_selected_centerline_curvature.size()));
+    g_selected_centerline_curvature_count = n;
+    const int span = std::max(1, g_centerline_curvature_step.load());
+    if (n < 2)
     {
         return;
     }
 
-    for (int i = start_idx; i < end_idx; ++i)
+    const float h = 1.0f;
+    const float inv_2sh = 1.0f / (2.0f * static_cast<float>(span) * h);
+    const float inv_sh2 = 1.0f / (static_cast<float>(span * span) * h * h);
+
+    for (int i = 0; i < n; ++i)
     {
-        const int i0 = i - step;
-        const int i1 = i;
-        const int i2 = i + step;
-
-        const double x0 = static_cast<double>(xs[i0]);
-        const double y0 = static_cast<double>(ys[i0]);
-        const double x1 = static_cast<double>(xs[i1]);
-        const double y1 = static_cast<double>(ys[i1]);
-        const double x2 = static_cast<double>(xs[i2]);
-        const double y2 = static_cast<double>(ys[i2]);
-
-        const double ax = x1 - x0;
-        const double ay = y1 - y0;
-        const double bx = x2 - x1;
-        const double by = y2 - y1;
-
-        const double len_a = std::sqrt(ax * ax + ay * ay);
-        const double len_b = std::sqrt(bx * bx + by * by);
-        const double cx = x2 - x0;
-        const double cy = y2 - y0;
-        const double len_c = std::sqrt(cx * cx + cy * cy);
-        const double denom = len_a * len_b * len_c;
-        if (denom <= 1e-9)
+        const int im = std::clamp(i - span, 0, n - 1);
+        const int ip = std::clamp(i + span, 0, n - 1);
+        if (im == ip)
         {
-            g_selected_centerline_curvature[i] = 0.0f;
             continue;
         }
 
-        const double cross = ax * by - ay * bx;
-        const double curvature = (2.0 * cross) / denom;
-        g_selected_centerline_curvature[i] = static_cast<float>(curvature);
+        const float xm = static_cast<float>(xs[im]);
+        const float x0 = static_cast<float>(xs[i]);
+        const float xp = static_cast<float>(xs[ip]);
+        const float ym = static_cast<float>(ys[im]);
+        const float y0 = static_cast<float>(ys[i]);
+        const float yp = static_cast<float>(ys[ip]);
+
+        const float x1 = (xp - xm) * inv_2sh;
+        const float y1 = (yp - ym) * inv_2sh;
+        const float x2 = (xp - 2.0f * x0 + xm) * inv_sh2;
+        const float y2 = (yp - 2.0f * y0 + ym) * inv_sh2;
+
+        g_selected_centerline_curvature[i] = x1 * y2 - x2 * y1;
+    }
+
+    std::array<float, VISION_DOWNSAMPLED_HEIGHT * 2> curvature_src = g_selected_centerline_curvature;
+    for (int i = 1; i + 1 < n; ++i)
+    {
+        g_selected_centerline_curvature[i] = (curvature_src[i - 1] +
+                                              2.0f * curvature_src[i] +
+                                              curvature_src[i + 1]) * 0.25f;
     }
 }
 
@@ -130,6 +132,7 @@ void vision_line_error_layer_reset()
     g_ipm_line_error_index_max.store(g_vision_runtime_config.ipm_line_error_index_max);
     reset_ipm_line_error_weighted_points_to_default();
     g_ipm_line_error_weighted_first_point_error.store(0);
+    g_centerline_curvature_enabled.store(g_vision_runtime_config.ipm_centerline_curvature_enabled);
     g_centerline_curvature_step.store(std::max(1, g_vision_runtime_config.ipm_centerline_curvature_step));
     g_ipm_weighted_decision_point_valid = false;
     g_ipm_weighted_decision_point_x = 0;
@@ -418,6 +421,16 @@ void vision_line_error_layer_set_curvature_step(int step)
 int vision_line_error_layer_curvature_step()
 {
     return g_centerline_curvature_step.load();
+}
+
+void vision_line_error_layer_set_curvature_enabled(bool enabled)
+{
+    g_centerline_curvature_enabled.store(enabled);
+}
+
+bool vision_line_error_layer_curvature_enabled()
+{
+    return g_centerline_curvature_enabled.load();
 }
 
 void vision_line_error_layer_get_selected_centerline_curvature(const float **curvature, int *count)

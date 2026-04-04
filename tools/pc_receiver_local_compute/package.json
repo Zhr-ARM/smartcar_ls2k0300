@@ -1,0 +1,11 @@
+{
+  "name": "vision-pc-receiver-local-compute",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lean smartcar vision receiver for raw frames + raw status with browser-side recompute pipeline",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  }
+}

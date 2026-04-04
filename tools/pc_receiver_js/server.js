@@ -15,8 +15,9 @@ const TCP_PORT = Number(process.env.TCP_PORT || 10001);
 const HTTP_PORT = Number(process.env.HTTP_PORT || 8080);
 
 const latestByMode = {
-  0: { jpeg: null, frameId: -1, updatedAtMs: 0 }, // binary
-  1: { jpeg: null, frameId: -1, updatedAtMs: 0 }  // gray
+  0: { jpeg: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 0 },
+  1: { jpeg: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 1 },
+  2: { jpeg: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 2 }
 };
 let latestStatus = { message: 'waiting' };
 
@@ -123,7 +124,7 @@ function writeRecordingFiles(folderName, payload) {
 
 function listRecordingFolders() {
   ensureRecordingsDir();
-  const entries = fs.readdirSync(RECORDINGS_DIR, { withFileTypes: true })
+  return fs.readdirSync(RECORDINGS_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => {
       const fullPath = path.join(RECORDINGS_DIR, entry.name);
@@ -136,7 +137,6 @@ function listRecordingFolders() {
       return { folder: entry.name, mtime_ms: Math.round(mtimeMs) };
     })
     .sort((a, b) => b.mtime_ms - a.mtime_ms);
-  return entries;
 }
 
 function parseHeader(buf) {
@@ -162,7 +162,6 @@ function cleanupInflight() {
 }
 
 function isFrameNewer(prevFrameId, nextFrameId) {
-  // 按 uint32 序关系判断 next 是否比 prev 更新，兼容回绕。
   const diff = ((nextFrameId >>> 0) - (prevFrameId >>> 0)) >>> 0;
   return diff !== 0 && diff < 0x80000000;
 }
@@ -172,9 +171,6 @@ function shouldAcceptFrame(mode, frameId, nowMs) {
   if (!latest) return false;
   if (latest.frameId < 0) return true;
   if (isFrameNewer(latest.frameId, frameId)) return true;
-
-  // 主板重连/发送中断后，frameId 可能从 0 重新开始。
-  // 当该 mode 超过 1.5s 没有新图后，允许接纳“非更新序”帧作为新起点。
   if ((nowMs - latest.updatedAtMs) > 1500) return true;
   return false;
 }
@@ -183,6 +179,7 @@ function onUdpMessage(msg) {
   const hdr = parseHeader(msg);
   if (!hdr) return;
   if (hdr.magic !== MAGIC) return;
+  if (!(hdr.mode in latestByMode)) return;
   if (hdr.chunkTotal === 0 || hdr.chunkIdx >= hdr.chunkTotal) return;
   if (HEADER_SIZE + hdr.payloadLen > msg.length) return;
 
@@ -215,9 +212,14 @@ function onUdpMessage(msg) {
     const jpeg = Buffer.concat(ordered);
     const nowMs = Date.now();
     if (shouldAcceptFrame(hdr.mode, hdr.frameId, nowMs)) {
-      latestByMode[hdr.mode].frameId = hdr.frameId >>> 0;
-      latestByMode[hdr.mode].jpeg = jpeg;
-      latestByMode[hdr.mode].updatedAtMs = nowMs;
+      latestByMode[hdr.mode] = {
+        jpeg,
+        frameId: hdr.frameId >>> 0,
+        updatedAtMs: nowMs,
+        width: hdr.width,
+        height: hdr.height,
+        mode: hdr.mode
+      };
     }
     inflightFrames.delete(hdr.frameId);
   }
@@ -275,6 +277,22 @@ function serveFile(res, filePath, contentType) {
   });
 }
 
+function writeJpeg(res, frame, notReadyMessage) {
+  if (!frame || !frame.jpeg) {
+    res.writeHead(503, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store'
+    });
+    res.end(notReadyMessage);
+    return;
+  }
+  res.writeHead(200, {
+    'Content-Type': 'image/jpeg',
+    'Cache-Control': 'no-store'
+  });
+  res.end(frame.jpeg);
+}
+
 function startHttpServer() {
   ensureRecordingsDir();
   const server = http.createServer((req, res) => {
@@ -283,6 +301,22 @@ function startHttpServer() {
 
     if (pathname === '/' || pathname === '/index.html') {
       serveFile(res, path.join(PUBLIC_DIR, 'index.html'), 'text/html; charset=utf-8');
+      return;
+    }
+    if (pathname === '/local_compute.html') {
+      serveFile(res, path.join(PUBLIC_DIR, 'local_compute.html'), 'text/html; charset=utf-8');
+      return;
+    }
+    if (pathname === '/local_compute_app.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'local_compute_app.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/shared_receiver_core.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'shared_receiver_core.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/pipeline_worker.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'pipeline_worker.js'), 'application/javascript; charset=utf-8');
       return;
     }
 
@@ -296,39 +330,27 @@ function startHttpServer() {
       return;
     }
 
-    if (pathname === '/api/frame_gray.jpg') {
-      const latestGray = latestByMode[1].jpeg;
-      if (!latestGray) {
-        res.writeHead(503, {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'Cache-Control': 'no-store'
-        });
-        res.end('gray frame not ready');
-        return;
-      }
-      res.writeHead(200, {
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'no-store'
+    if (pathname === '/api/frame_meta') {
+      sendJson(res, 200, {
+        gray: latestByMode[1],
+        binary: latestByMode[0],
+        rgb: latestByMode[2]
       });
-      res.end(latestGray);
+      return;
+    }
+
+    if (pathname === '/api/frame_gray.jpg') {
+      writeJpeg(res, latestByMode[1], 'gray frame not ready');
       return;
     }
 
     if (pathname === '/api/frame_binary.jpg') {
-      const latestBinary = latestByMode[0].jpeg;
-      if (!latestBinary) {
-        res.writeHead(503, {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'Cache-Control': 'no-store'
-        });
-        res.end('binary frame not ready');
-        return;
-      }
-      res.writeHead(200, {
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'no-store'
-      });
-      res.end(latestBinary);
+      writeJpeg(res, latestByMode[0], 'binary frame not ready');
+      return;
+    }
+
+    if (pathname === '/api/frame_rgb.jpg') {
+      writeJpeg(res, latestByMode[2], 'rgb frame not ready');
       return;
     }
 

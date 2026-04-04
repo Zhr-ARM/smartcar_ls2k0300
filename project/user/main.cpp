@@ -123,12 +123,15 @@ int main(int, char**)
     vision_transport_udp_set_enabled(g_vision_runtime_config.udp_web_enabled);      // UDP 视频发送开关
     vision_transport_udp_set_max_fps(g_vision_runtime_config.udp_web_max_fps);       // UDP 视频发送限频
     vision_transport_udp_set_tcp_enabled(g_vision_runtime_config.udp_web_tcp_enabled); // TCP 状态发送开关
-    printf("[UDP_WEB] enabled=%d server=%s video=%u meta=%u fps=%u\r\n",
+    printf("[UDP_WEB] enabled=%d server=%s video=%u meta=%u fps=%u gray=%d rgb=%d profile=%d\r\n",
            vision_transport_udp_is_enabled() ? 1 : 0,
            g_vision_runtime_config.udp_web_server_ip,
            static_cast<unsigned int>(g_vision_runtime_config.udp_web_video_port),
            static_cast<unsigned int>(g_vision_runtime_config.udp_web_meta_port),
-           static_cast<unsigned int>(vision_transport_udp_get_max_fps()));
+           static_cast<unsigned int>(vision_transport_udp_get_max_fps()),
+           g_vision_runtime_config.udp_web_send_gray_jpeg ? 1 : 0,
+           g_vision_runtime_config.udp_web_send_rgb_jpeg ? 1 : 0,
+           g_vision_runtime_config.udp_web_data_profile);
 
     // 初始化 ncnn 模型；后续是否真正执行推理由配置中的 infer_enabled 控制。
     LQ_NCNN ncnn;
@@ -181,6 +184,7 @@ int main(int, char**)
     vision_image_processor_set_ipm_triangle_filter_enabled(g_vision_runtime_config.ipm_triangle_filter_enabled); // IPM三角滤波
     vision_image_processor_set_ipm_resample_enabled(g_vision_runtime_config.ipm_resample_enabled); // IPM等距采样开关
     vision_image_processor_set_ipm_resample_step_px(g_vision_runtime_config.ipm_resample_step_px); // IPM等距采样步长
+    vision_image_processor_set_ipm_boundary_curvature_enabled(g_vision_runtime_config.ipm_boundary_curvature_enabled); // 边界曲率开关
     vision_image_processor_set_ipm_boundary_kappa_sample_spacing_cm(g_vision_runtime_config.ipm_boundary_kappa_sample_spacing_cm); // 边界kappa采样间距h(cm)
     vision_image_processor_set_ipm_boundary_angle_step(g_vision_runtime_config.ipm_boundary_angle_step); // 边界三点法夹角步长
     vision_image_processor_set_ipm_boundary_shift_distance_px(g_vision_runtime_config.ipm_boundary_shift_distance_px); // IPM边界法向平移距离
@@ -188,6 +192,7 @@ int main(int, char**)
     vision_image_processor_set_ipm_centerline_triangle_filter_enabled(g_vision_runtime_config.ipm_centerline_triangle_filter_enabled); // 中线三角滤波
     vision_image_processor_set_ipm_centerline_resample_enabled(g_vision_runtime_config.ipm_centerline_resample_enabled); // 中线等距采样
     vision_image_processor_set_ipm_centerline_resample_step_px(g_vision_runtime_config.ipm_centerline_resample_step_px); // 中线采样步长
+    vision_image_processor_set_ipm_centerline_curvature_enabled(g_vision_runtime_config.ipm_centerline_curvature_enabled); // 中线曲率开关
     vision_image_processor_set_ipm_centerline_curvature_step(g_vision_runtime_config.ipm_centerline_curvature_step); // 中线曲率计算步长
 
     // [偏差计算]
@@ -202,7 +207,7 @@ int main(int, char**)
     vision_image_processor_set_ipm_line_error_index_range(g_vision_runtime_config.ipm_line_error_index_min,
                                                           g_vision_runtime_config.ipm_line_error_index_max); // line_error 随速度索引区间
 
-    printf("[VISION CFG] mode=%d max_fps=%u infer=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_kappa_h_cm=%.3f ipm_angle_step=%d ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
+    printf("[VISION CFG] mode=%d max_fps=%u infer=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_boundary_kappa_en=%d ipm_step=%.2f ipm_kappa_h_cm=%.3f ipm_angle_step=%d ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
            static_cast<int>(vision_thread_get_send_mode()),
            static_cast<unsigned int>(vision_thread_get_send_max_fps()),
            vision_thread_infer_enabled() ? 1 : 0,
@@ -213,6 +218,7 @@ int main(int, char**)
            vision_image_processor_undistort_enabled() ? 1 : 0,
            vision_image_processor_ipm_triangle_filter_enabled() ? 1 : 0,
            vision_image_processor_ipm_resample_enabled() ? 1 : 0,
+           vision_image_processor_ipm_boundary_curvature_enabled() ? 1 : 0,
            static_cast<double>(vision_image_processor_ipm_resample_step_px()),
            static_cast<double>(vision_image_processor_ipm_boundary_kappa_sample_spacing_cm()),
            vision_image_processor_ipm_boundary_angle_step(),
@@ -220,6 +226,7 @@ int main(int, char**)
            vision_image_processor_ipm_centerline_postprocess_enabled() ? 1 : 0,
            vision_image_processor_ipm_centerline_triangle_filter_enabled() ? 1 : 0,
            vision_image_processor_ipm_centerline_resample_enabled() ? 1 : 0,
+           vision_image_processor_ipm_centerline_curvature_enabled() ? 1 : 0,
            static_cast<double>(vision_image_processor_ipm_centerline_resample_step_px()),
            static_cast<int>(vision_image_processor_ipm_line_error_source()),
            static_cast<int>(vision_image_processor_ipm_line_error_method()),
