@@ -335,6 +335,22 @@ static void send_tcp_status()
     uint16 right_dot_num = 0;
     vision_image_processor_get_boundaries(&x1, nullptr, &x3, &y1, nullptr, &y3, &dot_num);
     vision_image_processor_get_boundary_side_counts(&left_dot_num, &right_dot_num);
+    uint16 *aux_left_x = nullptr;
+    uint16 *aux_left_y = nullptr;
+    uint16 aux_left_num = 0;
+    uint16 *aux_right_x = nullptr;
+    uint16 *aux_right_y = nullptr;
+    uint16 aux_right_num = 0;
+    vision_image_processor_get_src_auxiliary_lines(&aux_left_x, &aux_left_y, &aux_left_num,
+                                                   &aux_right_x, &aux_right_y, &aux_right_num);
+    uint16 *aux_seed_left_x = nullptr;
+    uint16 *aux_seed_left_y = nullptr;
+    uint16 aux_seed_left_num = 0;
+    uint16 *aux_seed_right_x = nullptr;
+    uint16 *aux_seed_right_y = nullptr;
+    uint16 aux_seed_right_num = 0;
+    vision_image_processor_get_src_auxiliary_seed_points(&aux_seed_left_x, &aux_seed_left_y, &aux_seed_left_num,
+                                                         &aux_seed_right_x, &aux_seed_right_y, &aux_seed_right_num);
 
     uint16 *ipm_x1 = nullptr;
     uint16 *ipm_x3 = nullptr;
@@ -345,35 +361,30 @@ static void send_tcp_status()
     uint16 ipm_right_dot_num = 0;
     vision_image_processor_get_ipm_boundaries(&ipm_x1, nullptr, &ipm_x3, &ipm_y1, nullptr, &ipm_y3, &ipm_dot_num);
     vision_image_processor_get_ipm_boundary_side_counts(&ipm_left_dot_num, &ipm_right_dot_num);
-    uint16 *ipm_raw_x1 = nullptr;
-    uint16 *ipm_raw_x3 = nullptr;
-    uint16 *ipm_raw_y1 = nullptr;
-    uint16 *ipm_raw_y3 = nullptr;
-    uint16 ipm_raw_dot_num = 0;
-    uint16 ipm_raw_left_dot_num = 0;
-    uint16 ipm_raw_right_dot_num = 0;
-    vision_image_processor_get_ipm_boundaries_raw(&ipm_raw_x1, nullptr, &ipm_raw_x3, &ipm_raw_y1, nullptr, &ipm_raw_y3, &ipm_raw_dot_num);
-    vision_image_processor_get_ipm_raw_boundary_side_counts(&ipm_raw_left_dot_num, &ipm_raw_right_dot_num);
+    uint16 *src_corner_left_x = nullptr;
+    uint16 *src_corner_left_y = nullptr;
+    uint16 src_corner_left_num = 0;
+    uint16 *src_corner_right_x = nullptr;
+    uint16 *src_corner_right_y = nullptr;
+    uint16 src_corner_right_num = 0;
+    vision_image_processor_get_src_boundary_corners(&src_corner_left_x,
+                                                    &src_corner_left_y,
+                                                    &src_corner_left_num,
+                                                    &src_corner_right_x,
+                                                    &src_corner_right_y,
+                                                    &src_corner_right_num);
     uint16 *ipm_corner_left_x = nullptr;
     uint16 *ipm_corner_left_y = nullptr;
-    float *ipm_corner_left_raw_value = nullptr;
-    float *ipm_corner_left_value = nullptr;
     uint16 ipm_corner_left_num = 0;
-    vision_image_processor_get_ipm_corner_debug_left(&ipm_corner_left_x,
-                                                     &ipm_corner_left_y,
-                                                     &ipm_corner_left_raw_value,
-                                                     &ipm_corner_left_value,
-                                                     &ipm_corner_left_num);
     uint16 *ipm_corner_right_x = nullptr;
     uint16 *ipm_corner_right_y = nullptr;
-    float *ipm_corner_right_raw_value = nullptr;
-    float *ipm_corner_right_value = nullptr;
     uint16 ipm_corner_right_num = 0;
-    vision_image_processor_get_ipm_corner_debug_right(&ipm_corner_right_x,
-                                                      &ipm_corner_right_y,
-                                                      &ipm_corner_right_raw_value,
-                                                      &ipm_corner_right_value,
-                                                      &ipm_corner_right_num);
+    vision_image_processor_get_ipm_boundary_corners(&ipm_corner_left_x,
+                                                    &ipm_corner_left_y,
+                                                    &ipm_corner_left_num,
+                                                    &ipm_corner_right_x,
+                                                    &ipm_corner_right_y,
+                                                    &ipm_corner_right_num);
     uint16 *ipm_center_left_x = nullptr;
     uint16 *ipm_center_left_y = nullptr;
     uint16 ipm_center_left_num = 0;
@@ -393,36 +404,18 @@ static void send_tcp_status()
     const float *selected_ipm_curvature = nullptr;
     int selected_ipm_curvature_count = 0;
     vision_image_processor_get_ipm_selected_centerline_curvature(&selected_ipm_curvature, &selected_ipm_curvature_count);
-    float curvature_speed_v = 0.0f;
-    float curvature_k_eff = 0.0f;
-    float curvature_eta = 0.0f;
-    int curvature_lookahead_index = -1;
-    float curvature_weighted_error = 0.0f;
-    bool curvature_lookahead_point_valid = false;
-    int curvature_lookahead_point_x = 0;
-    int curvature_lookahead_point_y = 0;
-    float curvature_kappa_max = 0.0f;
-    float curvature_delta_kappa_max = 0.0f;
-    float curvature_base_speed_curve = 0.0f;
-    float curvature_v_curve_raw = 0.0f;
-    float curvature_v_curve_after_dkappa = 0.0f;
-    float curvature_v_error_limit = 0.0f;
-    float curvature_v_target = 0.0f;
-    vision_image_processor_get_ipm_curvature_lookahead_debug(&curvature_speed_v,
-                                                             &curvature_k_eff,
-                                                             &curvature_eta,
-                                                             &curvature_lookahead_index);
-    vision_image_processor_get_ipm_curvature_weighted_error_debug(&curvature_weighted_error,
-                                                                  &curvature_lookahead_point_valid,
-                                                                  &curvature_lookahead_point_x,
-                                                                  &curvature_lookahead_point_y);
-    vision_image_processor_get_ipm_curvature_speed_limit_debug(&curvature_kappa_max,
-                                                               &curvature_delta_kappa_max,
-                                                               &curvature_base_speed_curve,
-                                                               &curvature_v_curve_raw,
-                                                               &curvature_v_curve_after_dkappa,
-                                                               &curvature_v_error_limit,
-                                                               &curvature_v_target);
+    const float *left_ipm_boundary_curvature = nullptr;
+    int left_ipm_boundary_curvature_count = 0;
+    vision_image_processor_get_ipm_left_boundary_curvature(&left_ipm_boundary_curvature, &left_ipm_boundary_curvature_count);
+    const float *right_ipm_boundary_curvature = nullptr;
+    int right_ipm_boundary_curvature_count = 0;
+    vision_image_processor_get_ipm_right_boundary_curvature(&right_ipm_boundary_curvature, &right_ipm_boundary_curvature_count);
+    const float *left_ipm_boundary_angle_cos = nullptr;
+    int left_ipm_boundary_angle_cos_count = 0;
+    vision_image_processor_get_ipm_left_boundary_angle_cos(&left_ipm_boundary_angle_cos, &left_ipm_boundary_angle_cos_count);
+    const float *right_ipm_boundary_angle_cos = nullptr;
+    int right_ipm_boundary_angle_cos_count = 0;
+    vision_image_processor_get_ipm_right_boundary_angle_cos(&right_ipm_boundary_angle_cos, &right_ipm_boundary_angle_cos_count);
     bool ipm_track_valid = false;
     int ipm_track_index = -1;
     int ipm_track_x = 0;
@@ -436,9 +429,6 @@ static void send_tcp_status()
     uint16 maze_right_points_raw = 0;
     bool maze_left_ok = false;
     bool maze_right_ok = false;
-    bool intersection_mode = false;
-    int intersection_stop_row = -1;
-    int intersection_current_start_row = -1;
     bool ipm_weighted_decision_valid = false;
     int ipm_weighted_decision_x = 0;
     int ipm_weighted_decision_y = 0;
@@ -462,7 +452,6 @@ static void send_tcp_status()
                                                    &maze_right_points_raw,
                                                    &maze_left_ok,
                                                    &maze_right_ok);
-    vision_image_processor_get_intersection_mode_state(&intersection_mode, &intersection_stop_row, &intersection_current_start_row);
 
     const int64_t ts_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                               std::chrono::steady_clock::now().time_since_epoch())
@@ -577,39 +566,12 @@ static void send_tcp_status()
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_index, "ipm_track_index", ipm_track_index);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_track_point, "ipm_track_point",
                      {ipm_track_x, ipm_track_y});
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_first_index, "ipm_weighted_first_index",
-               g_vision_runtime_config.ipm_line_error_weighted_first_index);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_decision_index, "ipm_weighted_decision_index",
-               g_vision_runtime_config.ipm_line_error_weighted_decision_index);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_default_spacing, "ipm_weighted_default_spacing",
-               g_vision_runtime_config.ipm_line_error_weighted_default_spacing);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_threshold_1, "ipm_weighted_spacing_threshold_1",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_1);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_threshold_2, "ipm_weighted_spacing_threshold_2",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_2);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_threshold_3, "ipm_weighted_spacing_threshold_3",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_threshold_3);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_value_1, "ipm_weighted_spacing_value_1",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_value_1);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_value_2, "ipm_weighted_spacing_value_2",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_value_2);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_spacing_value_3, "ipm_weighted_spacing_value_3",
-               g_vision_runtime_config.ipm_line_error_weighted_spacing_value_3);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_first_point_error, "ipm_weighted_first_point_error",
                vision_image_processor_ipm_weighted_first_point_error());
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_current_spacing, "ipm_weighted_current_spacing",
-               vision_image_processor_ipm_weighted_current_spacing());
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_decision_point && ipm_weighted_decision_valid, "ipm_weighted_decision_point",
                      {ipm_weighted_decision_x, ipm_weighted_decision_y});
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_src_weighted_decision_point && src_weighted_decision_valid, "src_weighted_decision_point",
                      {src_weighted_decision_x, src_weighted_decision_y});
-    append_bool(g_vision_runtime_config.udp_web_tcp_send_intersection_mode, "intersection_mode", intersection_mode);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_intersection_stop_row, "intersection_stop_row", intersection_stop_row);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_intersection_current_start_row,
-               "intersection_current_start_row",
-               intersection_current_start_row);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_roundabout_mode, "roundabout_mode",
-               vision_image_processor_roundabout_mode());
 
     auto append_points = [&append_key, &line](bool enabled, const char *name, uint16 *xs, uint16 *ys, uint16 n, int max_w, int max_h) {
         if (!enabled)
@@ -659,26 +621,26 @@ static void send_tcp_status()
                   "left_boundary", x1, y1, left_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
                   "right_boundary", x3, y3, right_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
+                  "left_auxiliary_line", aux_left_x, aux_left_y, aux_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
+                  "right_auxiliary_line", aux_right_x, aux_right_y, aux_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
+                  "left_auxiliary_seed", aux_seed_left_x, aux_seed_left_y, aux_seed_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
+                  "right_auxiliary_seed", aux_seed_right_x, aux_seed_right_y, aux_seed_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
+                  "left_boundary_corner", src_corner_left_x, src_corner_left_y, src_corner_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
+                  "right_boundary_corner", src_corner_right_x, src_corner_right_y, src_corner_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary,
                   "ipm_left_boundary", ipm_x1, ipm_y1, ipm_left_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary,
                   "ipm_right_boundary", ipm_x3, ipm_y3, ipm_right_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_raw_left_boundary,
-                  "ipm_raw_left_boundary", ipm_raw_x1, ipm_raw_y1, ipm_raw_left_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_raw_right_boundary,
-                  "ipm_raw_right_boundary", ipm_raw_x3, ipm_raw_y3, ipm_raw_right_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_left_boundary,
-                  "ipm_corner_left_boundary", ipm_corner_left_x, ipm_corner_left_y, ipm_corner_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_right_boundary,
-                  "ipm_corner_right_boundary", ipm_corner_right_x, ipm_corner_right_y, ipm_corner_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_left_raw_angle,
-                       "ipm_corner_left_raw_angle", ipm_corner_left_raw_value, ipm_corner_left_num);
-    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_right_raw_angle,
-                       "ipm_corner_right_raw_angle", ipm_corner_right_raw_value, ipm_corner_right_num);
-    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_left_nms,
-                       "ipm_corner_left_nms", ipm_corner_left_value, ipm_corner_left_num);
-    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_corner_right_nms,
-                       "ipm_corner_right_nms", ipm_corner_right_value, ipm_corner_right_num);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary,
+                  "ipm_left_boundary_corner", ipm_corner_left_x, ipm_corner_left_y, ipm_corner_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary,
+                  "ipm_right_boundary_corner", ipm_corner_right_x, ipm_corner_right_y, ipm_corner_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
 
     const bool selected_is_right =
         (vision_image_processor_ipm_line_error_source() == VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT);
@@ -718,45 +680,22 @@ static void send_tcp_status()
                        "ipm_centerline_selected_curvature",
                        selected_ipm_curvature,
                        static_cast<uint16>(std::clamp(selected_ipm_curvature_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_speed_v,
-                 "ipm_curvature_speed_v",
-                 curvature_speed_v);
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_effective,
-                 "ipm_curvature_k_eff",
-                 curvature_k_eff);
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_eta,
-                 "ipm_curvature_eta",
-                 curvature_eta);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_lookahead_index,
-               "ipm_curvature_lookahead_index",
-               curvature_lookahead_index);
-    append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_lookahead_point && curvature_lookahead_point_valid,
-                     "ipm_curvature_lookahead_point",
-                     {curvature_lookahead_point_x, curvature_lookahead_point_y});
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_weighted_error,
-                 "ipm_curvature_weighted_error",
-                 curvature_weighted_error);
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_kappa_max,
-                 "ipm_curvature_kappa_max",
-                 curvature_kappa_max);
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_delta_kappa_max,
-                 "ipm_curvature_delta_kappa_max",
-                 curvature_delta_kappa_max);
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_base_speed_curve,
-                 "ipm_curvature_base_speed_curve",
-                 curvature_base_speed_curve);
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_v_curve_raw,
-                 "ipm_curvature_v_curve_raw",
-                 curvature_v_curve_raw);
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_v_curve_after_dkappa,
-                 "ipm_curvature_v_curve_after_dkappa",
-                 curvature_v_curve_after_dkappa);
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_v_error_limit,
-                 "ipm_curvature_v_error_limit",
-                 curvature_v_error_limit);
-    append_float(g_vision_runtime_config.udp_web_tcp_send_ipm_curvature_v_target,
-                 "ipm_curvature_v_target",
-                 curvature_v_target);
+    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
+                       "ipm_left_boundary_curvature",
+                       left_ipm_boundary_curvature,
+                       static_cast<uint16>(std::clamp(left_ipm_boundary_curvature_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
+    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
+                       "ipm_right_boundary_curvature",
+                       right_ipm_boundary_curvature,
+                       static_cast<uint16>(std::clamp(right_ipm_boundary_curvature_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
+    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
+                       "ipm_left_boundary_angle_cos",
+                       left_ipm_boundary_angle_cos,
+                       static_cast<uint16>(std::clamp(left_ipm_boundary_angle_cos_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
+    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
+                       "ipm_right_boundary_angle_cos",
+                       right_ipm_boundary_angle_cos,
+                       static_cast<uint16>(std::clamp(right_ipm_boundary_angle_cos_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
 
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_gray_size, "gray_size",
                      {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});

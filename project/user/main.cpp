@@ -111,26 +111,30 @@ int main(int, char**)
         return -1;
     }
 
-    // 下发视觉配置参数。
-    vision_thread_set_send_mode(static_cast<vision_thread_send_mode_enum>(g_vision_runtime_config.send_mode));                       // 图像模式
-    vision_thread_set_send_max_fps(g_vision_runtime_config.send_max_fps);                 // 客户端发送限频
-    vision_thread_set_infer_enabled(g_vision_runtime_config.infer_enabled);               // 推理开关
+    // 下发视觉配置参数（按“网页发送 / 视觉处理 / 偏差计算”分组）。
+    // [网页发送]
+    vision_thread_set_send_mode(static_cast<vision_thread_send_mode_enum>(g_vision_runtime_config.send_mode)); // 图像模式
+    vision_thread_set_send_max_fps(g_vision_runtime_config.send_max_fps); // 客户端发送限频
+    vision_thread_set_infer_enabled(g_vision_runtime_config.infer_enabled); // 推理开关
     vision_thread_set_client_sender_enabled(g_vision_runtime_config.client_sender_enabled); // 逐飞发送开关
-    vision_thread_set_roi_capture_mode(g_vision_runtime_config.roi_capture_mode);         // ROI 抓图开关
-    vision_image_processor_set_maze_start_row(g_vision_runtime_config.maze_start_row);    // 迷宫法起始搜索行
+    vision_thread_set_roi_capture_mode(g_vision_runtime_config.roi_capture_mode); // ROI 抓图开关
+
+    // [视觉处理]
+    vision_image_processor_set_maze_start_row(g_vision_runtime_config.maze_start_row); // 迷宫法起始搜索行
     vision_image_processor_set_undistort_enabled(g_vision_runtime_config.undistort_enabled); // 去畸变开关
     vision_image_processor_set_ipm_triangle_filter_enabled(g_vision_runtime_config.ipm_triangle_filter_enabled); // IPM三角滤波
-    vision_image_processor_set_ipm_min_point_dist_filter_enabled(g_vision_runtime_config.ipm_min_point_dist_filter_enabled); // IPM边界近重复点过滤
-    vision_image_processor_set_ipm_min_point_dist_px(g_vision_runtime_config.ipm_min_point_dist_px); // IPM边界近重复点阈值
     vision_image_processor_set_ipm_resample_enabled(g_vision_runtime_config.ipm_resample_enabled); // IPM等距采样开关
     vision_image_processor_set_ipm_resample_step_px(g_vision_runtime_config.ipm_resample_step_px); // IPM等距采样步长
+    vision_image_processor_set_ipm_boundary_kappa_sample_spacing_cm(g_vision_runtime_config.ipm_boundary_kappa_sample_spacing_cm); // 边界kappa采样间距h(cm)
+    vision_image_processor_set_ipm_boundary_angle_step(g_vision_runtime_config.ipm_boundary_angle_step); // 边界三点法夹角步长
     vision_image_processor_set_ipm_boundary_shift_distance_px(g_vision_runtime_config.ipm_boundary_shift_distance_px); // IPM边界法向平移距离
     vision_image_processor_set_ipm_centerline_postprocess_enabled(g_vision_runtime_config.ipm_centerline_postprocess_enabled); // 中线后处理总开关
     vision_image_processor_set_ipm_centerline_triangle_filter_enabled(g_vision_runtime_config.ipm_centerline_triangle_filter_enabled); // 中线三角滤波
     vision_image_processor_set_ipm_centerline_resample_enabled(g_vision_runtime_config.ipm_centerline_resample_enabled); // 中线等距采样
     vision_image_processor_set_ipm_centerline_resample_step_px(g_vision_runtime_config.ipm_centerline_resample_step_px); // 中线采样步长
-    vision_image_processor_set_ipm_centerline_min_point_dist_px(g_vision_runtime_config.ipm_centerline_min_point_dist_px); // 中线去近重复阈值
     vision_image_processor_set_ipm_centerline_curvature_step(g_vision_runtime_config.ipm_centerline_curvature_step); // 中线曲率计算步长
+
+    // [偏差计算]
     vision_image_processor_set_ipm_line_error_source(static_cast<vision_ipm_line_error_source_enum>(g_vision_runtime_config.ipm_line_error_source)); // line_error 中线来源
     vision_image_processor_set_ipm_line_error_method(static_cast<vision_ipm_line_error_method_enum>(g_vision_runtime_config.ipm_line_error_method)); // line_error 计算方法
     vision_image_processor_set_ipm_line_error_fixed_index(g_vision_runtime_config.ipm_line_error_fixed_index); // line_error 固定索引
@@ -142,7 +146,7 @@ int main(int, char**)
     vision_image_processor_set_ipm_line_error_index_range(g_vision_runtime_config.ipm_line_error_index_min,
                                                           g_vision_runtime_config.ipm_line_error_index_max); // line_error 随速度索引区间
 
-    printf("[VISION CFG] mode=%d max_fps=%u infer=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_min_filter=%d ipm_min_dist=%.2f ipm_resample=%d ipm_step=%.2f ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_step=%.2f center_min_dist=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
+    printf("[VISION CFG] mode=%d max_fps=%u infer=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_kappa_h_cm=%.3f ipm_angle_step=%d ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
            static_cast<int>(vision_thread_get_send_mode()),
            static_cast<unsigned int>(vision_thread_get_send_max_fps()),
            vision_thread_infer_enabled() ? 1 : 0,
@@ -152,16 +156,15 @@ int main(int, char**)
            vision_image_processor_get_maze_start_row(),
            vision_image_processor_undistort_enabled() ? 1 : 0,
            vision_image_processor_ipm_triangle_filter_enabled() ? 1 : 0,
-           vision_image_processor_ipm_min_point_dist_filter_enabled() ? 1 : 0,
-           static_cast<double>(vision_image_processor_ipm_min_point_dist_px()),
            vision_image_processor_ipm_resample_enabled() ? 1 : 0,
            static_cast<double>(vision_image_processor_ipm_resample_step_px()),
+           static_cast<double>(vision_image_processor_ipm_boundary_kappa_sample_spacing_cm()),
+           vision_image_processor_ipm_boundary_angle_step(),
            static_cast<double>(vision_image_processor_ipm_boundary_shift_distance_px()),
            vision_image_processor_ipm_centerline_postprocess_enabled() ? 1 : 0,
            vision_image_processor_ipm_centerline_triangle_filter_enabled() ? 1 : 0,
            vision_image_processor_ipm_centerline_resample_enabled() ? 1 : 0,
            static_cast<double>(vision_image_processor_ipm_centerline_resample_step_px()),
-           static_cast<double>(vision_image_processor_ipm_centerline_min_point_dist_px()),
            static_cast<int>(vision_image_processor_ipm_line_error_source()),
            static_cast<int>(vision_image_processor_ipm_line_error_method()),
            vision_image_processor_ipm_line_error_fixed_index(),
@@ -174,7 +177,7 @@ int main(int, char**)
     uart_thread_init();
 
     // 巡线基础速度配置（控制线程会在此基础上叠加转向差速）。
-    line_follow_thread_set_base_speed(380.0f);
+    line_follow_thread_set_base_speed(200.0f);
     
     // 为motor_thread设置目标计数，单位 counts/5ms。
     // 固定左右轮目标值为 800，便于速度环调参。

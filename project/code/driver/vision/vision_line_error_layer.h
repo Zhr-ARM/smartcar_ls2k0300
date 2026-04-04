@@ -41,25 +41,9 @@ int vision_line_error_layer_track_index();
 void vision_line_error_layer_set_curvature_step(int step);
 int vision_line_error_layer_curvature_step();
 void vision_line_error_layer_get_selected_centerline_curvature(const float **curvature, int *count);
-void vision_line_error_layer_get_curvature_lookahead_debug(float *speed_v,
-                                                           float *k_eff,
-                                                           float *eta,
-                                                           int *lookahead_index);
-void vision_line_error_layer_get_curvature_weighted_error_debug(float *weighted_error,
-                                                                bool *lookahead_point_valid,
-                                                                int *lookahead_point_x,
-                                                                int *lookahead_point_y);
-void vision_line_error_layer_get_curvature_speed_limit_debug(float *kappa_max,
-                                                             float *delta_kappa_max,
-                                                             float *curve_base_speed,
-                                                             float *v_curve_raw,
-                                                             float *v_curve_after_dkappa,
-                                                             float *v_error_limit,
-                                                             float *v_target);
 float vision_line_error_layer_mean_abs_offset();
 
 int vision_line_error_layer_weighted_first_point_error();
-int vision_line_error_layer_weighted_current_spacing();
 void vision_line_error_layer_get_ipm_weighted_decision_point(bool *valid, int *x, int *y);
 void vision_line_error_layer_get_src_weighted_decision_point(bool *valid, int *x, int *y);
 

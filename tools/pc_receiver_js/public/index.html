@@ -174,12 +174,16 @@
     </div>
     <div class="meta">
       <label style="margin-right: 16px;">
-        <input type="checkbox" id="toggleMeanCenterline" checked />
-        灰度图显示所选偏移中线
+        <input type="checkbox" id="toggleGrayBoundaries" checked />
+        灰度图显示左右边界
+      </label>
+      <label style="margin-right: 16px;">
+        <input type="checkbox" id="toggleMeanCenterline" />
+        灰度图显示左右均值中线
       </label>
       <label>
         <input type="checkbox" id="toggleIpmAnchorDot" checked />
-        透视图显示锚点圆 (x=200,y=200,r=1)
+        透视图显示锚点圆 (x=140,y=140,r=1)
       </label>
       <label style="margin-left: 16px;">
         <input type="checkbox" id="toggleBoundaryPointMode" />
@@ -215,14 +219,14 @@
       <div class="card" id="ipmCard">
         <div class="title">透视边界图-处理链数组（可三角滤波）</div>
         <div class="view">
-          <canvas id="ipmCanvas" width="400" height="200"></canvas>
+          <canvas id="ipmCanvas" width="280" height="140"></canvas>
           <div class="pixel-info" id="ipmPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
         </div>
       </div>
       <div class="card" id="ipmRawCard">
         <div class="title">透视边界图-原始拷贝数组（角点识别）</div>
         <div class="view">
-          <canvas id="ipmRawCanvas" width="400" height="200"></canvas>
+          <canvas id="ipmRawCanvas" width="280" height="140"></canvas>
           <div class="pixel-info" id="ipmRawPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
         </div>
       </div>
@@ -234,6 +238,30 @@
         <div class="title">中线曲率图（横轴=索引，纵轴=曲率）</div>
         <div class="view">
           <canvas id="curvatureCanvas" width="480" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card" id="leftBoundaryCurvatureCard">
+        <div class="title">左边界 kappa 图（横轴=索引，纵轴=kappa）</div>
+        <div class="view">
+          <canvas id="leftBoundaryCurvatureCanvas" width="480" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card" id="rightBoundaryCurvatureCard">
+        <div class="title">右边界 kappa 图（横轴=索引，纵轴=kappa）</div>
+        <div class="view">
+          <canvas id="rightBoundaryCurvatureCanvas" width="480" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card" id="leftBoundaryAngleCosCard">
+        <div class="title">左边界 cos 图（横轴=索引，纵轴=cos）</div>
+        <div class="view">
+          <canvas id="leftBoundaryAngleCosCanvas" width="480" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card" id="rightBoundaryAngleCosCard">
+        <div class="title">右边界 cos 图（横轴=索引，纵轴=cos）</div>
+        <div class="view">
+          <canvas id="rightBoundaryAngleCosCanvas" width="480" height="220"></canvas>
         </div>
       </div>
     </div>
@@ -261,28 +289,7 @@
               </div>
               <div class="playback-time" id="playbackTimeLabel">00:00.00 / 00:00.00</div>
             </div>
-            <div class="playback-grid" style="margin-top:12px;">
-              <div class="playback-item" id="playbackGrayWrap">
-                <div class="title">灰度图录制</div>
-                <video id="playbackGrayVideo" muted playsinline></video>
-              </div>
-              <div class="playback-item" id="playbackBinaryWrap">
-                <div class="title">二值图录制</div>
-                <video id="playbackBinaryVideo" muted playsinline></video>
-              </div>
-              <div class="playback-item" id="playbackIpmWrap">
-                <div class="title">透视图录制</div>
-                <video id="playbackIpmVideo" muted playsinline></video>
-              </div>
-              <div class="playback-item" id="playbackIpmRawWrap">
-                <div class="title">透视原始图录制</div>
-                <video id="playbackIpmRawVideo" muted playsinline></video>
-              </div>
-              <div class="playback-item" id="playbackCurvatureWrap">
-                <div class="title">曲率图录制</div>
-                <video id="playbackCurvatureVideo" muted playsinline></video>
-              </div>
-            </div>
+            <div class="playback-grid" id="playbackGrid" style="margin-top:12px;"></div>
           </div>
           <div class="recording-side">
             <div class="recording-status-panel">
@@ -341,6 +348,14 @@
     const ipmRawCtx = ipmRawCanvas.getContext('2d');
     const curvatureCanvas = document.getElementById('curvatureCanvas');
     const curvatureCtx = curvatureCanvas.getContext('2d');
+    const leftBoundaryCurvatureCanvas = document.getElementById('leftBoundaryCurvatureCanvas');
+    const leftBoundaryCurvatureCtx = leftBoundaryCurvatureCanvas.getContext('2d');
+    const rightBoundaryCurvatureCanvas = document.getElementById('rightBoundaryCurvatureCanvas');
+    const rightBoundaryCurvatureCtx = rightBoundaryCurvatureCanvas.getContext('2d');
+    const leftBoundaryAngleCosCanvas = document.getElementById('leftBoundaryAngleCosCanvas');
+    const leftBoundaryAngleCosCtx = leftBoundaryAngleCosCanvas.getContext('2d');
+    const rightBoundaryAngleCosCanvas = document.getElementById('rightBoundaryAngleCosCanvas');
+    const rightBoundaryAngleCosCtx = rightBoundaryAngleCosCanvas.getContext('2d');
     const grayPixelInfo = document.getElementById('grayPixelInfo');
     const binaryPixelInfo = document.getElementById('binaryPixelInfo');
     const ipmPixelInfo = document.getElementById('ipmPixelInfo');
@@ -365,17 +380,12 @@
     const ipmCard = document.getElementById('ipmCard');
     const ipmRawCard = document.getElementById('ipmRawCard');
     const curvatureCard = document.getElementById('curvatureCard');
+    const leftBoundaryCurvatureCard = document.getElementById('leftBoundaryCurvatureCard');
+    const rightBoundaryCurvatureCard = document.getElementById('rightBoundaryCurvatureCard');
+    const leftBoundaryAngleCosCard = document.getElementById('leftBoundaryAngleCosCard');
+    const rightBoundaryAngleCosCard = document.getElementById('rightBoundaryAngleCosCard');
     const playbackStatus = document.getElementById('playbackStatus');
-    const playbackGrayWrap = document.getElementById('playbackGrayWrap');
-    const playbackBinaryWrap = document.getElementById('playbackBinaryWrap');
-    const playbackIpmWrap = document.getElementById('playbackIpmWrap');
-    const playbackIpmRawWrap = document.getElementById('playbackIpmRawWrap');
-    const playbackCurvatureWrap = document.getElementById('playbackCurvatureWrap');
-    const playbackGrayVideo = document.getElementById('playbackGrayVideo');
-    const playbackBinaryVideo = document.getElementById('playbackBinaryVideo');
-    const playbackIpmVideo = document.getElementById('playbackIpmVideo');
-    const playbackIpmRawVideo = document.getElementById('playbackIpmRawVideo');
-    const playbackCurvatureVideo = document.getElementById('playbackCurvatureVideo');
+    const playbackGrid = document.getElementById('playbackGrid');
     const paramModal = document.getElementById('paramModal');
     const savedModal = document.getElementById('savedModal');
     const paramPanelMeta = document.getElementById('paramPanelMeta');
@@ -388,14 +398,18 @@
     const savedFoldersList = document.getElementById('savedFoldersList');
     const savedLoadInfo = document.getElementById('savedLoadInfo');
     const toggleMeanCenterline = document.getElementById('toggleMeanCenterline');
+    const toggleGrayBoundaries = document.getElementById('toggleGrayBoundaries');
     const toggleIpmAnchorDot = document.getElementById('toggleIpmAnchorDot');
     const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
     const curvatureYMinInput = document.getElementById('curvatureYMinInput');
     const curvatureYMaxInput = document.getElementById('curvatureYMaxInput');
     const ipmCenterlineSourceLabel = document.getElementById('ipmCenterlineSourceLabel');
     const grayImg = new Image();
+    const rawGrayCanvas = document.createElement('canvas');
+    const rawGrayCtx = rawGrayCanvas.getContext('2d');
     let latestStatus = {};
-    let showMeanCenterline = true;
+    let showGrayBoundaries = true;
+    let showMeanCenterline = false;
     let showIpmAnchorDot = true;
     let boundaryPointMode = false;
     let recordingState = null;
@@ -405,6 +419,8 @@
     let isSyncingPlayback = false;
     let curvatureYMin = -0.3;
     let curvatureYMax = 0.3;
+    let playbackVideoEntries = [];
+    let playbackPrimaryKey = '';
 
     function hasValue(value) {
       return value !== undefined && value !== null;
@@ -426,8 +442,48 @@
       return status.src_centerline_from_left_shift || [];
     }
 
+    function getMeanCenterlineFromBoundaries(status) {
+      const left = Array.isArray(status.left_boundary) ? status.left_boundary : [];
+      const right = Array.isArray(status.right_boundary) ? status.right_boundary : [];
+      const n = Math.min(left.length, right.length);
+      if (n < 1) return [];
+      const mid = [];
+      for (let i = 0; i < n; i += 1) {
+        const lp = left[i];
+        const rp = right[i];
+        if (!Array.isArray(lp) || lp.length < 2 || !Array.isArray(rp) || rp.length < 2) continue;
+        const lx = Number(lp[0]);
+        const ly = Number(lp[1]);
+        const rx = Number(rp[0]);
+        const ry = Number(rp[1]);
+        if (!Number.isFinite(lx) || !Number.isFinite(ly) || !Number.isFinite(rx) || !Number.isFinite(ry)) continue;
+        mid.push([Math.round((lx + rx) * 0.5), Math.round((ly + ry) * 0.5)]);
+      }
+      return mid;
+    }
+
     function getSelectedCurvature(status) {
       if (Array.isArray(status.ipm_centerline_selected_curvature)) return status.ipm_centerline_selected_curvature;
+      return [];
+    }
+
+    function getLeftBoundaryKappa(status) {
+      if (Array.isArray(status.ipm_left_boundary_curvature)) return status.ipm_left_boundary_curvature;
+      return [];
+    }
+
+    function getRightBoundaryKappa(status) {
+      if (Array.isArray(status.ipm_right_boundary_curvature)) return status.ipm_right_boundary_curvature;
+      return [];
+    }
+
+    function getLeftBoundaryAngleCos(status) {
+      if (Array.isArray(status.ipm_left_boundary_angle_cos)) return status.ipm_left_boundary_angle_cos;
+      return [];
+    }
+
+    function getRightBoundaryAngleCos(status) {
+      if (Array.isArray(status.ipm_right_boundary_angle_cos)) return status.ipm_right_boundary_angle_cos;
       return [];
     }
 
@@ -447,6 +503,8 @@
       curvatureYMin = minVal;
       curvatureYMax = maxVal;
       drawCurvatureChart(latestStatus || {});
+      drawBoundaryCurvatureCharts(latestStatus || {});
+      drawBoundaryAngleCosCharts(latestStatus || {});
     }
 
     function formatStatusForPanel(status) {
@@ -466,9 +524,6 @@
 
       const basicRows = [];
       push(basicRows, 'ts_ms', status.ts_ms);
-      if (hasValue(status.roundabout_mode) || hasValue(status.intersection_mode)) {
-        push(basicRows, 'current_mode', fmtCurrentMode(status));
-      }
       push(basicRows, 'line_error', status.line_error);
       push(basicRows, 'base_speed', status.base_speed);
       push(basicRows, 'adjusted_base_speed', status.adjusted_base_speed);
@@ -529,57 +584,35 @@
       }
       push(trackRows, 'ipm_track_index', status.ipm_track_index);
       pushArray(trackRows, 'ipm_track_point', status.ipm_track_point);
-      push(trackRows, 'ipm_weighted_first_index', status.ipm_weighted_first_index);
-      push(trackRows, 'ipm_weighted_decision_index', status.ipm_weighted_decision_index);
-      push(trackRows, 'ipm_weighted_default_spacing', status.ipm_weighted_default_spacing);
-      push(trackRows, 'ipm_weighted_spacing_threshold_1', status.ipm_weighted_spacing_threshold_1);
-      push(trackRows, 'ipm_weighted_spacing_threshold_2', status.ipm_weighted_spacing_threshold_2);
-      push(trackRows, 'ipm_weighted_spacing_threshold_3', status.ipm_weighted_spacing_threshold_3);
-      push(trackRows, 'ipm_weighted_spacing_value_1', status.ipm_weighted_spacing_value_1);
-      push(trackRows, 'ipm_weighted_spacing_value_2', status.ipm_weighted_spacing_value_2);
-      push(trackRows, 'ipm_weighted_spacing_value_3', status.ipm_weighted_spacing_value_3);
       push(trackRows, 'ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
-      push(trackRows, 'ipm_weighted_current_spacing', status.ipm_weighted_current_spacing);
       pushArray(trackRows, 'ipm_weighted_decision_point', status.ipm_weighted_decision_point);
       pushArray(trackRows, 'src_weighted_decision_point', status.src_weighted_decision_point);
-      push(trackRows, 'ipm_curvature_speed_v', status.ipm_curvature_speed_v);
-      push(trackRows, 'ipm_curvature_k_eff', status.ipm_curvature_k_eff);
-      push(trackRows, 'ipm_curvature_eta', status.ipm_curvature_eta);
-      push(trackRows, 'ipm_curvature_lookahead_index', status.ipm_curvature_lookahead_index);
-      pushArray(trackRows, 'ipm_curvature_lookahead_point', status.ipm_curvature_lookahead_point);
-      push(trackRows, 'ipm_curvature_weighted_error', status.ipm_curvature_weighted_error);
-      push(trackRows, 'ipm_curvature_kappa_max', status.ipm_curvature_kappa_max);
-      push(trackRows, 'ipm_curvature_delta_kappa_max', status.ipm_curvature_delta_kappa_max);
-      push(trackRows, 'ipm_curvature_base_speed_curve', status.ipm_curvature_base_speed_curve);
-      push(trackRows, 'ipm_curvature_v_curve_raw', status.ipm_curvature_v_curve_raw);
-      push(trackRows, 'ipm_curvature_v_curve_after_dkappa', status.ipm_curvature_v_curve_after_dkappa);
-      push(trackRows, 'ipm_curvature_v_error_limit', status.ipm_curvature_v_error_limit);
-      push(trackRows, 'ipm_curvature_v_target', status.ipm_curvature_v_target);
       addSection('巡线跟踪', trackRows);
-
-      const modeRows = [];
-      push(modeRows, 'intersection_mode', status.intersection_mode);
-      push(modeRows, 'intersection_stop_row', status.intersection_stop_row);
-      push(modeRows, 'intersection_current_start_row', status.intersection_current_start_row);
-      if (hasValue(status.roundabout_mode)) {
-        push(modeRows, 'roundabout_mode', fmtRoundaboutMode(status.roundabout_mode));
-      }
-      addSection('元素状态机', modeRows);
 
       const arrayRows = [];
       pushCount(arrayRows, 'left_boundary', status.left_boundary);
       pushCount(arrayRows, 'right_boundary', status.right_boundary);
+      pushCount(arrayRows, 'left_auxiliary_line', status.left_auxiliary_line);
+      pushCount(arrayRows, 'right_auxiliary_line', status.right_auxiliary_line);
+      pushCount(arrayRows, 'left_auxiliary_seed', status.left_auxiliary_seed);
+      pushCount(arrayRows, 'right_auxiliary_seed', status.right_auxiliary_seed);
+      pushCount(arrayRows, 'left_boundary_corner', status.left_boundary_corner);
+      pushCount(arrayRows, 'right_boundary_corner', status.right_boundary_corner);
       pushCount(arrayRows, 'ipm_left_boundary', status.ipm_left_boundary);
       pushCount(arrayRows, 'ipm_right_boundary', status.ipm_right_boundary);
+      pushCount(arrayRows, 'ipm_left_boundary_corner', status.ipm_left_boundary_corner);
+      pushCount(arrayRows, 'ipm_right_boundary_corner', status.ipm_right_boundary_corner);
       pushCount(arrayRows, 'ipm_raw_left_boundary', status.ipm_raw_left_boundary);
       pushCount(arrayRows, 'ipm_raw_right_boundary', status.ipm_raw_right_boundary);
-      pushCount(arrayRows, 'ipm_corner_left_boundary', status.ipm_corner_left_boundary);
-      pushCount(arrayRows, 'ipm_corner_right_boundary', status.ipm_corner_right_boundary);
       pushCount(arrayRows, 'ipm_centerline_selected_shift', getSelectedIpmCenterline(status));
       pushCount(arrayRows, 'src_centerline_selected_shift', getSelectedSrcCenterline(status));
       push(arrayRows, 'ipm_centerline_selected_count', status.ipm_centerline_selected_count);
       push(arrayRows, 'src_centerline_selected_count', status.src_centerline_selected_count);
       pushCount(arrayRows, 'ipm_centerline_selected_curvature', getSelectedCurvature(status));
+      pushCount(arrayRows, 'ipm_left_boundary_curvature', getLeftBoundaryKappa(status));
+      pushCount(arrayRows, 'ipm_right_boundary_curvature', getRightBoundaryKappa(status));
+      pushCount(arrayRows, 'ipm_left_boundary_angle_cos', getLeftBoundaryAngleCos(status));
+      pushCount(arrayRows, 'ipm_right_boundary_angle_cos', getRightBoundaryAngleCos(status));
       addSection('点列数量', arrayRows);
 
       return sections.length > 0 ? sections.join('\n\n') : 'waiting...';
@@ -589,18 +622,144 @@
       paramPanelContent.textContent = text;
     }
 
+    function safeRecordKeyFromCanvas(canvas, fallbackIdx) {
+      const raw = String((canvas && canvas.dataset && canvas.dataset.recordKey) || (canvas && canvas.id) || `canvas_${fallbackIdx + 1}`);
+      const key = raw.toLowerCase().replace(/[^a-z0-9._-]/g, '_');
+      return key || `canvas_${fallbackIdx + 1}`;
+    }
+
+    function getCanvasTitle(canvas, fallbackKey) {
+      if (!canvas) return fallbackKey;
+      const card = canvas.closest('.card');
+      if (!card) return fallbackKey;
+      const titleEl = card.querySelector('.title');
+      const t = titleEl ? String(titleEl.textContent || '').trim() : '';
+      return t || fallbackKey;
+    }
+
+    function listRecordableCanvases() {
+      const all = Array.from(document.querySelectorAll('.grid .card canvas'));
+      const result = [];
+      const usedKeys = new Set();
+      for (let i = 0; i < all.length; i += 1) {
+        const canvas = all[i];
+        if (!(canvas instanceof HTMLCanvasElement)) continue;
+        if (canvas.width <= 0 || canvas.height <= 0) continue;
+        const card = canvas.closest('.card');
+        if (card && card.style && card.style.display === 'none') continue;
+        let key = safeRecordKeyFromCanvas(canvas, i);
+        if (usedKeys.has(key)) {
+          let seq = 2;
+          while (usedKeys.has(`${key}_${seq}`)) seq += 1;
+          key = `${key}_${seq}`;
+        }
+        usedKeys.add(key);
+        result.push({
+          key,
+          canvas,
+          title: getCanvasTitle(canvas, key)
+        });
+      }
+      return result;
+    }
+
+    function bindPlaybackVideoEvents(video) {
+      if (!video) return;
+      video.addEventListener('click', () => {
+        const entry = playbackVideoEntries.find((item) => item.videoEl === video);
+        if (entry) playbackPrimaryKey = entry.key;
+      });
+      video.addEventListener('timeupdate', () => {
+        if (isSyncingPlayback) return;
+        if (video === currentPlaybackVideo()) {
+          syncPlaybackVideos(video);
+          refreshParamPanel();
+        }
+      });
+      video.addEventListener('seeked', () => {
+        if (isSyncingPlayback) return;
+        if (video === currentPlaybackVideo()) {
+          syncPlaybackVideos(video);
+          refreshParamPanel();
+        }
+      });
+      video.addEventListener('play', () => {
+        if (isSyncingPlayback) return;
+        if (video === currentPlaybackVideo()) {
+          syncPlaybackVideos(video);
+          refreshParamPanel();
+        }
+      });
+      video.addEventListener('pause', () => {
+        if (isSyncingPlayback) return;
+        if (video === currentPlaybackVideo()) {
+          syncPlaybackVideos(video);
+          refreshParamPanel();
+        }
+      });
+      video.addEventListener('ended', () => {
+        if (video === currentPlaybackVideo()) {
+          setPlaybackPlaying(false);
+        }
+      });
+    }
+
+    function rebuildPlaybackGrid(urls, labels) {
+      if (!playbackGrid) return;
+      playbackGrid.innerHTML = '';
+      playbackVideoEntries = [];
+      const map = (urls && typeof urls === 'object') ? urls : {};
+      const keys = Object.keys(map);
+      for (const key of keys) {
+        const url = map[key];
+        if (!url) continue;
+        const wrap = document.createElement('div');
+        wrap.className = 'playback-item';
+        wrap.dataset.recordKey = key;
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        const label = labels && labels[key] ? String(labels[key]) : key;
+        title.textContent = `${label} 录制`;
+
+        const video = document.createElement('video');
+        video.muted = true;
+        video.playsInline = true;
+        video.src = url;
+
+        wrap.appendChild(title);
+        wrap.appendChild(video);
+        playbackGrid.appendChild(wrap);
+        playbackVideoEntries.push({ key, wrapEl: wrap, videoEl: video });
+        bindPlaybackVideoEvents(video);
+      }
+      if (!playbackVideoEntries.some((item) => item.key === playbackPrimaryKey)) {
+        playbackPrimaryKey = '';
+      }
+      if (!playbackPrimaryKey && playbackVideoEntries.length > 0) {
+        playbackPrimaryKey = playbackVideoEntries[0].key;
+      }
+    }
+
     function currentPlaybackVideo() {
-      const candidates = [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo, playbackCurvatureVideo];
-      for (const video of candidates) {
-        if (video && video.src && video.parentElement.style.display !== 'none') return video;
+      if (playbackPrimaryKey) {
+        const hit = playbackVideoEntries.find((item) => item.key === playbackPrimaryKey && item.videoEl && item.videoEl.src && item.wrapEl.style.display !== 'none');
+        if (hit) return hit.videoEl;
+      }
+      for (const item of playbackVideoEntries) {
+        const video = item.videoEl;
+        if (video && video.src && item.wrapEl.style.display !== 'none') {
+          playbackPrimaryKey = item.key;
+          return video;
+        }
       }
       return null;
     }
 
     function allPlaybackVideos() {
-      return [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo, playbackCurvatureVideo].filter(
-        (video) => video && video.src && video.parentElement.style.display !== 'none'
-      );
+      return playbackVideoEntries
+        .filter((item) => item.videoEl && item.videoEl.src && item.wrapEl.style.display !== 'none')
+        .map((item) => item.videoEl);
     }
 
     function fmtPlaybackTime(sec) {
@@ -735,7 +894,7 @@
       return JSON.parse(JSON.stringify(status || {}));
     }
 
-    function createCanvasRecorder(key, canvas, enabled) {
+    function createCanvasRecorder(key, title, canvas, enabled) {
       if (!enabled || typeof MediaRecorder === 'undefined') return null;
       const mimeType = detectRecordMimeType();
       if (!mimeType) return null;
@@ -749,6 +908,7 @@
         recorder.onstop = () => {
           resolve({
             key,
+            title,
             mimeType,
             blob: chunks.length > 0 ? new Blob(chunks, { type: mimeType }) : null
           });
@@ -761,18 +921,16 @@
     async function startRecording() {
       if (recordingState || typeof MediaRecorder === 'undefined') return;
       const recorders = [];
-      const grayRecorder = createCanvasRecorder('gray', grayCanvas, true);
-      const binaryRecorder = createCanvasRecorder('binary', binaryCanvas, binaryCard.style.display !== 'none');
-      const ipmRecorder = createCanvasRecorder('ipm', ipmCanvas, ipmCard.style.display !== 'none');
-      const ipmRawRecorder = createCanvasRecorder('ipm_raw', ipmRawCanvas, ipmRawCard.style.display !== 'none');
-      const curvatureRecorder = createCanvasRecorder('curvature', curvatureCanvas, curvatureCard.style.display !== 'none');
-      [grayRecorder, binaryRecorder, ipmRecorder, ipmRawRecorder, curvatureRecorder].forEach((item) => {
-        if (item) recorders.push(item);
-      });
+      const canvasItems = listRecordableCanvases();
+      for (const item of canvasItems) {
+        const recorder = createCanvasRecorder(item.key, item.title, item.canvas, true);
+        if (recorder) recorders.push(recorder);
+      }
       recordingState = {
         active: true,
         startedAtMs: Date.now(),
         recorders,
+        recordedViews: canvasItems.map((item) => ({ key: item.key, title: item.title })),
         statusFrames: []
       };
       updateRecordingUi();
@@ -796,9 +954,11 @@
 
       const videos = {};
       const urls = {};
+      const videoLabels = {};
       for (const result of results) {
         videos[result.key] = result.blob;
         urls[result.key] = result.blob ? URL.createObjectURL(result.blob) : '';
+        videoLabels[result.key] = result.title || result.key;
       }
 
       const savedAtMs = Date.now();
@@ -806,6 +966,7 @@
         recorded_at_ms: savedAtMs,
         duration_ms: savedAtMs - state.startedAtMs,
         frame_count: state.statusFrames.length,
+        video_labels: videoLabels,
         statuses: state.statusFrames
       };
       const statusBlob = new Blob([JSON.stringify(statusPayload, null, 2)], { type: 'application/json' });
@@ -818,6 +979,7 @@
         frameCount: state.statusFrames.length,
         durationSec: ((savedAtMs - state.startedAtMs) / 1000).toFixed(1),
         statusFrames: state.statusFrames,
+        videoLabels,
         statusBlob,
         videos,
         urls
@@ -831,19 +993,6 @@
       }
     }
 
-    function setPlaybackVideo(videoEl, wrapEl, url) {
-      if (!videoEl || !wrapEl) return;
-      const visible = !!url;
-      wrapEl.style.display = visible ? '' : 'none';
-      if (visible) {
-        videoEl.src = url;
-        videoEl.currentTime = 0;
-      } else {
-        videoEl.removeAttribute('src');
-        videoEl.load();
-      }
-    }
-
     function playLastRecording() {
       if (!lastRecording) return;
       playbackStatus.textContent = JSON.stringify({
@@ -851,11 +1000,7 @@
         duration_sec: lastRecording.durationSec,
         frame_count: lastRecording.frameCount
       }, null, 2);
-      setPlaybackVideo(playbackGrayVideo, playbackGrayWrap, lastRecording.urls.gray);
-      setPlaybackVideo(playbackBinaryVideo, playbackBinaryWrap, lastRecording.urls.binary);
-      setPlaybackVideo(playbackIpmVideo, playbackIpmWrap, lastRecording.urls.ipm);
-      setPlaybackVideo(playbackIpmRawVideo, playbackIpmRawWrap, lastRecording.urls.ipm_raw);
-      setPlaybackVideo(playbackCurvatureVideo, playbackCurvatureWrap, lastRecording.urls.curvature);
+      rebuildPlaybackGrid(lastRecording.urls || {}, lastRecording.videoLabels || {});
       paramPanelOpen = true;
       paramModal.style.display = 'flex';
       refreshParamPanel();
@@ -887,13 +1032,14 @@
 
       saveRecordBtn.disabled = true;
       try {
-        const keys = ['gray', 'binary', 'ipm', 'ipm_raw', 'curvature'];
         const videos = {};
-        for (const key of keys) {
+        const labels = Object.assign({}, lastRecording.videoLabels || {});
+        for (const key of Object.keys(lastRecording.videos || {})) {
           const blob = lastRecording.videos[key];
           if (!blob) continue;
           videos[key] = {
             mime: blob.type || 'video/webm',
+            title: labels[key] || key,
             data_b64: await blobToBase64(blob)
           };
         }
@@ -902,6 +1048,7 @@
           recorded_at_ms: lastRecording.startedAtMs,
           duration_ms: lastRecording.durationMs,
           frame_count: lastRecording.frameCount,
+          video_labels: labels,
           statuses: lastRecording.statusFrames || [],
           videos
         };
@@ -962,6 +1109,9 @@
         const durationMs = Number(loadedStatus.duration_ms) || 0;
         const startedAtMs = Number(loadedStatus.recorded_at_ms) || Date.now();
         const frameCount = Number(loadedStatus.frame_count) || statusFrames.length;
+        const videoLabels = (j.meta && j.meta.video_labels && typeof j.meta.video_labels === 'object')
+          ? j.meta.video_labels
+          : ((loadedStatus.video_labels && typeof loadedStatus.video_labels === 'object') ? loadedStatus.video_labels : {});
 
         const urls = Object.assign({}, j.videos || {});
         if (lastRecording) revokeRecordingUrls(lastRecording);
@@ -972,6 +1122,7 @@
           frameCount,
           durationSec: (durationMs / 1000).toFixed(1),
           statusFrames,
+          videoLabels,
           statusBlob: null,
           videos: {},
           urls,
@@ -987,11 +1138,7 @@
           frame_count: frameCount
         }, null, 2);
 
-        setPlaybackVideo(playbackGrayVideo, playbackGrayWrap, urls.gray || '');
-        setPlaybackVideo(playbackBinaryVideo, playbackBinaryWrap, urls.binary || '');
-        setPlaybackVideo(playbackIpmVideo, playbackIpmWrap, urls.ipm || '');
-        setPlaybackVideo(playbackIpmRawVideo, playbackIpmRawWrap, urls.ipm_raw || '');
-        setPlaybackVideo(playbackCurvatureVideo, playbackCurvatureWrap, urls.curvature || '');
+        rebuildPlaybackGrid(urls, videoLabels);
 
         paramPanelOpen = true;
         paramModal.style.display = 'flex';
@@ -1048,101 +1195,19 @@
       ctx.stroke();
     }
 
-    function scalarToColor(value, maxAbs) {
-      const scale = Math.max(1e-6, maxAbs || 1);
-      const t = Math.max(-1, Math.min(1, value / scale));
-      if (t >= 0) {
-        const r = 255;
-        const g = Math.round(220 - 120 * t);
-        const b = Math.round(80 - 60 * t);
-        return `rgb(${r},${Math.max(80, g)},${Math.max(20, b)})`;
-      }
-      const u = -t;
-      const r = Math.round(80 - 40 * u);
-      const g = Math.round(200 + 30 * u);
-      const b = 255;
-      return `rgb(${Math.max(20, r)},${Math.min(255, g)},${b})`;
-    }
-
-    function combinedCornerSamples(status) {
-      const leftPts = Array.isArray(status.ipm_corner_left_boundary) ? status.ipm_corner_left_boundary : [];
-      const leftRaw = Array.isArray(status.ipm_corner_left_raw_angle) ? status.ipm_corner_left_raw_angle : [];
-      const leftVals = Array.isArray(status.ipm_corner_left_nms) ? status.ipm_corner_left_nms : [];
-      const rightPts = Array.isArray(status.ipm_corner_right_boundary) ? status.ipm_corner_right_boundary : [];
-      const rightRaw = Array.isArray(status.ipm_corner_right_raw_angle) ? status.ipm_corner_right_raw_angle : [];
-      const rightVals = Array.isArray(status.ipm_corner_right_nms) ? status.ipm_corner_right_nms : [];
-      const samples = [];
-      for (let i = 0; i < leftPts.length && i < leftVals.length; i += 1) {
-        samples.push({
-          point: leftPts[i],
-          raw: (i < leftRaw.length) ? (Number(leftRaw[i]) || 0) : 0,
-          value: Number(leftVals[i]) || 0
-        });
-      }
-      for (let i = 0; i < rightPts.length && i < rightVals.length; i += 1) {
-        samples.push({
-          point: rightPts[i],
-          raw: (i < rightRaw.length) ? (Number(rightRaw[i]) || 0) : 0,
-          value: Number(rightVals[i]) || 0
-        });
-      }
-      return samples;
-    }
-
-    function drawCornerDebugBoundary(ctx, status, w, h) {
-      const samples = combinedCornerSamples(status);
-      if (samples.length < 1) return;
-      let maxAbs = 0;
-      for (const sample of samples) {
-        maxAbs = Math.max(maxAbs, Math.abs(sample.value));
-      }
-      for (const sample of samples) {
-        const p = sample.point;
-        if (!Array.isArray(p) || p.length < 2) continue;
-        ctx.fillStyle = scalarToColor(sample.value, maxAbs);
-        ctx.beginPath();
-        ctx.arc(
-          Math.max(0, Math.min(w - 1, p[0] | 0)),
-          Math.max(0, Math.min(h - 1, p[1] | 0)),
-          boundaryPointMode ? 2 : 2,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
-      }
-    }
-
-    function findNearestCornerSample(status, x, y) {
-      const samples = combinedCornerSamples(status);
-      let best = null;
-      let bestD2 = 36;
-      for (const sample of samples) {
-        const p = sample.point;
-        if (!Array.isArray(p) || p.length < 2) continue;
-        const dx = (p[0] | 0) - x;
-        const dy = (p[1] | 0) - y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 <= bestD2) {
-          bestD2 = d2;
-          best = sample;
-        }
-      }
-      return best;
-    }
-
     function drawIpmBoundariesToCanvas(status, canvas, ctx, leftKey, rightKey, centerData) {
-      const ipmSize = status.ipm_size || [400, 200];
-      const w = ipmSize[0] || 400;
-      const h = ipmSize[1] || 200;
+      const ipmSize = status.ipm_size || [280, 140];
+      const w = ipmSize[0] || 280;
+      const h = ipmSize[1] || 140;
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, w, h);
-      if (canvas === ipmRawCanvas) {
-        drawCornerDebugBoundary(ctx, status, w, h);
-      } else {
-        drawSeries(ctx, status[leftKey] || [], '#ff4d4f', 2, 1);
-        drawSeries(ctx, status[rightKey] || [], '#22c55e', 2, 1);
+      drawSeries(ctx, status[leftKey] || [], '#ff4d4f', 2, 1);
+      drawSeries(ctx, status[rightKey] || [], '#22c55e', 2, 1);
+      if (canvas === ipmCanvas) {
+        drawPointSet(ctx, status.ipm_left_boundary_corner || [], '#facc15', 3);
+        drawPointSet(ctx, status.ipm_right_boundary_corner || [], '#fb923c', 3);
       }
       if (Array.isArray(centerData) && centerData.length > 0) {
         drawSeries(ctx, centerData, '#facc15', 2, 1);
@@ -1151,8 +1216,8 @@
         const tp = Array.isArray(status.ipm_track_point) ? status.ipm_track_point : [0, 0];
         const tx = Math.max(0, Math.min(w - 1, tp[0] | 0));
         const ty = Math.max(0, Math.min(h - 1, tp[1] | 0));
-        const cx = Math.max(0, Math.min(w - 1, 200));
-        const cy = Math.max(0, Math.min(h - 1, 200));
+        const cx = Math.max(0, Math.min(w - 1, Math.floor(w / 2)));
+        const cy = Math.max(0, Math.min(h - 1, h));
         ctx.strokeStyle = '#93c5fd';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1163,22 +1228,9 @@
         drawPointSet(ctx, [[cx, cy], [tx, ty], [tx, cy]], '#93c5fd', 2);
       }
       drawDecisionPoint(ctx, status.ipm_weighted_decision_point);
-      if (Array.isArray(status.ipm_curvature_lookahead_point) && status.ipm_curvature_lookahead_point.length >= 2) {
-        const px = Math.max(0, Math.min(w - 1, status.ipm_curvature_lookahead_point[0] | 0));
-        const py = Math.max(0, Math.min(h - 1, status.ipm_curvature_lookahead_point[1] | 0));
-        ctx.fillStyle = '#f97316';
-        ctx.beginPath();
-        ctx.arc(px, py, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#fff7ed';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(px, py, 5, 0, Math.PI * 2);
-        ctx.stroke();
-      }
       if (showIpmAnchorDot) {
-        const cx = Math.max(0, Math.min(w - 1, 200));
-        const cy = Math.max(0, Math.min(h - 1, 200));
+        const cx = Math.max(0, Math.min(w - 1, Math.floor(w / 2)));
+        const cy = Math.max(0, Math.min(h - 1, h));
         ctx.fillStyle = '#38bdf8';
         ctx.beginPath();
         ctx.arc(cx, cy, 1, 0, Math.PI * 2);
@@ -1188,10 +1240,11 @@
 
     function drawIpmBoundaries(status) {
       const hasIpmMain = hasPointArray(status.ipm_left_boundary) || hasPointArray(status.ipm_right_boundary) ||
+        hasPointArray(status.ipm_left_boundary_corner) || hasPointArray(status.ipm_right_boundary_corner) ||
         hasPointArray(getSelectedIpmCenterline(status)) ||
         hasValue(status.ipm_track_valid);
       const hasIpmRaw = hasPointArray(status.ipm_raw_left_boundary) || hasPointArray(status.ipm_raw_right_boundary) ||
-        hasPointArray(status.ipm_corner_left_boundary) || hasPointArray(status.ipm_corner_right_boundary);
+        false;
       setCardVisible(ipmCard, hasIpmMain);
       setCardVisible(ipmRawCard, hasIpmRaw);
       if (!hasIpmMain && !hasIpmRaw) return;
@@ -1204,19 +1257,17 @@
       }
     }
 
-    function drawCurvatureChart(status) {
-      const rawValues = getSelectedCurvature(status);
-      const w = curvatureCanvas.width;
-      const h = curvatureCanvas.height;
-      curvatureCtx.fillStyle = '#020617';
-      curvatureCtx.fillRect(0, 0, w, h);
+    function drawCurveChartToCanvas(canvas, ctx, rawValues, yMinOverride, yMaxOverride) {
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, w, h);
+      if (!Array.isArray(rawValues) || rawValues.length < 1) return false;
 
-      if (!Array.isArray(rawValues) || rawValues.length < 1) {
-        setCardVisible(curvatureCard, false);
-        return;
-      }
-      setCardVisible(curvatureCard, true);
-      const values = rawValues.map((v) => Math.max(curvatureYMin, Math.min(curvatureYMax, Number(v) || 0)));
+      const minY = Number.isFinite(yMinOverride) ? yMinOverride : curvatureYMin;
+      const maxY = Number.isFinite(yMaxOverride) ? yMaxOverride : curvatureYMax;
+      if (minY >= maxY) return false;
+      const values = rawValues.map((v) => Math.max(minY, Math.min(maxY, Number(v) || 0)));
 
       const marginLeft = 36;
       const marginRight = 10;
@@ -1225,88 +1276,108 @@
       const plotW = Math.max(1, w - marginLeft - marginRight);
       const plotH = Math.max(1, h - marginTop - marginBottom);
 
-      const minY = curvatureYMin;
-      const maxY = curvatureYMax;
-
       const xAt = (idx) => marginLeft + (idx * plotW) / Math.max(1, values.length - 1);
       const yAt = (v) => marginTop + ((maxY - v) * plotH) / (maxY - minY);
       const yZero = yAt(0);
 
-      curvatureCtx.strokeStyle = '#334155';
-      curvatureCtx.lineWidth = 1;
-      curvatureCtx.beginPath();
-      curvatureCtx.moveTo(marginLeft, marginTop);
-      curvatureCtx.lineTo(marginLeft, marginTop + plotH);
-      curvatureCtx.lineTo(marginLeft + plotW, marginTop + plotH);
-      curvatureCtx.stroke();
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(marginLeft, marginTop);
+      ctx.lineTo(marginLeft, marginTop + plotH);
+      ctx.lineTo(marginLeft + plotW, marginTop + plotH);
+      ctx.stroke();
 
-      curvatureCtx.strokeStyle = '#64748b';
-      curvatureCtx.beginPath();
-      curvatureCtx.moveTo(marginLeft, yZero);
-      curvatureCtx.lineTo(marginLeft + plotW, yZero);
-      curvatureCtx.stroke();
+      ctx.strokeStyle = '#64748b';
+      ctx.beginPath();
+      ctx.moveTo(marginLeft, yZero);
+      ctx.lineTo(marginLeft + plotW, yZero);
+      ctx.stroke();
 
       // 参考网格与轴刻度点：X/Y 轴都按 5 等分
       const divs = 5;
-      curvatureCtx.setLineDash([3, 3]);
-      curvatureCtx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-      curvatureCtx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+      ctx.lineWidth = 1;
       for (let i = 0; i <= divs; i += 1) {
         const t = i / divs;
         const gx = marginLeft + t * plotW;
         const gy = marginTop + t * plotH;
 
-        curvatureCtx.beginPath();
-        curvatureCtx.moveTo(gx, marginTop);
-        curvatureCtx.lineTo(gx, marginTop + plotH);
-        curvatureCtx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(gx, marginTop);
+        ctx.lineTo(gx, marginTop + plotH);
+        ctx.stroke();
 
-        curvatureCtx.beginPath();
-        curvatureCtx.moveTo(marginLeft, gy);
-        curvatureCtx.lineTo(marginLeft + plotW, gy);
-        curvatureCtx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(marginLeft, gy);
+        ctx.lineTo(marginLeft + plotW, gy);
+        ctx.stroke();
       }
-      curvatureCtx.setLineDash([]);
+      ctx.setLineDash([]);
 
-      curvatureCtx.fillStyle = '#94a3b8';
+      ctx.fillStyle = '#94a3b8';
       for (let i = 0; i <= divs; i += 1) {
         const t = i / divs;
         const gx = marginLeft + t * plotW;
         const gy = marginTop + t * plotH;
 
-        curvatureCtx.beginPath();
-        curvatureCtx.arc(gx, marginTop + plotH, 2, 0, Math.PI * 2);
-        curvatureCtx.fill();
+        ctx.beginPath();
+        ctx.arc(gx, marginTop + plotH, 2, 0, Math.PI * 2);
+        ctx.fill();
 
-        curvatureCtx.beginPath();
-        curvatureCtx.arc(marginLeft, gy, 2, 0, Math.PI * 2);
-        curvatureCtx.fill();
+        ctx.beginPath();
+        ctx.arc(marginLeft, gy, 2, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      curvatureCtx.strokeStyle = '#38bdf8';
-      curvatureCtx.lineWidth = 1.5;
-      curvatureCtx.beginPath();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
       for (let i = 0; i < values.length; i += 1) {
         const x = xAt(i);
         const y = yAt(Number(values[i]) || 0);
-        if (i === 0) curvatureCtx.moveTo(x, y);
-        else curvatureCtx.lineTo(x, y);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       }
-      curvatureCtx.stroke();
+      ctx.stroke();
 
-      curvatureCtx.fillStyle = '#94a3b8';
-      curvatureCtx.font = '12px "Noto Sans SC", "Microsoft YaHei", sans-serif';
-      curvatureCtx.fillText('0', marginLeft - 10, marginTop + plotH + 16);
-      curvatureCtx.fillText(String(values.length - 1), marginLeft + plotW - 22, marginTop + plotH + 16);
-      curvatureCtx.fillText(maxY.toFixed(3), 6, marginTop + 8);
-      curvatureCtx.fillText('0', 12, yZero + 4);
-      curvatureCtx.fillText(minY.toFixed(3), 2, marginTop + plotH);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '12px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText('0', marginLeft - 10, marginTop + plotH + 16);
+      ctx.fillText(String(values.length - 1), marginLeft + plotW - 22, marginTop + plotH + 16);
+      ctx.fillText(maxY.toFixed(3), 6, marginTop + 8);
+      ctx.fillText('0', 12, yZero + 4);
+      ctx.fillText(minY.toFixed(3), 2, marginTop + plotH);
+      return true;
+    }
+
+    function drawCurvatureChart(status) {
+      const ok = drawCurveChartToCanvas(curvatureCanvas, curvatureCtx, getSelectedCurvature(status));
+      setCardVisible(curvatureCard, ok);
+    }
+
+    function drawBoundaryCurvatureCharts(status) {
+      const leftOk = drawCurveChartToCanvas(leftBoundaryCurvatureCanvas, leftBoundaryCurvatureCtx, getLeftBoundaryKappa(status));
+      const rightOk = drawCurveChartToCanvas(rightBoundaryCurvatureCanvas, rightBoundaryCurvatureCtx, getRightBoundaryKappa(status));
+      setCardVisible(leftBoundaryCurvatureCard, leftOk);
+      setCardVisible(rightBoundaryCurvatureCard, rightOk);
+    }
+
+    function drawBoundaryAngleCosCharts(status) {
+      const leftOk = drawCurveChartToCanvas(leftBoundaryAngleCosCanvas, leftBoundaryAngleCosCtx, getLeftBoundaryAngleCos(status), -1.0, 1.0);
+      const rightOk = drawCurveChartToCanvas(rightBoundaryAngleCosCanvas, rightBoundaryAngleCosCtx, getRightBoundaryAngleCos(status), -1.0, 1.0);
+      setCardVisible(leftBoundaryAngleCosCard, leftOk);
+      setCardVisible(rightBoundaryAngleCosCard, rightOk);
     }
 
     function renderGrayFrame() {
       const size = latestStatus.gray_size || [160, 120];
       const w = size[0] || 160;
       const h = size[1] || 120;
+      if (rawGrayCanvas.width !== w) rawGrayCanvas.width = w;
+      if (rawGrayCanvas.height !== h) rawGrayCanvas.height = h;
+      rawGrayCtx.drawImage(grayImg, 0, 0, w, h);
       if (grayCanvas.width !== w) grayCanvas.width = w;
       if (grayCanvas.height !== h) grayCanvas.height = h;
       grayCtx.drawImage(grayImg, 0, 0, w, h);
@@ -1317,7 +1388,7 @@
       grayCtx.moveTo(centerX + 0.5, 0);
       grayCtx.lineTo(centerX + 0.5, h);
       grayCtx.stroke();
-      const guideY = Math.max(0, Math.min(h - 1, 105));
+      const guideY = Math.max(0, Math.min(h - 1, 100));
       grayCtx.strokeStyle = '#ffffff';
       grayCtx.lineWidth = 1;
       grayCtx.beginPath();
@@ -1326,11 +1397,23 @@
       grayCtx.stroke();
       const left = latestStatus.left_boundary || [];
       const right = latestStatus.right_boundary || [];
-      drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
-      drawSeries(grayCtx, right, '#22c55e', 2, 1);
+      const leftAux = latestStatus.left_auxiliary_line || [];
+      const rightAux = latestStatus.right_auxiliary_line || [];
+      const leftAuxSeed = latestStatus.left_auxiliary_seed || [];
+      const rightAuxSeed = latestStatus.right_auxiliary_seed || [];
+      if (showGrayBoundaries) {
+        drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
+        drawSeries(grayCtx, right, '#22c55e', 2, 1);
+        drawSeries(grayCtx, leftAux, '#2563eb', 2, 2);
+        drawSeries(grayCtx, rightAux, '#f59e0b', 2, 2);
+        drawPointSet(grayCtx, leftAuxSeed, '#60a5fa', 3);
+        drawPointSet(grayCtx, rightAuxSeed, '#fbbf24', 3);
+        drawPointSet(grayCtx, latestStatus.left_boundary_corner || [], '#facc15', 3);
+        drawPointSet(grayCtx, latestStatus.right_boundary_corner || [], '#fb923c', 3);
+      }
       if (showMeanCenterline) {
-        const selectedCenterline = getSelectedSrcCenterline(latestStatus);
-        drawSeries(grayCtx, selectedCenterline, '#facc15', 2, 1);
+        const meanCenterline = getMeanCenterlineFromBoundaries(latestStatus);
+        drawSeries(grayCtx, meanCenterline, '#facc15', 2, 1);
       }
       drawDecisionPoint(grayCtx, latestStatus.src_weighted_decision_point);
       renderBinaryFromGray();
@@ -1351,7 +1434,7 @@
       if (binaryCanvas.width !== w) binaryCanvas.width = w;
       if (binaryCanvas.height !== h) binaryCanvas.height = h;
 
-      const grayImage = grayCtx.getImageData(0, 0, w, h);
+      const grayImage = rawGrayCtx.getImageData(0, 0, w, h);
       const binaryImage = binaryCtx.createImageData(w, h);
       const src = grayImage.data;
       const dst = binaryImage.data;
@@ -1366,7 +1449,6 @@
         dst[i + 3] = 255;
       }
       binaryCtx.putImageData(binaryImage, 0, 0);
-      drawDecisionPoint(binaryCtx, latestStatus.src_weighted_decision_point);
     }
 
     function getCanvasPoint(ev, canvas) {
@@ -1399,19 +1481,78 @@
       const gray = Math.round((gr + gg + gb) / 3);
       const binaryGray = Math.round((br + bg + bb) / 3);
       const bin = binaryGray >= 128 ? 1 : 0;
-      if (activeCanvas === ipmRawCanvas) {
-        const sample = findNearestCornerSample(latestStatus, x, y);
-        if (sample) {
-          return `x:${x} y:${y} | Gray:${gray} Bin:${bin} RGB:(${ar},${ag},${ab}) | Raw:${sample.raw.toFixed(4)} NMS:${sample.value.toFixed(4)}`;
-        }
-      }
       return `x:${x} y:${y} | Gray:${gray} Bin:${bin} RGB:(${ar},${ag},${ab})`;
     }
 
-    function bindPixelProbe(canvas, ctx, infoEl) {
+    function findNearestBoundaryPoint(points, x, y, maxDistPx) {
+      if (!Array.isArray(points) || points.length < 1) return null;
+      const maxDistSq = maxDistPx * maxDistPx;
+      let bestIdx = -1;
+      let bestDistSq = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < points.length; i += 1) {
+        const p = points[i];
+        if (!Array.isArray(p) || p.length < 2) continue;
+        const px = Number(p[0]);
+        const py = Number(p[1]);
+        if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
+        const dx = x - px;
+        const dy = y - py;
+        const d2 = dx * dx + dy * dy;
+        if (d2 <= maxDistSq && d2 < bestDistSq) {
+          bestDistSq = d2;
+          bestIdx = i;
+        }
+      }
+      if (bestIdx < 0) return null;
+      return { index: bestIdx, distSq: bestDistSq };
+    }
+
+    function ipmBoundaryHoverText(status, x, y) {
+      const left = Array.isArray(status.ipm_left_boundary) ? status.ipm_left_boundary : [];
+      const right = Array.isArray(status.ipm_right_boundary) ? status.ipm_right_boundary : [];
+      const leftHit = findNearestBoundaryPoint(left, x, y, 2.5);
+      const rightHit = findNearestBoundaryPoint(right, x, y, 2.5);
+      let hit = null;
+      let sideKey = '';
+      if (leftHit && rightHit) {
+        if (leftHit.distSq <= rightHit.distSq) {
+          hit = leftHit;
+          sideKey = 'ipm_left_boundary';
+        } else {
+          hit = rightHit;
+          sideKey = 'ipm_right_boundary';
+        }
+      } else if (leftHit) {
+        hit = leftHit;
+        sideKey = 'ipm_left_boundary';
+      } else if (rightHit) {
+        hit = rightHit;
+        sideKey = 'ipm_right_boundary';
+      }
+      if (!hit) return '';
+
+      let kappaText = 'N/A';
+      const kappa = sideKey === 'ipm_left_boundary' ? getLeftBoundaryKappa(status) : getRightBoundaryKappa(status);
+      if (Array.isArray(kappa) && hit.index < kappa.length) {
+        const kv = Number(kappa[hit.index]);
+        if (Number.isFinite(kv)) kappaText = kv.toFixed(6);
+      }
+      let cosText = 'N/A';
+      const angleCos = sideKey === 'ipm_left_boundary' ? getLeftBoundaryAngleCos(status) : getRightBoundaryAngleCos(status);
+      if (Array.isArray(angleCos) && hit.index < angleCos.length) {
+        const cv = Number(angleCos[hit.index]);
+        if (Number.isFinite(cv)) cosText = cv.toFixed(6);
+      }
+      const sideLabel = sideKey === 'ipm_left_boundary' ? 'L' : 'R';
+      return ` | 边界:${sideLabel} idx:${hit.index} kappa:${kappaText} cos:${cosText}`;
+    }
+
+    function bindPixelProbe(canvas, ctx, infoEl, extraTextFn) {
       canvas.addEventListener('mousemove', (ev) => {
         const [x, y] = getCanvasPoint(ev, canvas);
-        infoEl.textContent = pixelTextFromCanvas(canvas, ctx, x, y);
+        const baseText = pixelTextFromCanvas(canvas, ctx, x, y);
+        const extraText = typeof extraTextFn === 'function' ? (extraTextFn(x, y) || '') : '';
+        infoEl.textContent = `${baseText}${extraText}`;
       });
       canvas.addEventListener('mouseleave', () => {
         infoEl.textContent = 'x:- y:- | Gray:- Bin:- RGB:(-,-,-)';
@@ -1435,39 +1576,15 @@
     function fmtCenterlineSource(source) {
       if (source === 0) return 'left_shift';
       if (source === 1) return 'right_shift';
+      if (source === 2) return 'auto';
       return `unknown(${source})`;
     }
 
     function fmtCenterlineSourceLabel(source) {
       if (source === 0) return '透视中线来源：自动选择（左边界平移）';
       if (source === 1) return '透视中线来源：自动选择（右边界平移）';
+      if (source === 2) return '透视中线来源：无偏好（待本帧自动选择）';
       return '透视中线来源：自动选择（未知）';
-    }
-
-    function fmtIntersectionMode(enabled) {
-      return enabled ? 'intersection' : 'normal';
-    }
-
-    function fmtRoundaboutMode(mode) {
-      if (mode === 1) return 'left_approach';
-      if (mode === 2) return 'left_loop';
-      if (mode === 3) return 'left_entry';
-      if (mode === 4) return 'left_running';
-      if (mode === 5) return 'left_exit';
-      if (mode === 6) return 'left_out';
-      if (mode === 7) return 'right_approach';
-      if (mode === 8) return 'right_loop';
-      if (mode === 9) return 'right_entry';
-      if (mode === 10) return 'right_running';
-      if (mode === 11) return 'right_exit';
-      if (mode === 12) return 'right_out';
-      return 'normal';
-    }
-
-    function fmtCurrentMode(status) {
-      const roundabout = Number(status.roundabout_mode) || 0;
-      if (roundabout !== 0) return fmtRoundaboutMode(roundabout);
-      return fmtIntersectionMode(!!status.intersection_mode);
     }
 
     function buildStatusSummary(status) {
@@ -1480,15 +1597,6 @@
       };
 
       push('ts_ms', status.ts_ms);
-      if (hasValue(status.roundabout_mode) || hasValue(status.intersection_mode)) {
-        push('current_mode', fmtCurrentMode(status));
-      }
-      push('intersection_mode', status.intersection_mode);
-      push('intersection_stop_row', status.intersection_stop_row);
-      push('intersection_current_start_row', status.intersection_current_start_row);
-      if (hasValue(status.roundabout_mode)) {
-        push('roundabout_mode', fmtRoundaboutMode(status.roundabout_mode));
-      }
       push('line_error', status.line_error);
       push('base_speed', status.base_speed);
       push('adjusted_base_speed', status.adjusted_base_speed);
@@ -1512,32 +1620,9 @@
       push('right_hardware_duty', status.right_hardware_duty);
       push('left_dir_level', status.left_dir_level);
       push('right_dir_level', status.right_dir_level);
-      push('ipm_weighted_first_index', status.ipm_weighted_first_index);
-      push('ipm_weighted_decision_index', status.ipm_weighted_decision_index);
-      push('ipm_weighted_default_spacing', status.ipm_weighted_default_spacing);
-      push('ipm_weighted_spacing_threshold_1', status.ipm_weighted_spacing_threshold_1);
-      push('ipm_weighted_spacing_threshold_2', status.ipm_weighted_spacing_threshold_2);
-      push('ipm_weighted_spacing_threshold_3', status.ipm_weighted_spacing_threshold_3);
-      push('ipm_weighted_spacing_value_1', status.ipm_weighted_spacing_value_1);
-      push('ipm_weighted_spacing_value_2', status.ipm_weighted_spacing_value_2);
-      push('ipm_weighted_spacing_value_3', status.ipm_weighted_spacing_value_3);
       push('ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
-      push('ipm_weighted_current_spacing', status.ipm_weighted_current_spacing);
       if (Array.isArray(status.ipm_weighted_decision_point)) push('ipm_weighted_decision_point', fmtArrayInline(status.ipm_weighted_decision_point));
       if (Array.isArray(status.src_weighted_decision_point)) push('src_weighted_decision_point', fmtArrayInline(status.src_weighted_decision_point));
-      push('ipm_curvature_speed_v', status.ipm_curvature_speed_v);
-      push('ipm_curvature_k_eff', status.ipm_curvature_k_eff);
-      push('ipm_curvature_eta', status.ipm_curvature_eta);
-      push('ipm_curvature_lookahead_index', status.ipm_curvature_lookahead_index);
-      if (Array.isArray(status.ipm_curvature_lookahead_point)) push('ipm_curvature_lookahead_point', fmtArrayInline(status.ipm_curvature_lookahead_point));
-      push('ipm_curvature_weighted_error', status.ipm_curvature_weighted_error);
-      push('ipm_curvature_kappa_max', status.ipm_curvature_kappa_max);
-      push('ipm_curvature_delta_kappa_max', status.ipm_curvature_delta_kappa_max);
-      push('ipm_curvature_base_speed_curve', status.ipm_curvature_base_speed_curve);
-      push('ipm_curvature_v_curve_raw', status.ipm_curvature_v_curve_raw);
-      push('ipm_curvature_v_curve_after_dkappa', status.ipm_curvature_v_curve_after_dkappa);
-      push('ipm_curvature_v_error_limit', status.ipm_curvature_v_error_limit);
-      push('ipm_curvature_v_target', status.ipm_curvature_v_target);
       push('otsu_threshold', status.otsu_threshold);
       push('capture_wait_us', status.capture_wait_us);
       push('preprocess_us', status.preprocess_us);
@@ -1559,17 +1644,27 @@
       if (Array.isArray(status.ipm_size)) push('ipm_size', fmtArrayInline(status.ipm_size));
       pushCount('left_boundary_count', status.left_boundary);
       pushCount('right_boundary_count', status.right_boundary);
+      pushCount('left_auxiliary_line_count', status.left_auxiliary_line);
+      pushCount('right_auxiliary_line_count', status.right_auxiliary_line);
+      pushCount('left_auxiliary_seed_count', status.left_auxiliary_seed);
+      pushCount('right_auxiliary_seed_count', status.right_auxiliary_seed);
+      pushCount('left_boundary_corner_count', status.left_boundary_corner);
+      pushCount('right_boundary_corner_count', status.right_boundary_corner);
       pushCount('ipm_left_boundary_count', status.ipm_left_boundary);
       pushCount('ipm_right_boundary_count', status.ipm_right_boundary);
+      pushCount('ipm_left_boundary_corner_count', status.ipm_left_boundary_corner);
+      pushCount('ipm_right_boundary_corner_count', status.ipm_right_boundary_corner);
       pushCount('ipm_raw_left_boundary_count', status.ipm_raw_left_boundary);
       pushCount('ipm_raw_right_boundary_count', status.ipm_raw_right_boundary);
-      pushCount('ipm_corner_left_boundary_count', status.ipm_corner_left_boundary);
-      pushCount('ipm_corner_right_boundary_count', status.ipm_corner_right_boundary);
       pushCount('ipm_centerline_selected_shift_count', getSelectedIpmCenterline(status));
       pushCount('src_centerline_selected_shift_count', getSelectedSrcCenterline(status));
       push('ipm_centerline_selected_count', status.ipm_centerline_selected_count);
       push('src_centerline_selected_count', status.src_centerline_selected_count);
       pushCount('ipm_centerline_selected_curvature_count', getSelectedCurvature(status));
+      pushCount('ipm_left_boundary_curvature_count', getLeftBoundaryKappa(status));
+      pushCount('ipm_right_boundary_curvature_count', getRightBoundaryKappa(status));
+      pushCount('ipm_left_boundary_angle_cos_count', getLeftBoundaryAngleCos(status));
+      pushCount('ipm_right_boundary_angle_cos_count', getRightBoundaryAngleCos(status));
       return lines.length > 0 ? lines.join('\n') : 'waiting...';
     }
 
@@ -1587,6 +1682,8 @@
         statusEl.textContent = buildStatusSummary(j);
         drawIpmBoundaries(j);
         drawCurvatureChart(j);
+        drawBoundaryCurvatureCharts(j);
+        drawBoundaryAngleCosCharts(j);
         if (hasValue(j.ipm_centerline_source)) {
           ipmCenterlineSourceLabel.style.display = '';
           ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(j.ipm_centerline_source);
@@ -1605,7 +1702,7 @@
 
     bindPixelProbe(grayCanvas, grayCtx, grayPixelInfo);
     bindPixelProbe(binaryCanvas, binaryCtx, binaryPixelInfo);
-    bindPixelProbe(ipmCanvas, ipmCtx, ipmPixelInfo);
+    bindPixelProbe(ipmCanvas, ipmCtx, ipmPixelInfo, (x, y) => ipmBoundaryHoverText(latestStatus || {}, x, y));
     bindPixelProbe(ipmRawCanvas, ipmRawCtx, ipmRawPixelInfo);
 
     startRecordBtn.addEventListener('click', () => {
@@ -1686,6 +1783,10 @@
       showMeanCenterline = !!toggleMeanCenterline.checked;
       if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
     });
+    toggleGrayBoundaries.addEventListener('change', () => {
+      showGrayBoundaries = !!toggleGrayBoundaries.checked;
+      if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
+    });
     toggleIpmAnchorDot.addEventListener('change', () => {
       showIpmAnchorDot = !!toggleIpmAnchorDot.checked;
       drawIpmBoundaries(latestStatus);
@@ -1699,41 +1800,7 @@
     curvatureYMaxInput.addEventListener('change', applyCurvatureYRangeFromInput);
     curvatureYMinInput.addEventListener('blur', applyCurvatureYRangeFromInput);
     curvatureYMaxInput.addEventListener('blur', applyCurvatureYRangeFromInput);
-    [playbackGrayVideo, playbackBinaryVideo, playbackIpmVideo, playbackIpmRawVideo, playbackCurvatureVideo].forEach((video) => {
-      video.addEventListener('timeupdate', () => {
-        if (isSyncingPlayback) return;
-        if (video === currentPlaybackVideo()) {
-          syncPlaybackVideos(video);
-          refreshParamPanel();
-        }
-      });
-      video.addEventListener('seeked', () => {
-        if (isSyncingPlayback) return;
-        if (video === currentPlaybackVideo()) {
-          syncPlaybackVideos(video);
-          refreshParamPanel();
-        }
-      });
-      video.addEventListener('play', () => {
-        if (isSyncingPlayback) return;
-        if (video === currentPlaybackVideo()) {
-          syncPlaybackVideos(video);
-          refreshParamPanel();
-        }
-      });
-      video.addEventListener('pause', () => {
-        if (isSyncingPlayback) return;
-        if (video === currentPlaybackVideo()) {
-          syncPlaybackVideos(video);
-          refreshParamPanel();
-        }
-      });
-      video.addEventListener('ended', () => {
-        if (video === currentPlaybackVideo()) {
-          setPlaybackPlaying(false);
-        }
-      });
-    });
+    rebuildPlaybackGrid({}, {});
     setInterval(pullStatus, 120);
     setInterval(pullFrames, 60);
     setInterval(updateRecordingUi, 500);

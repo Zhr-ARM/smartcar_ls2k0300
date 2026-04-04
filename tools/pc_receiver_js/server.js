@@ -88,14 +88,15 @@ function writeRecordingFiles(folderName, payload) {
     recorded_at_ms: payload.recorded_at_ms,
     duration_ms: payload.duration_ms,
     frame_count: payload.frame_count,
+    video_labels: (payload.video_labels && typeof payload.video_labels === 'object') ? payload.video_labels : {},
     statuses: Array.isArray(payload.statuses) ? payload.statuses : []
   };
   fs.writeFileSync(path.join(folderPath, 'status.json'), JSON.stringify(statusPayload, null, 2), 'utf8');
 
   const videos = payload.videos && typeof payload.videos === 'object' ? payload.videos : {};
   const videoMeta = {};
-  const keys = ['gray', 'binary', 'ipm', 'ipm_raw', 'curvature'];
-  for (const key of keys) {
+  for (const key of Object.keys(videos)) {
+    if (!/^[A-Za-z0-9._-]+$/.test(key)) continue;
     const item = videos[key];
     if (!item || typeof item.data_b64 !== 'string' || !item.data_b64) continue;
     const mime = (typeof item.mime === 'string' && item.mime) ? item.mime : 'video/webm';
@@ -103,7 +104,8 @@ function writeRecordingFiles(folderName, payload) {
     const fileName = `${key}${ext}`;
     const filePath = path.join(folderPath, fileName);
     fs.writeFileSync(filePath, Buffer.from(item.data_b64, 'base64'));
-    videoMeta[key] = { file: fileName, mime };
+    const title = (typeof item.title === 'string' && item.title.trim()) ? item.title.trim() : key;
+    videoMeta[key] = { file: fileName, mime, title };
   }
 
   const meta = {
@@ -112,6 +114,7 @@ function writeRecordingFiles(folderName, payload) {
     recorded_at_ms: payload.recorded_at_ms,
     duration_ms: payload.duration_ms,
     frame_count: payload.frame_count,
+    video_labels: statusPayload.video_labels,
     videos: videoMeta
   };
   fs.writeFileSync(path.join(folderPath, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
@@ -371,11 +374,20 @@ function startHttpServer() {
       }
 
       const videos = {};
-      const files = fs.readdirSync(folderPath);
-      const keys = ['gray', 'binary', 'ipm', 'ipm_raw', 'curvature'];
-      for (const key of keys) {
-        const hit = files.find((name) => name === `${key}.webm` || name === `${key}.mp4`);
-        if (hit) videos[key] = `/api/recordings/file?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(hit)}`;
+      if (meta && meta.videos && typeof meta.videos === 'object') {
+        for (const [key, item] of Object.entries(meta.videos)) {
+          if (!item || typeof item.file !== 'string' || !item.file) continue;
+          videos[key] = `/api/recordings/file?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(item.file)}`;
+        }
+      } else {
+        const files = fs.readdirSync(folderPath);
+        for (const name of files) {
+          const ext = path.extname(name).toLowerCase();
+          if (ext !== '.webm' && ext !== '.mp4') continue;
+          const key = path.basename(name, ext);
+          if (!/^[A-Za-z0-9._-]+$/.test(key)) continue;
+          videos[key] = `/api/recordings/file?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(name)}`;
+        }
       }
       sendJson(res, 200, { ok: true, folder, status, meta, videos });
       return;
