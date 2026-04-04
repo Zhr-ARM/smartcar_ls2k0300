@@ -16,7 +16,7 @@
 namespace
 {
 // 控制周期：10ms(100Hz)。巡线环频率高于电机速度环(5ms)的整数倍，能持续给出平滑转向目标。
-constexpr int32 LINE_FOLLOW_PERIOD_MS = 20;
+constexpr int32 LINE_FOLLOW_PERIOD_MS = 1;
 // 调度优先级：巡线线程作为中高优先级实时任务执行。
 constexpr int32 LINE_FOLLOW_THREAD_PRIORITY = 8;
 

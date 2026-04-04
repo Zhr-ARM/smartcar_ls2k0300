@@ -161,7 +161,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    .udp_web_server_ip = "172.21.79.129",
+    .udp_web_server_ip = "10.131.211.102",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -243,7 +243,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // line_error 加权索引点（0-based）。
     .ipm_line_error_point_indices = {2, 6, 10},
     // line_error 各索引点对应权重。
-    .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
+    .ipm_line_error_weights = {0.48f, 0.29f, 0.23f},
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
     .ipm_line_error_speed_k = 0.02f,
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b。

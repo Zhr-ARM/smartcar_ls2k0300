@@ -104,7 +104,8 @@ int main(int, char**)
         cleanup();
         return -1;
     }
-
+    brushless_driver.set_left_duty(0);
+    brushless_driver.set_right_duty(0);
     if (g_vision_runtime_config.screen_display_enabled && !screen_display_thread_init())
     {
         cleanup();
@@ -177,13 +178,12 @@ int main(int, char**)
     uart_thread_init();
 
     // 巡线基础速度配置（控制线程会在此基础上叠加转向差速）。
-    line_follow_thread_set_base_speed(200.0f);
+    line_follow_thread_set_base_speed(700.0f);
     
     // 为motor_thread设置目标计数，单位 counts/5ms。
     // 固定左右轮目标值为 800，便于速度环调参。
     //motor_thread_set_target_count(600.0f, 600.0f);
-    brushless_driver.set_left_duty(0);
-    brushless_driver.set_right_duty(0);
+    
     system_delay_ms(50);
     motor_thread_print_info();
     //imu_thread_print_info();
