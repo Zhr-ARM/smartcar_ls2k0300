@@ -3,6 +3,47 @@
 const vision_runtime_config_t g_vision_runtime_config = {
     // ==================== 参数区域 3: 网页发送 ====================
     // 说明：发送相关参数集中在最前，包含逐飞助手、UDP 视频、TCP 状态上报。
+    //
+    // ==================== 网页图传怎么选 ====================
+    // 当前代码已实现：灰度 / 二值 / 彩图 均可选 JPEG / PNG / BMP。
+    //
+    // 若按“负载量从小到大”粗略排序：
+    // 1. 灰度 JPEG
+    // 2. 彩图 JPEG
+    // 3. 灰度 PNG（未来建议）
+    // 4. 彩图 PNG（未来建议）
+    // 5. 灰度 BMP（未来建议）
+    // 6. 彩图 BMP（未来建议，通常不建议）
+    //
+    // 若按“本地复算保真度”排序：
+    // 1. 灰度 PNG
+    // 2. 灰度 BMP
+    // 3. 彩图 PNG
+    // 4. 彩图 BMP
+    // 5. 灰度 JPEG
+    // 6. 彩图 JPEG
+    //
+    // 当前代码里最常用的 3 套配置：
+    // A. 本地复算优先：
+    //    udp_web_send_gray_jpeg = true
+    //    udp_web_send_rgb_jpeg = false
+    //    udp_web_send_binary_jpeg = false
+    //    udp_web_data_profile = VISION_WEB_DATA_PROFILE_RAW_MINIMAL
+    //
+    // B. 前端展示彩图优先：
+    //    udp_web_send_gray_jpeg = false
+    //    udp_web_send_rgb_jpeg = true
+    //    udp_web_send_binary_jpeg = false
+    //    udp_web_data_profile = VISION_WEB_DATA_PROFILE_RAW_MINIMAL
+    //
+    // C. 全量调试：
+    //    可选灰度图或彩图图传
+    //    udp_web_data_profile = VISION_WEB_DATA_PROFILE_FULL
+    //
+    // 经验建议：
+    // 1. 不建议长期同时发送灰度图和彩图，重复占带宽。
+    // 2. 不建议长期发送二值图，网页侧可由灰度图 + otsu_threshold 现算。
+    // 3. 若要兼顾“低负载 + 高保真”，优先把灰度图格式切到 PNG。
     // ==================== 本地显示与逐飞助手链路 ====================
     // 图传输出模式：
     // 0=binary 二值图，1=gray 灰度图(带线)，2=rgb565 彩图。
@@ -20,18 +61,30 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // UDP 网页图传总开关。
     .udp_web_enabled = true,
     // UDP 网页图传发送上限帧率，0 表示不限速。
-    .udp_web_max_fps = 30,
-    // 是否向网页端发送灰度 JPEG。
+    .udp_web_max_fps = 120,
+    // 是否向网页端发送灰度图。
     // 当前网页端可用该灰度图结合 TCP 下发的 otsu_threshold 自行实时二值化。
+    // 若目标是“本地复算尽量贴近主板”，优先开这个。
     .udp_web_send_gray_jpeg = true,
-    // 是否向网页端发送二值 JPEG。
+    // 灰度图格式：0=JPEG，1=PNG，2=BMP。
+    // 当前保持 JPEG，不改变现有配置行为。
+    .udp_web_gray_image_format = VISION_WEB_IMAGE_FORMAT_JPEG,
+    // 是否向网页端发送二值图。
     // 当前需求为停发二值图，因此默认关闭。
+    // 推荐继续保持关闭，除非临时想单独观察二值结果。
     .udp_web_send_binary_jpeg = false,
-    // 是否向网页端发送原始 BGR 彩图 JPEG。
-    .udp_web_send_rgb_jpeg = true,
+    // 二值图格式：0=JPEG，1=PNG，2=BMP。
+    // 当前保持 JPEG，不改变现有配置行为。
+    .udp_web_binary_image_format = VISION_WEB_IMAGE_FORMAT_JPEG,
+    // 是否向网页端发送原始 BGR 彩图。
+    // 若目标是“网页主要看彩图”，开这个；网页侧可在没有灰度图时自行转灰度。
+    .udp_web_send_rgb_jpeg = false,
+    // 彩图格式：0=JPEG，1=PNG，2=BMP。
+    // 当前保持 JPEG，不改变现有配置行为。
+    .udp_web_rgb_image_format = VISION_WEB_IMAGE_FORMAT_PNG,
     // 网页端 TCP 数据模式：
     // 0=全量调试数据，1=仅原始图像 + 最小原始状态。
-    .udp_web_data_profile = VISION_WEB_DATA_PROFILE_FULL,
+    .udp_web_data_profile = 0,
 
     // ==================== 网页端 TCP 状态发送总开关 ====================
     // TCP 状态上报开关。

@@ -1,4 +1,7 @@
 (() => {
+  const WEB_DATA_PROFILE_FULL = 0;
+  const WEB_DATA_PROFILE_RAW_MINIMAL = 1;
+
   function imageEndpointByMode(mode) {
     if (mode === 'rgb') return '/api/frame_rgb.jpg';
     if (mode === 'binary') return '/api/frame_binary.jpg';
@@ -38,11 +41,371 @@
     }
   }
 
+  function hasValue(value) {
+    return value !== undefined && value !== null;
+  }
+
+  function isFullDebugProfile(profile) {
+    return Number(profile) === WEB_DATA_PROFILE_FULL;
+  }
+
+  function isRawMinimalProfile(profile) {
+    return Number(profile) === WEB_DATA_PROFILE_RAW_MINIMAL;
+  }
+
+  function setElementVisible(el, visible) {
+    if (!el) return;
+    el.style.display = visible ? '' : 'none';
+  }
+
+  function frameSlotReady(slot) {
+    return !!(slot && slot.frameId >= 0 && slot.width > 0 && slot.height > 0);
+  }
+
+  function formatArrayInline(arr) {
+    if (!Array.isArray(arr)) return '[]';
+    return `[${arr.map((v) => Array.isArray(v) ? `[${v.join(', ')}]` : formatValue(v)).join(', ')}]`;
+  }
+
+  function formatTrackMethod(method) {
+    if (method === 0) return 'fixed';
+    if (method === 1) return 'weighted';
+    if (method === 2) return 'speed';
+    return `unknown(${method})`;
+  }
+
+  function formatCenterlineSource(source) {
+    if (source === 0) return 'left_shift';
+    if (source === 1) return 'right_shift';
+    if (source === 2) return 'auto';
+    return `unknown(${source})`;
+  }
+
+  function formatCenterlineSourceLabel(source) {
+    if (source === 0) return '透视中线来源：自动选择（左边界平移）';
+    if (source === 1) return '透视中线来源：自动选择（右边界平移）';
+    if (source === 2) return '透视中线来源：无偏好（待本帧自动选择）';
+    return '透视中线来源：自动选择（未知）';
+  }
+
+  function drawCurveChartToCanvas(canvas, ctx, rawValues, options = {}) {
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.fillStyle = options.backgroundColor || '#020617';
+    ctx.fillRect(0, 0, w, h);
+
+    const minY = Number(options.yMin);
+    const maxY = Number(options.yMax);
+    if (!Number.isFinite(minY) || !Number.isFinite(maxY) || minY >= maxY) return false;
+    const series = Array.isArray(rawValues) ? rawValues : [];
+
+    const marginLeft = 36;
+    const marginRight = 10;
+    const marginTop = 10;
+    const marginBottom = 24;
+    const plotW = Math.max(1, w - marginLeft - marginRight);
+    const plotH = Math.max(1, h - marginTop - marginBottom);
+
+    const yAt = (v) => marginTop + ((maxY - v) * plotH) / (maxY - minY);
+    const yZero = yAt(0);
+
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(marginLeft, marginTop);
+    ctx.lineTo(marginLeft, marginTop + plotH);
+    ctx.lineTo(marginLeft + plotW, marginTop + plotH);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#64748b';
+    ctx.beginPath();
+    ctx.moveTo(marginLeft, yZero);
+    ctx.lineTo(marginLeft + plotW, yZero);
+    ctx.stroke();
+
+    const divs = 5;
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= divs; i += 1) {
+      const t = i / divs;
+      const gx = marginLeft + t * plotW;
+      const gy = marginTop + t * plotH;
+
+      ctx.beginPath();
+      ctx.moveTo(gx, marginTop);
+      ctx.lineTo(gx, marginTop + plotH);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(marginLeft, gy);
+      ctx.lineTo(marginLeft + plotW, gy);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#94a3b8';
+    for (let i = 0; i <= divs; i += 1) {
+      const t = i / divs;
+      const gx = marginLeft + t * plotW;
+      const gy = marginTop + t * plotH;
+
+      ctx.beginPath();
+      ctx.arc(gx, marginTop + plotH, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(marginLeft, gy, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '12px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText('0', marginLeft - 10, marginTop + plotH + 16);
+    ctx.fillText(series.length > 0 ? String(series.length - 1) : 'N/A', marginLeft + plotW - 28, marginTop + plotH + 16);
+    ctx.fillText(maxY.toFixed(3), 6, marginTop + 8);
+    ctx.fillText('0', 12, yZero + 4);
+    ctx.fillText(minY.toFixed(3), 2, marginTop + plotH);
+
+    if (series.length < 1) {
+      ctx.fillStyle = '#64748b';
+      ctx.fillText('No data', marginLeft + plotW * 0.5 - 20, marginTop + plotH * 0.5);
+      return false;
+    }
+
+    const values = series.map((v) => Math.max(minY, Math.min(maxY, Number(v) || 0)));
+    const xAt = (idx) => marginLeft + (idx * plotW) / Math.max(1, values.length - 1);
+
+    ctx.strokeStyle = options.lineColor || '#38bdf8';
+    ctx.lineWidth = options.lineWidth || 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < values.length; i += 1) {
+      const x = xAt(i);
+      const y = yAt(Number(values[i]) || 0);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    return true;
+  }
+
+  function normalizePointSeries(pts) {
+    if (!Array.isArray(pts)) return [];
+    const normalized = [];
+    let hasNonZeroPoint = false;
+    for (const p of pts) {
+      if (!Array.isArray(p) || p.length < 2) continue;
+      const x = Number(p[0] || 0);
+      const y = Number(p[1] || 0);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      if (x !== 0 || y !== 0) hasNonZeroPoint = true;
+      normalized.push([x, y]);
+    }
+    if (!hasNonZeroPoint) return normalized;
+    return normalized.filter(([x, y]) => x !== 0 || y !== 0);
+  }
+
+  function drawPolyline(ctx, pts, color, lineWidth) {
+    const series = normalizePointSeries(pts);
+    if (series.length < 2) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    ctx.moveTo(series[0][0], series[0][1]);
+    for (let i = 1; i < series.length; i += 1) {
+      ctx.lineTo(series[i][0], series[i][1]);
+    }
+    ctx.stroke();
+  }
+
+  function drawPointSet(ctx, pts, color, radius) {
+    const series = normalizePointSeries(pts);
+    if (series.length < 1) return;
+    ctx.fillStyle = color;
+    const r = Math.max(1, radius | 0);
+    for (let i = 0; i < series.length; i += 1) {
+      const p = series[i];
+      ctx.beginPath();
+      ctx.arc(p[0], p[1], r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawSeries(ctx, pts, color, lineWidth, pointRadius, pointMode) {
+    if (pointMode) {
+      drawPointSet(ctx, pts, color, pointRadius);
+    } else {
+      drawPolyline(ctx, pts, color, lineWidth);
+    }
+  }
+
+  function getCanvasPoint(ev, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    const x = Math.max(0, Math.min(canvas.width - 1, Math.floor((ev.clientX - rect.left) * sx)));
+    const y = Math.max(0, Math.min(canvas.height - 1, Math.floor((ev.clientY - rect.top) * sy)));
+    return [x, y];
+  }
+
+  function sampleRGB(ctx, x, y) {
+    const d = ctx.getImageData(x, y, 1, 1).data;
+    return [d[0] | 0, d[1] | 0, d[2] | 0];
+  }
+
+  function mapCoord(x, y, srcW, srcH, dstW, dstH) {
+    if (srcW <= 1 || srcH <= 1 || dstW <= 0 || dstH <= 0) return [0, 0];
+    const mx = Math.max(0, Math.min(dstW - 1, Math.round((x * (dstW - 1)) / (srcW - 1))));
+    const my = Math.max(0, Math.min(dstH - 1, Math.round((y * (dstH - 1)) / (srcH - 1))));
+    return [mx, my];
+  }
+
+  function bindPixelProbe(canvas, ctx, infoEl, callbacks = {}) {
+    const buildText = callbacks.buildText;
+    const resetText = callbacks.resetText || 'x:- y:- | Gray:- Bin:- RGB:(-,-,-)';
+    canvas.addEventListener('mousemove', (ev) => {
+      const [x, y] = getCanvasPoint(ev, canvas);
+      const text = typeof buildText === 'function' ? buildText(x, y, canvas, ctx) : `x:${x} y:${y}`;
+      infoEl.textContent = text;
+    });
+    canvas.addEventListener('mouseleave', () => {
+      infoEl.textContent = resetText;
+    });
+  }
+
+  function buildStatusSummary(status, helpers = {}) {
+    const lines = [];
+    const getSelectedIpmCenterline = helpers.getSelectedIpmCenterline || (() => []);
+    const getLeftBoundaryKappa = helpers.getLeftBoundaryKappa || (() => []);
+    const getRightBoundaryKappa = helpers.getRightBoundaryKappa || (() => []);
+    const getLeftBoundaryAngleCos = helpers.getLeftBoundaryAngleCos || (() => []);
+    const getRightBoundaryAngleCos = helpers.getRightBoundaryAngleCos || (() => []);
+
+    const push = (name, value) => {
+      if (hasValue(value)) lines.push(`${name}: ${formatValue(value)}`);
+    };
+    const pushCount = (name, value) => {
+      if (Array.isArray(value)) lines.push(`${name}: ${value.length}`);
+    };
+
+    push('web_data_profile', status.web_data_profile);
+    push('line_error', status.line_error);
+    push('ts_ms', status.ts_ms);
+    push('udp_web_max_fps', status.udp_web_max_fps);
+    push('udp_web_send_gray', status.udp_web_send_gray);
+    push('udp_web_send_binary', status.udp_web_send_binary);
+    push('udp_web_send_rgb', status.udp_web_send_rgb);
+    push('udp_web_gray_image_format', status.udp_web_gray_image_format);
+    push('udp_web_binary_image_format', status.udp_web_binary_image_format);
+    push('udp_web_rgb_image_format', status.udp_web_rgb_image_format);
+    push('base_speed', status.base_speed);
+    push('adjusted_base_speed', status.adjusted_base_speed);
+    push('left_target_count', status.left_target_count);
+    push('right_target_count', status.right_target_count);
+    push('left_current_count', status.left_current_count);
+    push('right_current_count', status.right_current_count);
+    push('left_filtered_count', status.left_filtered_count);
+    push('right_filtered_count', status.right_filtered_count);
+    push('left_error', status.left_error);
+    push('right_error', status.right_error);
+    push('left_feedforward', status.left_feedforward);
+    push('right_feedforward', status.right_feedforward);
+    push('left_correction', status.left_correction);
+    push('right_correction', status.right_correction);
+    push('left_decel_assist', status.left_decel_assist);
+    push('right_decel_assist', status.right_decel_assist);
+    push('left_duty', status.left_duty);
+    push('right_duty', status.right_duty);
+    push('left_hardware_duty', status.left_hardware_duty);
+    push('right_hardware_duty', status.right_hardware_duty);
+    push('left_dir_level', status.left_dir_level);
+    push('right_dir_level', status.right_dir_level);
+    push('ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
+    if (Array.isArray(status.ipm_weighted_decision_point)) push('ipm_weighted_decision_point', formatArrayInline(status.ipm_weighted_decision_point));
+    if (Array.isArray(status.src_weighted_decision_point)) push('src_weighted_decision_point', formatArrayInline(status.src_weighted_decision_point));
+    push('otsu_threshold', status.otsu_threshold);
+    push('capture_wait_us', status.capture_wait_us);
+    push('preprocess_us', status.preprocess_us);
+    push('otsu_us', status.otsu_us);
+    push('maze_us', status.maze_us);
+    push('total_us', status.total_us);
+    push('rx_udp_bytes_per_sec', status.rx_udp_bytes_per_sec);
+    push('rx_udp_kib_per_sec', status.rx_udp_kib_per_sec);
+    push('rx_udp_mbps', status.rx_udp_mbps);
+    push('rx_udp_frames_per_sec', status.rx_udp_frames_per_sec);
+    push('rx_udp_gray_fps', status.rx_udp_gray_fps);
+    push('rx_udp_binary_fps', status.rx_udp_binary_fps);
+    push('rx_udp_rgb_fps', status.rx_udp_rgb_fps);
+    push('rx_udp_avg_gray_frame_bytes', status.rx_udp_avg_gray_frame_bytes);
+    push('rx_udp_avg_binary_frame_bytes', status.rx_udp_avg_binary_frame_bytes);
+    push('rx_udp_avg_rgb_frame_bytes', status.rx_udp_avg_rgb_frame_bytes);
+    push('rx_udp_estimated_peak_bytes_per_sec', status.rx_udp_estimated_peak_bytes_per_sec);
+    push('rx_udp_estimated_peak_kib_per_sec', status.rx_udp_estimated_peak_kib_per_sec);
+    push('rx_udp_estimated_peak_mbps', status.rx_udp_estimated_peak_mbps);
+    push('maze_left_points_raw', status.maze_left_points_raw);
+    push('maze_right_points_raw', status.maze_right_points_raw);
+    push('red_found', status.red_found);
+    if (Array.isArray(status.red)) push('red', formatArrayInline(status.red));
+    push('roi_valid', status.roi_valid);
+    if (Array.isArray(status.roi)) push('roi', formatArrayInline(status.roi));
+    push('ipm_track_valid', status.ipm_track_valid);
+    if (hasValue(status.ipm_track_method)) push('ipm_track_method', formatTrackMethod(status.ipm_track_method));
+    if (hasValue(status.ipm_centerline_source)) push('ipm_centerline_source', formatCenterlineSource(status.ipm_centerline_source));
+    push('ipm_track_index', status.ipm_track_index);
+    if (Array.isArray(status.ipm_track_point)) push('ipm_track_point', formatArrayInline(status.ipm_track_point));
+    if (Array.isArray(status.gray_size)) push('gray_size', formatArrayInline(status.gray_size));
+    if (Array.isArray(status.ipm_size)) push('ipm_size', formatArrayInline(status.ipm_size));
+    pushCount('left_boundary_count', status.left_boundary);
+    pushCount('right_boundary_count', status.right_boundary);
+    pushCount('left_auxiliary_line_count', status.left_auxiliary_line);
+    pushCount('right_auxiliary_line_count', status.right_auxiliary_line);
+    pushCount('left_auxiliary_seed_count', status.left_auxiliary_seed);
+    pushCount('right_auxiliary_seed_count', status.right_auxiliary_seed);
+    pushCount('left_boundary_corner_count', status.left_boundary_corner);
+    pushCount('right_boundary_corner_count', status.right_boundary_corner);
+    pushCount('ipm_left_boundary_count', status.ipm_left_boundary);
+    pushCount('ipm_right_boundary_count', status.ipm_right_boundary);
+    pushCount('ipm_left_boundary_corner_count', status.ipm_left_boundary_corner);
+    pushCount('ipm_right_boundary_corner_count', status.ipm_right_boundary_corner);
+    pushCount('ipm_raw_left_boundary_count', status.ipm_raw_left_boundary);
+    pushCount('ipm_raw_right_boundary_count', status.ipm_raw_right_boundary);
+    pushCount('ipm_centerline_selected_shift_count', getSelectedIpmCenterline(status));
+    push('ipm_centerline_selected_count', status.ipm_centerline_selected_count);
+    push('src_centerline_selected_count', status.src_centerline_selected_count);
+    pushCount('ipm_left_boundary_curvature_count', getLeftBoundaryKappa(status));
+    pushCount('ipm_right_boundary_curvature_count', getRightBoundaryKappa(status));
+    pushCount('ipm_left_boundary_angle_cos_count', getLeftBoundaryAngleCos(status));
+    pushCount('ipm_right_boundary_angle_cos_count', getRightBoundaryAngleCos(status));
+
+    return lines.length > 0 ? lines.join('\n') : 'waiting...';
+  }
+
   window.SharedReceiverCore = {
+    WEB_DATA_PROFILE_FULL,
+    WEB_DATA_PROFILE_RAW_MINIMAL,
     imageEndpointByMode,
     frameUrlForMode,
     fetchJsonNoStore,
     formatValue,
-    renderStatusList
+    renderStatusList,
+    hasValue,
+    isFullDebugProfile,
+    isRawMinimalProfile,
+    setElementVisible,
+    frameSlotReady,
+    formatArrayInline,
+    formatTrackMethod,
+    formatCenterlineSource,
+    formatCenterlineSourceLabel,
+    drawCurveChartToCanvas,
+    drawPolyline,
+    drawPointSet,
+    drawSeries,
+    normalizePointSeries,
+    getCanvasPoint,
+    sampleRGB,
+    mapCoord,
+    bindPixelProbe,
+    buildStatusSummary
   };
 })();

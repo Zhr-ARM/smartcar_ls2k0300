@@ -47,6 +47,8 @@ constexpr uint32 kUdpMaxFpsUpper = 120;
 constexpr uint32 kMaxUdpPayload = 1200;
 constexpr uint32 kUdpHeaderSize = 20;
 constexpr uint32 kMagic = 0x56535544;
+constexpr int kGrayJpegQuality = 100;
+constexpr int kRgbJpegQuality = 80;
 constexpr int kIpmCanvasWidth = VISION_IPM_WIDTH;
 constexpr int kIpmCanvasHeight = VISION_IPM_HEIGHT;
 
@@ -77,6 +79,32 @@ bool g_tcp_ready = false;     // TCP 初始化是否成功。
 char g_server_ip[64] = {0};   // 接收端 IP。
 uint16 g_video_port = 0;      // UDP 视频端口。
 uint16 g_meta_port = 0;       // TCP 状态端口。
+
+static vision_web_image_format_enum sanitize_web_image_format(int format)
+{
+    switch (format)
+    {
+        case VISION_WEB_IMAGE_FORMAT_PNG:
+            return VISION_WEB_IMAGE_FORMAT_PNG;
+        case VISION_WEB_IMAGE_FORMAT_BMP:
+            return VISION_WEB_IMAGE_FORMAT_BMP;
+        default:
+            return VISION_WEB_IMAGE_FORMAT_JPEG;
+    }
+}
+
+static const char *opencv_ext_for_web_image_format(vision_web_image_format_enum format)
+{
+    switch (format)
+    {
+        case VISION_WEB_IMAGE_FORMAT_PNG:
+            return ".png";
+        case VISION_WEB_IMAGE_FORMAT_BMP:
+            return ".bmp";
+        default:
+            return ".jpg";
+    }
+}
 
 static vision_send_mode_enum vision_sender_sanitize_mode(vision_send_mode_enum mode)
 {
@@ -227,28 +255,40 @@ static bool try_acquire_udp_send_slot()
     return true;
 }
 
-// 作用：将灰度/二值图编码为 JPEG（供 UDP 发送）。
-static bool encode_jpeg_gray_like(const uint8 *gray_u8, int width, int height, std::vector<uint8> *jpeg_out)
+// 作用：将灰度/二值图编码为指定格式（供 UDP 发送）。
+static bool encode_gray_like_for_web(const uint8 *gray_u8,
+                                     int width,
+                                     int height,
+                                     vision_web_image_format_enum format,
+                                     int jpeg_quality,
+                                     std::vector<uint8> *image_out)
 {
-    if (gray_u8 == nullptr || jpeg_out == nullptr || width <= 0 || height <= 0)
+    if (gray_u8 == nullptr || image_out == nullptr || width <= 0 || height <= 0)
     {
         return false;
     }
     cv::Mat img(height, width, CV_8UC1, const_cast<uint8 *>(gray_u8));
-    std::vector<int> enc_params = {cv::IMWRITE_JPEG_QUALITY, 80};
-    return cv::imencode(".jpg", img, *jpeg_out, enc_params);
+    std::vector<int> enc_params;
+    if (format == VISION_WEB_IMAGE_FORMAT_JPEG)
+    {
+        // 本地计算页会基于该灰度帧重新跑同源算法，因此默认 JPEG 质量尽量高。
+        enc_params = {cv::IMWRITE_JPEG_QUALITY, jpeg_quality};
+    }
+    return cv::imencode(opencv_ext_for_web_image_format(format), img, *image_out, enc_params);
 }
 
-static bool build_gray_jpeg(std::vector<uint8> *jpeg_out, int *width, int *height, uint8 *mode_out)
+static bool build_gray_image(std::vector<uint8> *image_out, int *width, int *height, uint8 *mode_out)
 {
-    if (jpeg_out == nullptr || width == nullptr || height == nullptr || mode_out == nullptr)
+    if (image_out == nullptr || width == nullptr || height == nullptr || mode_out == nullptr)
     {
         return false;
     }
     const int w = VISION_DOWNSAMPLED_WIDTH;
     const int h = VISION_DOWNSAMPLED_HEIGHT;
     const uint8 *gray = vision_image_processor_gray_downsampled_image();
-    if (!encode_jpeg_gray_like(gray, w, h, jpeg_out))
+    const vision_web_image_format_enum format =
+        sanitize_web_image_format(g_vision_runtime_config.udp_web_gray_image_format);
+    if (!encode_gray_like_for_web(gray, w, h, format, kGrayJpegQuality, image_out))
     {
         return false;
     }
@@ -258,9 +298,30 @@ static bool build_gray_jpeg(std::vector<uint8> *jpeg_out, int *width, int *heigh
     return true;
 }
 
-static bool build_rgb_jpeg(std::vector<uint8> *jpeg_out, int *width, int *height, uint8 *mode_out)
+static bool build_binary_image(std::vector<uint8> *image_out, int *width, int *height, uint8 *mode_out)
 {
-    if (jpeg_out == nullptr || width == nullptr || height == nullptr || mode_out == nullptr)
+    if (image_out == nullptr || width == nullptr || height == nullptr || mode_out == nullptr)
+    {
+        return false;
+    }
+    const int w = VISION_DOWNSAMPLED_WIDTH;
+    const int h = VISION_DOWNSAMPLED_HEIGHT;
+    const uint8 *binary = vision_image_processor_binary_downsampled_u8_image();
+    const vision_web_image_format_enum format =
+        sanitize_web_image_format(g_vision_runtime_config.udp_web_binary_image_format);
+    if (!encode_gray_like_for_web(binary, w, h, format, kGrayJpegQuality, image_out))
+    {
+        return false;
+    }
+    *width = w;
+    *height = h;
+    *mode_out = 0;
+    return true;
+}
+
+static bool build_rgb_image(std::vector<uint8> *image_out, int *width, int *height, uint8 *mode_out)
+{
+    if (image_out == nullptr || width == nullptr || height == nullptr || mode_out == nullptr)
     {
         return false;
     }
@@ -272,8 +333,14 @@ static bool build_rgb_jpeg(std::vector<uint8> *jpeg_out, int *width, int *height
         return false;
     }
     cv::Mat img(h, w, CV_8UC3, const_cast<uint8 *>(bgr));
-    std::vector<int> enc_params = {cv::IMWRITE_JPEG_QUALITY, 80};
-    if (!cv::imencode(".jpg", img, *jpeg_out, enc_params))
+    const vision_web_image_format_enum format =
+        sanitize_web_image_format(g_vision_runtime_config.udp_web_rgb_image_format);
+    std::vector<int> enc_params;
+    if (format == VISION_WEB_IMAGE_FORMAT_JPEG)
+    {
+        enc_params = {cv::IMWRITE_JPEG_QUALITY, kRgbJpegQuality};
+    }
+    if (!cv::imencode(opencv_ext_for_web_image_format(format), img, *image_out, enc_params))
     {
         return false;
     }
@@ -284,23 +351,27 @@ static bool build_rgb_jpeg(std::vector<uint8> *jpeg_out, int *width, int *height
 }
 
 // 作用：发送 UDP 分片帧。
-static void send_udp_frame(const std::vector<uint8> &jpeg, int width, int height, uint8 mode)
+static void send_udp_frame(const std::vector<uint8> &image_bytes,
+                           int width,
+                           int height,
+                           uint8 mode,
+                           vision_web_image_format_enum format)
 {
-    if (!g_udp_ready || jpeg.empty())
+    if (!g_udp_ready || image_bytes.empty())
     {
         return;
     }
 
     const uint32 frame_id = g_udp_frame_id.fetch_add(1);
     const uint32 max_chunk_data = kMaxUdpPayload - kUdpHeaderSize;
-    const uint32 chunk_total = (static_cast<uint32>(jpeg.size()) + max_chunk_data - 1U) / max_chunk_data;
+    const uint32 chunk_total = (static_cast<uint32>(image_bytes.size()) + max_chunk_data - 1U) / max_chunk_data;
     std::vector<uint8> packet;
     packet.resize(kMaxUdpPayload);
 
     for (uint32 i = 0; i < chunk_total; ++i)
     {
         const uint32 offset = i * max_chunk_data;
-        const uint32 remain = static_cast<uint32>(jpeg.size()) - offset;
+        const uint32 remain = static_cast<uint32>(image_bytes.size()) - offset;
         const uint32 payload_len = (remain > max_chunk_data) ? max_chunk_data : remain;
 
         udp_chunk_header_t hdr{};
@@ -312,9 +383,10 @@ static void send_udp_frame(const std::vector<uint8> &jpeg, int width, int height
         hdr.width = htons(static_cast<uint16>(width));
         hdr.height = htons(static_cast<uint16>(height));
         hdr.mode = mode;
+        hdr.reserved = static_cast<uint8>(format);
 
         std::memcpy(packet.data(), &hdr, sizeof(hdr));
-        std::memcpy(packet.data() + sizeof(hdr), jpeg.data() + offset, payload_len);
+        std::memcpy(packet.data() + sizeof(hdr), image_bytes.data() + offset, payload_len);
         udp_send_data(packet.data(), payload_len + sizeof(hdr));
     }
 }
@@ -549,6 +621,16 @@ static void send_tcp_status()
 
     append_int(true, "web_data_profile", data_profile);
     append_int(true, "web_full_debug", send_full_debug ? 1 : 0);
+    append_int(true, "udp_web_max_fps", g_vision_runtime_config.udp_web_max_fps);
+    append_bool(true, "udp_web_send_gray", g_vision_runtime_config.udp_web_send_gray_jpeg);
+    append_bool(true, "udp_web_send_binary", g_vision_runtime_config.udp_web_send_binary_jpeg);
+    append_bool(true, "udp_web_send_rgb", g_vision_runtime_config.udp_web_send_rgb_jpeg);
+    append_int(true, "udp_web_gray_image_format",
+               static_cast<int>(sanitize_web_image_format(g_vision_runtime_config.udp_web_gray_image_format)));
+    append_int(true, "udp_web_binary_image_format",
+               static_cast<int>(sanitize_web_image_format(g_vision_runtime_config.udp_web_binary_image_format)));
+    append_int(true, "udp_web_rgb_image_format",
+               static_cast<int>(sanitize_web_image_format(g_vision_runtime_config.udp_web_rgb_image_format)));
 
     if (!send_full_debug)
     {
@@ -813,24 +895,41 @@ void vision_transport_send_step()
     {
         if (g_udp_enabled.load() && g_vision_runtime_config.udp_web_send_gray_jpeg)
         {
-            std::vector<uint8> gray_jpeg;
+            std::vector<uint8> gray_image;
             int width = 0;
             int height = 0;
             uint8 mode = 0;
-            if (build_gray_jpeg(&gray_jpeg, &width, &height, &mode))
+            const vision_web_image_format_enum format =
+                sanitize_web_image_format(g_vision_runtime_config.udp_web_gray_image_format);
+            if (build_gray_image(&gray_image, &width, &height, &mode))
             {
-                send_udp_frame(gray_jpeg, width, height, mode);
+                send_udp_frame(gray_image, width, height, mode, format);
+            }
+        }
+        if (g_udp_enabled.load() && g_vision_runtime_config.udp_web_send_binary_jpeg)
+        {
+            std::vector<uint8> binary_image;
+            int width = 0;
+            int height = 0;
+            uint8 mode = 0;
+            const vision_web_image_format_enum format =
+                sanitize_web_image_format(g_vision_runtime_config.udp_web_binary_image_format);
+            if (build_binary_image(&binary_image, &width, &height, &mode))
+            {
+                send_udp_frame(binary_image, width, height, mode, format);
             }
         }
         if (g_udp_enabled.load() && g_vision_runtime_config.udp_web_send_rgb_jpeg)
         {
-            std::vector<uint8> rgb_jpeg;
+            std::vector<uint8> rgb_image;
             int width = 0;
             int height = 0;
             uint8 mode = 0;
-            if (build_rgb_jpeg(&rgb_jpeg, &width, &height, &mode))
+            const vision_web_image_format_enum format =
+                sanitize_web_image_format(g_vision_runtime_config.udp_web_rgb_image_format);
+            if (build_rgb_image(&rgb_image, &width, &height, &mode))
             {
-                send_udp_frame(rgb_jpeg, width, height, mode);
+                send_udp_frame(rgb_image, width, height, mode, format);
             }
         }
         send_tcp_status();

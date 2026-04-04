@@ -47,6 +47,18 @@
 
 目标是“一份算法，两种产物”，而不是“两份算法，两边同步改”。
 
+### 4. 不再把简化版 JS 识别结果作为目标路线
+
+- 浏览器端可以临时保留最小联调桩
+- 但正式目标不是“近似结果”
+- 正式目标是：
+  - 输入同一帧图像
+  - 输入同一组原始采集值
+  - 调同一份 C++ 视觉算法源码
+  - 输出尽可能一模一样的边界 / 中线 / 曲率 / line_error / 角点 / 辅助线
+
+也就是说，网页端本地计算最终应是“同源算法的另一次编译产物”，而不是单独维护一份手写 JS 算法。
+
 ## 后续落地顺序
 
 1. 定义 Web 端真正需要的最小原始状态集
@@ -58,3 +70,18 @@
 ## 明确约束
 
 如果后续某一步必须动 `project/` 内现有算法文件，我会先停下来和你确认，不会直接改。
+
+## 当前里程碑进度
+
+- 已完成：单通道双页面服务
+- 已完成：`FULL / RAW_MINIMAL` 传输档位
+- 已完成：网页接收层与基础绘图共享
+- 已完成：`wasm_bridge` 稳定接口骨架
+- 已完成：第一版 probe 编译链
+  - 当前已能在 `tools/pc_receiver_local_compute/wasm_bridge` 下同源编译：
+    - `vision_config.c`
+    - `vision_line_error_layer.cpp`
+  - 当前使用的 compat：
+    - `zf_common_headfile.h`
+    - `line_follow_thread.h/.cpp`
+- 下一步：补 `vision_frame_capture` compat，并把 `vision_image_processor.cpp` 纳入 probe

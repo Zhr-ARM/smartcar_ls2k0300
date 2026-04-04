@@ -15,6 +15,13 @@ typedef enum
     VISION_WEB_DATA_PROFILE_RAW_MINIMAL = 1
 } vision_web_data_profile_enum;
 
+typedef enum
+{
+    VISION_WEB_IMAGE_FORMAT_JPEG = 0,
+    VISION_WEB_IMAGE_FORMAT_PNG = 1,
+    VISION_WEB_IMAGE_FORMAT_BMP = 2
+} vision_web_image_format_enum;
+
 typedef struct
 {
     // ==================== 参数区域 3: 网页发送 ====================
@@ -30,17 +37,49 @@ typedef struct
     bool client_sender_enabled;
     // 车载屏显示开关：true 时启动 screen_display_thread。
     bool screen_display_enabled;
+    // ==================== 网页图传选型说明 ====================
+    // 当前代码已实现的网页图片格式：JPEG / PNG / BMP（灰度 / 二值 / 彩图）。
+    //
+    // 若以“负载量从小到大”为标准，通常推荐顺序为：
+    // 1. 灰度 JPEG：最省，但有损，可能影响本地复算。
+    // 2. 彩图 JPEG：通常也较省，但有损，且网页侧还需转灰度。
+    // 3. 灰度 PNG：无损压缩，适合本地复算，通常是最推荐方案。
+    // 4. 彩图 PNG：无损压缩，但负载明显高于灰度 PNG。
+    // 5. 灰度 BMP：无损不压缩，保真好，但带宽较高。
+    // 6. 彩图 BMP：无损不压缩，带宽最高，通常不建议。
+    //
+    // 若以“本地复算保真度”为标准，推荐顺序为：
+    // 灰度 PNG > 灰度 BMP > 彩图 PNG > 彩图 BMP > 灰度 JPEG > 彩图 JPEG。
+    //
+    // 当前这份配置里，可切换的是“是否发送灰度 / 二值 / 彩图”
+    // 以及三路图像各自的格式（JPEG / PNG / BMP）与 FULL / RAW_MINIMAL。
     // UDP 网页图传开关：控制是否向电脑端发送视频帧。
     bool udp_web_enabled;
     // UDP 网页图传最大发送帧率，0 表示不限速。
     uint32 udp_web_max_fps;
-    // UDP 网页图传是否发送灰度 JPEG。
+    // UDP 网页图传是否发送灰度图。
+    // 推荐：
+    // 1. 本地复算优先：只开灰度图，再配 RAW_MINIMAL。
+    // 2. 若担心 JPEG 失真，优先改用灰度 PNG，而不是直接上 BMP。
     bool udp_web_send_gray_jpeg;
-    // UDP 网页图传是否发送二值 JPEG。
+    // UDP 网页灰度图格式：0=JPEG，1=PNG，2=BMP。
+    int udp_web_gray_image_format;
+    // UDP 网页图传是否发送二值图。
+    // 推荐默认关闭。二值图可由网页侧根据灰度图 + otsu_threshold 现算。
     bool udp_web_send_binary_jpeg;
-    // UDP 网页图传是否发送原始 BGR 彩图 JPEG。
+    // UDP 网页二值图格式：0=JPEG，1=PNG，2=BMP。
+    int udp_web_binary_image_format;
+    // UDP 网页图传是否发送原始 BGR 彩图。
+    // 推荐：
+    // 1. 展示彩图优先：只开彩图图传，再配 RAW_MINIMAL。
+    // 2. 若同时开启灰度 + 彩图，会额外占用带宽，通常不建议长期并开。
     bool udp_web_send_rgb_jpeg;
+    // UDP 网页彩图格式：0=JPEG，1=PNG，2=BMP。
+    int udp_web_rgb_image_format;
     // 网页端 TCP 数据模式：0=全量调试数据，1=仅原始最小状态。
+    // 推荐：
+    // 1. FULL：用于完整调试，但状态负载明显更高。
+    // 2. RAW_MINIMAL：用于“图片 + 最小状态 + 网页侧本地复算”，更适合长期使用。
     int udp_web_data_profile;
     // TCP 状态上报开关：控制是否向电脑端发送 JSON 状态数据。
     bool udp_web_tcp_enabled;

@@ -26,7 +26,67 @@
       white-space: nowrap;
     }
     .meta { margin: 8px 0 12px; color: #94a3b8; font-size: 13px; }
+    .mode-note {
+      display: none;
+      margin: 8px 0 12px;
+      padding: 12px 14px;
+      border: 1px solid #3b82f6;
+      border-radius: 10px;
+      background: rgba(30, 64, 175, 0.16);
+      color: #dbeafe;
+    }
     .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 16px; }
+    .transport-panel {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 30;
+      width: min(360px, calc(100vw - 32px));
+      background: rgba(11, 18, 32, 0.94);
+      border: 1px solid rgba(71, 85, 105, 0.9);
+      border-radius: 12px;
+      box-shadow: 0 14px 40px rgba(2, 6, 23, 0.42);
+      backdrop-filter: blur(8px);
+      padding: 12px 14px;
+    }
+    .transport-panel .title {
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #bfdbfe;
+    }
+    .transport-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+    }
+    .transport-stat {
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    .transport-label {
+      color: #94a3b8;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+    .transport-value {
+      color: #f8fafc;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+    .transport-subvalue {
+      color: #cbd5e1;
+      font-size: 11px;
+      margin-top: 3px;
+    }
+    .transport-note {
+      margin-top: 8px;
+      color: #93c5fd;
+      font-size: 11px;
+      line-height: 1.4;
+    }
     .btn {
       border: 1px solid #475569;
       background: #1e293b;
@@ -157,13 +217,47 @@
     @media (max-width: 1100px) {
       .recording-layout { grid-template-columns: 1fr; }
     }
-    @media (max-width: 900px){ .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 900px){
+      .grid { grid-template-columns: 1fr; }
+      .transport-panel {
+        position: static;
+        width: auto;
+        margin: 0 0 12px;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <div class="transport-panel" id="transportPanel">
+      <div class="title">图传概览</div>
+      <div class="transport-grid">
+        <div class="transport-stat">
+          <div class="transport-label">当前传输速度</div>
+          <div class="transport-value" id="transportRateValue">-- Mbps</div>
+          <div class="transport-subvalue" id="transportRateSub">-- KiB/s</div>
+        </div>
+        <div class="transport-stat">
+          <div class="transport-label">当前图像帧率</div>
+          <div class="transport-value" id="transportFpsValue">-- fps</div>
+          <div class="transport-subvalue" id="transportFpsSub">gray -- / rgb -- / binary --</div>
+        </div>
+        <div class="transport-stat">
+          <div class="transport-label">当前图传配置</div>
+          <div class="transport-value" id="transportModeValue">--</div>
+          <div class="transport-subvalue" id="transportModeSub">max fps --</div>
+        </div>
+        <div class="transport-stat">
+          <div class="transport-label">本地复算同步</div>
+          <div class="transport-value" id="transportSyncValue">--</div>
+          <div class="transport-subvalue" id="transportSyncSub">等待同步信息...</div>
+        </div>
+      </div>
+      <div class="transport-note" id="transportNote">等待图传数据...</div>
+    </div>
     <h2>智能车视觉接收端（Node.js）</h2>
     <div class="meta" id="meta">connecting...</div>
+    <div class="mode-note" id="modeNote">当前模式说明加载中...</div>
     <div class="toolbar">
       <button class="btn btn-primary" id="startRecordBtn">开始录制</button>
       <button class="btn btn-danger" id="stopRecordBtn" disabled>停止录制</button>
@@ -194,12 +288,16 @@
         显示中线曲率图
       </label>
       <label style="margin-left: 16px;">
-        <input type="checkbox" id="toggleBoundaryCurvatureCharts" checked />
+        <input type="checkbox" id="toggleBoundaryCurvatureCharts" />
         显示边界曲率图
       </label>
       <label style="margin-left: 16px;">
         <input type="checkbox" id="toggleBoundaryAngleCosCharts" checked />
         显示边界角点cos图
+      </label>
+      <label style="margin-left: 16px;">
+        <input type="checkbox" id="toggleLocalCompute" />
+        启用本地复算补数
       </label>
       <label style="margin-left: 16px;">
         曲率Y最小
@@ -214,6 +312,13 @@
       </span>
     </div>
     <div class="grid">
+      <div class="card" id="rgbCard">
+        <div class="title">彩图</div>
+        <div class="view">
+          <canvas id="rgbCanvas" width="160" height="120"></canvas>
+          <div class="pixel-info" id="rgbPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
+      </div>
       <div class="card" id="grayCard">
         <div class="title">灰度图 + 迷宫左右边线（红/绿）</div>
         <div class="view">
@@ -351,6 +456,8 @@
   </div>
   <script src="/shared_receiver_core.js"></script>
   <script>
+    const rgbCanvas = document.getElementById('rgbCanvas');
+    const rgbCtx = rgbCanvas.getContext('2d');
     const grayCanvas = document.getElementById('grayCanvas');
     const grayCtx = grayCanvas.getContext('2d');
     const binaryCanvas = document.getElementById('binaryCanvas');
@@ -369,12 +476,23 @@
     const leftBoundaryAngleCosCtx = leftBoundaryAngleCosCanvas.getContext('2d');
     const rightBoundaryAngleCosCanvas = document.getElementById('rightBoundaryAngleCosCanvas');
     const rightBoundaryAngleCosCtx = rightBoundaryAngleCosCanvas.getContext('2d');
+    const rgbPixelInfo = document.getElementById('rgbPixelInfo');
     const grayPixelInfo = document.getElementById('grayPixelInfo');
     const binaryPixelInfo = document.getElementById('binaryPixelInfo');
     const ipmPixelInfo = document.getElementById('ipmPixelInfo');
     const ipmRawPixelInfo = document.getElementById('ipmRawPixelInfo');
     const statusEl = document.getElementById('status');
     const metaEl = document.getElementById('meta');
+    const transportRateValueEl = document.getElementById('transportRateValue');
+    const transportRateSubEl = document.getElementById('transportRateSub');
+    const transportFpsValueEl = document.getElementById('transportFpsValue');
+    const transportFpsSubEl = document.getElementById('transportFpsSub');
+    const transportModeValueEl = document.getElementById('transportModeValue');
+    const transportModeSubEl = document.getElementById('transportModeSub');
+    const transportSyncValueEl = document.getElementById('transportSyncValue');
+    const transportSyncSubEl = document.getElementById('transportSyncSub');
+    const transportNoteEl = document.getElementById('transportNote');
+    const modeNote = document.getElementById('modeNote');
     const startRecordBtn = document.getElementById('startRecordBtn');
     const stopRecordBtn = document.getElementById('stopRecordBtn');
     const playRecordBtn = document.getElementById('playRecordBtn');
@@ -388,10 +506,12 @@
     const playbackForwardBtn = document.getElementById('playbackForwardBtn');
     const playbackTimeLabel = document.getElementById('playbackTimeLabel');
     const recordingMeta = document.getElementById('recordingMeta');
+    const rgbCard = document.getElementById('rgbCard');
     const binaryCard = document.getElementById('binaryCard');
     const binaryTitle = document.getElementById('binaryTitle');
     const ipmCard = document.getElementById('ipmCard');
     const ipmRawCard = document.getElementById('ipmRawCard');
+    const statusCard = document.getElementById('statusCard');
     const curvatureCard = document.getElementById('curvatureCard');
     const leftBoundaryCurvatureCard = document.getElementById('leftBoundaryCurvatureCard');
     const rightBoundaryCurvatureCard = document.getElementById('rightBoundaryCurvatureCard');
@@ -417,20 +537,24 @@
     const toggleCenterlineCurvatureChart = document.getElementById('toggleCenterlineCurvatureChart');
     const toggleBoundaryCurvatureCharts = document.getElementById('toggleBoundaryCurvatureCharts');
     const toggleBoundaryAngleCosCharts = document.getElementById('toggleBoundaryAngleCosCharts');
+    const toggleLocalCompute = document.getElementById('toggleLocalCompute');
     const curvatureYMinInput = document.getElementById('curvatureYMinInput');
     const curvatureYMaxInput = document.getElementById('curvatureYMaxInput');
     const ipmCenterlineSourceLabel = document.getElementById('ipmCenterlineSourceLabel');
+    const rgbImg = new Image();
     const grayImg = new Image();
     const rawGrayCanvas = document.createElement('canvas');
     const rawGrayCtx = rawGrayCanvas.getContext('2d');
     const receiverCore = window.SharedReceiverCore;
     let latestStatus = {};
+    let latestLocalPayload = null;
+    let latestWasmSyncStatus = null;
     let showGrayBoundaries = true;
     let showMeanCenterline = false;
     let showIpmAnchorDot = true;
     let boundaryPointMode = false;
     let showCenterlineCurvatureChart = true;
-    let showBoundaryCurvatureCharts = true;
+    let showBoundaryCurvatureCharts = false;
     let showBoundaryAngleCosCharts = true;
     let recordingState = null;
     let lastRecording = null;
@@ -441,6 +565,15 @@
     let curvatureYMax = 0.3;
     let playbackVideoEntries = [];
     let playbackPrimaryKey = '';
+    let fullDebugModeActive = true;
+    let localComputeEnabled = new URLSearchParams(window.location.search).get('local_compute') === '1';
+    let localWorkerBusy = false;
+    let grayFrameReady = false;
+    let rgbFrameReady = false;
+    let grayFetchSeq = 0;
+    let grayFetchInFlight = false;
+    let activeGraySource = 'none';
+    const localWorker = new Worker('/pipeline_worker.js');
 
     function hasValue(value) {
       return value !== undefined && value !== null;
@@ -448,6 +581,82 @@
 
     function hasPointArray(value) {
       return Array.isArray(value) && value.length > 0;
+    }
+
+    function setDebugPageActive(active) {
+      fullDebugModeActive = !!active;
+      receiverCore.setElementVisible(modeNote, !active);
+      receiverCore.setElementVisible(document.querySelector('.grid'), true);
+      receiverCore.setElementVisible(document.querySelector('.toolbar'), true);
+      receiverCore.setElementVisible(statusCard, true);
+      receiverCore.setElementVisible(ipmCard, active);
+      receiverCore.setElementVisible(ipmRawCard, active);
+      receiverCore.setElementVisible(curvatureCard, active && toggleCenterlineCurvatureChart.checked);
+      receiverCore.setElementVisible(leftBoundaryCurvatureCard, active && toggleBoundaryCurvatureCharts.checked);
+      receiverCore.setElementVisible(rightBoundaryCurvatureCard, active && toggleBoundaryCurvatureCharts.checked);
+      receiverCore.setElementVisible(leftBoundaryAngleCosCard, active && toggleBoundaryAngleCosCharts.checked);
+      receiverCore.setElementVisible(rightBoundaryAngleCosCard, active && toggleBoundaryAngleCosCharts.checked);
+    }
+
+    function shouldUseLocalCompute() {
+      return !!localComputeEnabled;
+    }
+
+    function buildLocalAugmentedStatus(status, payload) {
+      const merged = JSON.parse(JSON.stringify(status || {}));
+      if (!payload || !payload.valid) return merged;
+
+      merged.gray_size = Array.isArray(merged.gray_size) ? merged.gray_size : [grayCanvas.width || 160, grayCanvas.height || 120];
+      merged.ipm_size = Array.isArray(merged.ipm_size) ? merged.ipm_size : [280, 140];
+      merged.left_boundary = Array.isArray(payload.leftBoundary) ? payload.leftBoundary : (merged.left_boundary || []);
+      merged.right_boundary = Array.isArray(payload.rightBoundary) ? payload.rightBoundary : (merged.right_boundary || []);
+      merged.left_auxiliary_line = Array.isArray(payload.leftAuxiliaryLine) ? payload.leftAuxiliaryLine : (merged.left_auxiliary_line || []);
+      merged.right_auxiliary_line = Array.isArray(payload.rightAuxiliaryLine) ? payload.rightAuxiliaryLine : (merged.right_auxiliary_line || []);
+      merged.left_boundary_corner = Array.isArray(payload.leftBoundaryCorner) ? payload.leftBoundaryCorner : (merged.left_boundary_corner || []);
+      merged.right_boundary_corner = Array.isArray(payload.rightBoundaryCorner) ? payload.rightBoundaryCorner : (merged.right_boundary_corner || []);
+      merged.ipm_left_boundary = Array.isArray(payload.ipmLeftBoundary) ? payload.ipmLeftBoundary : (merged.ipm_left_boundary || []);
+      merged.ipm_right_boundary = Array.isArray(payload.ipmRightBoundary) ? payload.ipmRightBoundary : (merged.ipm_right_boundary || []);
+      merged.ipm_left_boundary_corner = Array.isArray(payload.ipmLeftBoundaryCorner) ? payload.ipmLeftBoundaryCorner : (merged.ipm_left_boundary_corner || []);
+      merged.ipm_right_boundary_corner = Array.isArray(payload.ipmRightBoundaryCorner) ? payload.ipmRightBoundaryCorner : (merged.ipm_right_boundary_corner || []);
+      merged.src_centerline_selected_shift = Array.isArray(payload.centerline) ? payload.centerline : (merged.src_centerline_selected_shift || []);
+      merged.ipm_centerline_selected_shift = Array.isArray(payload.ipmCenterline) ? payload.ipmCenterline : (merged.ipm_centerline_selected_shift || []);
+      merged.ipm_centerline_selected_curvature = Array.isArray(payload.centerlineCurvature) ? payload.centerlineCurvature : (merged.ipm_centerline_selected_curvature || []);
+      merged.ipm_left_boundary_curvature = Array.isArray(payload.leftBoundaryCurvature) ? payload.leftBoundaryCurvature : (merged.ipm_left_boundary_curvature || []);
+      merged.ipm_right_boundary_curvature = Array.isArray(payload.rightBoundaryCurvature) ? payload.rightBoundaryCurvature : (merged.ipm_right_boundary_curvature || []);
+      merged.ipm_left_boundary_angle_cos = Array.isArray(payload.leftBoundaryAngleCos) ? payload.leftBoundaryAngleCos : (merged.ipm_left_boundary_angle_cos || []);
+      merged.ipm_right_boundary_angle_cos = Array.isArray(payload.rightBoundaryAngleCos) ? payload.rightBoundaryAngleCos : (merged.ipm_right_boundary_angle_cos || []);
+      merged.ipm_track_valid = !!payload.ipm_track_valid;
+      merged.ipm_track_index = Number(payload.ipm_track_index);
+      merged.ipm_track_point = Array.isArray(payload.ipm_track_point) ? payload.ipm_track_point : (merged.ipm_track_point || []);
+      merged.line_error = Number.isFinite(Number(payload.line_error)) ? Number(payload.line_error) : merged.line_error;
+      merged.ipm_centerline_selected_count = Array.isArray(merged.ipm_centerline_selected_shift) ? merged.ipm_centerline_selected_shift.length : merged.ipm_centerline_selected_count;
+      merged.src_centerline_selected_count = Array.isArray(merged.src_centerline_selected_shift) ? merged.src_centerline_selected_shift.length : merged.src_centerline_selected_count;
+      if (!hasValue(merged.ipm_centerline_source)) {
+        merged.ipm_centerline_source = 0;
+      }
+      return merged;
+    }
+
+    function getRenderStatus() {
+      return shouldUseLocalCompute() ? buildLocalAugmentedStatus(latestStatus, latestLocalPayload) : latestStatus;
+    }
+
+    function requestLocalCompute() {
+      if (!shouldUseLocalCompute() || localWorkerBusy) return;
+      const w = rawGrayCanvas.width;
+      const h = rawGrayCanvas.height;
+      if (!w || !h) return;
+      try {
+        const imageData = rawGrayCtx.getImageData(0, 0, w, h);
+        localWorkerBusy = true;
+        localWorker.postMessage({
+          imageData,
+          status: latestStatus,
+          mode: 'gray'
+        });
+      } catch (_) {
+        localWorkerBusy = false;
+      }
     }
 
     function getSelectedIpmCenterline(status) {
@@ -507,9 +716,24 @@
       return [];
     }
 
+    localWorker.onmessage = (ev) => {
+      localWorkerBusy = false;
+      latestLocalPayload = ev.data || {};
+      if (!fullDebugModeActive) return;
+      const renderStatus = getRenderStatus();
+      statusEl.textContent = buildStatusSummary(renderStatus);
+      drawIpmBoundaries(renderStatus);
+      drawCurvatureChart(renderStatus);
+      drawBoundaryCurvatureCharts(renderStatus);
+      drawBoundaryAngleCosCharts(renderStatus);
+      if (hasValue(renderStatus.ipm_centerline_source)) {
+        ipmCenterlineSourceLabel.style.display = '';
+        ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(renderStatus.ipm_centerline_source);
+      }
+    };
+
     function setCardVisible(el, visible) {
-      if (!el) return;
-      el.style.display = visible ? '' : 'none';
+      receiverCore.setElementVisible(el, visible);
     }
 
     function applyCurvatureYRangeFromInput() {
@@ -1165,37 +1389,12 @@
         savedLoadInfo.textContent = `加载失败: ${err}`;
       }
     }
-    function drawPolyline(ctx, pts, color, lineWidth) {
-      if (!Array.isArray(pts) || pts.length < 2) return;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let i = 1; i < pts.length; i += 1) {
-        ctx.lineTo(pts[i][0], pts[i][1]);
-      }
-      ctx.stroke();
+    function drawSeries(ctx, pts, color, lineWidth, pointRadius) {
+      receiverCore.drawSeries(ctx, pts, color, lineWidth, pointRadius, boundaryPointMode);
     }
 
     function drawPointSet(ctx, pts, color, radius) {
-      if (!Array.isArray(pts) || pts.length < 1) return;
-      ctx.fillStyle = color;
-      const r = Math.max(1, radius | 0);
-      for (let i = 0; i < pts.length; i += 1) {
-        const p = pts[i];
-        if (!Array.isArray(p) || p.length < 2) continue;
-        ctx.beginPath();
-        ctx.arc(p[0], p[1], r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    function drawSeries(ctx, pts, color, lineWidth, pointRadius) {
-      if (boundaryPointMode) {
-        drawPointSet(ctx, pts, color, pointRadius);
-      } else {
-        drawPolyline(ctx, pts, color, lineWidth);
-      }
+      receiverCore.drawPointSet(ctx, pts, color, radius);
     }
 
     function drawDecisionPoint(ctx, point) {
@@ -1276,105 +1475,10 @@
     }
 
     function drawCurveChartToCanvas(canvas, ctx, rawValues, yMinOverride, yMaxOverride) {
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.fillStyle = '#020617';
-      ctx.fillRect(0, 0, w, h);
-
-      const minY = Number.isFinite(yMinOverride) ? yMinOverride : curvatureYMin;
-      const maxY = Number.isFinite(yMaxOverride) ? yMaxOverride : curvatureYMax;
-      if (minY >= maxY) return false;
-      const series = Array.isArray(rawValues) ? rawValues : [];
-
-      const marginLeft = 36;
-      const marginRight = 10;
-      const marginTop = 10;
-      const marginBottom = 24;
-      const plotW = Math.max(1, w - marginLeft - marginRight);
-      const plotH = Math.max(1, h - marginTop - marginBottom);
-
-      const yAt = (v) => marginTop + ((maxY - v) * plotH) / (maxY - minY);
-      const yZero = yAt(0);
-
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(marginLeft, marginTop);
-      ctx.lineTo(marginLeft, marginTop + plotH);
-      ctx.lineTo(marginLeft + plotW, marginTop + plotH);
-      ctx.stroke();
-
-      ctx.strokeStyle = '#64748b';
-      ctx.beginPath();
-      ctx.moveTo(marginLeft, yZero);
-      ctx.lineTo(marginLeft + plotW, yZero);
-      ctx.stroke();
-
-      // 参考网格与轴刻度点：X/Y 轴都按 5 等分
-      const divs = 5;
-      ctx.setLineDash([3, 3]);
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-      ctx.lineWidth = 1;
-      for (let i = 0; i <= divs; i += 1) {
-        const t = i / divs;
-        const gx = marginLeft + t * plotW;
-        const gy = marginTop + t * plotH;
-
-        ctx.beginPath();
-        ctx.moveTo(gx, marginTop);
-        ctx.lineTo(gx, marginTop + plotH);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(marginLeft, gy);
-        ctx.lineTo(marginLeft + plotW, gy);
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
-
-      ctx.fillStyle = '#94a3b8';
-      for (let i = 0; i <= divs; i += 1) {
-        const t = i / divs;
-        const gx = marginLeft + t * plotW;
-        const gy = marginTop + t * plotH;
-
-        ctx.beginPath();
-        ctx.arc(gx, marginTop + plotH, 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.arc(marginLeft, gy, 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '12px "Noto Sans SC", "Microsoft YaHei", sans-serif';
-      ctx.fillText('0', marginLeft - 10, marginTop + plotH + 16);
-      ctx.fillText(series.length > 0 ? String(series.length - 1) : 'N/A', marginLeft + plotW - 28, marginTop + plotH + 16);
-      ctx.fillText(maxY.toFixed(3), 6, marginTop + 8);
-      ctx.fillText('0', 12, yZero + 4);
-      ctx.fillText(minY.toFixed(3), 2, marginTop + plotH);
-
-      if (series.length < 1) {
-        ctx.fillStyle = '#64748b';
-        ctx.fillText('No data', marginLeft + plotW * 0.5 - 20, marginTop + plotH * 0.5);
-        return false;
-      }
-
-      const values = series.map((v) => Math.max(minY, Math.min(maxY, Number(v) || 0)));
-      const xAt = (idx) => marginLeft + (idx * plotW) / Math.max(1, values.length - 1);
-
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      for (let i = 0; i < values.length; i += 1) {
-        const x = xAt(i);
-        const y = yAt(Number(values[i]) || 0);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      return true;
+      return receiverCore.drawCurveChartToCanvas(canvas, ctx, rawValues, {
+        yMin: Number.isFinite(yMinOverride) ? yMinOverride : curvatureYMin,
+        yMax: Number.isFinite(yMaxOverride) ? yMaxOverride : curvatureYMax
+      });
     }
 
     function drawCurvatureChart(status) {
@@ -1399,16 +1503,30 @@
       drawCurveChartToCanvas(rightBoundaryAngleCosCanvas, rightBoundaryAngleCosCtx, getRightBoundaryAngleCos(status), -1.0, 1.0);
     }
 
-    function renderGrayFrame() {
-      const size = latestStatus.gray_size || [160, 120];
-      const w = size[0] || 160;
-      const h = size[1] || 120;
+    function renderGrayFrameFromSource(source, w, h, sourceMode) {
+      if (!source || !w || !h) return;
       if (rawGrayCanvas.width !== w) rawGrayCanvas.width = w;
       if (rawGrayCanvas.height !== h) rawGrayCanvas.height = h;
-      rawGrayCtx.drawImage(grayImg, 0, 0, w, h);
+      rawGrayCtx.drawImage(source, 0, 0, w, h);
+      if (sourceMode === 'rgb') {
+        const grayImage = rawGrayCtx.getImageData(0, 0, w, h);
+        const data = grayImage.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const gray = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+          data[i] = gray;
+          data[i + 1] = gray;
+          data[i + 2] = gray;
+          data[i + 3] = 255;
+        }
+        rawGrayCtx.putImageData(grayImage, 0, 0);
+      }
       if (grayCanvas.width !== w) grayCanvas.width = w;
       if (grayCanvas.height !== h) grayCanvas.height = h;
-      grayCtx.drawImage(grayImg, 0, 0, w, h);
+      grayCtx.drawImage(rawGrayCanvas, 0, 0, w, h);
+      activeGraySource = sourceMode;
       const centerX = Math.max(0, Math.min(w - 1, 80));
       grayCtx.strokeStyle = '#ffffff';
       grayCtx.lineWidth = 1;
@@ -1423,12 +1541,13 @@
       grayCtx.moveTo(0, guideY + 0.5);
       grayCtx.lineTo(w, guideY + 0.5);
       grayCtx.stroke();
-      const left = latestStatus.left_boundary || [];
-      const right = latestStatus.right_boundary || [];
-      const leftAux = latestStatus.left_auxiliary_line || [];
-      const rightAux = latestStatus.right_auxiliary_line || [];
-      const leftAuxSeed = latestStatus.left_auxiliary_seed || [];
-      const rightAuxSeed = latestStatus.right_auxiliary_seed || [];
+      const renderStatus = getRenderStatus();
+      const left = renderStatus.left_boundary || [];
+      const right = renderStatus.right_boundary || [];
+      const leftAux = renderStatus.left_auxiliary_line || [];
+      const rightAux = renderStatus.right_auxiliary_line || [];
+      const leftAuxSeed = renderStatus.left_auxiliary_seed || [];
+      const rightAuxSeed = renderStatus.right_auxiliary_seed || [];
       if (showGrayBoundaries) {
         drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
         drawSeries(grayCtx, right, '#22c55e', 2, 1);
@@ -1436,19 +1555,50 @@
         drawSeries(grayCtx, rightAux, '#f59e0b', 2, 1);
         drawPointSet(grayCtx, leftAuxSeed, '#60a5fa', 1);
         drawPointSet(grayCtx, rightAuxSeed, '#fbbf24', 1);
-        drawPointSet(grayCtx, latestStatus.left_boundary_corner || [], '#facc15', 1);
-        drawPointSet(grayCtx, latestStatus.right_boundary_corner || [], '#fb923c', 1);
+        drawPointSet(grayCtx, renderStatus.left_boundary_corner || [], '#facc15', 1);
+        drawPointSet(grayCtx, renderStatus.right_boundary_corner || [], '#fb923c', 1);
       }
       if (showMeanCenterline) {
-        const meanCenterline = getMeanCenterlineFromBoundaries(latestStatus);
+        const meanCenterline = getMeanCenterlineFromBoundaries(renderStatus);
         drawSeries(grayCtx, meanCenterline, '#facc15', 2, 1);
       }
-      drawDecisionPoint(grayCtx, latestStatus.src_weighted_decision_point);
+      drawDecisionPoint(grayCtx, renderStatus.src_weighted_decision_point);
       renderBinaryFromGray();
+      requestLocalCompute();
+    }
+
+    function renderGrayFrameFromImage(image, sourceMode) {
+      if (!image || !image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) return;
+      const w = image.naturalWidth || 160;
+      const h = image.naturalHeight || 120;
+      renderGrayFrameFromSource(image, w, h, sourceMode);
+    }
+
+    function renderGrayFrame() {
+      if (grayFrameReady) {
+        renderGrayFrameFromImage(grayImg, 'gray');
+        return;
+      }
+      if (rgbFrameReady) {
+        renderGrayFrameFromImage(rgbImg, 'rgb');
+      }
+    }
+
+    function renderRgbFrame() {
+      const ready = rgbImg.complete && rgbImg.naturalWidth > 0 && rgbImg.naturalHeight > 0;
+      setCardVisible(rgbCard, ready);
+      if (!ready) return;
+      const w = rgbImg.naturalWidth || 160;
+      const h = rgbImg.naturalHeight || 120;
+      if (rgbCanvas.width !== w) rgbCanvas.width = w;
+      if (rgbCanvas.height !== h) rgbCanvas.height = h;
+      rgbCtx.drawImage(rgbImg, 0, 0, w, h);
     }
 
     function renderBinaryFromGray() {
-      const threshold = Number(latestStatus.otsu_threshold);
+      const threshold = shouldUseLocalCompute() && latestLocalPayload
+        ? Number(latestLocalPayload.workerThreshold)
+        : Number(latestStatus.otsu_threshold);
       if (!Number.isFinite(threshold)) {
         setCardVisible(binaryCard, false);
         return;
@@ -1479,33 +1629,12 @@
       binaryCtx.putImageData(binaryImage, 0, 0);
     }
 
-    function getCanvasPoint(ev, canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const sx = canvas.width / rect.width;
-      const sy = canvas.height / rect.height;
-      const x = Math.max(0, Math.min(canvas.width - 1, Math.floor((ev.clientX - rect.left) * sx)));
-      const y = Math.max(0, Math.min(canvas.height - 1, Math.floor((ev.clientY - rect.top) * sy)));
-      return [x, y];
-    }
-
-    function sampleRGB(ctx, x, y) {
-      const d = ctx.getImageData(x, y, 1, 1).data;
-      return [d[0] | 0, d[1] | 0, d[2] | 0];
-    }
-
-    function mapCoord(x, y, srcW, srcH, dstW, dstH) {
-      if (srcW <= 1 || srcH <= 1 || dstW <= 0 || dstH <= 0) return [0, 0];
-      const mx = Math.max(0, Math.min(dstW - 1, Math.round((x * (dstW - 1)) / (srcW - 1))));
-      const my = Math.max(0, Math.min(dstH - 1, Math.round((y * (dstH - 1)) / (srcH - 1))));
-      return [mx, my];
-    }
-
     function pixelTextFromCanvas(activeCanvas, activeCtx, x, y) {
-      const [ar, ag, ab] = sampleRGB(activeCtx, x, y);
-      const [gx, gy] = mapCoord(x, y, activeCanvas.width, activeCanvas.height, grayCanvas.width, grayCanvas.height);
-      const [bx, by] = mapCoord(x, y, activeCanvas.width, activeCanvas.height, binaryCanvas.width, binaryCanvas.height);
-      const [gr, gg, gb] = sampleRGB(grayCtx, gx, gy);
-      const [br, bg, bb] = sampleRGB(binaryCtx, bx, by);
+      const [ar, ag, ab] = receiverCore.sampleRGB(activeCtx, x, y);
+      const [gx, gy] = receiverCore.mapCoord(x, y, activeCanvas.width, activeCanvas.height, grayCanvas.width, grayCanvas.height);
+      const [bx, by] = receiverCore.mapCoord(x, y, activeCanvas.width, activeCanvas.height, binaryCanvas.width, binaryCanvas.height);
+      const [gr, gg, gb] = receiverCore.sampleRGB(grayCtx, gx, gy);
+      const [br, bg, bb] = receiverCore.sampleRGB(binaryCtx, bx, by);
       const gray = Math.round((gr + gg + gb) / 3);
       const binaryGray = Math.round((br + bg + bb) / 3);
       const bin = binaryGray >= 128 ? 1 : 0;
@@ -1576,160 +1705,261 @@
     }
 
     function bindPixelProbe(canvas, ctx, infoEl, extraTextFn) {
-      canvas.addEventListener('mousemove', (ev) => {
-        const [x, y] = getCanvasPoint(ev, canvas);
-        const baseText = pixelTextFromCanvas(canvas, ctx, x, y);
-        const extraText = typeof extraTextFn === 'function' ? (extraTextFn(x, y) || '') : '';
-        infoEl.textContent = `${baseText}${extraText}`;
-      });
-      canvas.addEventListener('mouseleave', () => {
-        infoEl.textContent = 'x:- y:- | Gray:- Bin:- RGB:(-,-,-)';
+      receiverCore.bindPixelProbe(canvas, ctx, infoEl, {
+        buildText: (x, y) => {
+          const baseText = pixelTextFromCanvas(canvas, ctx, x, y);
+          const extraText = typeof extraTextFn === 'function' ? (extraTextFn(x, y) || '') : '';
+          return `${baseText}${extraText}`;
+        }
       });
     }
 
-    grayImg.onload = () => { renderGrayFrame(); };
+    rgbImg.onload = () => {
+      rgbFrameReady = true;
+      renderRgbFrame();
+      if (!grayFrameReady) renderGrayFrame();
+    };
+    rgbImg.onerror = () => {
+      rgbFrameReady = false;
+      setCardVisible(rgbCard, false);
+    };
+    grayImg.onload = () => {
+      grayFrameReady = true;
+      renderGrayFrame();
+    };
+    grayImg.onerror = () => {
+      grayFrameReady = false;
+      if (rgbFrameReady) renderGrayFrame();
+    };
+
+    async function fetchGrayFrameDirect() {
+      const seq = ++grayFetchSeq;
+      grayFetchInFlight = true;
+      try {
+        const response = await fetch(receiverCore.frameUrlForMode('gray'), { cache: 'no-store' });
+        if (!response.ok) throw new Error(`gray frame ${response.status}`);
+        const blob = await response.blob();
+        const bitmap = await createImageBitmap(blob);
+        if (seq !== grayFetchSeq) {
+          bitmap.close();
+          return;
+        }
+        grayFrameReady = true;
+        renderGrayFrameFromSource(bitmap, bitmap.width || 160, bitmap.height || 120, 'gray');
+        bitmap.close();
+      } catch (_) {
+        grayFrameReady = false;
+        if (rgbFrameReady) renderGrayFrame();
+      } finally {
+        if (seq === grayFetchSeq) grayFetchInFlight = false;
+      }
+    }
 
     function fmtArrayInline(arr) {
-      if (!Array.isArray(arr)) return '[]';
-      return `[${arr.map((v) => Array.isArray(v) ? `[${v.join(', ')}]` : receiverCore.formatValue(v)).join(', ')}]`;
+      return receiverCore.formatArrayInline(arr);
     }
 
     function fmtTrackMethod(method) {
-      if (method === 0) return 'fixed';
-      if (method === 1) return 'weighted';
-      if (method === 2) return 'speed';
-      return `unknown(${method})`;
+      return receiverCore.formatTrackMethod(method);
     }
 
     function fmtCenterlineSource(source) {
-      if (source === 0) return 'left_shift';
-      if (source === 1) return 'right_shift';
-      if (source === 2) return 'auto';
-      return `unknown(${source})`;
+      return receiverCore.formatCenterlineSource(source);
     }
 
     function fmtCenterlineSourceLabel(source) {
-      if (source === 0) return '透视中线来源：自动选择（左边界平移）';
-      if (source === 1) return '透视中线来源：自动选择（右边界平移）';
-      if (source === 2) return '透视中线来源：无偏好（待本帧自动选择）';
-      return '透视中线来源：自动选择（未知）';
+      return receiverCore.formatCenterlineSourceLabel(source);
+    }
+
+    function fmtHumanRateMbps(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '-- Mbps';
+      return `${n.toFixed(n >= 10 ? 1 : 2)} Mbps`;
+    }
+
+    function fmtHumanRateKiB(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '-- KiB/s';
+      return `${n.toFixed(n >= 100 ? 0 : 1)} KiB/s`;
+    }
+
+    function fmtImageFormatName(value) {
+      if (Number(value) === 1) return 'PNG';
+      if (Number(value) === 2) return 'BMP';
+      return 'JPEG';
+    }
+
+    function buildTransportModeSummary(status) {
+      const parts = [];
+      if (receiverCore.hasValue(status.udp_web_send_gray) && Number(status.udp_web_send_gray) === 1) {
+        parts.push(`灰度 ${fmtImageFormatName(status.udp_web_gray_image_format)}`);
+      }
+      if (receiverCore.hasValue(status.udp_web_send_rgb) && Number(status.udp_web_send_rgb) === 1) {
+        parts.push(`彩图 ${fmtImageFormatName(status.udp_web_rgb_image_format)}`);
+      }
+      if (receiverCore.hasValue(status.udp_web_send_binary) && Number(status.udp_web_send_binary) === 1) {
+        parts.push(`二值 ${fmtImageFormatName(status.udp_web_binary_image_format)}`);
+      }
+      return parts.length > 0 ? parts.join(' + ') : '未发送图像';
+    }
+
+    function formatSyncBuiltTime(isoText) {
+      if (!isoText) return '构建时间未知';
+      const date = new Date(isoText);
+      if (Number.isNaN(date.getTime())) return '构建时间未知';
+      return `构建 ${date.toLocaleString()}`;
+    }
+
+    function shortDigest(text) {
+      if (!text || typeof text !== 'string') return '--';
+      return text.slice(0, 8);
+    }
+
+    function updateTransportNote() {
+      const base = '仅显示实时接收速度、实时帧率和当前图传配置，不再做估算。';
+      if (!latestWasmSyncStatus || !latestWasmSyncStatus.sync_detail) {
+        transportNoteEl.textContent = base;
+        return;
+      }
+      transportNoteEl.textContent = `${base} ${latestWasmSyncStatus.sync_detail}`;
+    }
+
+    function buildModeExplanation(status) {
+      const isFull = receiverCore.isFullDebugProfile(status && status.web_data_profile);
+      const localOn = shouldUseLocalCompute();
+      const syncState = latestWasmSyncStatus && latestWasmSyncStatus.sync_state ? latestWasmSyncStatus.sync_state : 'unknown';
+      if (isFull) {
+        if (localOn) {
+          return syncState === 'synced'
+            ? '当前是 FULL 全量模式，页面主要直接显示主板完整结果；本地复算已同步，可用于补数和一致性比对。'
+            : '当前是 FULL 全量模式，页面主要直接显示主板完整结果；即使本地复算未同步或未构建，主画面仍然可以正常渲染。';
+        }
+        return '当前是 FULL 全量模式，页面直接显示主板完整结果；这一模式不依赖本地复算 WASM，本机没有构建链也能正常看图和调试。';
+      }
+      if (localOn) {
+        if (syncState === 'synced') {
+          return '当前是 RAW_MINIMAL + 本地复算模式。主板只发基础数据，网页依赖本地 WASM 补出边界、中线等结果；当前本地复算已同步。';
+        }
+        if (syncState === 'missing') {
+          return '当前是 RAW_MINIMAL + 本地复算模式，但本机还没有构建本地复算 WASM；原始图像仍可显示，补算结果不会完整。';
+        }
+        return '当前是 RAW_MINIMAL + 本地复算模式，但本地 WASM 与当前算法源码未同步；原始图像仍可显示，补算结果可能和最新算法不一致。';
+      }
+      return '当前是 RAW_MINIMAL 原始最小模式，页面只显示主板传来的原始图像和基础状态；如果想补出边界、中线等结果，请打开本地复算。';
+    }
+
+    function updateTransportPanel(status) {
+      if (!status) return;
+      transportRateValueEl.textContent = fmtHumanRateMbps(status.rx_udp_mbps);
+      transportRateSubEl.textContent = fmtHumanRateKiB(status.rx_udp_kib_per_sec);
+      transportFpsValueEl.textContent = receiverCore.hasValue(status.rx_udp_frames_per_sec) ? `${status.rx_udp_frames_per_sec} fps` : '-- fps';
+      transportFpsSubEl.textContent =
+        `gray ${receiverCore.hasValue(status.rx_udp_gray_fps) ? status.rx_udp_gray_fps : '--'} / `
+        + `rgb ${receiverCore.hasValue(status.rx_udp_rgb_fps) ? status.rx_udp_rgb_fps : '--'} / `
+        + `binary ${receiverCore.hasValue(status.rx_udp_binary_fps) ? status.rx_udp_binary_fps : '--'}`;
+      transportModeValueEl.textContent = buildTransportModeSummary(status);
+      transportModeSubEl.textContent = receiverCore.hasValue(status.udp_web_max_fps)
+        ? `max fps ${status.udp_web_max_fps}`
+        : 'max fps --';
+      updateTransportNote();
+    }
+
+    function updateWasmSyncPanel(syncStatus) {
+      latestWasmSyncStatus = syncStatus || null;
+      if (!syncStatus) {
+        transportSyncValueEl.textContent = '--';
+        transportSyncSubEl.textContent = '等待同步信息...';
+        updateTransportNote();
+        modeNote.textContent = buildModeExplanation(latestStatus || {});
+        return;
+      }
+      transportSyncValueEl.textContent = syncStatus.sync_label || '未知';
+      const builtText = formatSyncBuiltTime(syncStatus.built_at_iso);
+      if (syncStatus.available) {
+        transportSyncSubEl.textContent = `${builtText} | 构建 ${shortDigest(syncStatus.built_source_digest)} / 当前 ${shortDigest(syncStatus.current_source_digest)}`;
+      } else {
+        transportSyncSubEl.textContent = syncStatus.sync_detail || builtText;
+      }
+      updateTransportNote();
+      modeNote.textContent = buildModeExplanation(latestStatus || {});
+    }
+
+    async function pullWasmSyncStatus() {
+      try {
+        const j = await receiverCore.fetchJsonNoStore('/api/wasm_sync_status');
+        updateWasmSyncPanel(j);
+      } catch (e) {
+        updateWasmSyncPanel({
+          available: false,
+          sync_label: '未知',
+          sync_detail: `无法获取同步状态：${e}`,
+          built_at_iso: null,
+          built_source_digest: null,
+          current_source_digest: null,
+        });
+      }
     }
 
     function buildStatusSummary(status) {
-      const lines = [];
-      const push = (name, value) => {
-        if (hasValue(value)) lines.push(`${name}: ${receiverCore.formatValue(value)}`);
-      };
-      const pushCount = (name, value) => {
-        if (Array.isArray(value)) lines.push(`${name}: ${value.length}`);
-      };
-
-      push('ts_ms', status.ts_ms);
-      push('line_error', status.line_error);
-      push('base_speed', status.base_speed);
-      push('adjusted_base_speed', status.adjusted_base_speed);
-      push('left_target_count', status.left_target_count);
-      push('right_target_count', status.right_target_count);
-      push('left_current_count', status.left_current_count);
-      push('right_current_count', status.right_current_count);
-      push('left_filtered_count', status.left_filtered_count);
-      push('right_filtered_count', status.right_filtered_count);
-      push('left_error', status.left_error);
-      push('right_error', status.right_error);
-      push('left_feedforward', status.left_feedforward);
-      push('right_feedforward', status.right_feedforward);
-      push('left_correction', status.left_correction);
-      push('right_correction', status.right_correction);
-      push('left_decel_assist', status.left_decel_assist);
-      push('right_decel_assist', status.right_decel_assist);
-      push('left_duty', status.left_duty);
-      push('right_duty', status.right_duty);
-      push('left_hardware_duty', status.left_hardware_duty);
-      push('right_hardware_duty', status.right_hardware_duty);
-      push('left_dir_level', status.left_dir_level);
-      push('right_dir_level', status.right_dir_level);
-      push('ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
-      if (Array.isArray(status.ipm_weighted_decision_point)) push('ipm_weighted_decision_point', fmtArrayInline(status.ipm_weighted_decision_point));
-      if (Array.isArray(status.src_weighted_decision_point)) push('src_weighted_decision_point', fmtArrayInline(status.src_weighted_decision_point));
-      push('otsu_threshold', status.otsu_threshold);
-      push('capture_wait_us', status.capture_wait_us);
-      push('preprocess_us', status.preprocess_us);
-      push('otsu_us', status.otsu_us);
-      push('maze_us', status.maze_us);
-      push('total_us', status.total_us);
-      push('maze_left_points_raw', status.maze_left_points_raw);
-      push('maze_right_points_raw', status.maze_right_points_raw);
-      push('red_found', status.red_found);
-      if (Array.isArray(status.red)) push('red', fmtArrayInline(status.red));
-      push('roi_valid', status.roi_valid);
-      if (Array.isArray(status.roi)) push('roi', fmtArrayInline(status.roi));
-      push('ipm_track_valid', status.ipm_track_valid);
-      if (hasValue(status.ipm_track_method)) push('ipm_track_method', fmtTrackMethod(status.ipm_track_method));
-      if (hasValue(status.ipm_centerline_source)) push('ipm_centerline_source', fmtCenterlineSource(status.ipm_centerline_source));
-      push('ipm_track_index', status.ipm_track_index);
-      if (Array.isArray(status.ipm_track_point)) push('ipm_track_point', fmtArrayInline(status.ipm_track_point));
-      if (Array.isArray(status.gray_size)) push('gray_size', fmtArrayInline(status.gray_size));
-      if (Array.isArray(status.ipm_size)) push('ipm_size', fmtArrayInline(status.ipm_size));
-      pushCount('left_boundary_count', status.left_boundary);
-      pushCount('right_boundary_count', status.right_boundary);
-      pushCount('left_auxiliary_line_count', status.left_auxiliary_line);
-      pushCount('right_auxiliary_line_count', status.right_auxiliary_line);
-      pushCount('left_auxiliary_seed_count', status.left_auxiliary_seed);
-      pushCount('right_auxiliary_seed_count', status.right_auxiliary_seed);
-      pushCount('left_boundary_corner_count', status.left_boundary_corner);
-      pushCount('right_boundary_corner_count', status.right_boundary_corner);
-      pushCount('ipm_left_boundary_count', status.ipm_left_boundary);
-      pushCount('ipm_right_boundary_count', status.ipm_right_boundary);
-      pushCount('ipm_left_boundary_corner_count', status.ipm_left_boundary_corner);
-      pushCount('ipm_right_boundary_corner_count', status.ipm_right_boundary_corner);
-      pushCount('ipm_raw_left_boundary_count', status.ipm_raw_left_boundary);
-      pushCount('ipm_raw_right_boundary_count', status.ipm_raw_right_boundary);
-      pushCount('ipm_centerline_selected_shift_count', getSelectedIpmCenterline(status));
-      pushCount('src_centerline_selected_shift_count', getSelectedSrcCenterline(status));
-      push('ipm_centerline_selected_count', status.ipm_centerline_selected_count);
-      push('src_centerline_selected_count', status.src_centerline_selected_count);
-      pushCount('ipm_centerline_selected_curvature_count', getSelectedCurvature(status));
-      pushCount('ipm_left_boundary_curvature_count', getLeftBoundaryKappa(status));
-      pushCount('ipm_right_boundary_curvature_count', getRightBoundaryKappa(status));
-      pushCount('ipm_left_boundary_angle_cos_count', getLeftBoundaryAngleCos(status));
-      pushCount('ipm_right_boundary_angle_cos_count', getRightBoundaryAngleCos(status));
-      return lines.length > 0 ? lines.join('\n') : 'waiting...';
+      return receiverCore.buildStatusSummary(status, {
+        getSelectedIpmCenterline,
+        getLeftBoundaryKappa,
+        getRightBoundaryKappa,
+        getLeftBoundaryAngleCos,
+        getRightBoundaryAngleCos
+      });
     }
 
     async function pullStatus() {
       try {
         const j = await receiverCore.fetchJsonNoStore('/api/status');
         latestStatus = j;
+        const isFull = receiverCore.isFullDebugProfile(j.web_data_profile);
+        setDebugPageActive(isFull || shouldUseLocalCompute());
         if (recordingState && recordingState.active) {
           recordingState.statusFrames.push({
             client_ts_ms: Date.now(),
             status: cloneStatus(j)
           });
         }
-        statusEl.textContent = buildStatusSummary(j);
-        drawIpmBoundaries(j);
-        drawCurvatureChart(j);
-        drawBoundaryCurvatureCharts(j);
-        drawBoundaryAngleCosCharts(j);
-        if (hasValue(j.ipm_centerline_source)) {
-          ipmCenterlineSourceLabel.style.display = '';
-          ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(j.ipm_centerline_source);
+        const renderStatus = getRenderStatus();
+        updateTransportPanel(j);
+        modeNote.textContent = buildModeExplanation(j);
+        statusEl.textContent = buildStatusSummary(renderStatus);
+        if (isFull || shouldUseLocalCompute()) {
+          drawIpmBoundaries(renderStatus);
+          drawCurvatureChart(renderStatus);
+          drawBoundaryCurvatureCharts(renderStatus);
+          drawBoundaryAngleCosCharts(renderStatus);
+          if (hasValue(renderStatus.ipm_centerline_source)) {
+            ipmCenterlineSourceLabel.style.display = '';
+            ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(renderStatus.ipm_centerline_source);
+          } else {
+            ipmCenterlineSourceLabel.style.display = 'none';
+          }
         } else {
           ipmCenterlineSourceLabel.style.display = 'none';
         }
-        metaEl.textContent = `status ok @ ${new Date().toLocaleTimeString()}`;
+        metaEl.textContent = isFull
+          ? `full status ok @ ${new Date().toLocaleTimeString()}${shouldUseLocalCompute() ? ' | local compute on' : ''}`
+          : `raw minimal status ok @ ${new Date().toLocaleTimeString()}${shouldUseLocalCompute() ? ' | local compute on' : ' | showing raw image stream only'}`;
       } catch (e) {
         metaEl.textContent = `status error: ${e}`;
       }
     }
 
     function pullFrames() {
-      grayImg.src = receiverCore.frameUrlForMode('gray');
+      if (!fullDebugModeActive && !shouldUseLocalCompute()) return;
+      rgbImg.src = receiverCore.frameUrlForMode('rgb');
+      if (!grayFetchInFlight) {
+        fetchGrayFrameDirect();
+      }
     }
 
+    bindPixelProbe(rgbCanvas, rgbCtx, rgbPixelInfo);
     bindPixelProbe(grayCanvas, grayCtx, grayPixelInfo);
     bindPixelProbe(binaryCanvas, binaryCtx, binaryPixelInfo);
-    bindPixelProbe(ipmCanvas, ipmCtx, ipmPixelInfo, (x, y) => ipmBoundaryHoverText(latestStatus || {}, x, y));
+    bindPixelProbe(ipmCanvas, ipmCtx, ipmPixelInfo, (x, y) => ipmBoundaryHoverText(getRenderStatus() || {}, x, y));
     bindPixelProbe(ipmRawCanvas, ipmRawCtx, ipmRawPixelInfo);
 
     startRecordBtn.addEventListener('click', () => {
@@ -1808,32 +2038,46 @@
     });
     toggleMeanCenterline.addEventListener('change', () => {
       showMeanCenterline = !!toggleMeanCenterline.checked;
-      if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
+      if (grayFrameReady) renderGrayFrame();
     });
     toggleGrayBoundaries.addEventListener('change', () => {
       showGrayBoundaries = !!toggleGrayBoundaries.checked;
-      if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
+      if (grayFrameReady) renderGrayFrame();
     });
     toggleIpmAnchorDot.addEventListener('change', () => {
       showIpmAnchorDot = !!toggleIpmAnchorDot.checked;
-      drawIpmBoundaries(latestStatus);
+      drawIpmBoundaries(getRenderStatus());
     });
     toggleBoundaryPointMode.addEventListener('change', () => {
       boundaryPointMode = !!toggleBoundaryPointMode.checked;
-      drawIpmBoundaries(latestStatus);
-      if (grayImg.complete && grayImg.naturalWidth > 0) renderGrayFrame();
+      drawIpmBoundaries(getRenderStatus());
+      if (grayFrameReady) renderGrayFrame();
     });
     toggleCenterlineCurvatureChart.addEventListener('change', () => {
       showCenterlineCurvatureChart = !!toggleCenterlineCurvatureChart.checked;
-      drawCurvatureChart(latestStatus || {});
+      drawCurvatureChart(getRenderStatus() || {});
     });
     toggleBoundaryCurvatureCharts.addEventListener('change', () => {
       showBoundaryCurvatureCharts = !!toggleBoundaryCurvatureCharts.checked;
-      drawBoundaryCurvatureCharts(latestStatus || {});
+      drawBoundaryCurvatureCharts(getRenderStatus() || {});
     });
     toggleBoundaryAngleCosCharts.addEventListener('change', () => {
       showBoundaryAngleCosCharts = !!toggleBoundaryAngleCosCharts.checked;
-      drawBoundaryAngleCosCharts(latestStatus || {});
+      drawBoundaryAngleCosCharts(getRenderStatus() || {});
+    });
+    toggleLocalCompute.checked = localComputeEnabled;
+    toggleLocalCompute.addEventListener('change', () => {
+      localComputeEnabled = !!toggleLocalCompute.checked;
+      latestLocalPayload = null;
+      const isFull = receiverCore.isFullDebugProfile(latestStatus.web_data_profile);
+      setDebugPageActive(isFull || shouldUseLocalCompute());
+      modeNote.textContent = buildModeExplanation(latestStatus || {});
+      statusEl.textContent = buildStatusSummary(getRenderStatus() || {});
+      drawIpmBoundaries(getRenderStatus() || {});
+      drawCurvatureChart(getRenderStatus() || {});
+      drawBoundaryCurvatureCharts(getRenderStatus() || {});
+      drawBoundaryAngleCosCharts(getRenderStatus() || {});
+      if (grayFrameReady) renderGrayFrame();
     });
     curvatureYMinInput.addEventListener('change', applyCurvatureYRangeFromInput);
     curvatureYMaxInput.addEventListener('change', applyCurvatureYRangeFromInput);
@@ -1843,11 +2087,14 @@
     showBoundaryCurvatureCharts = !!toggleBoundaryCurvatureCharts.checked;
     showBoundaryAngleCosCharts = !!toggleBoundaryAngleCosCharts.checked;
     rebuildPlaybackGrid({}, {});
+    setDebugPageActive(true);
     setInterval(pullStatus, 120);
+    setInterval(pullWasmSyncStatus, 2000);
     setInterval(pullFrames, 60);
     setInterval(updateRecordingUi, 500);
     updateRecordingUi();
     pullStatus();
+    pullWasmSyncStatus();
     pullFrames();
   </script>
 </body>

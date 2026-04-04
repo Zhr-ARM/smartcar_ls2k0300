@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "built_at_iso": "2026-04-04T22:03:53.489Z",
+  "built_at_ms": 1775340233489,
+  "source_digest": "f1191a827344a1ea573089085ce10e2ca0f435c23f8565b1a156e3afdeaf5d3a",
+  "tracked_file_count": 15,
+  "missing_files": [],
+  "tracked_files": [
+    {
+      "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/CMakeLists.txt",
+      "exists": true,
+      "size": 4523,
+      "mtime_ms": 1775331763340,
+      "sha256": "5737ca5ecf6ec028e582f03191ce826ed92d6c360776766ed959e046ffba8665"
+    },
+    {
+      "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/web_vision_bridge.h",
+      "exists": true,
+      "size": 2442,
+      "mtime_ms": 1775328804660,
+      "sha256": "cb25e8a5bb12a788bfa5836c28cb9eedeeddab6814f3989628a35fa4f60d1247"
+    },
+    {
+      "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/web_vision_bridge.cpp",
+      "exists": true,
+      "size": 8726,
+      "mtime_ms": 1775328804660,
+      "sha256": "95955e0737f66ca43976d899851ed9c8b1b13ef099ce3f05646ed37b2c25b9ce"
+    },
+    {
+      "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/web_vision_abi.cpp",
+      "exists": true,
+      "size": 5920,
+      "mtime_ms": 1775328854779,
+      "sha256": "5c2a4d14930a7cbbb7b1b66c7f435520f947fd9b00051359b5f322d6d5b2328e"
+    },
+    {
+      "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/compat/line_follow_thread.h",
+      "exists": true,
+      "size": 586,
+      "mtime_ms": 1775328032580,
+      "sha256": "0a583e5629c18e0a9a6345227862127ac69a9c60ea1af07dd61ce9d65f5eff1c"
+    },
+    {
+      "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/compat/line_follow_thread.cpp",
+      "exists": true,
+      "size": 769,
+      "mtime_ms": 1775328032580,
+      "sha256": "07c7a7093cad8fed3a78aa0d5732c18e884677b6059e3a4415f1ce02a2c3cf6f"
+    },
+    {
+      "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/compat/vision_frame_capture.cpp",
+      "exists": true,
+      "size": 964,
+      "mtime_ms": 1775328163398,
+      "sha256": "b4d47f80e92de127fc54ac611ea9599a30c26e94b6a68420a430154d59d612d9"
+    },
+    {
+      "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/compat/driver/vision/vision_frame_capture.h",
+      "exists": true,
+      "size": 503,
+      "mtime_ms": 1775328163398,
+      "sha256": "d1f23e92acad755ec9eb5f0573e1743220d513dcd9df244070b58cddc21b50e3"
+    },
+    {
+      "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/compat/driver/vision/vision_image_processor.h",
+      "exists": true,
+      "size": 3151,
+      "mtime_ms": 1775328813519,
+      "sha256": "faaf0a51d9a5aea7c4cc235cce34695759b561cad9c2fa0f876053c971d5b3c5"
+    },
+    {
+      "relative_path": "project/code/driver/vision/vision_config.h",
+      "exists": true,
+      "size": 13723,
+      "mtime_ms": 1775336222598,
+      "sha256": "fa061e5c3ad2294b7c3583e7c969e7c2002c2b14d216dc35ca8942950a3cccfb"
+    },
+    {
+      "relative_path": "project/code/driver/vision/vision_config.c",
+      "exists": true,
+      "size": 17528,
+      "mtime_ms": 1775339333264,
+      "sha256": "d2269c2a17323e5a6aa71f673bb05f89ebb5d6c67f2e780bd22ff06c750ad949"
+    },
+    {
+      "relative_path": "project/code/driver/vision/vision_line_error_layer.h",
+      "exists": true,
+      "size": 2407,
+      "mtime_ms": 1775320401533,
+      "sha256": "61b17dd9f0b2c6f53d67c1ee790038c95c56b5031f64aa42c5dd3f4d043e050a"
+    },
+    {
+      "relative_path": "project/code/driver/vision/vision_line_error_layer.cpp",
+      "exists": true,
+      "size": 18070,
+      "mtime_ms": 1775320429851,
+      "sha256": "a882ebc01ffe19e5bdc18140b87b8cc4776eb780f2c493de052f90963fcdcb5a"
+    },
+    {
+      "relative_path": "project/code/driver/vision/vision_image_processor.h",
+      "exists": true,
+      "size": 15199,
+      "mtime_ms": 1775320397719,
+      "sha256": "9e9074c7d3726eeb5697c42e5682442a29f321f9b31150a95fdd7a5ed7b9b2db"
+    },
+    {
+      "relative_path": "project/code/driver/vision/vision_image_processor.cpp",
+      "exists": true,
+      "size": 145737,
+      "mtime_ms": 1775322930388,
+      "sha256": "94f1b8380514ed48b58cbdc66fa7416446bdfb29c9191e4f9f9cf034f303fbdf"
+    }
+  ]
+}

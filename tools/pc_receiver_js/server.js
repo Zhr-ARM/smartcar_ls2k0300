@@ -3,25 +3,61 @@ const http = require('node:http');
 const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
+const { summarizeSyncStatus } = require('../pc_receiver_local_compute/wasm_sync_meta.js');
 
 const MAGIC = 0x56535544; // VSUD
 const HEADER_SIZE = 20;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const RECORDINGS_DIR = path.join(__dirname, 'recordings');
+const WASM_DIR = path.join(PUBLIC_DIR, 'wasm');
+const ROOT_DIR = path.join(__dirname, '..', '..');
+const WASM_SYNC_METADATA_PATH = path.join(WASM_DIR, 'vision_pipeline.sync.json');
 
 const BIND_HOST = process.env.BIND_HOST || '0.0.0.0';
 const UDP_PORT = Number(process.env.UDP_PORT || 10000);
 const TCP_PORT = Number(process.env.TCP_PORT || 10001);
 const HTTP_PORT = Number(process.env.HTTP_PORT || 8080);
+const WEB_IMAGE_FORMAT_JPEG = 0;
+const WEB_IMAGE_FORMAT_PNG = 1;
+const WEB_IMAGE_FORMAT_BMP = 2;
 
 const latestByMode = {
-  0: { jpeg: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 0 },
-  1: { jpeg: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 1 },
-  2: { jpeg: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 2 }
+  0: { image: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 0, format: WEB_IMAGE_FORMAT_JPEG },
+  1: { image: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 1, format: WEB_IMAGE_FORMAT_JPEG },
+  2: { image: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 2, format: WEB_IMAGE_FORMAT_JPEG }
 };
 let latestStatus = { message: 'waiting' };
 
 const inflightFrames = new Map();
+const udpByteEvents = [];
+const udpFrameEvents = [];
+let cachedWasmSyncStatus = null;
+let cachedWasmSyncStatusAtMs = 0;
+
+function modeName(mode) {
+  if (mode === 0) return 'binary';
+  if (mode === 1) return 'gray';
+  if (mode === 2) return 'rgb';
+  return `mode_${mode}`;
+}
+
+function toBool01(value) {
+  return value === true || value === 1 || value === '1';
+}
+
+function round3(value) {
+  return Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null;
+}
+
+function getWasmSyncStatus() {
+  const now = Date.now();
+  if (cachedWasmSyncStatus && (now - cachedWasmSyncStatusAtMs) < 2000) {
+    return cachedWasmSyncStatus;
+  }
+  cachedWasmSyncStatus = summarizeSyncStatus(ROOT_DIR, WASM_SYNC_METADATA_PATH);
+  cachedWasmSyncStatusAtMs = now;
+  return cachedWasmSyncStatus;
+}
 
 function ensureRecordingsDir() {
   fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
@@ -149,7 +185,20 @@ function parseHeader(buf) {
   const width = buf.readUInt16BE(14);
   const height = buf.readUInt16BE(16);
   const mode = buf.readUInt8(18);
-  return { magic, frameId, chunkIdx, chunkTotal, payloadLen, width, height, mode };
+  const format = buf.readUInt8(19);
+  return { magic, frameId, chunkIdx, chunkTotal, payloadLen, width, height, mode, format };
+}
+
+function sanitizeImageFormat(format) {
+  if (format === WEB_IMAGE_FORMAT_PNG) return WEB_IMAGE_FORMAT_PNG;
+  if (format === WEB_IMAGE_FORMAT_BMP) return WEB_IMAGE_FORMAT_BMP;
+  return WEB_IMAGE_FORMAT_JPEG;
+}
+
+function contentTypeByImageFormat(format) {
+  if (format === WEB_IMAGE_FORMAT_PNG) return 'image/png';
+  if (format === WEB_IMAGE_FORMAT_BMP) return 'image/bmp';
+  return 'image/jpeg';
 }
 
 function cleanupInflight() {
@@ -159,6 +208,8 @@ function cleanupInflight() {
       inflightFrames.delete(frameId);
     }
   }
+  while (udpByteEvents.length > 0 && now - udpByteEvents[0].ts > 5000) udpByteEvents.shift();
+  while (udpFrameEvents.length > 0 && now - udpFrameEvents[0].ts > 5000) udpFrameEvents.shift();
 }
 
 function isFrameNewer(prevFrameId, nextFrameId) {
@@ -166,16 +217,27 @@ function isFrameNewer(prevFrameId, nextFrameId) {
   return diff !== 0 && diff < 0x80000000;
 }
 
+function isLikelyFrameCounterReset(prevFrameId, nextFrameId) {
+  const prev = prevFrameId >>> 0;
+  const next = nextFrameId >>> 0;
+  // 主板重启/重刷程序后，frame_id 常常会重新从很小的值开始。
+  // 这里把“上一帧已经跑到较大值，而新帧突然回到很小值”视为复位信号，立即接纳。
+  if (prev < 1024) return false;
+  return next < 64;
+}
+
 function shouldAcceptFrame(mode, frameId, nowMs) {
   const latest = latestByMode[mode];
   if (!latest) return false;
   if (latest.frameId < 0) return true;
   if (isFrameNewer(latest.frameId, frameId)) return true;
+  if (isLikelyFrameCounterReset(latest.frameId, frameId)) return true;
   if ((nowMs - latest.updatedAtMs) > 1500) return true;
   return false;
 }
 
 function onUdpMessage(msg) {
+  udpByteEvents.push({ ts: Date.now(), bytes: msg.length });
   const hdr = parseHeader(msg);
   if (!hdr) return;
   if (hdr.magic !== MAGIC) return;
@@ -191,6 +253,7 @@ function onUdpMessage(msg) {
       width: hdr.width,
       height: hdr.height,
       mode: hdr.mode,
+      format: sanitizeImageFormat(hdr.format),
       ts: Date.now()
     };
     inflightFrames.set(hdr.frameId, entry);
@@ -209,20 +272,99 @@ function onUdpMessage(msg) {
       }
       ordered.push(chunk);
     }
-    const jpeg = Buffer.concat(ordered);
+    const image = Buffer.concat(ordered);
     const nowMs = Date.now();
     if (shouldAcceptFrame(hdr.mode, hdr.frameId, nowMs)) {
+      const wireBytes = ordered.reduce((sum, chunk) => sum + chunk.length, 0) + (entry.chunkTotal * HEADER_SIZE);
       latestByMode[hdr.mode] = {
-        jpeg,
+        image,
         frameId: hdr.frameId >>> 0,
         updatedAtMs: nowMs,
         width: hdr.width,
         height: hdr.height,
-        mode: hdr.mode
+        mode: hdr.mode,
+        format: sanitizeImageFormat(hdr.format),
+        wireBytes
       };
+      udpFrameEvents.push({ ts: nowMs, mode: hdr.mode, wireBytes });
     }
     inflightFrames.delete(hdr.frameId);
   }
+}
+
+function buildTransportTelemetry(status) {
+  const now = Date.now();
+  const oneSecAgo = now - 1000;
+  const recentBytes = udpByteEvents.filter((item) => item.ts >= oneSecAgo);
+  const recentFrames = udpFrameEvents.filter((item) => item.ts >= oneSecAgo);
+
+  const rxBytesPerSec = recentBytes.reduce((sum, item) => sum + item.bytes, 0);
+  const rxFramesPerSec = recentFrames.length;
+  const rxFramesByMode = { gray: 0, binary: 0, rgb: 0 };
+  const frameBytesByMode = { gray: 0, binary: 0, rgb: 0 };
+  for (const item of recentFrames) {
+    const key = modeName(item.mode);
+    if (key in rxFramesByMode) {
+      rxFramesByMode[key] += 1;
+      frameBytesByMode[key] += item.wireBytes;
+    }
+  }
+
+  const avgWireBytesByMode = { gray: null, binary: null, rgb: null };
+  for (const key of Object.keys(avgWireBytesByMode)) {
+    if (rxFramesByMode[key] > 0) {
+      avgWireBytesByMode[key] = Math.round(frameBytesByMode[key] / rxFramesByMode[key]);
+    }
+  }
+
+  const maxFps = Number(status && status.udp_web_max_fps);
+  const peakContributors = [];
+  const activeModeMissingRecentFrame = [];
+  if (toBool01(status && status.udp_web_send_gray) && Number.isFinite(avgWireBytesByMode.gray)) {
+    peakContributors.push(avgWireBytesByMode.gray);
+  } else if (toBool01(status && status.udp_web_send_gray)) {
+    activeModeMissingRecentFrame.push('gray');
+  }
+  if (toBool01(status && status.udp_web_send_binary) && Number.isFinite(avgWireBytesByMode.binary)) {
+    peakContributors.push(avgWireBytesByMode.binary);
+  } else if (toBool01(status && status.udp_web_send_binary)) {
+    activeModeMissingRecentFrame.push('binary');
+  }
+  if (toBool01(status && status.udp_web_send_rgb) && Number.isFinite(avgWireBytesByMode.rgb)) {
+    peakContributors.push(avgWireBytesByMode.rgb);
+  } else if (toBool01(status && status.udp_web_send_rgb)) {
+    activeModeMissingRecentFrame.push('rgb');
+  }
+  const estimatedPeakBytesPerSec =
+    Number.isFinite(maxFps) && maxFps > 0 && peakContributors.length > 0 && activeModeMissingRecentFrame.length === 0
+      ? Math.round(maxFps * peakContributors.reduce((sum, value) => sum + value, 0))
+      : null;
+  const observedUtilization =
+    Number.isFinite(estimatedPeakBytesPerSec) && estimatedPeakBytesPerSec > 0
+      ? round3(rxBytesPerSec / estimatedPeakBytesPerSec)
+      : null;
+
+  return {
+    rx_udp_bytes_per_sec: rxBytesPerSec,
+    rx_udp_kib_per_sec: round3(rxBytesPerSec / 1024),
+    rx_udp_mbps: round3((rxBytesPerSec * 8) / 1000000),
+    rx_udp_frames_per_sec: rxFramesPerSec,
+    rx_udp_gray_fps: rxFramesByMode.gray,
+    rx_udp_binary_fps: rxFramesByMode.binary,
+    rx_udp_rgb_fps: rxFramesByMode.rgb,
+    rx_udp_avg_gray_frame_bytes: avgWireBytesByMode.gray,
+    rx_udp_avg_binary_frame_bytes: avgWireBytesByMode.binary,
+    rx_udp_avg_rgb_frame_bytes: avgWireBytesByMode.rgb,
+    rx_udp_estimated_peak_bytes_per_sec: estimatedPeakBytesPerSec,
+    rx_udp_estimated_peak_kib_per_sec: Number.isFinite(estimatedPeakBytesPerSec) ? round3(estimatedPeakBytesPerSec / 1024) : null,
+    rx_udp_estimated_peak_mbps: Number.isFinite(estimatedPeakBytesPerSec) ? round3((estimatedPeakBytesPerSec * 8) / 1000000) : null,
+    rx_udp_utilization_ratio: observedUtilization,
+    rx_udp_estimated_peak_note: Number.isFinite(estimatedPeakBytesPerSec)
+      ? '仅按最近1秒真实收到的活跃图像流估算满载，不再使用旧帧回退值'
+      : (activeModeMissingRecentFrame.length > 0
+        ? `当前启用的 ${activeModeMissingRecentFrame.join('/')} 最近1秒没有有效帧，暂不估算满载`
+        : '当前 max_fps=0 或最近窗口没有有效图像帧，无法估算满载')
+  };
 }
 
 function startUdpReceiver() {
@@ -277,8 +419,8 @@ function serveFile(res, filePath, contentType) {
   });
 }
 
-function writeJpeg(res, frame, notReadyMessage) {
-  if (!frame || !frame.jpeg) {
+function writeImage(res, frame, notReadyMessage) {
+  if (!frame || !frame.image) {
     res.writeHead(503, {
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'no-store'
@@ -287,10 +429,10 @@ function writeJpeg(res, frame, notReadyMessage) {
     return;
   }
   res.writeHead(200, {
-    'Content-Type': 'image/jpeg',
+    'Content-Type': contentTypeByImageFormat(frame.format),
     'Cache-Control': 'no-store'
   });
-  res.end(frame.jpeg);
+  res.end(frame.image);
 }
 
 function startHttpServer() {
@@ -319,14 +461,30 @@ function startHttpServer() {
       serveFile(res, path.join(PUBLIC_DIR, 'pipeline_worker.js'), 'application/javascript; charset=utf-8');
       return;
     }
+    if (pathname.startsWith('/wasm/')) {
+      const rel = pathname.slice('/wasm/'.length);
+      const safeName = path.basename(rel);
+      const filePath = path.join(WASM_DIR, safeName);
+      const ext = path.extname(safeName).toLowerCase();
+      const contentType = ext === '.js'
+        ? 'application/javascript; charset=utf-8'
+        : (ext === '.wasm' ? 'application/wasm' : 'application/octet-stream');
+      serveFile(res, filePath, contentType);
+      return;
+    }
 
     if (pathname === '/api/status') {
-      const payload = JSON.stringify(latestStatus);
+      const payload = JSON.stringify(Object.assign({}, latestStatus, buildTransportTelemetry(latestStatus)));
       res.writeHead(200, {
         'Content-Type': 'application/json; charset=utf-8',
         'Cache-Control': 'no-store'
       });
       res.end(payload);
+      return;
+    }
+
+    if (pathname === '/api/wasm_sync_status') {
+      sendJson(res, 200, getWasmSyncStatus());
       return;
     }
 
@@ -340,17 +498,17 @@ function startHttpServer() {
     }
 
     if (pathname === '/api/frame_gray.jpg') {
-      writeJpeg(res, latestByMode[1], 'gray frame not ready');
+      writeImage(res, latestByMode[1], 'gray frame not ready');
       return;
     }
 
     if (pathname === '/api/frame_binary.jpg') {
-      writeJpeg(res, latestByMode[0], 'binary frame not ready');
+      writeImage(res, latestByMode[0], 'binary frame not ready');
       return;
     }
 
     if (pathname === '/api/frame_rgb.jpg') {
-      writeJpeg(res, latestByMode[2], 'rgb frame not ready');
+      writeImage(res, latestByMode[2], 'rgb frame not ready');
       return;
     }
 

@@ -2,183 +2,26 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
+  <meta http-equiv="refresh" content="0; url=/index.html?local_compute=1" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Local Compute Receiver</title>
+  <title>Redirecting To Unified Receiver</title>
   <style>
-    :root {
-      --bg: #0b1220;
-      --panel: #111a2b;
-      --muted: #90a4bf;
-      --text: #e7edf7;
-      --line: #22314d;
-      --accent: #38bdf8;
-      --ok: #22c55e;
-    }
-    * { box-sizing: border-box; }
     body {
       margin: 0;
-      background:
-        radial-gradient(circle at top left, rgba(56,189,248,0.12), transparent 28%),
-        radial-gradient(circle at top right, rgba(245,158,11,0.10), transparent 22%),
-        linear-gradient(180deg, #0a1020, #09111b 60%, #081019);
-      color: var(--text);
-      font: 14px/1.45 "Noto Sans SC", "Microsoft YaHei", sans-serif;
-    }
-    .wrap {
-      max-width: 1380px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    h1 {
-      margin: 0 0 10px;
-      font-size: 24px;
-    }
-    .sub {
-      color: var(--muted);
-      margin-bottom: 16px;
-    }
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 12px 14px;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      background: rgba(17,26,43,0.82);
-      margin-bottom: 16px;
-    }
-    .toolbar label {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .toolbar select, .toolbar button {
-      background: #0e1727;
-      color: var(--text);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 8px 10px;
-    }
-    .grid {
+      min-height: 100vh;
       display: grid;
-      gap: 16px;
-      grid-template-columns: 1.3fr 1.3fr 0.9fr;
+      place-items: center;
+      background: #0f172a;
+      color: #e2e8f0;
+      font: 16px/1.5 "Noto Sans SC", "Microsoft YaHei", sans-serif;
     }
-    .card {
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: rgba(17,26,43,0.82);
-      overflow: hidden;
-      min-height: 220px;
-    }
-    .card .title {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--line);
-      font-weight: 700;
-    }
-    .card .body {
-      padding: 14px;
-    }
-    .canvas-box {
-      background: #000;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid #17243a;
-    }
-    canvas {
-      display: block;
-      max-width: 100%;
-      height: auto;
-      image-rendering: pixelated;
-    }
-    pre {
-      margin: 0;
-      white-space: pre-wrap;
-      word-break: break-word;
-      color: #cbd7e6;
-    }
-    .note {
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .status-list {
-      display: grid;
-      gap: 8px;
-    }
-    .status-item {
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: rgba(9,16,25,0.8);
-    }
-    .status-item strong {
-      color: var(--accent);
-    }
-    @media (max-width: 1080px) {
-      .grid { grid-template-columns: 1fr; }
-    }
+    a { color: #38bdf8; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Local Compute Receiver</h1>
-    <div class="sub">同一套接收通道同时服务两个页面。这个页面只消费原始图像和原始状态，后续会在浏览器或 WebAssembly 里复算视觉链。</div>
-
-    <div class="toolbar">
-      <label>
-        帧源
-        <select id="frameMode">
-          <option value="gray">Gray</option>
-          <option value="rgb">RGB</option>
-          <option value="binary">Binary</option>
-        </select>
-      </label>
-      <label>
-        <input id="toggleOverlay" type="checkbox" checked />
-        显示本地复算覆盖层
-      </label>
-      <button id="runOnceBtn">手动重算一次</button>
-      <span id="metaText" class="note">waiting...</span>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <div class="title">原始接收帧</div>
-        <div class="body">
-          <div class="canvas-box">
-            <canvas id="rawCanvas" width="160" height="120"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="title">浏览器本地复算渲染</div>
-        <div class="body">
-          <div class="canvas-box">
-            <canvas id="overlayCanvas" width="160" height="120"></canvas>
-          </div>
-          <div class="note" style="margin-top:10px;">
-            当前 `pipeline_worker.js` 还是复算骨架。后续把 C++ 视觉链编到 WebAssembly 后，这里就能直接跑同一份算法核心。
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="title">原始状态</div>
-        <div class="body">
-          <div id="rawStatusList" class="status-list"></div>
-        </div>
-      </div>
-
-      <div class="card" style="grid-column: 1 / -1;">
-        <div class="title">本地复算结果 / 迁移说明</div>
-        <div class="body">
-          <pre id="resultText">waiting...</pre>
-        </div>
-      </div>
-    </div>
+  <div>
+    本地复算页已并入统一展示页，正在跳转到
+    <a href="/index.html?local_compute=1">/index.html?local_compute=1</a>
   </div>
-  <script src="/shared_receiver_core.js"></script>
-  <script src="/local_compute_app.js"></script>
 </body>
 </html>
