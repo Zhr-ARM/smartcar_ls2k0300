@@ -28,16 +28,21 @@ enum path_index
 	MAG_Z_RAW,
 };
 
+#define IMU_SYSFS_PATH_MAX_LEN   (128)
+#define IMU_DEVICE_NAME_MAX_LEN  (32)
 
 extern int16 imu_acc_x,  imu_acc_y,  imu_acc_z;
 extern int16 imu_gyro_x, imu_gyro_y, imu_gyro_z;
 extern int16 imu_mag_x,  imu_mag_y,  imu_mag_z;
 
-extern const char *imu_file_path[];
+extern char imu_device_dir[IMU_SYSFS_PATH_MAX_LEN];
+extern char imu_dev_name[IMU_DEVICE_NAME_MAX_LEN];
+extern char imu_file_path[9][IMU_SYSFS_PATH_MAX_LEN];
 extern uint8 imu_type;
 
 
 void imu_get_dev_info();
+int8 imu_get_node_path(const char *node_name, char *path, uint32 path_size);
 int16 imu_get_raw(const char *path);
 
 

@@ -145,6 +145,12 @@ bool Imu660raDriver::init()
         {
             set_error("检测到 IMU963RA,当前库仅支持 IMU660RA");
         }
+        else if ('\0' != imu_dev_name[0])
+        {
+            char message[sizeof(last_error_)] = {0};
+            snprintf(message, sizeof(message), "检测到未适配的 IMU 设备: %s", imu_dev_name);
+            set_error(message);
+        }
         else
         {
             set_error("未检测到 IMU660RA");
@@ -251,14 +257,17 @@ bool Imu660raDriver::reload_scale()
     acc_scale_ = IMU660RA_FALLBACK_ACC_SCALE_MS2;
     gyro_scale_ = IMU660RA_FALLBACK_GYRO_SCALE_RAD_S;
 
+    char scale_path[IMU_SYSFS_PATH_MAX_LEN] = {0};
     float value = 0.0f;
-    if (read_scale(IMU660RA_ACC_SCALE_PATH, value))
+    if (0 == imu_get_node_path(IMU660RA_ACC_SCALE_NODE, scale_path, sizeof(scale_path)) &&
+        read_scale(scale_path, value))
     {
         acc_scale_ = value;
     }
 
     value = 0.0f;
-    if (read_scale(IMU660RA_GYRO_SCALE_PATH, value))
+    if (0 == imu_get_node_path(IMU660RA_GYRO_SCALE_NODE, scale_path, sizeof(scale_path)) &&
+        read_scale(scale_path, value))
     {
         gyro_scale_ = value;
     }
@@ -322,6 +331,11 @@ Imu660raFloat3 Imu660raDriver::acc_ms2() const
 Imu660raEuler Imu660raDriver::attitude_deg() const
 {
     return attitude_deg_;
+}
+
+const char *Imu660raDriver::last_error() const
+{
+    return last_error_;
 }
 
 int16 Imu660raDriver::acc_x() const

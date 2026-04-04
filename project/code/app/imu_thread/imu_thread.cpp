@@ -95,7 +95,9 @@ bool imu_thread_init()
 
     if (!imu660ra_driver.init())
     {
-        printf("imu thread init failed\r\n");
+        const char *error = imu660ra_driver.last_error();
+        printf("imu thread init failed: %s\r\n",
+               (NULL != error && '\0' != error[0]) ? error : "unknown");
         return false;
     }
     imu660ra_driver.set_sample_period(IMU_PERIOD_MS / 1000.0f);

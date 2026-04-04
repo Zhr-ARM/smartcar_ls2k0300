@@ -3,8 +3,8 @@
 
 #include "zf_common_headfile.h"
 
-#define IMU660RA_ACC_SCALE_PATH "/sys/bus/iio/devices/iio:device1/in_accel_scale"
-#define IMU660RA_GYRO_SCALE_PATH "/sys/bus/iio/devices/iio:device1/in_anglvel_scale"
+#define IMU660RA_ACC_SCALE_NODE "in_accel_scale"
+#define IMU660RA_GYRO_SCALE_NODE "in_anglvel_scale"
 
 #define IMU660RA_DEFAULT_DT_S (0.01f)
 #define IMU660RA_DEFAULT_FILTER_ALPHA (0.70f)
@@ -135,6 +135,12 @@ public:
      * @return 欧拉角姿态，单位为度
      */
     Imu660raEuler attitude_deg() const;
+
+    /**
+     * @brief 获取最近一次初始化或运行错误信息
+     * @return 错误信息字符串
+     */
+    const char *last_error() const;
 
     /**
      * @brief 获取 X 轴加速度原始值
