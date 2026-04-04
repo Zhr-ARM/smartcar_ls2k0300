@@ -42,6 +42,12 @@ int main(int, char**)
     
     battery_monitor.init();
 
+    if (!imu_thread_init())
+    {
+        cleanup();
+        return -1;
+    }
+
     // 初始化逐飞助手独立 UDP 通道（不与网页端共用 IP/端口）。
     if (g_vision_runtime_config.assistant_udp_enabled)
     {
@@ -186,7 +192,7 @@ int main(int, char**)
     
     system_delay_ms(50);
     motor_thread_print_info();
-    //imu_thread_print_info();
+    imu_thread_print_info();
     line_follow_thread_print_info();
 
     while(!g_should_exit)

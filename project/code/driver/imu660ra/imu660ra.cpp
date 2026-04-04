@@ -328,9 +328,24 @@ Imu660raFloat3 Imu660raDriver::acc_ms2() const
     return acc_ms2_;
 }
 
+float Imu660raDriver::acc_scale_ms2() const
+{
+    return acc_scale_;
+}
+
+float Imu660raDriver::gyro_scale_rad_s() const
+{
+    return gyro_scale_;
+}
+
 Imu660raEuler Imu660raDriver::attitude_deg() const
 {
     return attitude_deg_;
+}
+
+float Imu660raDriver::filtered_gyro_z_deg_s() const
+{
+    return filtered_gyro_rad_s_.z * IMU660RA_RAD_TO_DEG;
 }
 
 const char *Imu660raDriver::last_error() const

@@ -17,6 +17,12 @@ bool imu_thread_init();
 Imu660raEuler imu_thread_attitude_deg();
 
 /**
+ * @brief 获取当前滤波并去零偏后的 Z 轴角速度
+ * @return 当前 gyro_z，单位 deg/s
+ */
+float imu_thread_gyro_z_dps();
+
+/**
  * @brief 停止 IMU 数据采集线程
  */
 void imu_thread_cleanup();

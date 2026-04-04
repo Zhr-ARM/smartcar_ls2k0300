@@ -308,13 +308,16 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_i
  /home/zhr/2k0300/test1/project/user/../../libraries/zf_device/zf_device_imu963ra.h \
  /home/zhr/2k0300/test1/project/user/../../libraries/zf_components/seekfree_assistant.h \
  /home/zhr/2k0300/test1/project/user/../../libraries/zf_components/seekfree_assistant_interface.h \
+ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/cstddef \
+ /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_config.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_frame_capture.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_line_error_layer.h \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/opencv.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/opencv_modules.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/cvdef.h \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/version.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/hal/interface.h \
- /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/cstddef \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core/base.hpp \
  /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/climits \

@@ -2548,3 +2548,557 @@ events:
       
       
 ...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:219 (try_compile)"
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:486 (_OPENMP_GET_FLAGS)"
+      - "/home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/lib/cmake/ncnn/ncnnConfig.cmake:10 (find_package)"
+      - "CMakeLists.txt:29 (find_package)"
+    description: "Detecting C OpenMP compiler info"
+    directories:
+      source: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo"
+      binary: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo"
+    cmakeVariables:
+      CMAKE_C_FLAGS: " -O3 -Wall"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "OpenMP_COMPILE_RESULT_C_fopenmp"
+      cached: true
+      stdout: |
+        Change Dir: '/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo'
+        
+        Run Build Command(s): /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_1bc6c/fast
+        gmake[1]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo”
+        /usr/bin/gmake  -f CMakeFiles/cmTC_1bc6c.dir/build.make CMakeFiles/cmTC_1bc6c.dir/build
+        gmake[2]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo”
+        Building C object CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc   -O3 -Wall -fopenmp -v -o CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o -c /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo/OpenMPTryFlag.c
+        Using built-in specs.
+        COLLECT_GCC=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc
+        Target: loongarch64-linux-gnu
+        Configured with: ../src/gcc/configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=loongarch64-linux-gnu --prefix=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix --with-pkgversion='LoongArch GNU toolchain rc1.6 (20241115)' --with-sysroot=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot --with-native-system-header-dir=/usr/include --with-gxx-include-dir=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0 --enable-languages=c,c++,fortran --enable-initfini-array --disable-bootstrap --disable-decimal-float --disable-linker-build-id --disable-multiarch --disable-libcc1 --disable-nls --disable-zlib --with-system-zlib --with-multilib-list=lp64d,lp64s
+        Thread model: posix
+        gcc version 8.3.0 (LoongArch GNU toolchain rc1.6 (20241115)) 
+        COLLECT_GCC_OPTIONS='-O3' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o' '-c' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread'
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/cc1 -quiet -v -imultilib . -iprefix /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/ -isysroot /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot -D_REENTRANT /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo/OpenMPTryFlag.c -quiet -dumpbase OpenMPTryFlag.c -mabi=lp64d -march=loongarch64 -mfpu=64 -msimd=none -mcmodel=normal -mtune=loongarch64 -auxbase-strip CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o -O3 -Wall -version -fopenmp -o /tmp/ccpKoOzP.s
+        GNU C17 (LoongArch GNU toolchain rc1.6 (20241115)) version 8.3.0 (loongarch64-linux-gnu)
+        	compiled by GNU C version 8.5.0, GMP version 6.1.0, MPFR version 3.1.4, MPC version 1.0.3, isl version isl-0.18-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/include"
+        ignoring duplicate directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include"
+        ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/local/include"
+        ignoring duplicate directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include-fixed"
+        ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/../../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include-fixed
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include
+        End of search list.
+        GNU C17 (LoongArch GNU toolchain rc1.6 (20241115)) version 8.3.0 (loongarch64-linux-gnu)
+        	compiled by GNU C version 8.5.0, GMP version 6.1.0, MPFR version 3.1.4, MPC version 1.0.3, isl version isl-0.18-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        Compiler executable checksum: e9195fca1b08cea7a12c2fefbe3ceb67
+        COLLECT_GCC_OPTIONS='-O3' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o' '-c' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread'
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/as -v -mabi=lp64 -o CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o /tmp/ccpKoOzP.s
+        GNU assembler version 2.31.1 (loongarch64-linux-gnu) using BFD version (LoongArch GNU toolchain rc1.6 20241115) 2.31.1.20190122
+        COMPILER_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/
+        LIBRARY_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/
+        COLLECT_GCC_OPTIONS='-O3' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o' '-c' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread'
+        Linking C executable cmTC_1bc6c
+        /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E cmake_link_script CMakeFiles/cmTC_1bc6c.dir/link.txt --verbose=1
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc  -O3 -Wall -fopenmp -v CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o -o cmTC_1bc6c  -v 
+        Using built-in specs.
+        COLLECT_GCC=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc
+        COLLECT_LTO_WRAPPER=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/lto-wrapper
+        Target: loongarch64-linux-gnu
+        Configured with: ../src/gcc/configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=loongarch64-linux-gnu --prefix=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix --with-pkgversion='LoongArch GNU toolchain rc1.6 (20241115)' --with-sysroot=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot --with-native-system-header-dir=/usr/include --with-gxx-include-dir=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0 --enable-languages=c,c++,fortran --enable-initfini-array --disable-bootstrap --disable-decimal-float --disable-linker-build-id --disable-multiarch --disable-libcc1 --disable-nls --disable-zlib --with-system-zlib --with-multilib-list=lp64d,lp64s
+        Thread model: posix
+        gcc version 8.3.0 (LoongArch GNU toolchain rc1.6 (20241115)) 
+        COMPILER_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/
+        LIBRARY_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/
+        Reading specs from /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/libgomp.spec
+        COLLECT_GCC_OPTIONS='-O3' '-Wall' '-fopenmp' '-v' '-o' 'cmTC_1bc6c' '-v' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread'
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/collect2 -plugin /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/liblto_plugin.so -plugin-opt=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/lto-wrapper -plugin-opt=-fresolution=/tmp/ccJLvOxD.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --sysroot=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot --eh-frame-hdr -m elf64loongarch -dynamic-linker /lib64/ld.so.1 -o cmTC_1bc6c /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crt1.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crti.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/crtbegin.o -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o -lgomp -lgcc --push-state --as-needed -lgcc_s --pop-state -lpthread -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/crtend.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crtn.o
+        COLLECT_GCC_OPTIONS='-O3' '-Wall' '-fopenmp' '-v' '-o' 'cmTC_1bc6c' '-v' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread'
+        gmake[2]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo”
+        gmake[1]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo”
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:262 (message)"
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:486 (_OPENMP_GET_FLAGS)"
+      - "/home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/lib/cmake/ncnn/ncnnConfig.cmake:10 (find_package)"
+      - "CMakeLists.txt:29 (find_package)"
+    message: |
+      Parsed C OpenMP implicit link information from above output:
+        link line regex: [^( *|.*[/\\])(loongarch64-linux-gnu-ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        ignore line: [Change Dir: '/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo']
+        ignore line: []
+        ignore line: [Run Build Command(s): /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_1bc6c/fast]
+        ignore line: [gmake[1]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo”]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_1bc6c.dir/build.make CMakeFiles/cmTC_1bc6c.dir/build]
+        ignore line: [gmake[2]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo”]
+        ignore line: [Building C object CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o]
+        ignore line: [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc   -O3 -Wall -fopenmp -v -o CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o -c /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo/OpenMPTryFlag.c]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc]
+        ignore line: [Target: loongarch64-linux-gnu]
+        ignore line: [Configured with: ../src/gcc/configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=loongarch64-linux-gnu --prefix=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix --with-pkgversion='LoongArch GNU toolchain rc1.6 (20241115)' --with-sysroot=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot --with-native-system-header-dir=/usr/include --with-gxx-include-dir=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0 --enable-languages=c c++ fortran --enable-initfini-array --disable-bootstrap --disable-decimal-float --disable-linker-build-id --disable-multiarch --disable-libcc1 --disable-nls --disable-zlib --with-system-zlib --with-multilib-list=lp64d lp64s]
+        ignore line: [Thread model: posix]
+        ignore line: [gcc version 8.3.0 (LoongArch GNU toolchain rc1.6 (20241115)) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-O3' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o' '-c' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread']
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/cc1 -quiet -v -imultilib . -iprefix /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/ -isysroot /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot -D_REENTRANT /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-s3bTvo/OpenMPTryFlag.c -quiet -dumpbase OpenMPTryFlag.c -mabi=lp64d -march=loongarch64 -mfpu=64 -msimd=none -mcmodel=normal -mtune=loongarch64 -auxbase-strip CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o -O3 -Wall -version -fopenmp -o /tmp/ccpKoOzP.s]
+        ignore line: [GNU C17 (LoongArch GNU toolchain rc1.6 (20241115)) version 8.3.0 (loongarch64-linux-gnu)]
+        ignore line: [	compiled by GNU C version 8.5.0  GMP version 6.1.0  MPFR version 3.1.4  MPC version 1.0.3  isl version isl-0.18-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/include"]
+        ignore line: [ignoring duplicate directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include"]
+        ignore line: [ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/local/include"]
+        ignore line: [ignoring duplicate directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include-fixed"]
+        ignore line: [ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/../../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/include"]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include]
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include-fixed]
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include]
+        ignore line: [End of search list.]
+        ignore line: [GNU C17 (LoongArch GNU toolchain rc1.6 (20241115)) version 8.3.0 (loongarch64-linux-gnu)]
+        ignore line: [	compiled by GNU C version 8.5.0  GMP version 6.1.0  MPFR version 3.1.4  MPC version 1.0.3  isl version isl-0.18-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [Compiler executable checksum: e9195fca1b08cea7a12c2fefbe3ceb67]
+        ignore line: [COLLECT_GCC_OPTIONS='-O3' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o' '-c' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread']
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/as -v -mabi=lp64 -o CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o /tmp/ccpKoOzP.s]
+        ignore line: [GNU assembler version 2.31.1 (loongarch64-linux-gnu) using BFD version (LoongArch GNU toolchain rc1.6 20241115) 2.31.1.20190122]
+        ignore line: [COMPILER_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/]
+        ignore line: [LIBRARY_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-O3' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o' '-c' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread']
+        ignore line: [Linking C executable cmTC_1bc6c]
+        ignore line: [/opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E cmake_link_script CMakeFiles/cmTC_1bc6c.dir/link.txt --verbose=1]
+        ignore line: [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc  -O3 -Wall -fopenmp -v CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o -o cmTC_1bc6c  -v ]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc]
+        ignore line: [COLLECT_LTO_WRAPPER=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/lto-wrapper]
+        ignore line: [Target: loongarch64-linux-gnu]
+        ignore line: [Configured with: ../src/gcc/configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=loongarch64-linux-gnu --prefix=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix --with-pkgversion='LoongArch GNU toolchain rc1.6 (20241115)' --with-sysroot=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot --with-native-system-header-dir=/usr/include --with-gxx-include-dir=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0 --enable-languages=c c++ fortran --enable-initfini-array --disable-bootstrap --disable-decimal-float --disable-linker-build-id --disable-multiarch --disable-libcc1 --disable-nls --disable-zlib --with-system-zlib --with-multilib-list=lp64d lp64s]
+        ignore line: [Thread model: posix]
+        ignore line: [gcc version 8.3.0 (LoongArch GNU toolchain rc1.6 (20241115)) ]
+        ignore line: [COMPILER_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/]
+        ignore line: [LIBRARY_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/]
+        ignore line: [Reading specs from /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/libgomp.spec]
+        ignore line: [COLLECT_GCC_OPTIONS='-O3' '-Wall' '-fopenmp' '-v' '-o' 'cmTC_1bc6c' '-v' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread']
+        link line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/collect2 -plugin /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/liblto_plugin.so -plugin-opt=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/lto-wrapper -plugin-opt=-fresolution=/tmp/ccJLvOxD.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --sysroot=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot --eh-frame-hdr -m elf64loongarch -dynamic-linker /lib64/ld.so.1 -o cmTC_1bc6c /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crt1.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crti.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/crtbegin.o -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o -lgomp -lgcc --push-state --as-needed -lgcc_s --pop-state -lpthread -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/crtend.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crtn.o]
+          arg [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/collect2] ==> ignore
+          arg [-plugin] ==> ignore
+          arg [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/liblto_plugin.so] ==> ignore
+          arg [-plugin-opt=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/lto-wrapper] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/ccJLvOxD.res] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lpthread] ==> ignore
+          arg [-plugin-opt=-pass-through=-lc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [--sysroot=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot] ==> ignore
+          arg [--eh-frame-hdr] ==> ignore
+          arg [-m] ==> ignore
+          arg [elf64loongarch] ==> ignore
+          arg [-dynamic-linker] ==> ignore
+          arg [/lib64/ld.so.1] ==> ignore
+          arg [-o] ==> ignore
+          arg [cmTC_1bc6c] ==> ignore
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib]
+          arg [CMakeFiles/cmTC_1bc6c.dir/OpenMPTryFlag.c.o] ==> ignore
+          arg [-lgomp] ==> lib [gomp]
+          arg [-lgcc] ==> lib [gcc]
+          arg [--push-state] ==> ignore
+          arg [--as-needed] ==> ignore
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [--pop-state] ==> ignore
+          arg [-lpthread] ==> lib [pthread]
+          arg [-lc] ==> lib [c]
+          arg [-lgcc] ==> lib [gcc]
+          arg [--push-state] ==> ignore
+          arg [--as-needed] ==> ignore
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [--pop-state] ==> ignore
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/lib64]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/lib64]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/lib64]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/lib]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/lib]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/lib]
+        implicit libs: [gomp;gcc;gcc_s;pthread;c;gcc;gcc_s]
+        implicit objs: []
+        implicit dirs: [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/lib64;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/lib64;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/lib64;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/lib;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/lib;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/lib]
+        implicit fwks: []
+      
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:219 (try_compile)"
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:486 (_OPENMP_GET_FLAGS)"
+      - "/home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/lib/cmake/ncnn/ncnnConfig.cmake:10 (find_package)"
+      - "CMakeLists.txt:29 (find_package)"
+    description: "Detecting CXX OpenMP compiler info"
+    directories:
+      source: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO"
+      binary: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: " -O3 -pthread -Wall"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "OpenMP_COMPILE_RESULT_CXX_fopenmp"
+      cached: true
+      stdout: |
+        Change Dir: '/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO'
+        
+        Run Build Command(s): /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_e7187/fast
+        gmake[1]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO”
+        /usr/bin/gmake  -f CMakeFiles/cmTC_e7187.dir/build.make CMakeFiles/cmTC_e7187.dir/build
+        gmake[2]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO”
+        Building CXX object CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++   -O3 -pthread -Wall -fopenmp -v -o CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o -c /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO/OpenMPTryFlag.cpp
+        Using built-in specs.
+        COLLECT_GCC=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++
+        Target: loongarch64-linux-gnu
+        Configured with: ../src/gcc/configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=loongarch64-linux-gnu --prefix=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix --with-pkgversion='LoongArch GNU toolchain rc1.6 (20241115)' --with-sysroot=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot --with-native-system-header-dir=/usr/include --with-gxx-include-dir=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0 --enable-languages=c,c++,fortran --enable-initfini-array --disable-bootstrap --disable-decimal-float --disable-linker-build-id --disable-multiarch --disable-libcc1 --disable-nls --disable-zlib --with-system-zlib --with-multilib-list=lp64d,lp64s
+        Thread model: posix
+        gcc version 8.3.0 (LoongArch GNU toolchain rc1.6 (20241115)) 
+        COLLECT_GCC_OPTIONS='-O3' '-pthread' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread'
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/cc1plus -quiet -v -imultilib . -iprefix /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/ -isysroot /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot -D_GNU_SOURCE -D_REENTRANT /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO/OpenMPTryFlag.cpp -quiet -dumpbase OpenMPTryFlag.cpp -mabi=lp64d -march=loongarch64 -mfpu=64 -msimd=none -mcmodel=normal -mtune=loongarch64 -auxbase-strip CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o -O3 -Wall -version -fopenmp -o /tmp/ccqTrL1r.s
+        GNU C++14 (LoongArch GNU toolchain rc1.6 (20241115)) version 8.3.0 (loongarch64-linux-gnu)
+        	compiled by GNU C version 8.5.0, GMP version 6.1.0, MPFR version 3.1.4, MPC version 1.0.3, isl version isl-0.18-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/include"
+        ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/loongarch64-linux-gnu/."
+        ignoring duplicate directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include"
+        ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/local/include"
+        ignoring duplicate directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include-fixed"
+        ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/../../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/include"
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include-fixed
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/backward
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include
+        End of search list.
+        GNU C++14 (LoongArch GNU toolchain rc1.6 (20241115)) version 8.3.0 (loongarch64-linux-gnu)
+        	compiled by GNU C version 8.5.0, GMP version 6.1.0, MPFR version 3.1.4, MPC version 1.0.3, isl version isl-0.18-GMP
+        
+        GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+        Compiler executable checksum: ea5bbb2d0afb0de20dca386a34b3655f
+        COLLECT_GCC_OPTIONS='-O3' '-pthread' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread'
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/as -v -mabi=lp64 -o CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o /tmp/ccqTrL1r.s
+        GNU assembler version 2.31.1 (loongarch64-linux-gnu) using BFD version (LoongArch GNU toolchain rc1.6 20241115) 2.31.1.20190122
+        COMPILER_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/
+        LIBRARY_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/
+        COLLECT_GCC_OPTIONS='-O3' '-pthread' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread'
+        Linking CXX executable cmTC_e7187
+        /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e7187.dir/link.txt --verbose=1
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++  -O3 -pthread -Wall -fopenmp -v CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o -o cmTC_e7187  -v 
+        Using built-in specs.
+        COLLECT_GCC=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++
+        COLLECT_LTO_WRAPPER=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/lto-wrapper
+        Target: loongarch64-linux-gnu
+        Configured with: ../src/gcc/configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=loongarch64-linux-gnu --prefix=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix --with-pkgversion='LoongArch GNU toolchain rc1.6 (20241115)' --with-sysroot=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot --with-native-system-header-dir=/usr/include --with-gxx-include-dir=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0 --enable-languages=c,c++,fortran --enable-initfini-array --disable-bootstrap --disable-decimal-float --disable-linker-build-id --disable-multiarch --disable-libcc1 --disable-nls --disable-zlib --with-system-zlib --with-multilib-list=lp64d,lp64s
+        Thread model: posix
+        gcc version 8.3.0 (LoongArch GNU toolchain rc1.6 (20241115)) 
+        COMPILER_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/
+        LIBRARY_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/
+        Reading specs from /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/libgomp.spec
+        COLLECT_GCC_OPTIONS='-O3' '-pthread' '-Wall' '-fopenmp' '-v' '-o' 'cmTC_e7187' '-v' '-shared-libgcc' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread'
+         /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/collect2 -plugin /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/liblto_plugin.so -plugin-opt=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/lto-wrapper -plugin-opt=-fresolution=/tmp/ccg6yMqh.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot --eh-frame-hdr -m elf64loongarch -dynamic-linker /lib64/ld.so.1 -o cmTC_e7187 /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crt1.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crti.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/crtbegin.o -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o -lstdc++ -lm -lgomp -lgcc_s -lgcc -lpthread -lc -lgcc_s -lgcc /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/crtend.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crtn.o
+        COLLECT_GCC_OPTIONS='-O3' '-pthread' '-Wall' '-fopenmp' '-v' '-o' 'cmTC_e7187' '-v' '-shared-libgcc' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread'
+        gmake[2]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO”
+        gmake[1]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO”
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:262 (message)"
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:486 (_OPENMP_GET_FLAGS)"
+      - "/home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/lib/cmake/ncnn/ncnnConfig.cmake:10 (find_package)"
+      - "CMakeLists.txt:29 (find_package)"
+    message: |
+      Parsed CXX OpenMP implicit link information from above output:
+        link line regex: [^( *|.*[/\\])(loongarch64-linux-gnu-ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        ignore line: [Change Dir: '/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO']
+        ignore line: []
+        ignore line: [Run Build Command(s): /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_e7187/fast]
+        ignore line: [gmake[1]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO”]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_e7187.dir/build.make CMakeFiles/cmTC_e7187.dir/build]
+        ignore line: [gmake[2]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO”]
+        ignore line: [Building CXX object CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o]
+        ignore line: [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++   -O3 -pthread -Wall -fopenmp -v -o CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o -c /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO/OpenMPTryFlag.cpp]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++]
+        ignore line: [Target: loongarch64-linux-gnu]
+        ignore line: [Configured with: ../src/gcc/configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=loongarch64-linux-gnu --prefix=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix --with-pkgversion='LoongArch GNU toolchain rc1.6 (20241115)' --with-sysroot=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot --with-native-system-header-dir=/usr/include --with-gxx-include-dir=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0 --enable-languages=c c++ fortran --enable-initfini-array --disable-bootstrap --disable-decimal-float --disable-linker-build-id --disable-multiarch --disable-libcc1 --disable-nls --disable-zlib --with-system-zlib --with-multilib-list=lp64d lp64s]
+        ignore line: [Thread model: posix]
+        ignore line: [gcc version 8.3.0 (LoongArch GNU toolchain rc1.6 (20241115)) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-O3' '-pthread' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread']
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/cc1plus -quiet -v -imultilib . -iprefix /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/ -isysroot /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot -D_GNU_SOURCE -D_REENTRANT /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-yobbwO/OpenMPTryFlag.cpp -quiet -dumpbase OpenMPTryFlag.cpp -mabi=lp64d -march=loongarch64 -mfpu=64 -msimd=none -mcmodel=normal -mtune=loongarch64 -auxbase-strip CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o -O3 -Wall -version -fopenmp -o /tmp/ccqTrL1r.s]
+        ignore line: [GNU C++14 (LoongArch GNU toolchain rc1.6 (20241115)) version 8.3.0 (loongarch64-linux-gnu)]
+        ignore line: [	compiled by GNU C version 8.5.0  GMP version 6.1.0  MPFR version 3.1.4  MPC version 1.0.3  isl version isl-0.18-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/include"]
+        ignore line: [ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/loongarch64-linux-gnu/."]
+        ignore line: [ignoring duplicate directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include"]
+        ignore line: [ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/local/include"]
+        ignore line: [ignoring duplicate directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include-fixed"]
+        ignore line: [ignoring nonexistent directory "/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/../../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/include"]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include]
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0/include-fixed]
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0]
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/backward]
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include]
+        ignore line: [End of search list.]
+        ignore line: [GNU C++14 (LoongArch GNU toolchain rc1.6 (20241115)) version 8.3.0 (loongarch64-linux-gnu)]
+        ignore line: [	compiled by GNU C version 8.5.0  GMP version 6.1.0  MPFR version 3.1.4  MPC version 1.0.3  isl version isl-0.18-GMP]
+        ignore line: []
+        ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
+        ignore line: [Compiler executable checksum: ea5bbb2d0afb0de20dca386a34b3655f]
+        ignore line: [COLLECT_GCC_OPTIONS='-O3' '-pthread' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread']
+        ignore line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/as -v -mabi=lp64 -o CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o /tmp/ccqTrL1r.s]
+        ignore line: [GNU assembler version 2.31.1 (loongarch64-linux-gnu) using BFD version (LoongArch GNU toolchain rc1.6 20241115) 2.31.1.20190122]
+        ignore line: [COMPILER_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/]
+        ignore line: [LIBRARY_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/]
+        ignore line: [COLLECT_GCC_OPTIONS='-O3' '-pthread' '-Wall' '-fopenmp' '-v' '-o' 'CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o' '-c' '-shared-libgcc' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread']
+        ignore line: [Linking CXX executable cmTC_e7187]
+        ignore line: [/opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e7187.dir/link.txt --verbose=1]
+        ignore line: [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++  -O3 -pthread -Wall -fopenmp -v CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o -o cmTC_e7187  -v ]
+        ignore line: [Using built-in specs.]
+        ignore line: [COLLECT_GCC=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++]
+        ignore line: [COLLECT_LTO_WRAPPER=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/lto-wrapper]
+        ignore line: [Target: loongarch64-linux-gnu]
+        ignore line: [Configured with: ../src/gcc/configure --build=x86_64-linux-gnu --host=x86_64-linux-gnu --target=loongarch64-linux-gnu --prefix=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix --with-pkgversion='LoongArch GNU toolchain rc1.6 (20241115)' --with-sysroot=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot --with-native-system-header-dir=/usr/include --with-gxx-include-dir=/dev/shm/build-loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/prefix/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0 --enable-languages=c c++ fortran --enable-initfini-array --disable-bootstrap --disable-decimal-float --disable-linker-build-id --disable-multiarch --disable-libcc1 --disable-nls --disable-zlib --with-system-zlib --with-multilib-list=lp64d lp64s]
+        ignore line: [Thread model: posix]
+        ignore line: [gcc version 8.3.0 (LoongArch GNU toolchain rc1.6 (20241115)) ]
+        ignore line: [COMPILER_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/]
+        ignore line: [LIBRARY_PATH=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/:/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/]
+        ignore line: [Reading specs from /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/libgomp.spec]
+        ignore line: [COLLECT_GCC_OPTIONS='-O3' '-pthread' '-Wall' '-fopenmp' '-v' '-o' 'cmTC_e7187' '-v' '-shared-libgcc' '-mabi=lp64d' '-march=loongarch64' '-mfpu=64' '-msimd=none' '-mcmodel=normal' '-mtune=loongarch64' '-pthread']
+        link line: [ /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/collect2 -plugin /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/liblto_plugin.so -plugin-opt=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/lto-wrapper -plugin-opt=-fresolution=/tmp/ccg6yMqh.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot --eh-frame-hdr -m elf64loongarch -dynamic-linker /lib64/ld.so.1 -o cmTC_e7187 /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crt1.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crti.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/crtbegin.o -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64 -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib -L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o -lstdc++ -lm -lgomp -lgcc_s -lgcc -lpthread -lc -lgcc_s -lgcc /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/crtend.o /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64/crtn.o]
+          arg [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/collect2] ==> ignore
+          arg [-plugin] ==> ignore
+          arg [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/liblto_plugin.so] ==> ignore
+          arg [-plugin-opt=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../libexec/gcc/loongarch64-linux-gnu/8.3.0/lto-wrapper] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/ccg6yMqh.res] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lpthread] ==> ignore
+          arg [-plugin-opt=-pass-through=-lc] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
+          arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
+          arg [--sysroot=/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot] ==> ignore
+          arg [--eh-frame-hdr] ==> ignore
+          arg [-m] ==> ignore
+          arg [elf64loongarch] ==> ignore
+          arg [-dynamic-linker] ==> ignore
+          arg [/lib64/ld.so.1] ==> ignore
+          arg [-o] ==> ignore
+          arg [cmTC_e7187] ==> ignore
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib]
+          arg [-L/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib] ==> dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib]
+          arg [CMakeFiles/cmTC_e7187.dir/OpenMPTryFlag.cpp.o] ==> ignore
+          arg [-lstdc++] ==> lib [stdc++]
+          arg [-lm] ==> lib [m]
+          arg [-lgomp] ==> lib [gomp]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+          arg [-lpthread] ==> lib [pthread]
+          arg [-lc] ==> lib [c]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-lgcc] ==> lib [gcc]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib/../lib64] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/lib64]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib/../lib64] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/lib64]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib/../lib64] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/lib64]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/lib] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/lib]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/lib] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/lib]
+        collapse library dir [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../loongarch64-linux-gnu/sysroot/usr/lib] ==> [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/lib]
+        implicit libs: [stdc++;m;gomp;gcc_s;gcc;pthread;c;gcc_s;gcc]
+        implicit objs: []
+        implicit dirs: [/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc/loongarch64-linux-gnu/8.3.0;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/lib/gcc;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/lib64;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/lib64;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/lib64;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/lib;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/lib;/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/lib]
+        implicit fwks: []
+      
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:420 (try_compile)"
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:560 (_OPENMP_GET_SPEC_DATE)"
+      - "/home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/lib/cmake/ncnn/ncnnConfig.cmake:10 (find_package)"
+      - "CMakeLists.txt:29 (find_package)"
+    description: "Detecting C OpenMP version"
+    directories:
+      source: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-HhHhUm"
+      binary: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-HhHhUm"
+    cmakeVariables:
+      CMAKE_C_FLAGS: " -O3 -Wall"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "OpenMP_SPECTEST_C_"
+      cached: true
+      stdout: |
+        Change Dir: '/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-HhHhUm'
+        
+        Run Build Command(s): /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_c21a9/fast
+        gmake[1]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-HhHhUm”
+        /usr/bin/gmake  -f CMakeFiles/cmTC_c21a9.dir/build.make CMakeFiles/cmTC_c21a9.dir/build
+        gmake[2]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-HhHhUm”
+        Building C object CMakeFiles/cmTC_c21a9.dir/OpenMPCheckVersion.c.o
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc   -O3 -Wall -fopenmp -o CMakeFiles/cmTC_c21a9.dir/OpenMPCheckVersion.c.o -c /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-HhHhUm/OpenMPCheckVersion.c
+        Linking C executable cmTC_c21a9
+        /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c21a9.dir/link.txt --verbose=1
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc  -O3 -Wall -fopenmp CMakeFiles/cmTC_c21a9.dir/OpenMPCheckVersion.c.o -o cmTC_c21a9 
+        gmake[2]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-HhHhUm”
+        gmake[1]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-HhHhUm”
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:420 (try_compile)"
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindOpenMP.cmake:560 (_OPENMP_GET_SPEC_DATE)"
+      - "/home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/lib/cmake/ncnn/ncnnConfig.cmake:10 (find_package)"
+      - "CMakeLists.txt:29 (find_package)"
+    description: "Detecting CXX OpenMP version"
+    directories:
+      source: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-CxYaCk"
+      binary: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-CxYaCk"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: " -O3 -pthread -Wall"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "OpenMP_SPECTEST_CXX_"
+      cached: true
+      stdout: |
+        Change Dir: '/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-CxYaCk'
+        
+        Run Build Command(s): /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_2a7da/fast
+        gmake[1]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-CxYaCk”
+        /usr/bin/gmake  -f CMakeFiles/cmTC_2a7da.dir/build.make CMakeFiles/cmTC_2a7da.dir/build
+        gmake[2]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-CxYaCk”
+        Building CXX object CMakeFiles/cmTC_2a7da.dir/OpenMPCheckVersion.cpp.o
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++   -O3 -pthread -Wall -fopenmp -o CMakeFiles/cmTC_2a7da.dir/OpenMPCheckVersion.cpp.o -c /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-CxYaCk/OpenMPCheckVersion.cpp
+        Linking CXX executable cmTC_2a7da
+        /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E cmake_link_script CMakeFiles/cmTC_2a7da.dir/link.txt --verbose=1
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++  -O3 -pthread -Wall -fopenmp CMakeFiles/cmTC_2a7da.dir/OpenMPCheckVersion.cpp.o -o cmTC_2a7da 
+        gmake[2]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-CxYaCk”
+        gmake[1]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-CxYaCk”
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/CheckCSourceCompiles.cmake:52 (cmake_check_source_compiles)"
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindThreads.cmake:97 (CHECK_C_SOURCE_COMPILES)"
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindThreads.cmake:163 (_threads_check_libc)"
+      - "/home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/lib/cmake/ncnn/ncnnConfig.cmake:16 (find_package)"
+      - "CMakeLists.txt:29 (find_package)"
+    checks:
+      - "Performing Test CMAKE_HAVE_LIBC_PTHREAD"
+    directories:
+      source: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-LGlgzv"
+      binary: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-LGlgzv"
+    cmakeVariables:
+      CMAKE_C_FLAGS: " -O3 -Wall"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "CMAKE_HAVE_LIBC_PTHREAD"
+      cached: true
+      stdout: |
+        Change Dir: '/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-LGlgzv'
+        
+        Run Build Command(s): /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_0562c/fast
+        gmake[1]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-LGlgzv”
+        /usr/bin/gmake  -f CMakeFiles/cmTC_0562c.dir/build.make CMakeFiles/cmTC_0562c.dir/build
+        gmake[2]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-LGlgzv”
+        Building C object CMakeFiles/cmTC_0562c.dir/src.c.o
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc -DCMAKE_HAVE_LIBC_PTHREAD  -O3 -Wall  -o CMakeFiles/cmTC_0562c.dir/src.c.o -c /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-LGlgzv/src.c
+        Linking C executable cmTC_0562c
+        /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E cmake_link_script CMakeFiles/cmTC_0562c.dir/link.txt --verbose=1
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc  -O3 -Wall  CMakeFiles/cmTC_0562c.dir/src.c.o -o cmTC_0562c 
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/ld: CMakeFiles/cmTC_0562c.dir/src.c.o: in function `main':
+        src.c:(.text.startup+0x1c): undefined reference to `pthread_create'
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/ld: src.c:(.text.startup+0x24): undefined reference to `pthread_detach'
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/ld: src.c:(.text.startup+0x2c): undefined reference to `pthread_cancel'
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/../lib/gcc/loongarch64-linux-gnu/8.3.0/../../../../loongarch64-linux-gnu/bin/ld: src.c:(.text.startup+0x38): undefined reference to `pthread_join'
+        collect2: error: ld returned 1 exit status
+        gmake[2]: *** [CMakeFiles/cmTC_0562c.dir/build.make:99：cmTC_0562c] 错误 1
+        gmake[2]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-LGlgzv”
+        gmake[1]: *** [Makefile:127：cmTC_0562c/fast] 错误 2
+        gmake[1]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-LGlgzv”
+        
+      exitCode: 2
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindThreads.cmake:136 (try_compile)"
+      - "/opt/st/stm32cubeclt_1.17.0/CMake/share/cmake-3.28/Modules/FindThreads.cmake:169 (_threads_check_flag_pthread)"
+      - "/home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/lib/cmake/ncnn/ncnnConfig.cmake:16 (find_package)"
+      - "CMakeLists.txt:29 (find_package)"
+    checks:
+      - "Check if compiler accepts -pthread"
+    directories:
+      source: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-hHIBl0"
+      binary: "/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-hHIBl0"
+    cmakeVariables:
+      CMAKE_C_FLAGS: " -O3 -Wall"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "THREADS_HAVE_PTHREAD_ARG"
+      cached: true
+      stdout: |
+        Change Dir: '/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-hHIBl0'
+        
+        Run Build Command(s): /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_aeb5b/fast
+        gmake[1]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-hHIBl0”
+        /usr/bin/gmake  -f CMakeFiles/cmTC_aeb5b.dir/build.make CMakeFiles/cmTC_aeb5b.dir/build
+        gmake[2]: 进入目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-hHIBl0”
+        Building C object CMakeFiles/cmTC_aeb5b.dir/CheckForPthreads.c.o
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc   -O3 -Wall  -o CMakeFiles/cmTC_aeb5b.dir/CheckForPthreads.c.o -c /home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-hHIBl0/CheckForPthreads.c
+        Linking C executable cmTC_aeb5b
+        /opt/st/stm32cubeclt_1.17.0/CMake/bin/cmake -E cmake_link_script CMakeFiles/cmTC_aeb5b.dir/link.txt --verbose=1
+        /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-gcc  -O3 -Wall  CMakeFiles/cmTC_aeb5b.dir/CheckForPthreads.c.o -o cmTC_aeb5b  -pthread 
+        gmake[2]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-hHIBl0”
+        gmake[1]: 离开目录“/home/zhr/2k0300/test1/build/CMakeFiles/CMakeScratch/TryCompile-hHIBl0”
+        
+      exitCode: 0
+...

@@ -25,5 +25,19 @@ Makefile
 # Logs
 *.log
 
+# Build folders (extra)
+build/
+build_local/
+lib-ncnn/main/build/
+
+# VSCode or IDE configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+
 # Web receiver saved recordings
 /tools/pc_receiver_js/recordings/

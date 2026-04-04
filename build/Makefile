@@ -922,6 +922,78 @@ home/zhr/2k0300/test1/project/code/driver/uart_pid_protocol/uart_pid_protocol.cp
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/uart_pid_protocol/uart_pid_protocol.cpp.s
 .PHONY : home/zhr/2k0300/test1/project/code/driver/uart_pid_protocol/uart_pid_protocol.cpp.s
 
+home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.o: home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.o
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.i: home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.i
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.s: home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.cpp.s
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_config.o: home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_config.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.o
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_config.i: home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_config.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.i
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_config.s: home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_config.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_config.c.s
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.o: home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.o
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.i: home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.i
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.s: home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.cpp.s
+
 home/zhr/2k0300/test1/project/code/driver/vision/vision_image_processor.o: home/zhr/2k0300/test1/project/code/driver/vision/vision_image_processor.cpp.o
 .PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_image_processor.o
 
@@ -945,6 +1017,102 @@ home/zhr/2k0300/test1/project/code/driver/vision/vision_image_processor.s: home/
 home/zhr/2k0300/test1/project/code/driver/vision/vision_image_processor.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_image_processor.cpp.s
 .PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_image_processor.cpp.s
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.o: home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.o
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.i: home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.i
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.s: home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.s
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.o: home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.o
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.i: home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.i
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.s: home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.s
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.o: home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.o
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.i: home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.i
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.s: home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.s
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.o: home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.i: home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.i
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.s: home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.s
 
 main.o: main.cpp.o
 .PHONY : main.o
@@ -1078,9 +1246,30 @@ help:
 	@echo "... home/zhr/2k0300/test1/project/code/driver/uart_pid_protocol/uart_pid_protocol.o"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/uart_pid_protocol/uart_pid_protocol.i"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/uart_pid_protocol/uart_pid_protocol.s"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.o"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.i"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_assistant_udp.s"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_config.o"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_config.i"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_config.s"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.o"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.i"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_frame_capture.s"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_image_processor.o"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_image_processor.i"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_image_processor.s"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.o"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.i"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.s"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.o"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.i"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.s"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.o"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.i"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.s"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.o"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.i"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"

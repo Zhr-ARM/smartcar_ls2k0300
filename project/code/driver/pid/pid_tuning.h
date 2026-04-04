@@ -10,6 +10,12 @@
 
 namespace pid_tuning
 {
+namespace imu
+{
+// IMU 启动零偏标定样本数：线程启动前静止采样这些点，估计 gyro_z 零偏。
+inline constexpr int32 kGyroBiasSampleCount = 80;
+} // namespace imu
+
 namespace motor_speed
 {
 // 左轮速度环比例项：误差一出现就立即给修正，越大响应越快，但过大容易抖。
@@ -61,6 +67,33 @@ namespace line_follow
 {
 // 视觉误差低通系数：越大越跟当前帧，越小越重视历史趋势。
 inline constexpr float kErrorFilterAlpha = 0.80f;
+
+// gyro_z 方向校正：若接入后“越抗漂越甩”，优先把它从 1 改成 -1。
+inline constexpr float kGyroYawRateSign = 1.0f;
+// 巡线线程内对横摆角速度再做一层轻滤波，抑制偶发抖动。
+inline constexpr float kGyroYawRateFilterAlpha = 0.30f;
+// 把视觉差速输出映射成期望横摆角速度：差速越大，允许车身转得越快。
+inline constexpr float kGyroYawRateRefGain = 0.15f;
+// 期望横摆角速度上限，避免视觉大误差时把横摆目标推得过猛。
+inline constexpr float kGyroYawRateRefLimitDps = 200.0f;
+// 横摆率跟踪增益：实际横摆角速度偏离目标越多，就额外补多少差速。
+inline constexpr float kGyroYawRateErrorGain = 1.30f;
+// 横摆率跟踪补偿限幅：防止陀螺仪补偿单独把输出打爆。
+inline constexpr float kGyroCorrectionLimit = 220.0f;
+// 过摆保护触发阈值：车身转得超过它，说明已经开始“发飘”。
+inline constexpr float kGyroOversteerStartDps = 120.0f;
+// 过摆保护增益：超过安全横摆率后，按超出的量反向补偿。
+inline constexpr float kGyroOversteerGain = 1.50f;
+// 过摆保护输出限幅：只做兜底刹摆，不要喧宾夺主。
+inline constexpr float kGyroOversteerLimit = 160.0f;
+// 直道满速判定的横摆率阈值：车身转动小于它时，才认为“姿态稳定可全速”。
+inline constexpr float kGyroStraightStableMaxDps = 45.0f;
+// 紧急抗漂降速触发裕量：实际横摆率比期望再多出这么多，才视为明显过摆。
+inline constexpr float kGyroEmergencySlowdownMarginDps = 25.0f;
+// 紧急抗漂降速从触发到满量程的附加超量范围。
+inline constexpr float kGyroEmergencySlowdownRangeDps = 70.0f;
+// 紧急抗漂降速后的最低速度比例：只在明显甩尾时兜底收速。
+inline constexpr float kGyroEmergencySlowdownMinScale = 0.72f;
 
 // 巡线位置环动态比例项：Kp = base + quad_a * error^2。
 // 使用归一化误差，参数不随分辨率变化。

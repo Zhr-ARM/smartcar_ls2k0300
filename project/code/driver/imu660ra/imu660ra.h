@@ -131,10 +131,28 @@ public:
     Imu660raFloat3 acc_ms2() const;
 
     /**
+     * @brief 获取当前加速度量程系数
+     * @return 每个 raw 对应的加速度，单位 m/s^2
+     */
+    float acc_scale_ms2() const;
+
+    /**
+     * @brief 获取当前角速度量程系数
+     * @return 每个 raw 对应的角速度，单位 rad/s
+     */
+    float gyro_scale_rad_s() const;
+
+    /**
      * @brief 获取当前姿态角
      * @return 欧拉角姿态，单位为度
      */
     Imu660raEuler attitude_deg() const;
+
+    /**
+     * @brief 获取滤波后的 Z 轴角速度
+     * @return Z 轴角速度，单位 deg/s
+     */
+    float filtered_gyro_z_deg_s() const;
 
     /**
      * @brief 获取最近一次初始化或运行错误信息
