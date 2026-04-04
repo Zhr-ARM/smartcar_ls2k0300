@@ -136,6 +136,17 @@ void line_follow_loop()
             control_error *= pid_tuning::line_follow::kErrorLowGain;
         }
 
+        // 动态 Kp：误差越大，比例增益越强。
+        const float error_sq = control_error * control_error;
+        const float dynamic_kp = std::clamp(
+            pid_tuning::line_follow::kDynamicKpBase +
+            pid_tuning::line_follow::kDynamicKpQuadA * error_sq,
+            pid_tuning::line_follow::kDynamicKpMin,
+            pid_tuning::line_follow::kDynamicKpMax);
+        position_pid1.set_params(dynamic_kp,
+                                 pid_tuning::line_follow::kPidKi,
+                                 pid_tuning::line_follow::kPidKd);
+
         // 位置式 PID 输出“差速量”而不是“绝对速度”。
         // 输出越大，说明需要更激烈地拉开左右轮速度差来完成回正。
         float steering_output = position_pid1.compute_by_error(control_error);
@@ -236,7 +247,7 @@ bool line_follow_thread_init()
     g_adjusted_base_speed_state = -1.0f;
 
     // 目标固定为 0：希望赛道中线最终回到图像中心，也就是“小车正对赛道”。
-    position_pid1.init(pid_tuning::line_follow::kPidKp,
+    position_pid1.init(pid_tuning::line_follow::kDynamicKpBase,
                        pid_tuning::line_follow::kPidKi,
                        pid_tuning::line_follow::kPidKd,
                        0.0f,

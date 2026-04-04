@@ -62,8 +62,14 @@ namespace line_follow
 // 视觉误差低通系数：越大越跟当前帧，越小越重视历史趋势。
 inline constexpr float kErrorFilterAlpha = 0.80f;
 
-// 巡线位置环比例项：横向误差一出现就打方向，越大回正越快。
-inline constexpr float kPidKp = 1300.0f; //1200
+// 巡线位置环动态比例项：Kp = base + quad_a * error^2。
+// 使用归一化误差，参数不随分辨率变化。
+inline constexpr float kDynamicKpQuadA = 600.0f;
+// 误差为 0 时的基础 Kp。
+inline constexpr float kDynamicKpBase = 900.0f;
+// 动态 Kp 下限与上限：防止过大过小。
+inline constexpr float kDynamicKpMin = 600.0f;
+inline constexpr float kDynamicKpMax = 2000.0f;
 // 巡线位置环积分项：用于消除长期偏差，当前默认关闭。
 inline constexpr float kPidKi = 0.0f;
 // 巡线位置环微分项：抑制误差变化过快，缓和转向过冲。
