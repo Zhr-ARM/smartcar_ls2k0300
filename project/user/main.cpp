@@ -6,6 +6,7 @@
 #include "line_follow_thread.h"
 #include "vision_thread.h"
 #include "screen_display_thread.h"
+#include "driver/pid/pid_tuning.h"
 #include "driver/vision/vision_assistant_udp.h"
 #include "driver/vision/vision_config.h"
 #include "driver/vision/vision_infer_async.h"
@@ -17,14 +18,17 @@
 
 volatile sig_atomic_t g_should_exit = 0;
 
-void sigint_handler(int signum) 
+namespace
 {
-    (void)signum;
-    g_should_exit = 1;
-}
+bool g_cleanup_done = false;
 
-void cleanup()
+void cleanup_once()
 {
+    if (g_cleanup_done)
+    {
+        return;
+    }
+
     screen_display_thread_cleanup();
     line_follow_thread_cleanup();
     vision_thread_cleanup();
@@ -33,6 +37,38 @@ void cleanup()
     motor_thread_cleanup();
     imu_thread_cleanup();
     uart_thread_cleanup();
+    g_cleanup_done = true;
+}
+
+void stop_all_motion_immediately()
+{
+    // 先把目标清零，避免清线程前还有旧的速度目标继续下发。
+    motor_thread_set_target_count(0.0f, 0.0f);
+    line_follow_thread_set_base_speed(0.0f);
+    brushless_driver.stop_all();
+}
+
+void handle_low_battery_protection()
+{
+    printf("[BATTERY] low voltage triggered=%.2fV threshold=%.2fV -> stopping all control loops\r\n",
+           static_cast<double>(battery_low_voltage_protection_filtered_voltage_v()),
+           static_cast<double>(battery_low_voltage_protection_threshold_v()));
+
+    stop_all_motion_immediately();
+    cleanup_once();
+    battery_low_voltage_protection_run_alarm_loop(&g_should_exit);
+}
+} // namespace
+
+void sigint_handler(int signum) 
+{
+    (void)signum;
+    g_should_exit = 1;
+}
+
+void cleanup()
+{
+    cleanup_once();
 }
 
 int main(int, char**) 
@@ -40,7 +76,14 @@ int main(int, char**)
     // 注册SIGINT信号处理函数
     signal(SIGINT, sigint_handler);
     
-    battery_monitor.init();
+    battery_low_voltage_protection_init();
+
+    if (battery_low_voltage_protection_update())
+    {
+        handle_low_battery_protection();
+        cleanup_once();
+        return 0;
+    }
 
     if (!imu_thread_init())
     {
@@ -97,8 +140,14 @@ int main(int, char**)
         return -1;
     }
 
-    // 视觉线程预热等待，给相机与首帧处理留稳定时间。
-    system_delay_ms(2000);
+    // 利用这 2s 视觉预热窗口同步完成 IMU 静止零偏标定：
+    // 1) 不额外增加总启动时间；
+    // 2) 标定结束后再启动 IMU 后台采集线程，后续按 5ms 周期持续更新并发布 gyro_z。
+    if (!imu_thread_calibrate_and_start(pid_tuning::imu::kStartupCalibrateDurationMs))
+    {
+        cleanup();
+        return -1;
+    }
     if (!line_follow_thread_init())
     {
         cleanup();
@@ -197,11 +246,20 @@ int main(int, char**)
 
     while(!g_should_exit)
     {   
-        battery_monitor.update();
-        system_delay_ms(1000);
+        if (battery_low_voltage_protection_update())
+        {
+            handle_low_battery_protection();
+            break;
+        }
+
+        system_delay_ms(battery_low_voltage_protection_check_period_ms());
     }
 
-    printf("收到Ctrl+C,程序即将退出\n");
-    cleanup();
+    battery_low_voltage_protection_silence_buzzer();
+    if (g_should_exit)
+    {
+        printf("收到Ctrl+C,程序即将退出\n");
+    }
+    cleanup_once();
     return 0;
 }

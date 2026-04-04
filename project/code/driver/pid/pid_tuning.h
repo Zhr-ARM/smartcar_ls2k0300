@@ -12,8 +12,12 @@ namespace pid_tuning
 {
 namespace imu
 {
-// IMU 启动零偏标定样本数：线程启动前静止采样这些点，估计 gyro_z 零偏。
-inline constexpr int32 kGyroBiasSampleCount = 80;
+// IMU 启动零偏标定时长：利用主程序启动阶段的静止窗口估计 gyro_z 零偏。
+inline constexpr int32 kStartupCalibrateDurationMs = 2000;
+// gyro_z 方向校正：若接入后“越抗漂越甩”，优先把它从 1 改成 -1。
+inline constexpr float kGyroYawRateSign = 1.0f;
+// 巡线线程内对横摆角速度再做一层轻滤波，抑制偶发抖动。
+inline constexpr float kGyroYawRateFilterAlpha = 0.30f;
 } // namespace imu
 
 namespace motor_speed
@@ -63,38 +67,8 @@ inline constexpr int32 kFeedbackAverageWindow = 2;
 inline constexpr float kFeedbackLowPassAlpha = 0.80f;
 } // namespace motor_speed
 
-namespace line_follow
+namespace position_loop
 {
-// 视觉误差低通系数：越大越跟当前帧，越小越重视历史趋势。
-inline constexpr float kErrorFilterAlpha = 0.80f;
-
-// gyro_z 方向校正：若接入后“越抗漂越甩”，优先把它从 1 改成 -1。
-inline constexpr float kGyroYawRateSign = 1.0f;
-// 巡线线程内对横摆角速度再做一层轻滤波，抑制偶发抖动。
-inline constexpr float kGyroYawRateFilterAlpha = 0.30f;
-// 把视觉差速输出映射成期望横摆角速度：差速越大，允许车身转得越快。
-inline constexpr float kGyroYawRateRefGain = 0.15f;
-// 期望横摆角速度上限，避免视觉大误差时把横摆目标推得过猛。
-inline constexpr float kGyroYawRateRefLimitDps = 200.0f;
-// 横摆率跟踪增益：实际横摆角速度偏离目标越多，就额外补多少差速。
-inline constexpr float kGyroYawRateErrorGain = 1.30f;
-// 横摆率跟踪补偿限幅：防止陀螺仪补偿单独把输出打爆。
-inline constexpr float kGyroCorrectionLimit = 220.0f;
-// 过摆保护触发阈值：车身转得超过它，说明已经开始“发飘”。
-inline constexpr float kGyroOversteerStartDps = 120.0f;
-// 过摆保护增益：超过安全横摆率后，按超出的量反向补偿。
-inline constexpr float kGyroOversteerGain = 1.50f;
-// 过摆保护输出限幅：只做兜底刹摆，不要喧宾夺主。
-inline constexpr float kGyroOversteerLimit = 160.0f;
-// 直道满速判定的横摆率阈值：车身转动小于它时，才认为“姿态稳定可全速”。
-inline constexpr float kGyroStraightStableMaxDps = 45.0f;
-// 紧急抗漂降速触发裕量：实际横摆率比期望再多出这么多，才视为明显过摆。
-inline constexpr float kGyroEmergencySlowdownMarginDps = 25.0f;
-// 紧急抗漂降速从触发到满量程的附加超量范围。
-inline constexpr float kGyroEmergencySlowdownRangeDps = 70.0f;
-// 紧急抗漂降速后的最低速度比例：只在明显甩尾时兜底收速。
-inline constexpr float kGyroEmergencySlowdownMinScale = 0.72f;
-
 // 巡线位置环动态比例项：Kp = base + quad_a * error^2。
 // 使用归一化误差，参数不随分辨率变化。
 inline constexpr float kDynamicKpQuadA = 600.0f;
@@ -104,11 +78,41 @@ inline constexpr float kDynamicKpBase = 900.0f;
 inline constexpr float kDynamicKpMin = 600.0f;
 inline constexpr float kDynamicKpMax = 2000.0f;
 // 巡线位置环积分项：用于消除长期偏差，当前默认关闭。
-inline constexpr float kPidKi = 0.0f;
+inline constexpr float kKi = 0.0f;
 // 巡线位置环微分项：抑制误差变化过快，缓和转向过冲。
-inline constexpr float kPidKd = 920.0f; //800
+inline constexpr float kKd = 920.0f; //800
 // 巡线位置环输出限幅：限制最终差速大小，避免大舵过猛。
-inline constexpr float kPidMaxOutput = 1250.0f;
+inline constexpr float kMaxOutput = 1250.0f;
+} // namespace position_loop
+
+namespace yaw_rate_loop
+{
+// 视觉曲率滤波系数：让目标角速度更多跟随赛道整体趋势，而不是单帧角点毛刺。
+inline constexpr float kVisualCurvatureFilterAlpha = 0.25f;
+// 视觉误差 -> 目标横摆角速度的映射增益。
+// 误差越大，给角速度环的“该转多快”目标就越大。
+inline constexpr float kRefFromErrorGainDps = 180.0f;
+// 视觉曲率 -> 目标横摆角速度的映射增益。
+// 这个量负责“提前量”，赛道曲率越大，越提前给出转向速度目标。
+inline constexpr float kRefFromCurvatureGainDps = 1600.0f;
+// 目标横摆角速度上限，避免视觉异常时把角速度目标推得过猛。
+inline constexpr float kRefLimitDps = 220.0f;
+
+// 角速度环建议保持“位置式 PID”：
+// 1) 它本身就是并级支路，直接输出一份差速量，位置式更直观；
+// 2) IMU 信号更新快，位置式更容易和输出限幅、积分限幅配合；
+// 3) 增量式更适合底层执行器或占空比直接调节，这里不是那个层级。
+inline constexpr float kKp = 1.30f;
+inline constexpr float kKi = 0.0f;
+inline constexpr float kKd = 0.0f;
+inline constexpr float kMaxIntegral = 0.0f;
+inline constexpr float kMaxOutput = 260.0f;
+} // namespace yaw_rate_loop
+
+namespace line_follow
+{
+// 视觉误差低通系数：越大越跟当前帧，越小越重视历史趋势。
+inline constexpr float kErrorFilterAlpha = 0.80f;
 
 // 左右轮目标最小值：允许轻微反转，方便大误差时快速拧回车头。
 inline constexpr float kTargetCountMin = -400.0f;

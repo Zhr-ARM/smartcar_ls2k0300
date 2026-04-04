@@ -6,15 +6,17 @@
 
 /**
  * @brief 初始化 IMU 数据采集线程
+ * 作用：完成 IMU 设备探测和驱动就绪，但不启动后台采集线程
  * @return 初始化成功返回 true，失败返回 false
  */
 bool imu_thread_init();
 
 /**
- * @brief 获取当前姿态角
- * @return 当前欧拉角，单位为度
+ * @brief 在指定时长内完成陀螺仪零偏标定，并启动后台采集线程
+ * @param calibrate_duration_ms 标定时长，单位 ms
+ * @return 标定并启动成功返回 true，失败返回 false
  */
-Imu660raEuler imu_thread_attitude_deg();
+bool imu_thread_calibrate_and_start(int32 calibrate_duration_ms);
 
 /**
  * @brief 获取当前滤波并去零偏后的 Z 轴角速度

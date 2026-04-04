@@ -1,5 +1,45 @@
 #include "battery.h"
 
+namespace
+{
+// 参考逐飞蜂鸣器例程：低电平点亮蜂鸣器，高电平关闭蜂鸣器。
+constexpr const char *kBatteryBeepDevicePath = "/dev/zf_driver_gpio_beep";
+constexpr float kBatteryLowVoltageThresholdV = 11.3f;
+constexpr float kBatteryVoltageFilterAlpha = 0.35f;
+constexpr int kBatteryLowVoltageConfirmCount = 3;
+constexpr int kBatteryCheckPeriodMs =1000;
+constexpr int kBatteryStatusPrintPeriodMs = 2000;
+
+float g_filtered_battery_voltage_v = 0.0f;
+bool g_battery_filter_initialized = false;
+int g_low_voltage_confirm_count = 0;
+bool g_low_voltage_latched = false;
+
+void battery_buzzer_set_enabled(bool enabled)
+{
+    gpio_set_level(kBatteryBeepDevicePath, enabled ? 0x0 : 0x1);
+}
+
+bool battery_exit_requested(volatile sig_atomic_t *exit_flag)
+{
+    return (nullptr != exit_flag) && (0 != *exit_flag);
+}
+
+bool battery_alarm_delay_ms(int total_ms, volatile sig_atomic_t *exit_flag)
+{
+    constexpr int kSliceMs = 20;
+    int elapsed_ms = 0;
+    while (!battery_exit_requested(exit_flag) && (elapsed_ms < total_ms))
+    {
+        const int remain_ms = total_ms - elapsed_ms;
+        const int step_ms = (remain_ms < kSliceMs) ? remain_ms : kSliceMs;
+        system_delay_ms(step_ms);
+        elapsed_ms += step_ms;
+    }
+    return !battery_exit_requested(exit_flag);
+}
+} // namespace
+
 /**
  * @brief 构造电池监测对象
  * @param adc_reg_path ADC 原始值节点路径
@@ -88,3 +128,121 @@ uint32 BatteryMonitor::calculate_voltage_mv(uint16 adc_raw, float adc_scale) con
 }
 
 BatteryMonitor battery_monitor(BATTERY_ADC_REG_PATH, BATTERY_ADC_SCALE_PATH, BATTERY_VOLTAGE_DIVIDER_RATIO);
+
+void battery_low_voltage_protection_init()
+{
+    battery_monitor.init();
+    g_filtered_battery_voltage_v = battery_monitor.voltage_v();
+    g_battery_filter_initialized = true;
+    g_low_voltage_latched = (g_filtered_battery_voltage_v < kBatteryLowVoltageThresholdV);
+    g_low_voltage_confirm_count = g_low_voltage_latched ? kBatteryLowVoltageConfirmCount : 0;
+    battery_buzzer_set_enabled(false);
+}
+
+bool battery_low_voltage_protection_update()
+{
+    battery_monitor.update();
+
+    const float raw_battery_voltage_v = battery_monitor.voltage_v();
+    if (!g_battery_filter_initialized)
+    {
+        g_filtered_battery_voltage_v = raw_battery_voltage_v;
+        g_battery_filter_initialized = true;
+    }
+    else
+    {
+        g_filtered_battery_voltage_v =
+            g_filtered_battery_voltage_v * (1.0f - kBatteryVoltageFilterAlpha) +
+            raw_battery_voltage_v * kBatteryVoltageFilterAlpha;
+    }
+
+    if (g_filtered_battery_voltage_v < kBatteryLowVoltageThresholdV)
+    {
+        ++g_low_voltage_confirm_count;
+    }
+    else
+    {
+        g_low_voltage_confirm_count = 0;
+    }
+
+    if (g_low_voltage_confirm_count >= kBatteryLowVoltageConfirmCount)
+    {
+        g_low_voltage_latched = true;
+    }
+
+    return g_low_voltage_latched;
+}
+
+bool battery_low_voltage_protection_latched()
+{
+    return g_low_voltage_latched;
+}
+
+float battery_low_voltage_protection_filtered_voltage_v()
+{
+    return g_filtered_battery_voltage_v;
+}
+
+float battery_low_voltage_protection_threshold_v()
+{
+    return kBatteryLowVoltageThresholdV;
+}
+
+int battery_low_voltage_protection_check_period_ms()
+{
+    return kBatteryCheckPeriodMs;
+}
+
+void battery_low_voltage_protection_silence_buzzer()
+{
+    battery_buzzer_set_enabled(false);
+}
+
+void battery_low_voltage_protection_run_alarm_loop(volatile sig_atomic_t *exit_flag)
+{
+    int elapsed_since_print_ms = kBatteryStatusPrintPeriodMs;
+
+    while (!battery_exit_requested(exit_flag))
+    {
+        battery_monitor.update();
+        const float current_voltage_v = battery_monitor.voltage_v();
+
+        if (elapsed_since_print_ms >= kBatteryStatusPrintPeriodMs)
+        {
+            printf("[BATTERY] protection latched voltage=%.2fV, buzzer alarm active\r\n",
+                   static_cast<double>(current_voltage_v));
+            elapsed_since_print_ms = 0;
+        }
+
+        // 报警节奏：三声短鸣，再停顿一下，便于听觉上明显区分“低压告警”。
+        for (int i = 0; (i < 3) && !battery_exit_requested(exit_flag); ++i)
+        {
+            battery_buzzer_set_enabled(true);
+            if (!battery_alarm_delay_ms(140, exit_flag))
+            {
+                break;
+            }
+
+            battery_buzzer_set_enabled(false);
+            if (!battery_alarm_delay_ms(120, exit_flag))
+            {
+                break;
+            }
+
+            elapsed_since_print_ms += 260;
+        }
+
+        if (battery_exit_requested(exit_flag))
+        {
+            break;
+        }
+
+        if (!battery_alarm_delay_ms(700, exit_flag))
+        {
+            break;
+        }
+        elapsed_since_print_ms += 700;
+    }
+
+    battery_buzzer_set_enabled(false);
+}

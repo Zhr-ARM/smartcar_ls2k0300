@@ -3283,9 +3283,9 @@ int vision_image_processor_ipm_centerline_curvature_step()
 
 void vision_image_processor_get_ipm_selected_centerline_curvature(const float **curvature, int *count)
 {
-    // 按需求：中线曲率图数据源暂时置空。
-    if (curvature) *curvature = nullptr;
-    if (count) *count = 0;
+    // 当前返回 line_error 实际选中的那条 IPM 中线曲率序列，
+    // 供控制层用来生成“来自视觉的目标横摆角速度”。
+    vision_line_error_layer_get_selected_centerline_curvature(curvature, count);
 }
 
 void vision_image_processor_get_ipm_left_boundary_curvature(const float **curvature, int *count)

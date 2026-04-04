@@ -35,6 +35,8 @@ std::atomic<float> g_turn_output(0.0f);
 float g_filtered_error = 0.0f;
 // 滤波后的横摆角速度状态：把 IMU 的瞬时抖动再收一层，减轻差速来回抽动。
 float g_filtered_yaw_rate_dps = 0.0f;
+// 滤波后的赛道曲率：由视觉路径给出，用来生成“该转多快”的目标横摆角速度。
+float g_filtered_path_curvature = 0.0f;
 // 误差降速后的基础速度状态：把“理想基础速度”做成缓增缓降，避免一帧一跳。
 float g_adjusted_base_speed_state = -1.0f;
 
@@ -83,8 +85,8 @@ void refresh_thread_info()
  * 1) 视觉模块先给出采样行处的赛道中线偏差 line_error（像素）；
  * 2) 巡线线程统一方向约定，并把误差归一化、限幅；
  * 3) 通过低通滤波、死区、小误差降增益把视觉噪声整形成“可控误差”；
- * 4) 位置环 PID 把横向误差变成转向差速；
- * 5) 再叠加基础速度，并在大弯时主动降速，最终下发左右轮目标转速。
+ * 4) 位置环 PID 负责“回中线”，角速度环 PID 负责“按视觉期望横摆率转过去”；
+ * 5) 两个环并级叠加成最终差速，再叠加基础速度与视觉弯道降速后下发左右轮目标。
  */
 void line_follow_loop()
 {
@@ -104,11 +106,10 @@ void line_follow_loop()
         const float current_base_speed = g_base_speed.load(); // 当前设定的基础巡航速度
         // 约定正号与 steering_output 同向：正值表示车体正朝“左修正”方向旋转。
         const float measured_yaw_rate_dps = // 测量得到的当前横摆角速度(度/每秒)
-            imu_thread_gyro_z_dps() * pid_tuning::line_follow::kGyroYawRateSign;
+            imu_thread_gyro_z_dps() * pid_tuning::imu::kGyroYawRateSign;
         g_filtered_yaw_rate_dps =
-            g_filtered_yaw_rate_dps * (1.0f - pid_tuning::line_follow::kGyroYawRateFilterAlpha) +
-            measured_yaw_rate_dps * pid_tuning::line_follow::kGyroYawRateFilterAlpha;
-        const float abs_yaw_rate_dps = std::fabs(g_filtered_yaw_rate_dps); // 滤波后横摆角速度的绝对值
+            g_filtered_yaw_rate_dps * (1.0f - pid_tuning::imu::kGyroYawRateFilterAlpha) +
+            measured_yaw_rate_dps * pid_tuning::imu::kGyroYawRateFilterAlpha;
 
         // 偏差来源固定使用 line_error（方案A）。
         const float selected_offset_error = static_cast<float>(line_error); // 选定的赛道偏置误差(像素)
@@ -146,68 +147,83 @@ void line_follow_loop()
             control_error *= pid_tuning::line_follow::kErrorLowGain;
         }
 
+        // 额外从视觉处理中读取“当前被 line_error 选中的那条中线曲率”。
+        // 这样目标角速度就不再从位置环输出反推，而是直接由视觉路径本身给出。
+        const float *selected_centerline_curvature = nullptr;
+        int selected_curvature_count = 0;
+        vision_image_processor_get_ipm_selected_centerline_curvature(&selected_centerline_curvature,
+                                                                     &selected_curvature_count);
+        const int track_index = vision_image_processor_ipm_line_error_track_index();
+        float current_path_curvature = 0.0f; // 当前跟踪点对应的视觉曲率，正负表示左右弯方向
+        if ((nullptr != selected_centerline_curvature) &&
+            (0 <= track_index) &&
+            (track_index < selected_curvature_count))
+        {
+            current_path_curvature = selected_centerline_curvature[track_index];
+        }
+        g_filtered_path_curvature =
+            g_filtered_path_curvature * (1.0f - pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha) +
+            current_path_curvature * pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha;
+
         // 动态 Kp：误差越大，比例增益越强。
         const float error_sq = control_error * control_error; // 控制误差的平方，用于计算动态Kp
         const float dynamic_kp = std::clamp( // 计算得到的本次动态比例增益系数
-            pid_tuning::line_follow::kDynamicKpBase +
-            pid_tuning::line_follow::kDynamicKpQuadA * error_sq,
-            pid_tuning::line_follow::kDynamicKpMin,
-            pid_tuning::line_follow::kDynamicKpMax);
+            pid_tuning::position_loop::kDynamicKpBase +
+            pid_tuning::position_loop::kDynamicKpQuadA * error_sq,
+            pid_tuning::position_loop::kDynamicKpMin,
+            pid_tuning::position_loop::kDynamicKpMax);
         position_pid1.set_params(dynamic_kp,
-                                 pid_tuning::line_follow::kPidKi,
-                                 pid_tuning::line_follow::kPidKd);
+                                 pid_tuning::position_loop::kKi,
+                                 pid_tuning::position_loop::kKd);
 
-        // 位置式 PID 输出“差速量”而不是“绝对速度”。
-        // 输出越大，说明需要更激烈地拉开左右轮速度差来完成回正。
-        float steering_output = position_pid1.compute_by_error(control_error); // PID计算得出的基础转向差速输出量
-        steering_output = std::clamp(steering_output,
-                                     -pid_tuning::line_follow::kPidMaxOutput,
-                                     pid_tuning::line_follow::kPidMaxOutput);
+        // ---------------- 并级控制核心 ----------------
+        // 第一条支路：位置环 PID，只负责“把车拉回中线”。
+        // 它盯的是横向误差 e，输出一份差速量。
+        const float position_output = std::clamp(
+            position_pid1.compute_by_error(control_error),
+            -pid_tuning::position_loop::kMaxOutput,
+            pid_tuning::position_loop::kMaxOutput);
 
-        // 视觉位置环先决定“该往哪边修、修多猛”，再把它映射成期望横摆角速度。
-        // 如果实际横摆率已经超过视觉希望的水平，就主动收舵/反打，抑制甩尾和过摆。
-        const float yaw_rate_ref_dps = std::clamp( // 期望的横摆角速度(由转向输出量按增益映射)
-            steering_output * pid_tuning::line_follow::kGyroYawRateRefGain,
-            -pid_tuning::line_follow::kGyroYawRateRefLimitDps,
-            pid_tuning::line_follow::kGyroYawRateRefLimitDps);
-        const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 横摆角速度偏差(期望值与实际滤波值之差)
-        const float gyro_tracking_output = std::clamp( // 陀螺仪横摆角速度跟踪补偿计算得出的转向附加量
-            yaw_rate_error_dps * pid_tuning::line_follow::kGyroYawRateErrorGain,
-            -pid_tuning::line_follow::kGyroCorrectionLimit,
-            pid_tuning::line_follow::kGyroCorrectionLimit);
+        // 第二条支路：角速度环 PID。
+        // 目标横摆角速度 r_ref 直接由视觉给出：
+        // 1) 视觉误差越大，说明应该更快地把车头拧回去；
+        // 2) 视觉曲率越大，说明前方弯更急，需要更早建立横摆速度。
+        // 这里继续采用“位置式 PID”，因为角速度环输出的是一份独立差速量，
+        // 直接限幅、直接和位置环并加，调试和观察都会比增量式更直接。
+        const float yaw_rate_ref_dps = std::clamp(
+            control_error * pid_tuning::yaw_rate_loop::kRefFromErrorGainDps +
+            g_filtered_path_curvature * pid_tuning::yaw_rate_loop::kRefFromCurvatureGainDps,
+            -pid_tuning::yaw_rate_loop::kRefLimitDps,
+            pid_tuning::yaw_rate_loop::kRefLimitDps);
+        const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 目标角速度与实际角速度之差
+        position_pid2.set_params(pid_tuning::yaw_rate_loop::kKp,
+                                 pid_tuning::yaw_rate_loop::kKi,
+                                 pid_tuning::yaw_rate_loop::kKd);
+        const float yaw_rate_output = std::clamp(
+            position_pid2.compute_by_error(yaw_rate_error_dps),
+            -pid_tuning::yaw_rate_loop::kMaxOutput,
+            pid_tuning::yaw_rate_loop::kMaxOutput);
 
-        float gyro_oversteer_output = 0.0f; // 陀螺仪检测到过摆时的反打收舵补偿量
-        const bool yaw_same_direction_as_command = // 判断当前横摆方向是否与控制指令方向一致
-            ((0.0f < g_filtered_yaw_rate_dps) && (0.0f < steering_output)) ||
-            ((0.0f > g_filtered_yaw_rate_dps) && (0.0f > steering_output));
-        if ((abs_yaw_rate_dps > pid_tuning::line_follow::kGyroOversteerStartDps) &&
-            yaw_same_direction_as_command)
-        {
-            const float oversteer_excess_dps = // 超过过摆横摆角速度阈值的多余部分
-                abs_yaw_rate_dps - pid_tuning::line_follow::kGyroOversteerStartDps;
-            gyro_oversteer_output = -std::copysign(
-                std::min(oversteer_excess_dps * pid_tuning::line_follow::kGyroOversteerGain,
-                         pid_tuning::line_follow::kGyroOversteerLimit),
-                g_filtered_yaw_rate_dps);
-        }
-
-        steering_output = std::clamp(steering_output + gyro_tracking_output + gyro_oversteer_output,
-                                     -pid_tuning::line_follow::kPidMaxOutput,
-                                     pid_tuning::line_follow::kPidMaxOutput);
+        // 并级的意思，就是两条支路独立算完后再直接相加：
+        // - position_output 管“位置偏了多少”；
+        // - yaw_rate_output 管“车身现在转得对不对”。
+        float steering_output = std::clamp(position_output + yaw_rate_output,
+                                           -pid_tuning::position_loop::kMaxOutput,
+                                           pid_tuning::position_loop::kMaxOutput);
 
         float desired_base_speed = current_base_speed; // 期望的目标基础速度(可能会经过弯道降速处理)
         bool force_full_speed = false; // 是否强制满速(即车身状态良好处于直道)的标志位
         const float mean_abs_path_error = vision_image_processor_ipm_mean_abs_offset_error(); // 视觉给出的整条分析路径平均绝对偏差像素
-        // 若整条路径绝对偏差均值很小且车身横摆也稳定，认为处于直道，可直接给满基础速度。
-        if ((mean_abs_path_error < 2.0f) &&
-            (abs_yaw_rate_dps < pid_tuning::line_follow::kGyroStraightStableMaxDps))
+        // 当前版本把“陀螺仪降速”整体拿掉，只保留视觉负责速度规划。
+        // 若整条路径绝对偏差均值很小，认为处于稳定直道，可直接给满基础速度。
+        if (mean_abs_path_error < 2.0f)
         {
             desired_base_speed = current_base_speed;
             force_full_speed = true;
         }
         // 大弯主动降基础速度：
         // 如果还按直道速度冲，内外轮目标会跳得很大，速度环很容易跟不上，车体就会发飘。
-        // 正常情况下只由视觉误差负责弯道降速；陀螺仪降速仅在“明显过摆”时兜底触发。
+        // 这里刻意只保留视觉降速：速度慢一点由视觉决定，姿态稳不稳交给角速度环去控。
         if (!force_full_speed)
         {
             float vision_speed_scale = 1.0f; // 基于视觉误差计算出的弯道降速缩放比例(0~1)
@@ -222,25 +238,7 @@ void line_follow_loop()
                     1.0f - slowdown_ratio * (1.0f - pid_tuning::line_follow::kTurnMinSpeedScale);
             }
 
-            float speed_scale = vision_speed_scale; // 综合降速比例(包含了视觉和陀螺仪的限制)
-            const float emergency_slowdown_start_dps = std::max( // 紧急降速的陀螺仪角速度有效触发阈值
-                pid_tuning::line_follow::kGyroOversteerStartDps,
-                std::fabs(yaw_rate_ref_dps) + pid_tuning::line_follow::kGyroEmergencySlowdownMarginDps);
-            if (yaw_same_direction_as_command &&
-                (abs_yaw_rate_dps > emergency_slowdown_start_dps))
-            {
-                const float emergency_slowdown_ratio = std::clamp( // 陀螺仪过大引起的紧急降速进度系数比率(0~1)
-                    (abs_yaw_rate_dps - emergency_slowdown_start_dps) /
-                    pid_tuning::line_follow::kGyroEmergencySlowdownRangeDps,
-                    0.0f,
-                    1.0f);
-                const float gyro_emergency_speed_scale = // 陀螺仪严重过摆时要求的基础速度降速缩放比例
-                    1.0f - emergency_slowdown_ratio *
-                    (1.0f - pid_tuning::line_follow::kGyroEmergencySlowdownMinScale);
-                speed_scale = std::min(speed_scale, gyro_emergency_speed_scale);
-            }
-
-            desired_base_speed = current_base_speed * speed_scale;
+            desired_base_speed = current_base_speed * vision_speed_scale;
         }
 
         if (g_adjusted_base_speed_state < 0.0f)
@@ -308,15 +306,25 @@ bool line_follow_thread_init()
     g_turn_output.store(0.0f);
     g_filtered_error = 0.0f;
     g_filtered_yaw_rate_dps = 0.0f;
+    g_filtered_path_curvature = 0.0f;
     g_adjusted_base_speed_state = -1.0f;
 
-    // 目标固定为 0：希望赛道中线最终回到图像中心，也就是“小车正对赛道”。
-    position_pid1.init(pid_tuning::line_follow::kDynamicKpBase,
-                       pid_tuning::line_follow::kPidKi,
-                       pid_tuning::line_follow::kPidKd,
+    // 位置环：目标固定为 0，表示希望赛道中线最终回到图像中心。
+    position_pid1.init(pid_tuning::position_loop::kDynamicKpBase,
+                       pid_tuning::position_loop::kKi,
+                       pid_tuning::position_loop::kKd,
                        0.0f,
-                       pid_tuning::line_follow::kPidMaxOutput);
+                       pid_tuning::position_loop::kMaxOutput);
     position_pid1.set_target(0.0f);
+    // 角速度环：同样目标为 0，但真正计算时使用的是 compute_by_error(r_ref - r)。
+    // 这里明确采用位置式 PID，把“目标角速度和实际角速度的差”直接变成一份差速补偿量。
+    // 这样更符合它作为并级支路的角色，也更方便你后面直接看输出大小来调参。
+    position_pid2.init(pid_tuning::yaw_rate_loop::kKp,
+                       pid_tuning::yaw_rate_loop::kKi,
+                       pid_tuning::yaw_rate_loop::kKd,
+                       pid_tuning::yaw_rate_loop::kMaxIntegral,
+                       pid_tuning::yaw_rate_loop::kMaxOutput);
+    position_pid2.set_target(0.0f);
 
     g_line_follow_running = true;
     g_line_follow_thread = std::thread(line_follow_loop);
@@ -340,10 +348,12 @@ void line_follow_thread_cleanup()
 
     // 清掉 PID 和滤波残留，避免下次启动时把上一次的“方向记忆”带进来。
     position_pid1.reset();
+    position_pid2.reset();
     g_line_error_px.store(0.0f);
     g_turn_output.store(0.0f);
     g_filtered_error = 0.0f;
     g_filtered_yaw_rate_dps = 0.0f;
+    g_filtered_path_curvature = 0.0f;
     g_adjusted_base_speed_state = -1.0f;
 }
 
