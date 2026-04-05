@@ -32,15 +32,22 @@ std::atomic<float> g_turn_output(0.0f);
 
 // 滤波后的归一化误差状态，跨周期保留。
 // 这里刻意保留“状态记忆”，因为巡线不是单次运算，而是连续控制。
+// 注意：状态只在“拿到新视觉帧”时推进一次，不会在 1ms 空循环里重复吃旧帧。
 float g_filtered_error = 0.0f;
 // 滤波后的横摆角速度状态：把 IMU 的瞬时抖动再收一层，减轻差速来回抽动。
+// 注意：状态只在“拿到新 IMU 样本”时推进一次。
 float g_filtered_yaw_rate_dps = 0.0f;
 // 滤波后的赛道曲率：由视觉路径给出，用来生成“该转多快”的目标横摆角速度。
+// 注意：状态只在“拿到新视觉帧”时推进一次。
 float g_filtered_path_curvature = 0.0f;
 // 滤波后的目标点夹角：由跟踪点相对图像中垂线的偏转角得到。
+// 注意：状态只在“拿到新视觉帧”时推进一次。
 float g_filtered_track_point_angle_deg = 0.0f;
 // 误差降速后的基础速度状态：把“理想基础速度”做成缓增缓降，避免一帧一跳。
 float g_adjusted_base_speed_state = -1.0f;
+// 最近一次已消费的 IMU / 视觉样本序号。
+uint32 g_last_imu_sample_seq = 0;
+uint32 g_last_vision_frame_seq = 0;
 
 const char *sched_policy_name(int32 policy)
 {
@@ -73,6 +80,78 @@ float compute_signed_track_point_angle_deg(bool track_valid, int track_x, int tr
     return angle_rad * (180.0f / 3.1415926f);
 }
 
+void update_filtered_yaw_rate_if_new_sample()
+{
+    const uint32 imu_sample_seq = imu_thread_gyro_z_sample_seq();
+    if (imu_sample_seq == g_last_imu_sample_seq)
+    {
+        return;
+    }
+    g_last_imu_sample_seq = imu_sample_seq;
+
+    const float measured_yaw_rate_dps =
+        imu_thread_gyro_z_dps() * pid_tuning::imu::kGyroYawRateSign;
+    g_filtered_yaw_rate_dps =
+        g_filtered_yaw_rate_dps * (1.0f - pid_tuning::imu::kGyroYawRateFilterAlpha) +
+        measured_yaw_rate_dps * pid_tuning::imu::kGyroYawRateFilterAlpha;
+}
+
+void update_filtered_vision_inputs_if_new_frame()
+{
+    const uint32 vision_frame_seq = vision_image_processor_processed_frame_seq();
+    if (vision_frame_seq == g_last_vision_frame_seq)
+    {
+        return;
+    }
+    g_last_vision_frame_seq = vision_frame_seq;
+
+    // 偏差来源固定使用 line_error（方案A）。
+    const float selected_offset_error = static_cast<float>(line_error);
+    // 方向约定：正偏差表示中线偏右（x_ref右侧），与控制器内部正方向相反，统一取负。
+    const float raw_error_px = -selected_offset_error;
+    g_line_error_px.store(raw_error_px);
+
+    // 以半幅宽度归一化到近似[-1,1]范围，并对异常值做保护限幅。
+    // 这样 PID 参数可以脱离具体分辨率，后续改摄像头宽度时更容易复用。
+    const float normalized_error = std::clamp(
+        raw_error_px / ((float)VISION_DOWNSAMPLED_WIDTH * 0.5f),
+        -pid_tuning::line_follow::kNormalizedErrorLimit,
+        pid_tuning::line_follow::kNormalizedErrorLimit);
+
+    // 一阶 IIR 滤波只在“新视觉帧到来”时推进一次，避免在 1ms 循环里对旧帧重复滤波。
+    g_filtered_error =
+        g_filtered_error * (1.0f - pid_tuning::line_follow::kErrorFilterAlpha) +
+        normalized_error * pid_tuning::line_follow::kErrorFilterAlpha;
+
+    // 额外从视觉处理中读取“当前被 line_error 选中的那条中线曲率”。
+    // 这样目标角速度就不再从位置环输出反推，而是直接由视觉路径本身给出。
+    const float *selected_centerline_curvature = nullptr;
+    int selected_curvature_count = 0;
+    vision_image_processor_get_ipm_selected_centerline_curvature(&selected_centerline_curvature,
+                                                                 &selected_curvature_count);
+    const int track_index = vision_image_processor_ipm_line_error_track_index();
+    float current_path_curvature = 0.0f;
+    if ((nullptr != selected_centerline_curvature) &&
+        (0 <= track_index) &&
+        (track_index < selected_curvature_count))
+    {
+        current_path_curvature = selected_centerline_curvature[track_index];
+    }
+    g_filtered_path_curvature =
+        g_filtered_path_curvature * (1.0f - pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha) +
+        current_path_curvature * pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha;
+
+    bool track_point_valid = false;
+    int track_point_x = 0;
+    int track_point_y = 0;
+    vision_image_processor_get_ipm_line_error_track_point(&track_point_valid, &track_point_x, &track_point_y);
+    const float current_track_point_angle_deg =
+        compute_signed_track_point_angle_deg(track_point_valid, track_point_x, track_point_y);
+    g_filtered_track_point_angle_deg =
+        g_filtered_track_point_angle_deg * (1.0f - pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha) +
+        current_track_point_angle_deg * pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha;
+}
+
 void refresh_thread_info()
 {
     int policy = 0; // 获取到的当前线程调度策略
@@ -99,8 +178,8 @@ void refresh_thread_info()
  *
  * 控制链路：
  * 1) 视觉模块先给出采样行处的赛道中线偏差 line_error（像素）；
- * 2) 巡线线程统一方向约定，并把误差归一化、限幅；
- * 3) 通过低通滤波、死区、小误差降增益把视觉噪声整形成“可控误差”；
+ * 2) 巡线线程只在“拿到新视觉帧 / 新 IMU 样本”时推进各自滤波状态；
+ * 3) 再统一方向约定，并通过归一化、死区、小误差降增益把视觉噪声整形成“可控误差”；
  * 4) 位置环 PID 负责“回中线”，角速度环 PID 负责“按视觉期望横摆率转过去”；
  * 5) 两个环并级叠加成最终差速，再叠加基础速度与视觉弯道降速后下发左右轮目标。
  */
@@ -120,31 +199,10 @@ void line_follow_loop()
         // base_speed 相当于“直道巡航速度”。
         // 真正送到电机线程的值，还会被后面的弯道降速逻辑二次修正。
         const float current_base_speed = g_base_speed.load(); // 当前设定的基础巡航速度
-        // 约定正号与 steering_output 同向：正值表示车体正朝“左修正”方向旋转。
-        const float measured_yaw_rate_dps = // 测量得到的当前横摆角速度(度/每秒)
-            imu_thread_gyro_z_dps() * pid_tuning::imu::kGyroYawRateSign;
-        g_filtered_yaw_rate_dps =
-            g_filtered_yaw_rate_dps * (1.0f - pid_tuning::imu::kGyroYawRateFilterAlpha) +
-            measured_yaw_rate_dps * pid_tuning::imu::kGyroYawRateFilterAlpha;
-
-        // 偏差来源固定使用 line_error（方案A）。
-        const float selected_offset_error = static_cast<float>(line_error); // 选定的赛道偏置误差(像素)
-
-        // 方向约定：正偏差表示中线偏右（x_ref右侧），与控制器内部正方向相反，统一取负。
-        const float raw_error_px = -selected_offset_error; // 统一方向后的原始偏差像素值(正表示偏右)
-
-        // 以半幅宽度归一化到近似[-1,1]范围，并对异常值做保护限幅。
-        // 这样 PID 参数可以脱离具体分辨率，后续改摄像头宽度时更容易复用。
-        const float normalized_error = std::clamp( // 归一化后的中心偏差，范围近似[-1, 1]
-            raw_error_px / ((float)VISION_DOWNSAMPLED_WIDTH * 0.5f),
-            -pid_tuning::line_follow::kNormalizedErrorLimit,
-            pid_tuning::line_follow::kNormalizedErrorLimit);
-
-        // 一阶 IIR 滤波：抑制视觉噪声，避免转向输出高频抖动。
-        // 这一步相当于告诉控制器：“相信趋势，不要被单帧跳动牵着走”。
-        g_filtered_error =
-            g_filtered_error * (1.0f - pid_tuning::line_follow::kErrorFilterAlpha) +
-            normalized_error * pid_tuning::line_follow::kErrorFilterAlpha;
+        // 这些滤波器只在“数据源真的更新了”时推进一次；
+        // 若当前 1ms 周期只是重复读到旧样本，就沿用上一份滤波状态，避免 alpha 被空转放大。
+        update_filtered_yaw_rate_if_new_sample();
+        update_filtered_vision_inputs_if_new_frame();
 
         // 后面的 deadzone / 小误差降增益继续使用像素尺度判断，
         // 是为了让阈值更直观，便于你结合画面观察实际偏差量。
@@ -162,34 +220,6 @@ void line_follow_loop()
         {
             control_error *= pid_tuning::line_follow::kErrorLowGain;
         }
-
-        // 额外从视觉处理中读取“当前被 line_error 选中的那条中线曲率”。
-        // 这样目标角速度就不再从位置环输出反推，而是直接由视觉路径本身给出。
-        const float *selected_centerline_curvature = nullptr;
-        int selected_curvature_count = 0;
-        vision_image_processor_get_ipm_selected_centerline_curvature(&selected_centerline_curvature,
-                                                                     &selected_curvature_count);
-        const int track_index = vision_image_processor_ipm_line_error_track_index();
-        float current_path_curvature = 0.0f; // 当前跟踪点对应的视觉曲率，正负表示左右弯方向
-        if ((nullptr != selected_centerline_curvature) &&
-            (0 <= track_index) &&
-            (track_index < selected_curvature_count))
-        {
-            current_path_curvature = selected_centerline_curvature[track_index];
-        }
-        g_filtered_path_curvature =
-            g_filtered_path_curvature * (1.0f - pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha) +
-            current_path_curvature * pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha;
-
-        bool track_point_valid = false;
-        int track_point_x = 0;
-        int track_point_y = 0;
-        vision_image_processor_get_ipm_line_error_track_point(&track_point_valid, &track_point_x, &track_point_y);
-        const float current_track_point_angle_deg =
-            compute_signed_track_point_angle_deg(track_point_valid, track_point_x, track_point_y);
-        g_filtered_track_point_angle_deg =
-            g_filtered_track_point_angle_deg * (1.0f - pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha) +
-            current_track_point_angle_deg * pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha;
 
         // 动态 Kp：误差越大，比例增益越强。
         const float error_sq = control_error * control_error; // 控制误差的平方，用于计算动态Kp
@@ -323,7 +353,6 @@ void line_follow_loop()
 
         // 对外发布关键调试量，供屏显/上位机读取。
         // 这样你在调试时能同时看到：看到了多大误差、实际打了多少差速、左右轮目标是多少。
-        g_line_error_px.store(raw_error_px);
         g_turn_output.store(applied_steering_output);
 
         system_delay_ms(LINE_FOLLOW_PERIOD_MS);
@@ -348,6 +377,8 @@ bool line_follow_thread_init()
     g_filtered_path_curvature = 0.0f;
     g_filtered_track_point_angle_deg = 0.0f;
     g_adjusted_base_speed_state = -1.0f;
+    g_last_imu_sample_seq = 0;
+    g_last_vision_frame_seq = 0;
 
     // 位置环：目标固定为 0，表示希望赛道中线最终回到图像中心。
     position_pid1.init(pid_tuning::position_loop::kDynamicKpBase,
@@ -396,6 +427,8 @@ void line_follow_thread_cleanup()
     g_filtered_path_curvature = 0.0f;
     g_filtered_track_point_angle_deg = 0.0f;
     g_adjusted_base_speed_state = -1.0f;
+    g_last_imu_sample_seq = 0;
+    g_last_vision_frame_seq = 0;
 }
 
 void line_follow_thread_print_info()

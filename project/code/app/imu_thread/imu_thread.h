@@ -25,6 +25,12 @@ bool imu_thread_calibrate_and_start(int32 calibrate_duration_ms);
 float imu_thread_gyro_z_dps();
 
 /**
+ * @brief 获取当前 gyro_z 对应的新样本序号
+ * @return 每成功发布一份新 gyro_z 样本就递增一次的序号
+ */
+uint32 imu_thread_gyro_z_sample_seq();
+
+/**
  * @brief 停止 IMU 数据采集线程
  */
 void imu_thread_cleanup();

@@ -46,6 +46,9 @@ void vision_image_processor_cleanup();
 // 返回：true=处理成功，false=当前周期未取到新帧。
 // 是否调用：是，vision_pipeline_process_step 每帧调用。
 bool vision_image_processor_process_step();
+// 作用：读取“最近一次成功完成处理”的视觉帧序号。
+// 约定：仅当 process_step 成功处理完一帧时递增，供控制层判断是否拿到了新视觉样本。
+uint32 vision_image_processor_processed_frame_seq();
 
 // 作用：设置/获取迷宫法左右起点搜索行（单行搜索）。
 // 如何修改：建议范围 [1, H-2]；值越大越靠近图像底部。

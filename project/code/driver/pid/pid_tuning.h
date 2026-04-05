@@ -17,6 +17,7 @@ inline constexpr int32 kStartupCalibrateDurationMs = 2000;
 // gyro_z 方向校正：若接入后“越抗漂越甩”，优先把它从 1 改成 -1。
 inline constexpr float kGyroYawRateSign = 1.0f;
 // 巡线线程内对横摆角速度再做一层轻滤波，抑制偶发抖动。
+// 约定：该滤波只在“收到新 IMU 样本”时推进一次，不按 1ms 控制循环空转。
 inline constexpr float kGyroYawRateFilterAlpha = 0.30f;
 } // namespace imu
 
@@ -88,9 +89,11 @@ inline constexpr float kMaxOutput = 1250.0f;
 namespace yaw_rate_loop
 {
 // 视觉曲率滤波系数：让目标角速度更多跟随赛道整体趋势，而不是单帧角点毛刺。
+// 约定：该滤波只在“收到新视觉帧”时推进一次。
 inline constexpr float kVisualCurvatureFilterAlpha = 0.25f;
 // 目标点夹角滤波系数：平滑单帧跟踪点跳动，避免目标角速度突然抽动。
-inline constexpr float kTrackPointAngleFilterAlpha = 0.35f;
+// 约定：该滤波只在“收到新视觉帧”时推进一次。
+inline constexpr float kTrackPointAngleFilterAlpha = 0.25f;
 // 视觉误差 -> 目标横摆角速度的映射增益。
 // 误差越大，给角速度环的“该转多快”目标就越大。
 inline constexpr float kRefFromErrorGainDps = 180.0f;
@@ -107,7 +110,7 @@ inline constexpr float kRefLimitDps = 220.0f;
 // 1) 它本身就是并级支路，直接输出一份差速量，位置式更直观；
 // 2) IMU 信号更新快，位置式更容易和输出限幅、积分限幅配合；
 // 3) 增量式更适合底层执行器或占空比直接调节，这里不是那个层级。
-inline constexpr float kKp = 20.0f;
+inline constexpr float kKp = 1.50f;
 inline constexpr float kKi = 0.0f;
 inline constexpr float kKd = 0.0f;
 inline constexpr float kMaxIntegral = 0.0f;
@@ -117,6 +120,7 @@ inline constexpr float kMaxOutput = 260.0f;
 namespace line_follow
 {
 // 视觉误差低通系数：越大越跟当前帧，越小越重视历史趋势。
+// 约定：该滤波只在“收到新视觉帧”时推进一次。
 inline constexpr float kErrorFilterAlpha = 0.80f;
 
 // 左右轮目标最小值：允许轻微反转，方便大误差时快速拧回车头。

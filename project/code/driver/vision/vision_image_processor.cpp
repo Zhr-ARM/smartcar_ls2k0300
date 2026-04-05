@@ -193,6 +193,8 @@ static uint16 g_last_maze_left_points = 0;
 static uint16 g_last_maze_right_points = 0;
 static bool g_last_maze_left_ok = false;
 static bool g_last_maze_right_ok = false;
+// 成功处理完一帧视觉结果后递增，供控制层做“新样本驱动”的滤波推进。
+static std::atomic<uint32> g_processed_frame_seq(0);
 // 记录“最近一次成功识别”的左右起点 x，用于下一帧起点搜索偏移。
 static int g_last_maze_left_start_x = -1;
 static int g_last_maze_right_start_x = -1;
@@ -2727,6 +2729,7 @@ bool vision_image_processor_init(const char *camera_path)
     g_last_otsu_threshold = 127;
     g_last_maze_left_start_x = -1;
     g_last_maze_right_start_x = -1;
+    g_processed_frame_seq.store(0U);
     return true;
 }
 
@@ -2736,6 +2739,7 @@ void vision_image_processor_cleanup()
     g_undistort_map_x.release();
     g_undistort_map_y.release();
     g_undistort_ready = false;
+    g_processed_frame_seq.store(0U);
 }
 
 bool vision_image_processor_process_step()
@@ -2745,7 +2749,7 @@ bool vision_image_processor_process_step()
     // 2) 生成灰度/RGB565/二值图；
     // 3) 迷宫法双边线提取；
     // 4) 计算中线误差与逆透视结果；
-    // 5) 更新时间统计。
+    // 5) 更新时间统计，并把“成功处理帧序号”向前推进一次。
     auto t0 = std::chrono::steady_clock::now();
 
     if (!vision_frame_capture_wait_next_bgr(g_image_bgr_full, sizeof(g_image_bgr_full), 100, &g_last_capture_wait_us))
@@ -3068,8 +3072,14 @@ bool vision_image_processor_process_step()
         g_last_maze_right_start_x = std::clamp(center_x + 10, maze_trace_x_min, maze_trace_x_max);
     }
     g_last_total_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_end - t0).count());
+    g_processed_frame_seq.fetch_add(1U);
 
     return true;
+}
+
+uint32 vision_image_processor_processed_frame_seq()
+{
+    return g_processed_frame_seq.load();
 }
 
 void vision_image_processor_set_maze_start_row(int row)

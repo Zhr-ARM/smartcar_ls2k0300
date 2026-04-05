@@ -21,6 +21,7 @@ std::atomic<int32> g_thread_policy(0);
 std::atomic<int32> g_thread_priority(0);
 std::atomic<float> g_gyro_z_dps(0.0f);
 std::atomic<float> g_gyro_z_bias_dps(0.0f);
+std::atomic<uint32> g_gyro_z_sample_seq(0);
 
 /**
  * @brief 将调度策略枚举转换为字符串
@@ -130,6 +131,8 @@ void publish_gyro_state()
     const float corrected_gyro_z_dps =
         imu660ra_driver.filtered_gyro_z_deg_s() - g_gyro_z_bias_dps.load();
     g_gyro_z_dps.store(corrected_gyro_z_dps);
+    // 序号仅在“拿到并发布了新 IMU 样本”时递增，供上层判断是否需要推进滤波器状态。
+    g_gyro_z_sample_seq.fetch_add(1U);
 }
 
 int32 calc_bias_sample_count(int32 calibrate_duration_ms)
@@ -251,6 +254,7 @@ bool imu_thread_init()
     g_imu_initialized = true;
     g_gyro_z_dps.store(0.0f);
     g_gyro_z_bias_dps.store(0.0f);
+    g_gyro_z_sample_seq.store(0U);
 
     return true;
 }
@@ -264,6 +268,8 @@ bool imu_thread_calibrate_and_start(int32 calibrate_duration_ms)
     {
         return true;
     }
+
+    g_gyro_z_sample_seq.store(0U);
 
     if (!g_imu_initialized.load() && !imu_thread_init())
     {
@@ -311,12 +317,18 @@ float imu_thread_gyro_z_dps()
     return g_gyro_z_dps.load();
 }
 
+uint32 imu_thread_gyro_z_sample_seq()
+{
+    return g_gyro_z_sample_seq.load();
+}
+
 void imu_thread_cleanup()
 {
     if (!g_imu_running.load())
     {
         g_gyro_z_dps.store(0.0f);
         g_gyro_z_bias_dps.store(0.0f);
+        g_gyro_z_sample_seq.store(0U);
         g_imu_initialized = false;
         return;
     }
@@ -330,6 +342,7 @@ void imu_thread_cleanup()
 
     g_gyro_z_dps.store(0.0f);
     g_gyro_z_bias_dps.store(0.0f);
+    g_gyro_z_sample_seq.store(0U);
     g_imu_initialized = false;
 }
 

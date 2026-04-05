@@ -2,10 +2,10 @@
 
 namespace
 {
-// 参考逐飞蜂鸣器例程：低电平点亮蜂鸣器，高电平关闭蜂鸣器。
+// 当前车上蜂鸣器为高电平有效：高电平点亮蜂鸣器，低电平关闭蜂鸣器。
 constexpr const char *kBatteryBeepDevicePath = "/dev/zf_driver_gpio_beep";
 // 低压后打印电压、停控制线程并进入蜂鸣报警，直到用户主动退出程序。
-constexpr bool kBatteryProtectionEnabled = true;
+constexpr bool kBatteryProtectionEnabled = false;
 constexpr bool kBatteryAlarmEnabled = kBatteryProtectionEnabled;
 constexpr float kBatteryLowVoltageThresholdV = 10.3f;
 constexpr float kBatteryVoltageFilterAlpha = 0.35f;
@@ -20,7 +20,7 @@ bool g_low_voltage_latched = false;
 
 void battery_buzzer_set_enabled(bool enabled)
 {
-    gpio_set_level(kBatteryBeepDevicePath, (kBatteryAlarmEnabled && enabled) ? 0x0 : 0x1);
+    gpio_set_level(kBatteryBeepDevicePath, (kBatteryAlarmEnabled && enabled) ? 0x1 : 0x0);
 }
 
 bool battery_exit_requested(volatile sig_atomic_t *exit_flag)
