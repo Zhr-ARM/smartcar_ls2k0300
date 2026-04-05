@@ -71,12 +71,12 @@ namespace position_loop
 {
 // 巡线位置环动态比例项：Kp = base + quad_a * error^2。
 // 使用归一化误差，参数不随分辨率变化。
-inline constexpr float kDynamicKpQuadA = 600.0f;
+inline constexpr float kDynamicKpQuadA = 800.0f;
 // 误差为 0 时的基础 Kp。
 inline constexpr float kDynamicKpBase = 1000.0f;
 // 动态 Kp 下限与上限：防止过大过小。
 inline constexpr float kDynamicKpMin = 1000.0f;
-inline constexpr float kDynamicKpMax = 2000.0f;
+inline constexpr float kDynamicKpMax = 3000.0f;
 // 巡线位置环积分项：用于消除长期偏差，当前默认关闭。
 inline constexpr float kKi = 0.0f;
 // 巡线位置环微分项：抑制误差变化过快，缓和转向过冲。
@@ -90,7 +90,7 @@ namespace yaw_rate_loop
 // 视觉曲率滤波系数：让目标角速度更多跟随赛道整体趋势，而不是单帧角点毛刺。
 inline constexpr float kVisualCurvatureFilterAlpha = 0.25f;
 // 目标点夹角滤波系数：平滑单帧跟踪点跳动，避免目标角速度突然抽动。
-inline constexpr float kTrackPointAngleFilterAlpha = 0.25f;
+inline constexpr float kTrackPointAngleFilterAlpha = 0.35f;
 // 视觉误差 -> 目标横摆角速度的映射增益。
 // 误差越大，给角速度环的“该转多快”目标就越大。
 inline constexpr float kRefFromErrorGainDps = 180.0f;
@@ -107,7 +107,7 @@ inline constexpr float kRefLimitDps = 220.0f;
 // 1) 它本身就是并级支路，直接输出一份差速量，位置式更直观；
 // 2) IMU 信号更新快，位置式更容易和输出限幅、积分限幅配合；
 // 3) 增量式更适合底层执行器或占空比直接调节，这里不是那个层级。
-inline constexpr float kKp = 1.30f;
+inline constexpr float kKp = 20.0f;
 inline constexpr float kKi = 0.0f;
 inline constexpr float kKd = 0.0f;
 inline constexpr float kMaxIntegral = 0.0f;

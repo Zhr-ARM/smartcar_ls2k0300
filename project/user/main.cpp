@@ -24,6 +24,8 @@ bool g_cleanup_done = false;
 
 void cleanup_once()
 {
+    battery_low_voltage_protection_silence_buzzer();
+
     if (g_cleanup_done)
     {
         return;
@@ -53,6 +55,7 @@ void handle_low_battery_protection()
     printf("[BATTERY] low voltage triggered=%.2fV threshold=%.2fV -> stopping all control loops\r\n",
            static_cast<double>(battery_low_voltage_protection_filtered_voltage_v()),
            static_cast<double>(battery_low_voltage_protection_threshold_v()));
+    printf("[BATTERY] buzzer alarm active, press Ctrl+C to stop alarm and exit\r\n");
 
     stop_all_motion_immediately();
     cleanup_once();
@@ -60,7 +63,7 @@ void handle_low_battery_protection()
 }
 } // namespace
 
-void sigint_handler(int signum) 
+void exit_signal_handler(int signum)
 {
     (void)signum;
     g_should_exit = 1;
@@ -73,8 +76,11 @@ void cleanup()
 
 int main(int, char**) 
 {
-    // 注册SIGINT信号处理函数
-    signal(SIGINT, sigint_handler);
+    // IDE 停止、kill 等场景不一定是 Ctrl+C，统一拉起退出标志做收尾。
+    signal(SIGINT, exit_signal_handler);
+    signal(SIGTERM, exit_signal_handler);
+    signal(SIGQUIT, exit_signal_handler);
+    signal(SIGHUP, exit_signal_handler);
     
     battery_low_voltage_protection_init();
 
