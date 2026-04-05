@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "built_at_iso": "2026-04-04T22:03:53.489Z",
-  "built_at_ms": 1775340233489,
-  "source_digest": "f1191a827344a1ea573089085ce10e2ca0f435c23f8565b1a156e3afdeaf5d3a",
+  "built_at_iso": "2026-04-05T00:18:28.580Z",
+  "built_at_ms": 1775348308580,
+  "source_digest": "b3dbfc2bcadc2d5642b23ad5bdfa65bd06cfcb494fe0202462111ddf81c0105e",
   "tracked_file_count": 15,
   "missing_files": [],
   "tracked_files": [
@@ -79,9 +79,9 @@
     {
       "relative_path": "project/code/driver/vision/vision_config.c",
       "exists": true,
-      "size": 17528,
-      "mtime_ms": 1775339333264,
-      "sha256": "d2269c2a17323e5a6aa71f673bb05f89ebb5d6c67f2e780bd22ff06c750ad949"
+      "size": 17522,
+      "mtime_ms": 1775348300874,
+      "sha256": "99b251b5c8cd9775f2bde46b01611210c9616d548a5ecb8e8607be8a44b7921f"
     },
     {
       "relative_path": "project/code/driver/vision/vision_line_error_layer.h",

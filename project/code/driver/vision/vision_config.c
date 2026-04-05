@@ -61,7 +61,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // UDP 网页图传总开关。
     .udp_web_enabled = true,
     // UDP 网页图传发送上限帧率，0 表示不限速。
-    .udp_web_max_fps = 120,
+    .udp_web_max_fps = 30,
     // 是否向网页端发送灰度图。
     // 当前网页端可用该灰度图结合 TCP 下发的 otsu_threshold 自行实时二值化。
     // 若目标是“本地复算尽量贴近主板”，优先开这个。
@@ -106,9 +106,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 发送右轮实时目标速度 right_target_count。
     .udp_web_tcp_send_right_target_count = true,
     // 发送左轮编码器实时速度 left_current_count。
-    .udp_web_tcp_send_left_current_count = false,
+    .udp_web_tcp_send_left_current_count = true,
     // 发送右轮编码器实时速度 right_current_count。
-    .udp_web_tcp_send_right_current_count = false,
+    .udp_web_tcp_send_right_current_count = true,
     // 发送左轮滤波后的速度反馈 left_filtered_count。
     .udp_web_tcp_send_left_filtered_count = false,
     // 发送右轮滤波后的速度反馈 right_filtered_count。
@@ -172,7 +172,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== TCP 巡线跟踪点字段 ====================
     // 发送当前 IPM 跟踪点是否有效。
-    .udp_web_tcp_send_ipm_track_valid = false,
+    .udp_web_tcp_send_ipm_track_valid = true,
     // 发送 line_error 的取点方式：固定索引 / 加权索引 / 随速度索引。
     .udp_web_tcp_send_ipm_track_method = false,
     // 发送当前采用的是左偏移中线还是右偏移中线。
@@ -180,7 +180,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 发送当前实际命中的中线点索引。
     .udp_web_tcp_send_ipm_track_index = false,
     // 发送当前实际跟踪点坐标 [x, y]。
-    .udp_web_tcp_send_ipm_track_point = false,
+    .udp_web_tcp_send_ipm_track_point = true,
     // 发送首点的当前偏差。
     .udp_web_tcp_send_ipm_weighted_first_point_error = false,
     // 发送逆透视图上的决策点坐标。
@@ -322,7 +322,7 @@ const vision_processor_config_t g_vision_processor_config = {
     // 迷宫法单侧最大输出点数。
     .maze_trace_max_points = 120,
     // 迷宫法允许追踪的纵向区域百分比，100 表示全高。
-    .maze_lower_region_percent = 100,
+    .maze_lower_region_percent = 80,
     // OTSU 策略：true=按需 OTSU，false=先生成整图二值图。
     .demand_otsu_enable = true,
     // 按需 OTSU 时是否保留整图二值缓存，便于调试和发送。

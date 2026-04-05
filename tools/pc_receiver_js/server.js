@@ -3,6 +3,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
+const WebSocket = require('ws');
 const { summarizeSyncStatus } = require('../pc_receiver_local_compute/wasm_sync_meta.js');
 
 const MAGIC = 0x56535544; // VSUD
@@ -33,6 +34,18 @@ const udpByteEvents = [];
 const udpFrameEvents = [];
 let cachedWasmSyncStatus = null;
 let cachedWasmSyncStatusAtMs = 0;
+
+let wss = null;
+
+function broadcastWs(type, data) {
+  if (!wss) return;
+  const txt = JSON.stringify({ type, data, ts: Date.now() });
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(txt);
+    }
+  }
+}
 
 function modeName(mode) {
   if (mode === 0) return 'binary';
@@ -286,6 +299,15 @@ function onUdpMessage(msg) {
         format: sanitizeImageFormat(hdr.format),
         wireBytes
       };
+      
+      broadcastWs('frame', {
+        mode: hdr.mode,
+        frameId: hdr.frameId >>> 0,
+        width: hdr.width,
+        height: hdr.height,
+        format: sanitizeImageFormat(hdr.format)
+      });
+      
       udpFrameEvents.push({ ts: nowMs, mode: hdr.mode, wireBytes });
     }
     inflightFrames.delete(hdr.frameId);
@@ -390,6 +412,7 @@ function startTcpReceiver() {
         if (line) {
           try {
             latestStatus = JSON.parse(line);
+            broadcastWs('status', latestStatus);
           } catch (_) {
             // ignore malformed lines
           }
@@ -624,8 +647,15 @@ function startHttpServer() {
     res.end('not found');
   });
 
+  wss = new WebSocket.Server({ server });
+  wss.on('connection', (ws) => {
+    // Send immediate state upon connection
+    ws.send(JSON.stringify({ type: 'status', data: latestStatus, ts: Date.now() }));
+  });
+
   server.listen(HTTP_PORT, BIND_HOST, () => {
     console.log(`[JS_RECEIVER] HTTP web listening on http://${BIND_HOST}:${HTTP_PORT}/`);
+    console.log(`[JS_RECEIVER] WebSocket listening on ws://${BIND_HOST}:${HTTP_PORT}/`);
   });
 }
 
