@@ -61,7 +61,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // UDP 网页图传总开关。
     .udp_web_enabled = true,
     // UDP 网页图传发送上限帧率，0 表示不限速。
-    .udp_web_max_fps = 30,
+    .udp_web_max_fps = 70,
     // 是否向网页端发送灰度图。
     // 当前网页端可用该灰度图结合 TCP 下发的 otsu_threshold 自行实时二值化。
     // 若目标是“本地复算尽量贴近主板”，优先开这个。
@@ -84,7 +84,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .udp_web_rgb_image_format = VISION_WEB_IMAGE_FORMAT_PNG,
     // 网页端 TCP 数据模式：
     // 0=全量调试数据，1=仅原始图像 + 最小原始状态。
-    .udp_web_data_profile = 0,
+    .udp_web_data_profile = 1,
 
     // ==================== 网页端 TCP 状态发送总开关 ====================
     // TCP 状态上报开关。
@@ -219,7 +219,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    .udp_web_server_ip = "172.21.79.179",
+    .udp_web_server_ip = "172.21.79.129",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -303,7 +303,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // line_error 加权点数量。
     .ipm_line_error_weighted_point_count = 3,
     // line_error 加权索引点（0-based）。
-    .ipm_line_error_point_indices = {2, 6, 10},
+    .ipm_line_error_point_indices = {3, 7, 11},
     // line_error 各索引点对应权重。
     .ipm_line_error_weights = {0.48f, 0.29f, 0.23f},
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。

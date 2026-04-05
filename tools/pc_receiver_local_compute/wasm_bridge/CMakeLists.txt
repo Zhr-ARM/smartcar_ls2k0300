@@ -14,7 +14,7 @@ set(ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}/../../..")
 set(PROJECT_CODE_DIR "${ROOT_DIR}/project/code")
 set(COMPAT_DIR "${CMAKE_CURRENT_LIST_DIR}/compat")
 
-find_package(OpenCV QUIET)
+find_package(OpenCV QUIET COMPONENTS core imgproc)
 
 add_library(vision_web_bridge_stub STATIC
     web_vision_bridge.cpp
@@ -88,7 +88,7 @@ if(OpenCV_FOUND)
             VISION_WEB_BRIDGE_IMAGE_PROBE=1
     )
 
-    message(STATUS "vision_web_bridge_image_probe enabled with OpenCV.")
+    message(STATUS "vision_web_bridge_image_probe enabled with OpenCV core/imgproc.")
 
     add_executable(vision_web_bridge_smoke
         smoke_test.cpp
@@ -143,5 +143,5 @@ if(OpenCV_FOUND)
         )
     endif()
 else()
-    message(WARNING "OpenCV not found. vision_web_bridge_image_probe is skipped for now.")
+    message(WARNING "OpenCV core/imgproc not found. vision_web_bridge_image_probe is skipped for now.")
 endif()

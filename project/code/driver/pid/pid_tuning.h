@@ -73,9 +73,9 @@ namespace position_loop
 // 使用归一化误差，参数不随分辨率变化。
 inline constexpr float kDynamicKpQuadA = 600.0f;
 // 误差为 0 时的基础 Kp。
-inline constexpr float kDynamicKpBase = 900.0f;
+inline constexpr float kDynamicKpBase = 1000.0f;
 // 动态 Kp 下限与上限：防止过大过小。
-inline constexpr float kDynamicKpMin = 900.0f;
+inline constexpr float kDynamicKpMin = 1000.0f;
 inline constexpr float kDynamicKpMax = 2000.0f;
 // 巡线位置环积分项：用于消除长期偏差，当前默认关闭。
 inline constexpr float kKi = 0.0f;
