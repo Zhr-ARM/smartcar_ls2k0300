@@ -41,3 +41,6 @@ lib-ncnn/main/build/
 
 # Web receiver saved recordings
 /tools/pc_receiver_js/recordings/
+
+# Local toolchains and generated local dependencies
+/tools/.local/
