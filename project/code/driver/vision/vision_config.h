@@ -189,12 +189,6 @@ typedef struct
     // 边界回跳毛刺抑制：反向判定 cos 阈值（<=阈值视为反向）。
     float ipm_boundary_spike_reverse_cos_threshold;
 
-    // ---------- 边界双处理流水线：曲率支路 ----------
-    // 边界曲率计算总开关。
-    bool ipm_boundary_curvature_enabled;
-    // 边界 SG 曲率计算采样间距 h（cm）。
-    float ipm_boundary_kappa_sample_spacing_cm;
-
     // ---------- 边界双处理流水线：角点支路 ----------
     // 边界三点法夹角 cos 计算步长（索引步长，默认3）。
     int ipm_boundary_angle_step;
@@ -202,19 +196,16 @@ typedef struct
     float ipm_boundary_corner_cos_threshold;
     // 角点 NMS 半径（索引半径）。
     int ipm_boundary_corner_nms_radius;
+    // 直边检测要求的最小边界点数。
+    int ipm_boundary_straight_min_points;
+    // 直边检测检查窗口长度（从边界起点开始按索引检查）。
+    int ipm_boundary_straight_check_count;
+    // 直边检测要求的最小 cos 阈值。
+    float ipm_boundary_straight_min_cos;
 
     // ---------- 边界双处理流水线：中线生成 ----------
     // 逆透视处理链边界法向平移距离（px），用于生成平移中线。
     float ipm_boundary_shift_distance_px;
-    // ---------- 角点触发辅助线 ----------
-    // 辅助线起始点相对角点的 X 偏移（右侧为 +offset，左侧为 -offset）。
-    int ipm_aux_seed_offset_x;
-    // 辅助线起始点相对角点的 Y 偏移（向上为正，实际使用 y - offset）。
-    int ipm_aux_seed_offset_y;
-    // 辅助线向上探测时，至少经过的白点数。
-    int ipm_aux_vertical_min_white_count;
-    // 辅助线迷宫法爬线最大点数。
-    int ipm_aux_trace_max_points;
     // 逆透视处理中线独立后处理总开关（去重/平滑/重采样）。
     bool ipm_centerline_postprocess_enabled;
     // 逆透视处理中线三角滤波开关。

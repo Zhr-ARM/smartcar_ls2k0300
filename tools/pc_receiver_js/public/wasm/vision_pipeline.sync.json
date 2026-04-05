@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "built_at_iso": "2026-04-05T01:37:44.144Z",
-  "built_at_ms": 1775353064144,
-  "source_digest": "1414889a6b6ace2796e89d97ca37120eb834b27ed8bbe6e3b8bfa18ab78c5471",
+  "built_at_iso": "2026-04-05T13:48:49.987Z",
+  "built_at_ms": 1775396929987,
+  "source_digest": "223b8250665af2b1ab290d8987e41e166833b9861027c9c19921e6f22dd3d382",
   "tracked_file_count": 15,
   "missing_files": [],
   "tracked_files": [
@@ -10,29 +10,29 @@
       "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/CMakeLists.txt",
       "exists": true,
       "size": 4573,
-      "mtime_ms": 1775351969709,
+      "mtime_ms": 1775394036174,
       "sha256": "2d8d5505ab8821ea572fde4e40748b1b0c1481720a0e11300249d341586bd4dd"
     },
     {
       "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/web_vision_bridge.h",
       "exists": true,
-      "size": 2442,
-      "mtime_ms": 1775350567390,
-      "sha256": "cb25e8a5bb12a788bfa5836c28cb9eedeeddab6814f3989628a35fa4f60d1247"
+      "size": 2329,
+      "mtime_ms": 1775396050566,
+      "sha256": "0ec60a32e07788a744963c4cbaac88d4527532c5074ad664631333a6f246bbc3"
     },
     {
       "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/web_vision_bridge.cpp",
       "exists": true,
-      "size": 8726,
-      "mtime_ms": 1775350567390,
-      "sha256": "95955e0737f66ca43976d899851ed9c8b1b13ef099ce3f05646ed37b2c25b9ce"
+      "size": 8396,
+      "mtime_ms": 1775396050566,
+      "sha256": "d6e055490c2bfb717043fe337ad1701e5a36fd43ba34b67a7bebf9c88238d3b3"
     },
     {
       "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/web_vision_abi.cpp",
       "exists": true,
-      "size": 5920,
-      "mtime_ms": 1775350567390,
-      "sha256": "5c2a4d14930a7cbbb7b1b66c7f435520f947fd9b00051359b5f322d6d5b2328e"
+      "size": 5696,
+      "mtime_ms": 1775396050567,
+      "sha256": "8c15cf50785a3647603620d8859b8362f3ad2a4ad287fca4a2673e85342cf28b"
     },
     {
       "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/compat/line_follow_thread.h",
@@ -65,23 +65,23 @@
     {
       "relative_path": "tools/pc_receiver_local_compute/wasm_bridge/compat/driver/vision/vision_image_processor.h",
       "exists": true,
-      "size": 3151,
-      "mtime_ms": 1775350567390,
-      "sha256": "faaf0a51d9a5aea7c4cc235cce34695759b561cad9c2fa0f876053c971d5b3c5"
+      "size": 2954,
+      "mtime_ms": 1775396050567,
+      "sha256": "4e6364aabd4fc23f5a161c27140a1656163a460fc334e5e07afdc4e40f02254b"
     },
     {
       "relative_path": "project/code/driver/vision/vision_config.h",
       "exists": true,
-      "size": 13992,
-      "mtime_ms": 1775350567372,
-      "sha256": "61e9a9b30a0581755c192894ebb73220f3a5ed3aa5f6c2e7ed687346da44591e"
+      "size": 13740,
+      "mtime_ms": 1775395649260,
+      "sha256": "75214fbcda0040dd797ca13cddd6e97bdb9fb6fba84ab922924cfd99fac5abf6"
     },
     {
       "relative_path": "project/code/driver/vision/vision_config.c",
       "exists": true,
-      "size": 17704,
-      "mtime_ms": 1775352704776,
-      "sha256": "abf0f6fe39390af4e0b5e8bd4a48bded20a417c2696b3ca3ec19b596aa73d330"
+      "size": 17443,
+      "mtime_ms": 1775395656437,
+      "sha256": "6af802891f53ad10e3bbe8df7126142f64f46e2e0c9ee3989d2c7972c46585c0"
     },
     {
       "relative_path": "project/code/driver/vision/vision_line_error_layer.h",
@@ -100,16 +100,16 @@
     {
       "relative_path": "project/code/driver/vision/vision_image_processor.h",
       "exists": true,
-      "size": 15199,
-      "mtime_ms": 1775350567373,
-      "sha256": "9e9074c7d3726eeb5697c42e5682442a29f321f9b31150a95fdd7a5ed7b9b2db"
+      "size": 14891,
+      "mtime_ms": 1775395643622,
+      "sha256": "1997a9307792334d43037d4fcfb5926a57539405984aaa36753289865055d030"
     },
     {
       "relative_path": "project/code/driver/vision/vision_image_processor.cpp",
       "exists": true,
-      "size": 145737,
-      "mtime_ms": 1775350567372,
-      "sha256": "94f1b8380514ed48b58cbdc66fa7416446bdfb29c9191e4f9f9cf034f303fbdf"
+      "size": 144027,
+      "mtime_ms": 1775395729564,
+      "sha256": "02384549ef8babb4ae56c486bdcea4544aab82cd212f921257b0cac6fef45b7c"
     }
   ]
 }

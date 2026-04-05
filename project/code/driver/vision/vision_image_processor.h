@@ -84,14 +84,15 @@ bool vision_image_processor_ipm_resample_enabled();
 // 建议 >= 1.0；数值越小点更密、越大点更稀。
 void vision_image_processor_set_ipm_resample_step_px(float step_px);
 float vision_image_processor_ipm_resample_step_px();
-// 边界 SG 曲率计算采样间距 h（单位：cm）。
-void vision_image_processor_set_ipm_boundary_curvature_enabled(bool enabled);
-bool vision_image_processor_ipm_boundary_curvature_enabled();
-void vision_image_processor_set_ipm_boundary_kappa_sample_spacing_cm(float spacing_cm);
-float vision_image_processor_ipm_boundary_kappa_sample_spacing_cm();
 // 边界三点法夹角 cos 计算步长（索引步长，>=1）。
 void vision_image_processor_set_ipm_boundary_angle_step(int step);
 int vision_image_processor_ipm_boundary_angle_step();
+void vision_image_processor_set_ipm_boundary_straight_min_points(int points);
+int vision_image_processor_ipm_boundary_straight_min_points();
+void vision_image_processor_set_ipm_boundary_straight_check_count(int count);
+int vision_image_processor_ipm_boundary_straight_check_count();
+void vision_image_processor_set_ipm_boundary_straight_min_cos(float min_cos);
+float vision_image_processor_ipm_boundary_straight_min_cos();
 
 // 逆透视处理链边界“法向平移距离”参数（单位：像素，默认15）。
 // 约定：左边界向右平移、右边界向左平移。
@@ -138,8 +139,6 @@ void vision_image_processor_get_ipm_line_error_track_point(bool *valid, int *x, 
 void vision_image_processor_set_ipm_centerline_curvature_step(int step);
 int vision_image_processor_ipm_centerline_curvature_step();
 void vision_image_processor_get_ipm_selected_centerline_curvature(const float **curvature, int *count);
-void vision_image_processor_get_ipm_left_boundary_curvature(const float **curvature, int *count);
-void vision_image_processor_get_ipm_right_boundary_curvature(const float **curvature, int *count);
 void vision_image_processor_get_ipm_left_boundary_angle_cos(const float **angle_cos, int *count);
 void vision_image_processor_get_ipm_right_boundary_angle_cos(const float **angle_cos, int *count);
 float vision_image_processor_ipm_mean_abs_offset_error();
@@ -206,12 +205,6 @@ void vision_image_processor_get_boundaries(uint16 **x1, uint16 **x2, uint16 **x3
                                            uint16 **y1, uint16 **y2, uint16 **y3,
                                            uint16 *dot_num);
 void vision_image_processor_get_boundary_side_counts(uint16 *left_dot_num, uint16 *right_dot_num);
-// 原图坐标系角点触发辅助线及其偏移起始点。
-void vision_image_processor_get_src_auxiliary_lines(uint16 **left_x, uint16 **left_y, uint16 *left_num,
-                                                    uint16 **right_x, uint16 **right_y, uint16 *right_num);
-void vision_image_processor_get_src_auxiliary_seed_points(uint16 **left_x, uint16 **left_y, uint16 *left_num,
-                                                          uint16 **right_x, uint16 **right_y, uint16 *right_num);
-
 // 逆透视后边界数据（另存，供控制等后续模块使用）
 void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
                                                uint16 **y1, uint16 **y2, uint16 **y3,
@@ -222,6 +215,13 @@ void vision_image_processor_get_src_boundary_corners(uint16 **left_x, uint16 **l
                                                      uint16 **right_x, uint16 **right_y, uint16 *right_num);
 void vision_image_processor_get_ipm_boundary_corners(uint16 **left_x, uint16 **left_y, uint16 *left_num,
                                                      uint16 **right_x, uint16 **right_y, uint16 *right_num);
+// 左右边界“首个角点”的实时状态，方便状态机直接读取。
+void vision_image_processor_get_src_boundary_corner_state(bool *left_found, int *left_x, int *left_y,
+                                                          bool *right_found, int *right_x, int *right_y);
+void vision_image_processor_get_ipm_boundary_corner_state(bool *left_found, int *left_x, int *left_y,
+                                                          bool *right_found, int *right_x, int *right_y);
+void vision_image_processor_get_ipm_boundary_corner_indices(int *left_index, int *right_index);
+void vision_image_processor_get_ipm_boundary_straight_state(bool *left_straight, bool *right_straight);
 // 逆透视处理链“平移中线”结果：
 // - from_left : 左边界向右法向平移得到；
 // - from_right: 右边界向左法向平移得到。

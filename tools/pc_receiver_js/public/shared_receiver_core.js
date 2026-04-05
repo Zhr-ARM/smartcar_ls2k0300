@@ -276,8 +276,6 @@
   function buildStatusSummary(status, helpers = {}) {
     const lines = [];
     const getSelectedIpmCenterline = helpers.getSelectedIpmCenterline || (() => []);
-    const getLeftBoundaryKappa = helpers.getLeftBoundaryKappa || (() => []);
-    const getRightBoundaryKappa = helpers.getRightBoundaryKappa || (() => []);
     const getLeftBoundaryAngleCos = helpers.getLeftBoundaryAngleCos || (() => []);
     const getRightBoundaryAngleCos = helpers.getRightBoundaryAngleCos || (() => []);
 
@@ -353,14 +351,22 @@
     if (hasValue(status.ipm_centerline_source)) push('ipm_centerline_source', formatCenterlineSource(status.ipm_centerline_source));
     push('ipm_track_index', status.ipm_track_index);
     if (Array.isArray(status.ipm_track_point)) push('ipm_track_point', formatArrayInline(status.ipm_track_point));
+    push('left_boundary_corner_found', status.left_boundary_corner_found);
+    push('right_boundary_corner_found', status.right_boundary_corner_found);
+    if (Array.isArray(status.left_boundary_corner_point)) push('left_boundary_corner_point', formatArrayInline(status.left_boundary_corner_point));
+    if (Array.isArray(status.right_boundary_corner_point)) push('right_boundary_corner_point', formatArrayInline(status.right_boundary_corner_point));
+    push('ipm_left_boundary_corner_found', status.ipm_left_boundary_corner_found);
+    push('ipm_right_boundary_corner_found', status.ipm_right_boundary_corner_found);
+    push('ipm_left_boundary_corner_index', status.ipm_left_boundary_corner_index);
+    push('ipm_right_boundary_corner_index', status.ipm_right_boundary_corner_index);
+    push('ipm_left_boundary_straight', status.ipm_left_boundary_straight);
+    push('ipm_right_boundary_straight', status.ipm_right_boundary_straight);
+    if (Array.isArray(status.ipm_left_boundary_corner_point)) push('ipm_left_boundary_corner_point', formatArrayInline(status.ipm_left_boundary_corner_point));
+    if (Array.isArray(status.ipm_right_boundary_corner_point)) push('ipm_right_boundary_corner_point', formatArrayInline(status.ipm_right_boundary_corner_point));
     if (Array.isArray(status.gray_size)) push('gray_size', formatArrayInline(status.gray_size));
     if (Array.isArray(status.ipm_size)) push('ipm_size', formatArrayInline(status.ipm_size));
     pushCount('left_boundary_count', status.left_boundary);
     pushCount('right_boundary_count', status.right_boundary);
-    pushCount('left_auxiliary_line_count', status.left_auxiliary_line);
-    pushCount('right_auxiliary_line_count', status.right_auxiliary_line);
-    pushCount('left_auxiliary_seed_count', status.left_auxiliary_seed);
-    pushCount('right_auxiliary_seed_count', status.right_auxiliary_seed);
     pushCount('left_boundary_corner_count', status.left_boundary_corner);
     pushCount('right_boundary_corner_count', status.right_boundary_corner);
     pushCount('ipm_left_boundary_count', status.ipm_left_boundary);
@@ -372,8 +378,6 @@
     pushCount('ipm_centerline_selected_shift_count', getSelectedIpmCenterline(status));
     push('ipm_centerline_selected_count', status.ipm_centerline_selected_count);
     push('src_centerline_selected_count', status.src_centerline_selected_count);
-    pushCount('ipm_left_boundary_curvature_count', getLeftBoundaryKappa(status));
-    pushCount('ipm_right_boundary_curvature_count', getRightBoundaryKappa(status));
     pushCount('ipm_left_boundary_angle_cos_count', getLeftBoundaryAngleCos(status));
     pushCount('ipm_right_boundary_angle_cos_count', getRightBoundaryAngleCos(status));
 

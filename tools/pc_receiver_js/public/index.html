@@ -288,10 +288,6 @@
         显示中线曲率图
       </label>
       <label style="margin-left: 16px;">
-        <input type="checkbox" id="toggleBoundaryCurvatureCharts" />
-        显示边界曲率图
-      </label>
-      <label style="margin-left: 16px;">
         <input type="checkbox" id="toggleBoundaryAngleCosCharts" checked />
         显示边界角点cos图
       </label>
@@ -355,18 +351,6 @@
         <div class="title">中线曲率图（横轴=索引，纵轴=曲率）</div>
         <div class="view">
           <canvas id="curvatureCanvas" width="480" height="220"></canvas>
-        </div>
-      </div>
-      <div class="card" id="leftBoundaryCurvatureCard">
-        <div class="title">左边界 kappa 图（横轴=索引，纵轴=kappa）</div>
-        <div class="view">
-          <canvas id="leftBoundaryCurvatureCanvas" width="480" height="220"></canvas>
-        </div>
-      </div>
-      <div class="card" id="rightBoundaryCurvatureCard">
-        <div class="title">右边界 kappa 图（横轴=索引，纵轴=kappa）</div>
-        <div class="view">
-          <canvas id="rightBoundaryCurvatureCanvas" width="480" height="220"></canvas>
         </div>
       </div>
       <div class="card" id="leftBoundaryAngleCosCard">
@@ -468,10 +452,6 @@
     const ipmRawCtx = ipmRawCanvas.getContext('2d');
     const curvatureCanvas = document.getElementById('curvatureCanvas');
     const curvatureCtx = curvatureCanvas.getContext('2d');
-    const leftBoundaryCurvatureCanvas = document.getElementById('leftBoundaryCurvatureCanvas');
-    const leftBoundaryCurvatureCtx = leftBoundaryCurvatureCanvas.getContext('2d');
-    const rightBoundaryCurvatureCanvas = document.getElementById('rightBoundaryCurvatureCanvas');
-    const rightBoundaryCurvatureCtx = rightBoundaryCurvatureCanvas.getContext('2d');
     const leftBoundaryAngleCosCanvas = document.getElementById('leftBoundaryAngleCosCanvas');
     const leftBoundaryAngleCosCtx = leftBoundaryAngleCosCanvas.getContext('2d');
     const rightBoundaryAngleCosCanvas = document.getElementById('rightBoundaryAngleCosCanvas');
@@ -513,8 +493,6 @@
     const ipmRawCard = document.getElementById('ipmRawCard');
     const statusCard = document.getElementById('statusCard');
     const curvatureCard = document.getElementById('curvatureCard');
-    const leftBoundaryCurvatureCard = document.getElementById('leftBoundaryCurvatureCard');
-    const rightBoundaryCurvatureCard = document.getElementById('rightBoundaryCurvatureCard');
     const leftBoundaryAngleCosCard = document.getElementById('leftBoundaryAngleCosCard');
     const rightBoundaryAngleCosCard = document.getElementById('rightBoundaryAngleCosCard');
     const playbackStatus = document.getElementById('playbackStatus');
@@ -535,7 +513,6 @@
     const toggleIpmAnchorDot = document.getElementById('toggleIpmAnchorDot');
     const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
     const toggleCenterlineCurvatureChart = document.getElementById('toggleCenterlineCurvatureChart');
-    const toggleBoundaryCurvatureCharts = document.getElementById('toggleBoundaryCurvatureCharts');
     const toggleBoundaryAngleCosCharts = document.getElementById('toggleBoundaryAngleCosCharts');
     const toggleLocalCompute = document.getElementById('toggleLocalCompute');
     const curvatureYMinInput = document.getElementById('curvatureYMinInput');
@@ -554,7 +531,6 @@
     let showIpmAnchorDot = true;
     let boundaryPointMode = false;
     let showCenterlineCurvatureChart = true;
-    let showBoundaryCurvatureCharts = false;
     let showBoundaryAngleCosCharts = true;
     let recordingState = null;
     let lastRecording = null;
@@ -592,8 +568,6 @@
       receiverCore.setElementVisible(ipmCard, active);
       receiverCore.setElementVisible(ipmRawCard, active);
       receiverCore.setElementVisible(curvatureCard, active && toggleCenterlineCurvatureChart.checked);
-      receiverCore.setElementVisible(leftBoundaryCurvatureCard, active && toggleBoundaryCurvatureCharts.checked);
-      receiverCore.setElementVisible(rightBoundaryCurvatureCard, active && toggleBoundaryCurvatureCharts.checked);
       receiverCore.setElementVisible(leftBoundaryAngleCosCard, active && toggleBoundaryAngleCosCharts.checked);
       receiverCore.setElementVisible(rightBoundaryAngleCosCard, active && toggleBoundaryAngleCosCharts.checked);
     }
@@ -610,8 +584,6 @@
       merged.ipm_size = Array.isArray(merged.ipm_size) ? merged.ipm_size : [280, 140];
       merged.left_boundary = Array.isArray(payload.leftBoundary) ? payload.leftBoundary : (merged.left_boundary || []);
       merged.right_boundary = Array.isArray(payload.rightBoundary) ? payload.rightBoundary : (merged.right_boundary || []);
-      merged.left_auxiliary_line = Array.isArray(payload.leftAuxiliaryLine) ? payload.leftAuxiliaryLine : (merged.left_auxiliary_line || []);
-      merged.right_auxiliary_line = Array.isArray(payload.rightAuxiliaryLine) ? payload.rightAuxiliaryLine : (merged.right_auxiliary_line || []);
       merged.left_boundary_corner = Array.isArray(payload.leftBoundaryCorner) ? payload.leftBoundaryCorner : (merged.left_boundary_corner || []);
       merged.right_boundary_corner = Array.isArray(payload.rightBoundaryCorner) ? payload.rightBoundaryCorner : (merged.right_boundary_corner || []);
       merged.ipm_left_boundary = Array.isArray(payload.ipmLeftBoundary) ? payload.ipmLeftBoundary : (merged.ipm_left_boundary || []);
@@ -621,8 +593,6 @@
       merged.src_centerline_selected_shift = Array.isArray(payload.centerline) ? payload.centerline : (merged.src_centerline_selected_shift || []);
       merged.ipm_centerline_selected_shift = Array.isArray(payload.ipmCenterline) ? payload.ipmCenterline : (merged.ipm_centerline_selected_shift || []);
       merged.ipm_centerline_selected_curvature = Array.isArray(payload.centerlineCurvature) ? payload.centerlineCurvature : (merged.ipm_centerline_selected_curvature || []);
-      merged.ipm_left_boundary_curvature = Array.isArray(payload.leftBoundaryCurvature) ? payload.leftBoundaryCurvature : (merged.ipm_left_boundary_curvature || []);
-      merged.ipm_right_boundary_curvature = Array.isArray(payload.rightBoundaryCurvature) ? payload.rightBoundaryCurvature : (merged.ipm_right_boundary_curvature || []);
       merged.ipm_left_boundary_angle_cos = Array.isArray(payload.leftBoundaryAngleCos) ? payload.leftBoundaryAngleCos : (merged.ipm_left_boundary_angle_cos || []);
       merged.ipm_right_boundary_angle_cos = Array.isArray(payload.rightBoundaryAngleCos) ? payload.rightBoundaryAngleCos : (merged.ipm_right_boundary_angle_cos || []);
       merged.ipm_track_valid = !!payload.ipm_track_valid;
@@ -696,16 +666,6 @@
       return [];
     }
 
-    function getLeftBoundaryKappa(status) {
-      if (Array.isArray(status.ipm_left_boundary_curvature)) return status.ipm_left_boundary_curvature;
-      return [];
-    }
-
-    function getRightBoundaryKappa(status) {
-      if (Array.isArray(status.ipm_right_boundary_curvature)) return status.ipm_right_boundary_curvature;
-      return [];
-    }
-
     function getLeftBoundaryAngleCos(status) {
       if (Array.isArray(status.ipm_left_boundary_angle_cos)) return status.ipm_left_boundary_angle_cos;
       return [];
@@ -724,7 +684,6 @@
       statusEl.textContent = buildStatusSummary(renderStatus);
       drawIpmBoundaries(renderStatus);
       drawCurvatureChart(renderStatus);
-      drawBoundaryCurvatureCharts(renderStatus);
       drawBoundaryAngleCosCharts(renderStatus);
       if (hasValue(renderStatus.ipm_centerline_source)) {
         ipmCenterlineSourceLabel.style.display = '';
@@ -747,7 +706,6 @@
       curvatureYMin = minVal;
       curvatureYMax = maxVal;
       drawCurvatureChart(latestStatus || {});
-      drawBoundaryCurvatureCharts(latestStatus || {});
       drawBoundaryAngleCosCharts(latestStatus || {});
     }
 
@@ -833,13 +791,24 @@
       pushArray(trackRows, 'src_weighted_decision_point', status.src_weighted_decision_point);
       addSection('巡线跟踪', trackRows);
 
+      const cornerRows = [];
+      push(cornerRows, 'left_boundary_corner_found', status.left_boundary_corner_found);
+      push(cornerRows, 'right_boundary_corner_found', status.right_boundary_corner_found);
+      pushArray(cornerRows, 'left_boundary_corner_point', status.left_boundary_corner_point);
+      pushArray(cornerRows, 'right_boundary_corner_point', status.right_boundary_corner_point);
+      push(cornerRows, 'ipm_left_boundary_corner_found', status.ipm_left_boundary_corner_found);
+      push(cornerRows, 'ipm_right_boundary_corner_found', status.ipm_right_boundary_corner_found);
+      push(cornerRows, 'ipm_left_boundary_corner_index', status.ipm_left_boundary_corner_index);
+      push(cornerRows, 'ipm_right_boundary_corner_index', status.ipm_right_boundary_corner_index);
+      pushArray(cornerRows, 'ipm_left_boundary_corner_point', status.ipm_left_boundary_corner_point);
+      pushArray(cornerRows, 'ipm_right_boundary_corner_point', status.ipm_right_boundary_corner_point);
+      push(cornerRows, 'ipm_left_boundary_straight', status.ipm_left_boundary_straight);
+      push(cornerRows, 'ipm_right_boundary_straight', status.ipm_right_boundary_straight);
+      addSection('角点与直边', cornerRows);
+
       const arrayRows = [];
       pushCount(arrayRows, 'left_boundary', status.left_boundary);
       pushCount(arrayRows, 'right_boundary', status.right_boundary);
-      pushCount(arrayRows, 'left_auxiliary_line', status.left_auxiliary_line);
-      pushCount(arrayRows, 'right_auxiliary_line', status.right_auxiliary_line);
-      pushCount(arrayRows, 'left_auxiliary_seed', status.left_auxiliary_seed);
-      pushCount(arrayRows, 'right_auxiliary_seed', status.right_auxiliary_seed);
       pushCount(arrayRows, 'left_boundary_corner', status.left_boundary_corner);
       pushCount(arrayRows, 'right_boundary_corner', status.right_boundary_corner);
       pushCount(arrayRows, 'ipm_left_boundary', status.ipm_left_boundary);
@@ -853,8 +822,6 @@
       push(arrayRows, 'ipm_centerline_selected_count', status.ipm_centerline_selected_count);
       push(arrayRows, 'src_centerline_selected_count', status.src_centerline_selected_count);
       pushCount(arrayRows, 'ipm_centerline_selected_curvature', getSelectedCurvature(status));
-      pushCount(arrayRows, 'ipm_left_boundary_curvature', getLeftBoundaryKappa(status));
-      pushCount(arrayRows, 'ipm_right_boundary_curvature', getRightBoundaryKappa(status));
       pushCount(arrayRows, 'ipm_left_boundary_angle_cos', getLeftBoundaryAngleCos(status));
       pushCount(arrayRows, 'ipm_right_boundary_angle_cos', getRightBoundaryAngleCos(status));
       addSection('点列数量', arrayRows);
@@ -1487,14 +1454,6 @@
       drawCurveChartToCanvas(curvatureCanvas, curvatureCtx, getSelectedCurvature(status));
     }
 
-    function drawBoundaryCurvatureCharts(status) {
-      setCardVisible(leftBoundaryCurvatureCard, showBoundaryCurvatureCharts);
-      setCardVisible(rightBoundaryCurvatureCard, showBoundaryCurvatureCharts);
-      if (!showBoundaryCurvatureCharts) return;
-      drawCurveChartToCanvas(leftBoundaryCurvatureCanvas, leftBoundaryCurvatureCtx, getLeftBoundaryKappa(status));
-      drawCurveChartToCanvas(rightBoundaryCurvatureCanvas, rightBoundaryCurvatureCtx, getRightBoundaryKappa(status));
-    }
-
     function drawBoundaryAngleCosCharts(status) {
       setCardVisible(leftBoundaryAngleCosCard, showBoundaryAngleCosCharts);
       setCardVisible(rightBoundaryAngleCosCard, showBoundaryAngleCosCharts);
@@ -1544,17 +1503,9 @@
       const renderStatus = getRenderStatus();
       const left = renderStatus.left_boundary || [];
       const right = renderStatus.right_boundary || [];
-      const leftAux = renderStatus.left_auxiliary_line || [];
-      const rightAux = renderStatus.right_auxiliary_line || [];
-      const leftAuxSeed = renderStatus.left_auxiliary_seed || [];
-      const rightAuxSeed = renderStatus.right_auxiliary_seed || [];
       if (showGrayBoundaries) {
         drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
         drawSeries(grayCtx, right, '#22c55e', 2, 1);
-        drawSeries(grayCtx, leftAux, '#2563eb', 2, 1);
-        drawSeries(grayCtx, rightAux, '#f59e0b', 2, 1);
-        drawPointSet(grayCtx, leftAuxSeed, '#60a5fa', 1);
-        drawPointSet(grayCtx, rightAuxSeed, '#fbbf24', 1);
         drawPointSet(grayCtx, renderStatus.left_boundary_corner || [], '#facc15', 1);
         drawPointSet(grayCtx, renderStatus.right_boundary_corner || [], '#fb923c', 1);
       }
@@ -1688,12 +1639,6 @@
       }
       if (!hit) return '';
 
-      let kappaText = 'N/A';
-      const kappa = sideKey === 'ipm_left_boundary' ? getLeftBoundaryKappa(status) : getRightBoundaryKappa(status);
-      if (Array.isArray(kappa) && hit.index < kappa.length) {
-        const kv = Number(kappa[hit.index]);
-        if (Number.isFinite(kv)) kappaText = kv.toFixed(6);
-      }
       let cosText = 'N/A';
       const angleCos = sideKey === 'ipm_left_boundary' ? getLeftBoundaryAngleCos(status) : getRightBoundaryAngleCos(status);
       if (Array.isArray(angleCos) && hit.index < angleCos.length) {
@@ -1701,7 +1646,7 @@
         if (Number.isFinite(cv)) cosText = cv.toFixed(6);
       }
       const sideLabel = sideKey === 'ipm_left_boundary' ? 'L' : 'R';
-      return ` | 边界:${sideLabel} idx:${hit.index} kappa:${kappaText} cos:${cosText}`;
+      return ` | 边界:${sideLabel} idx:${hit.index} cos:${cosText}`;
     }
 
     function bindPixelProbe(canvas, ctx, infoEl, extraTextFn) {
@@ -1903,8 +1848,6 @@
     function buildStatusSummary(status) {
       return receiverCore.buildStatusSummary(status, {
         getSelectedIpmCenterline,
-        getLeftBoundaryKappa,
-        getRightBoundaryKappa,
         getLeftBoundaryAngleCos,
         getRightBoundaryAngleCos
       });
@@ -1929,7 +1872,6 @@
         if (isFull || shouldUseLocalCompute()) {
           drawIpmBoundaries(renderStatus);
           drawCurvatureChart(renderStatus);
-          drawBoundaryCurvatureCharts(renderStatus);
           drawBoundaryAngleCosCharts(renderStatus);
           if (hasValue(renderStatus.ipm_centerline_source)) {
             ipmCenterlineSourceLabel.style.display = '';
@@ -2057,10 +1999,6 @@
       showCenterlineCurvatureChart = !!toggleCenterlineCurvatureChart.checked;
       drawCurvatureChart(getRenderStatus() || {});
     });
-    toggleBoundaryCurvatureCharts.addEventListener('change', () => {
-      showBoundaryCurvatureCharts = !!toggleBoundaryCurvatureCharts.checked;
-      drawBoundaryCurvatureCharts(getRenderStatus() || {});
-    });
     toggleBoundaryAngleCosCharts.addEventListener('change', () => {
       showBoundaryAngleCosCharts = !!toggleBoundaryAngleCosCharts.checked;
       drawBoundaryAngleCosCharts(getRenderStatus() || {});
@@ -2075,7 +2013,6 @@
       statusEl.textContent = buildStatusSummary(getRenderStatus() || {});
       drawIpmBoundaries(getRenderStatus() || {});
       drawCurvatureChart(getRenderStatus() || {});
-      drawBoundaryCurvatureCharts(getRenderStatus() || {});
       drawBoundaryAngleCosCharts(getRenderStatus() || {});
       if (grayFrameReady) renderGrayFrame();
     });
@@ -2084,7 +2021,6 @@
     curvatureYMinInput.addEventListener('blur', applyCurvatureYRangeFromInput);
     curvatureYMaxInput.addEventListener('blur', applyCurvatureYRangeFromInput);
     showCenterlineCurvatureChart = !!toggleCenterlineCurvatureChart.checked;
-    showBoundaryCurvatureCharts = !!toggleBoundaryCurvatureCharts.checked;
     showBoundaryAngleCosCharts = !!toggleBoundaryAngleCosCharts.checked;
     rebuildPlaybackGrid({}, {});
     setDebugPageActive(true);

@@ -8,10 +8,6 @@ const ipmRawCanvas = document.getElementById('ipmRawCanvas');
 const ipmRawCtx = ipmRawCanvas.getContext('2d');
 const curvatureCanvas = document.getElementById('curvatureCanvas');
 const curvatureCtx = curvatureCanvas.getContext('2d');
-const leftBoundaryCurvatureCanvas = document.getElementById('leftBoundaryCurvatureCanvas');
-const leftBoundaryCurvatureCtx = leftBoundaryCurvatureCanvas.getContext('2d');
-const rightBoundaryCurvatureCanvas = document.getElementById('rightBoundaryCurvatureCanvas');
-const rightBoundaryCurvatureCtx = rightBoundaryCurvatureCanvas.getContext('2d');
 const leftBoundaryAngleCosCanvas = document.getElementById('leftBoundaryAngleCosCanvas');
 const leftBoundaryAngleCosCtx = leftBoundaryAngleCosCanvas.getContext('2d');
 const rightBoundaryAngleCosCanvas = document.getElementById('rightBoundaryAngleCosCanvas');
@@ -27,7 +23,6 @@ const toggleGrayBoundaries = document.getElementById('toggleGrayBoundaries');
 const toggleMeanCenterline = document.getElementById('toggleMeanCenterline');
 const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
 const toggleCenterlineCurvatureChart = document.getElementById('toggleCenterlineCurvatureChart');
-const toggleBoundaryCurvatureCharts = document.getElementById('toggleBoundaryCurvatureCharts');
 const toggleBoundaryAngleCosCharts = document.getElementById('toggleBoundaryAngleCosCharts');
 const curvatureYMinInput = document.getElementById('curvatureYMinInput');
 const curvatureYMaxInput = document.getElementById('curvatureYMaxInput');
@@ -41,8 +36,6 @@ const fullModeBanner = document.getElementById('fullModeBanner');
 const ipmCenterlineSourceLabel = document.getElementById('ipmCenterlineSourceLabel');
 
 const curvatureCard = document.getElementById('curvatureCard');
-const leftBoundaryCurvatureCard = document.getElementById('leftBoundaryCurvatureCard');
-const rightBoundaryCurvatureCard = document.getElementById('rightBoundaryCurvatureCard');
 const leftBoundaryAngleCosCard = document.getElementById('leftBoundaryAngleCosCard');
 const rightBoundaryAngleCosCard = document.getElementById('rightBoundaryAngleCosCard');
 
@@ -59,7 +52,6 @@ let boundaryPointMode = false;
 let showGrayBoundaries = true;
 let showMeanCenterline = true;
 let showCenterlineCurvatureChart = true;
-let showBoundaryCurvatureCharts = false;
 let showBoundaryAngleCosCharts = true;
 let curvatureYMin = -0.3;
 let curvatureYMax = 0.3;
@@ -132,8 +124,6 @@ function drawLocalGrayOverlay(payload) {
   if (showMeanCenterline) {
     SharedReceiverCore.drawSeries(grayCtx, payload.centerline || [], '#facc15', 2, 1, boundaryPointMode);
   }
-  SharedReceiverCore.drawSeries(grayCtx, payload.leftAuxiliaryLine || [], '#60a5fa', 1, 1, true);
-  SharedReceiverCore.drawSeries(grayCtx, payload.rightAuxiliaryLine || [], '#a78bfa', 1, 1, true);
   SharedReceiverCore.drawPointSet(grayCtx, payload.leftBoundaryCorner || [], '#facc15', 2);
   SharedReceiverCore.drawPointSet(grayCtx, payload.rightBoundaryCorner || [], '#fb923c', 2);
 }
@@ -213,21 +203,11 @@ function renderIpmViews(payload) {
 
 function renderCharts(payload) {
   SharedReceiverCore.setElementVisible(curvatureCard, showCenterlineCurvatureChart);
-  SharedReceiverCore.setElementVisible(leftBoundaryCurvatureCard, showBoundaryCurvatureCharts);
-  SharedReceiverCore.setElementVisible(rightBoundaryCurvatureCard, showBoundaryCurvatureCharts);
   SharedReceiverCore.setElementVisible(leftBoundaryAngleCosCard, showBoundaryAngleCosCharts);
   SharedReceiverCore.setElementVisible(rightBoundaryAngleCosCard, showBoundaryAngleCosCharts);
 
   if (!payload) return;
   SharedReceiverCore.drawCurveChartToCanvas(curvatureCanvas, curvatureCtx, payload.centerlineCurvature || [], {
-    yMin: curvatureYMin,
-    yMax: curvatureYMax
-  });
-  SharedReceiverCore.drawCurveChartToCanvas(leftBoundaryCurvatureCanvas, leftBoundaryCurvatureCtx, payload.leftBoundaryCurvature || [], {
-    yMin: curvatureYMin,
-    yMax: curvatureYMax
-  });
-  SharedReceiverCore.drawCurveChartToCanvas(rightBoundaryCurvatureCanvas, rightBoundaryCurvatureCtx, payload.rightBoundaryCurvature || [], {
     yMin: curvatureYMin,
     yMax: curvatureYMax
   });
@@ -244,8 +224,6 @@ function renderCharts(payload) {
 function renderStatusSummary(status, payload) {
   statusSummaryText.textContent = SharedReceiverCore.buildStatusSummary(status, {
     getSelectedIpmCenterline: () => (payload && Array.isArray(payload.ipmCenterline) ? payload.ipmCenterline : getSelectedBoardIpmCenterline(status)),
-    getLeftBoundaryKappa: () => (payload && Array.isArray(payload.leftBoundaryCurvature) ? payload.leftBoundaryCurvature : []),
-    getRightBoundaryKappa: () => (payload && Array.isArray(payload.rightBoundaryCurvature) ? payload.rightBoundaryCurvature : []),
     getLeftBoundaryAngleCos: () => (payload && Array.isArray(payload.leftBoundaryAngleCos) ? payload.leftBoundaryAngleCos : []),
     getRightBoundaryAngleCos: () => (payload && Array.isArray(payload.rightBoundaryAngleCos) ? payload.rightBoundaryAngleCos : [])
   });
@@ -266,8 +244,6 @@ function renderResult(payload) {
     ipm_right_boundary_points: Array.isArray(payload.ipmRightBoundary) ? payload.ipmRightBoundary.length : 0,
     left_corner_points: Array.isArray(payload.leftBoundaryCorner) ? payload.leftBoundaryCorner.length : 0,
     right_corner_points: Array.isArray(payload.rightBoundaryCorner) ? payload.rightBoundaryCorner.length : 0,
-    left_aux_points: Array.isArray(payload.leftAuxiliaryLine) ? payload.leftAuxiliaryLine.length : 0,
-    right_aux_points: Array.isArray(payload.rightAuxiliaryLine) ? payload.rightAuxiliaryLine.length : 0,
     line_error: payload.line_error,
     ipm_track_valid: payload.ipm_track_valid,
     ipm_track_index: payload.ipm_track_index,
@@ -425,14 +401,8 @@ function buildFullComparison(status, payload) {
       ipm_left: averagePointDelta(status.ipm_left_boundary_corner, payload.ipmLeftBoundaryCorner),
       ipm_right: averagePointDelta(status.ipm_right_boundary_corner, payload.ipmRightBoundaryCorner)
     },
-    auxiliary: {
-      left: averagePointDeltaByY(status.left_auxiliary_line, payload.leftAuxiliaryLine),
-      right: averagePointDeltaByY(status.right_auxiliary_line, payload.rightAuxiliaryLine)
-    },
     curvature: {
-      centerline: averageScalarDelta(status.ipm_centerline_selected_curvature, payload.centerlineCurvature),
-      left_boundary: averageScalarDelta(status.ipm_left_boundary_curvature, payload.leftBoundaryCurvature),
-      right_boundary: averageScalarDelta(status.ipm_right_boundary_curvature, payload.rightBoundaryCurvature)
+      centerline: averageScalarDelta(status.ipm_centerline_selected_curvature, payload.centerlineCurvature)
     },
     angle_cos: {
       left_boundary: averageScalarDelta(status.ipm_left_boundary_angle_cos, payload.leftBoundaryAngleCos),
@@ -537,10 +507,6 @@ toggleBoundaryPointMode.addEventListener('change', () => {
 });
 toggleCenterlineCurvatureChart.addEventListener('change', () => {
   showCenterlineCurvatureChart = !!toggleCenterlineCurvatureChart.checked;
-  renderAll();
-});
-toggleBoundaryCurvatureCharts.addEventListener('change', () => {
-  showBoundaryCurvatureCharts = !!toggleBoundaryCurvatureCharts.checked;
   renderAll();
 });
 toggleBoundaryAngleCosCharts.addEventListener('change', () => {

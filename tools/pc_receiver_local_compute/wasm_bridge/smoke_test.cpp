@@ -29,11 +29,11 @@ int main()
                 result.line_error,
                 result.ipm_track_valid ? 1 : 0,
                 result.status_message);
-    std::printf("left=%d right=%d center=%d left_curv=%d center_curv=%d\n",
+    std::printf("left=%d right=%d center=%d center_curv=%d left_angle=%d\n",
                 result.left_boundary.count,
                 result.right_boundary.count,
                 result.centerline_selected_shift.count,
-                result.left_boundary_curvature.count,
-                result.centerline_curvature.count);
+                result.centerline_curvature.count,
+                result.left_boundary_angle_cos.count);
     return ok ? 0 : 1;
 }

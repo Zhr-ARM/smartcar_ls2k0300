@@ -162,17 +162,6 @@ bool web_vision_bridge_process(const web_vision_frame_t *frame,
     copy_point_set(corner_left_x, corner_left_y, corner_left_num, &result->ipm_left_boundary_corner);
     copy_point_set(corner_right_x, corner_right_y, corner_right_num, &result->ipm_right_boundary_corner);
 
-    uint16 *aux_left_x = nullptr;
-    uint16 *aux_left_y = nullptr;
-    uint16 *aux_right_x = nullptr;
-    uint16 *aux_right_y = nullptr;
-    uint16 aux_left_num = 0;
-    uint16 aux_right_num = 0;
-    vision_image_processor_get_src_auxiliary_lines(&aux_left_x, &aux_left_y, &aux_left_num,
-                                                   &aux_right_x, &aux_right_y, &aux_right_num);
-    copy_point_set(aux_left_x, aux_left_y, aux_left_num, &result->left_auxiliary_line);
-    copy_point_set(aux_right_x, aux_right_y, aux_right_num, &result->right_auxiliary_line);
-
     uint16 *shift_x = nullptr;
     uint16 *shift_y = nullptr;
     uint16 shift_num = 0;
@@ -196,10 +185,6 @@ bool web_vision_bridge_process(const web_vision_frame_t *frame,
     int series_count = 0;
     vision_image_processor_get_ipm_selected_centerline_curvature(&series, &series_count);
     copy_scalar_series(series, series_count, &result->centerline_curvature);
-    vision_image_processor_get_ipm_left_boundary_curvature(&series, &series_count);
-    copy_scalar_series(series, series_count, &result->left_boundary_curvature);
-    vision_image_processor_get_ipm_right_boundary_curvature(&series, &series_count);
-    copy_scalar_series(series, series_count, &result->right_boundary_curvature);
     vision_image_processor_get_ipm_left_boundary_angle_cos(&series, &series_count);
     copy_scalar_series(series, series_count, &result->left_boundary_angle_cos);
     vision_image_processor_get_ipm_right_boundary_angle_cos(&series, &series_count);

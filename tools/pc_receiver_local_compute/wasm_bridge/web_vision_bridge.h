@@ -52,8 +52,6 @@ typedef struct
     web_vision_point_set_t right_boundary;
     web_vision_point_set_t ipm_left_boundary;
     web_vision_point_set_t ipm_right_boundary;
-    web_vision_point_set_t left_auxiliary_line;
-    web_vision_point_set_t right_auxiliary_line;
     web_vision_point_set_t left_boundary_corner;
     web_vision_point_set_t right_boundary_corner;
     web_vision_point_set_t ipm_left_boundary_corner;
@@ -62,8 +60,6 @@ typedef struct
     web_vision_point_set_t centerline_selected_shift;
 
     web_vision_scalar_series_t centerline_curvature;
-    web_vision_scalar_series_t left_boundary_curvature;
-    web_vision_scalar_series_t right_boundary_curvature;
     web_vision_scalar_series_t left_boundary_angle_cos;
     web_vision_scalar_series_t right_boundary_angle_cos;
 

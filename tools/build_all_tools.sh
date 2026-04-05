@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TOOLS_DIR="$ROOT_DIR/tools"
-F1_DASHBOARD_DIR="$TOOLS_DIR/f1_dashboard"
 PC_RECEIVER_JS_DIR="$TOOLS_DIR/pc_receiver_js"
 LOCAL_COMPUTE_DIR="$TOOLS_DIR/pc_receiver_local_compute"
 
@@ -24,16 +23,13 @@ EOF
 }
 
 run_setup() {
-  echo "[1/3] Installing npm dependencies for tools/f1_dashboard"
-  (cd "$F1_DASHBOARD_DIR" && npm ci)
-
-  echo "[2/3] Installing npm dependencies for tools/pc_receiver_local_compute"
+  echo "[1/2] Installing npm dependencies for tools/pc_receiver_local_compute"
   (cd "$LOCAL_COMPUTE_DIR" && npm ci)
 
   if [ -f "$PC_RECEIVER_JS_DIR/package-lock.json" ]; then
-    echo "[3/3] tools/pc_receiver_js has no declared npm dependencies, skipping npm ci"
+    echo "[2/2] tools/pc_receiver_js has no declared npm dependencies, skipping npm ci"
   else
-    echo "[3/3] tools/pc_receiver_js has no package-lock.json, skipping npm ci"
+    echo "[2/2] tools/pc_receiver_js has no package-lock.json, skipping npm ci"
   fi
 }
 

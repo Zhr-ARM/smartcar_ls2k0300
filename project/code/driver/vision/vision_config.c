@@ -61,7 +61,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // UDP 网页图传总开关。
     .udp_web_enabled = true,
     // UDP 网页图传发送上限帧率，0 表示不限速。
-    .udp_web_max_fps = 70,
+    .udp_web_max_fps = 30,
     // 是否向网页端发送灰度图。
     // 当前网页端可用该灰度图结合 TCP 下发的 otsu_threshold 自行实时二值化。
     // 若目标是“本地复算尽量贴近主板”，优先开这个。
@@ -84,7 +84,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .udp_web_rgb_image_format = VISION_WEB_IMAGE_FORMAT_PNG,
     // 网页端 TCP 数据模式：
     // 0=全量调试数据，1=仅原始图像 + 最小原始状态。
-    .udp_web_data_profile = 1,
+    .udp_web_data_profile = 0,
 
     // ==================== 网页端 TCP 状态发送总开关 ====================
     // TCP 状态上报开关。
@@ -254,11 +254,6 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_boundary_spike_short_seg_max_px = 2.0f,
     // 边界回跳毛刺抑制：反向判定 cos 阈值。
     .ipm_boundary_spike_reverse_cos_threshold = -0.2f,
-    // ---------- 边界双处理流水线：曲率支路 ----------
-    // 边界曲率计算总开关。
-    .ipm_boundary_curvature_enabled = false,
-    // 边界 SG 曲率计算采样间距 h，单位 cm。
-    .ipm_boundary_kappa_sample_spacing_cm = 1.5f,
     // ---------- 边界双处理流水线：角点支路 ----------
     // 边界三点法夹角 cos 计算步长（索引步长）。
     .ipm_boundary_angle_step = 3,
@@ -266,18 +261,15 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_boundary_corner_cos_threshold = 0.55f,
     // 角点 NMS 半径（索引半径）。
     .ipm_boundary_corner_nms_radius = 3,
+    // 直边检测最小边界点数。
+    .ipm_boundary_straight_min_points = 20,
+    // 直边检测起始检查窗口长度。
+    .ipm_boundary_straight_check_count = 20,
+    // 直边检测起始窗口内 cos 最小阈值。
+    .ipm_boundary_straight_min_cos = 0.90f,
     // ---------- 边界双处理流水线：中线生成 ----------
     // 边界法向平移距离，单位 px，用于生成平移中线。
     .ipm_boundary_shift_distance_px = 15.0f,
-    // ---------- 角点触发辅助线 ----------
-    // 辅助线起始点相对角点的 X 偏移（右侧 +offset，左侧 -offset）。
-    .ipm_aux_seed_offset_x = 12,
-    // 辅助线起始点相对角点的 Y 偏移（向上 y - offset）。
-    .ipm_aux_seed_offset_y = 6,
-    // 辅助线向上探测时至少经过 1 个白点。
-    .ipm_aux_vertical_min_white_count = 1,
-    // 辅助线迷宫法爬线最大点数。
-    .ipm_aux_trace_max_points = 30,
     // 中线独立后处理总开关。
     .ipm_centerline_postprocess_enabled = true,
     // 中线三角滤波开关。
@@ -324,7 +316,7 @@ const vision_processor_config_t g_vision_processor_config = {
     // 迷宫法单侧最大输出点数。
     .maze_trace_max_points = 120,
     // 迷宫法允许追踪的纵向区域百分比，100 表示全高。
-    .maze_lower_region_percent = 80,
+    .maze_lower_region_percent = 100,
     // OTSU 策略：true=按需 OTSU，false=先生成整图二值图。
     .demand_otsu_enable = true,
     // 按需 OTSU 时是否保留整图二值缓存，便于调试和发送。

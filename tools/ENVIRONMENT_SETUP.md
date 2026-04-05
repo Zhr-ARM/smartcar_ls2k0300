@@ -8,13 +8,11 @@
 
 ## 1. `tools` 目录里有哪些项目
 
-当前主要有 3 个可运行/可构建的工具目录：
+当前主要有 2 个可运行/可构建的工具目录：
 
-1. [`tools/f1_dashboard`](/home/terrisa/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/tools/f1_dashboard)
-   需要：`Node.js + npm`
-2. [`tools/pc_receiver_js`](/home/terrisa/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/tools/pc_receiver_js)
+1. [`tools/pc_receiver_js`](/home/terrisa/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/tools/pc_receiver_js)
    需要：`Node.js`
-3. [`tools/pc_receiver_local_compute`](/home/terrisa/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/tools/pc_receiver_local_compute)
+2. [`tools/pc_receiver_local_compute`](/home/terrisa/LoongCar/LS2K0300_Library-2k0300_99pi_wifi/Example/Motherboard_Demo/smartcar_ls2k0300/tools/pc_receiver_local_compute)
    运行需要：`Node.js + npm`
    重编 WASM 需要：`Node.js + npm + CMake + Python3 + make + Emscripten + OpenCV(for WASM)`
 
@@ -64,7 +62,6 @@ tools/build_all_tools.sh setup
 
 它会：
 
-- 给 `tools/f1_dashboard` 执行 `npm ci`
 - 给 `tools/pc_receiver_local_compute` 执行 `npm ci`
 - 跳过 `tools/pc_receiver_js`，因为它当前没有声明 npm 依赖
 
@@ -132,13 +129,6 @@ tools/build_all_tools.sh all
 
 ### 5.3 单独运行某个工具
 
-`f1_dashboard`：
-
-```bash
-cd tools/f1_dashboard
-npm run dev
-```
-
 `pc_receiver_local_compute`：
 
 ```bash
@@ -158,7 +148,6 @@ npm run dev
 安装 Node 依赖：
 
 ```bash
-cd tools/f1_dashboard && npm ci
 cd tools/pc_receiver_local_compute && npm ci
 ```
 

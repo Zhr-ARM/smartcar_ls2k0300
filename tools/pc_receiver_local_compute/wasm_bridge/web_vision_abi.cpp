@@ -96,10 +96,6 @@ void rebuild_last_result_json()
     append_point_set(out, g_last_result.ipm_left_boundary);
     append_key("ipmRightBoundary");
     append_point_set(out, g_last_result.ipm_right_boundary);
-    append_key("leftAuxiliaryLine");
-    append_point_set(out, g_last_result.left_auxiliary_line);
-    append_key("rightAuxiliaryLine");
-    append_point_set(out, g_last_result.right_auxiliary_line);
     append_key("leftBoundaryCorner");
     append_point_set(out, g_last_result.left_boundary_corner);
     append_key("rightBoundaryCorner");
@@ -115,10 +111,6 @@ void rebuild_last_result_json()
 
     append_key("centerlineCurvature");
     append_scalar_series(out, g_last_result.centerline_curvature);
-    append_key("leftBoundaryCurvature");
-    append_scalar_series(out, g_last_result.left_boundary_curvature);
-    append_key("rightBoundaryCurvature");
-    append_scalar_series(out, g_last_result.right_boundary_curvature);
     append_key("leftBoundaryAngleCos");
     append_scalar_series(out, g_last_result.left_boundary_angle_cos);
     append_key("rightBoundaryAngleCos");
