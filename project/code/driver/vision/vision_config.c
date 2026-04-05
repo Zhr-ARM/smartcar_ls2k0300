@@ -314,6 +314,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_line_error_index_min = 0,
     // 随速度索引模式允许的最大索引。
     .ipm_line_error_index_max = 30,
+    // 目标角速度生成方式：默认使用“跟踪点与图像中线最低点连线”的夹角模式。
+    .yaw_rate_ref_mode = VISION_YAW_RATE_REF_FROM_TRACK_POINT_ANGLE,
     // 基准速度方案B已移除，偏差层仅保留方案A所需参数。
 };
 

@@ -207,7 +207,7 @@ int main(int, char**)
     vision_image_processor_set_ipm_line_error_index_range(g_vision_runtime_config.ipm_line_error_index_min,
                                                           g_vision_runtime_config.ipm_line_error_index_max); // line_error 随速度索引区间
 
-    printf("[VISION CFG] mode=%d max_fps=%u infer=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_boundary_kappa_en=%d ipm_step=%.2f ipm_kappa_h_cm=%.3f ipm_angle_step=%d ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
+    printf("[VISION CFG] mode=%d max_fps=%u infer=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_boundary_kappa_en=%d ipm_step=%.2f ipm_kappa_h_cm=%.3f ipm_angle_step=%d ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d yaw_ref_mode=%d\r\n",
            static_cast<int>(vision_thread_get_send_mode()),
            static_cast<unsigned int>(vision_thread_get_send_max_fps()),
            vision_thread_infer_enabled() ? 1 : 0,
@@ -235,7 +235,8 @@ int main(int, char**)
            static_cast<double>(g_vision_runtime_config.ipm_line_error_speed_k),
            static_cast<double>(g_vision_runtime_config.ipm_line_error_speed_b),
            g_vision_runtime_config.ipm_line_error_index_min,
-           g_vision_runtime_config.ipm_line_error_index_max);
+           g_vision_runtime_config.ipm_line_error_index_max,
+           g_vision_runtime_config.yaw_rate_ref_mode);
 
     uart_thread_init();
 

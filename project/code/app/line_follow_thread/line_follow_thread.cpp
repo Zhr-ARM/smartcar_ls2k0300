@@ -37,6 +37,8 @@ float g_filtered_error = 0.0f;
 float g_filtered_yaw_rate_dps = 0.0f;
 // 滤波后的赛道曲率：由视觉路径给出，用来生成“该转多快”的目标横摆角速度。
 float g_filtered_path_curvature = 0.0f;
+// 滤波后的目标点夹角：由跟踪点相对图像中垂线的偏转角得到。
+float g_filtered_track_point_angle_deg = 0.0f;
 // 误差降速后的基础速度状态：把“理想基础速度”做成缓增缓降，避免一帧一跳。
 float g_adjusted_base_speed_state = -1.0f;
 
@@ -55,6 +57,20 @@ const char *sched_policy_name(int32 policy)
 #endif
         default:          return "UNKNOWN";
     }
+}
+
+float compute_signed_track_point_angle_deg(bool track_valid, int track_x, int track_y)
+{
+    if (!track_valid)
+    {
+        return 0.0f;
+    }
+
+    const float dx = static_cast<float>(track_x - (VISION_IPM_WIDTH / 2));
+    const float dy = static_cast<float>((VISION_IPM_HEIGHT - 1) - track_y);
+    const float clamped_dy = std::max(dy, 1.0f);
+    const float angle_rad = atan2f(-dx, clamped_dy);
+    return angle_rad * (180.0f / 3.1415926f);
 }
 
 void refresh_thread_info()
@@ -165,6 +181,16 @@ void line_follow_loop()
             g_filtered_path_curvature * (1.0f - pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha) +
             current_path_curvature * pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha;
 
+        bool track_point_valid = false;
+        int track_point_x = 0;
+        int track_point_y = 0;
+        vision_image_processor_get_ipm_line_error_track_point(&track_point_valid, &track_point_x, &track_point_y);
+        const float current_track_point_angle_deg =
+            compute_signed_track_point_angle_deg(track_point_valid, track_point_x, track_point_y);
+        g_filtered_track_point_angle_deg =
+            g_filtered_track_point_angle_deg * (1.0f - pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha) +
+            current_track_point_angle_deg * pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha;
+
         // 动态 Kp：误差越大，比例增益越强。
         const float error_sq = control_error * control_error; // 控制误差的平方，用于计算动态Kp
         const float dynamic_kp = std::clamp( // 计算得到的本次动态比例增益系数
@@ -190,11 +216,24 @@ void line_follow_loop()
         // 2) 视觉曲率越大，说明前方弯更急，需要更早建立横摆速度。
         // 这里继续采用“位置式 PID”，因为角速度环输出的是一份独立差速量，
         // 直接限幅、直接和位置环并加，调试和观察都会比增量式更直接。
-        const float yaw_rate_ref_dps = std::clamp(
-            control_error * pid_tuning::yaw_rate_loop::kRefFromErrorGainDps +
-            g_filtered_path_curvature * pid_tuning::yaw_rate_loop::kRefFromCurvatureGainDps,
-            -pid_tuning::yaw_rate_loop::kRefLimitDps,
-            pid_tuning::yaw_rate_loop::kRefLimitDps);
+        float yaw_rate_ref_dps = 0.0f;
+        const vision_yaw_rate_ref_mode_enum yaw_rate_ref_mode =
+            static_cast<vision_yaw_rate_ref_mode_enum>(g_vision_runtime_config.yaw_rate_ref_mode);
+        if (yaw_rate_ref_mode == VISION_YAW_RATE_REF_FROM_ERROR_AND_CURVATURE)
+        {
+            yaw_rate_ref_dps = std::clamp(
+                control_error * pid_tuning::yaw_rate_loop::kRefFromErrorGainDps +
+                g_filtered_path_curvature * pid_tuning::yaw_rate_loop::kRefFromCurvatureGainDps,
+                -pid_tuning::yaw_rate_loop::kRefLimitDps,
+                pid_tuning::yaw_rate_loop::kRefLimitDps);
+        }
+        else
+        {
+            yaw_rate_ref_dps = std::clamp(
+                g_filtered_track_point_angle_deg * pid_tuning::yaw_rate_loop::kRefFromTrackPointAngleGainDps,
+                -pid_tuning::yaw_rate_loop::kRefLimitDps,
+                pid_tuning::yaw_rate_loop::kRefLimitDps);
+        }
         const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 目标角速度与实际角速度之差
         position_pid2.set_params(pid_tuning::yaw_rate_loop::kKp,
                                  pid_tuning::yaw_rate_loop::kKi,
@@ -307,6 +346,7 @@ bool line_follow_thread_init()
     g_filtered_error = 0.0f;
     g_filtered_yaw_rate_dps = 0.0f;
     g_filtered_path_curvature = 0.0f;
+    g_filtered_track_point_angle_deg = 0.0f;
     g_adjusted_base_speed_state = -1.0f;
 
     // 位置环：目标固定为 0，表示希望赛道中线最终回到图像中心。
@@ -354,6 +394,7 @@ void line_follow_thread_cleanup()
     g_filtered_error = 0.0f;
     g_filtered_yaw_rate_dps = 0.0f;
     g_filtered_path_curvature = 0.0f;
+    g_filtered_track_point_angle_deg = 0.0f;
     g_adjusted_base_speed_state = -1.0f;
 }
 

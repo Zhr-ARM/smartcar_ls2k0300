@@ -22,6 +22,12 @@ typedef enum
     VISION_WEB_IMAGE_FORMAT_BMP = 2
 } vision_web_image_format_enum;
 
+typedef enum
+{
+    VISION_YAW_RATE_REF_FROM_ERROR_AND_CURVATURE = 0,
+    VISION_YAW_RATE_REF_FROM_TRACK_POINT_ANGLE = 1
+} vision_yaw_rate_ref_mode_enum;
+
 typedef struct
 {
     // ==================== 参数区域 3: 网页发送 ====================
@@ -246,6 +252,8 @@ typedef struct
     int ipm_line_error_index_min;
     // 随速度索引模式允许的最大索引。
     int ipm_line_error_index_max;
+    // 目标角速度生成方式：0=视觉误差+曲率，1=跟踪点连线夹角。
+    int yaw_rate_ref_mode;
 } vision_runtime_config_t;
 
 typedef struct
