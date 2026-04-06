@@ -76,8 +76,8 @@ inline constexpr float kDynamicKpQuadA = 800.0f;
 // 误差为 0 时的基础 Kp。
 inline constexpr float kDynamicKpBase = 1000.0f;
 // 动态 Kp 下限与上限：防止过大过小。
-inline constexpr float kDynamicKpMin = 1000.0f;
-inline constexpr float kDynamicKpMax = 3000.0f;
+inline constexpr float kDynamicKpMin = 1300.0f;
+inline constexpr float kDynamicKpMax = 2500.0f;
 // 巡线位置环积分项：用于消除长期偏差，当前默认关闭。
 inline constexpr float kKi = 0.0f;
 // 巡线位置环微分项：抑制误差变化过快，缓和转向过冲。

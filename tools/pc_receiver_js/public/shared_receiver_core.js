@@ -88,6 +88,143 @@
     return '透视中线来源：自动选择（未知）';
   }
 
+  function formatRouteMainState(state) {
+    if (state === 0) return '正常巡线';
+    if (state === 1) return '左环岛';
+    if (state === 2) return '右环岛';
+    if (state === 3) return '交叉口';
+    return `未知主状态(${state})`;
+  }
+
+  function formatRouteSubState(state) {
+    if (state === 0) return '无子状态';
+    if (state === 1) return '十字-准备进入';
+    if (state === 2) return '十字-穿越中';
+    if (state === 3) return '左环岛-开始';
+    if (state === 4) return '左环岛-入环';
+    if (state === 5) return '左环岛-运行';
+    if (state === 6) return '左环岛-出环';
+    if (state === 7) return '左环岛-结束';
+    if (state === 8) return '右环岛-开始';
+    if (state === 9) return '右环岛-入环';
+    if (state === 10) return '右环岛-运行';
+    if (state === 11) return '右环岛-出环';
+    if (state === 12) return '右环岛-结束';
+    return `未知子状态(${state})`;
+  }
+
+  function formatRoutePreferredSource(source) {
+    if (source === -1) return '自动';
+    if (source === 0) return '左边界';
+    if (source === 1) return '右边界';
+    return `未知(${source})`;
+  }
+
+  function pointDistance(pointA, pointB) {
+    if (!Array.isArray(pointA) || !Array.isArray(pointB) || pointA.length < 2 || pointB.length < 2) return null;
+    const ax = Number(pointA[0]);
+    const ay = Number(pointA[1]);
+    const bx = Number(pointB[0]);
+    const by = Number(pointB[1]);
+    if (!Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(bx) || !Number.isFinite(by)) return null;
+    return Math.hypot(ax - bx, ay - by);
+  }
+
+  function buildRouteStateSummary(status) {
+    const mainStateRaw = Number(status && status.route_main_state);
+    const subStateRaw = Number(status && status.route_sub_state);
+    const preferredSourceRaw = Number(status && status.route_preferred_source);
+    const encoderSinceEnterRaw = Number(status && status.route_encoder_since_enter);
+    const crossLossCountRaw = Number(status && status.route_cross_loss_count);
+    const leftLossCountRaw = Number(status && status.route_left_loss_count);
+    const leftGainCountRaw = Number(status && status.route_left_gain_count);
+    const rightLossCountRaw = Number(status && status.route_right_loss_count);
+    const rightGainCountRaw = Number(status && status.route_right_gain_count);
+    const mainState = Number.isFinite(mainStateRaw) ? mainStateRaw : null;
+    const subState = Number.isFinite(subStateRaw) ? subStateRaw : null;
+    const preferredSource = Number.isFinite(preferredSourceRaw) ? preferredSourceRaw : null;
+    const encoderSinceEnter = Number.isFinite(encoderSinceEnterRaw) ? encoderSinceEnterRaw : null;
+    const crossLossCount = Number.isFinite(crossLossCountRaw) ? crossLossCountRaw : null;
+    const leftLossCount = Number.isFinite(leftLossCountRaw) ? leftLossCountRaw : null;
+    const leftGainCount = Number.isFinite(leftGainCountRaw) ? leftGainCountRaw : null;
+    const rightLossCount = Number.isFinite(rightLossCountRaw) ? rightLossCountRaw : null;
+    const rightGainCount = Number.isFinite(rightGainCountRaw) ? rightGainCountRaw : null;
+    const leftCornerFound = !!(status && status.ipm_left_boundary_corner_found);
+    const rightCornerFound = !!(status && status.ipm_right_boundary_corner_found);
+    const leftStraight = !!(status && status.ipm_left_boundary_straight);
+    const rightStraight = !!(status && status.ipm_right_boundary_straight);
+    const leftCornerPoint = Array.isArray(status && status.ipm_left_boundary_corner_point) ? status.ipm_left_boundary_corner_point : null;
+    const rightCornerPoint = Array.isArray(status && status.ipm_right_boundary_corner_point) ? status.ipm_right_boundary_corner_point : null;
+    const cornerDistance = pointDistance(leftCornerPoint, rightCornerPoint);
+
+    const clues = [];
+    if (leftCornerFound || rightCornerFound) {
+      clues.push(`角点检测：左=${leftCornerFound ? '有' : '无'}，右=${rightCornerFound ? '有' : '无'}`);
+    }
+    if (leftStraight || rightStraight) {
+      clues.push(`直边检测：左=${leftStraight ? '有' : '无'}，右=${rightStraight ? '有' : '无'}`);
+    }
+    if (cornerDistance !== null) {
+      clues.push(`双角点距离：${cornerDistance.toFixed(1)} px`);
+    }
+
+    const judgments = [];
+    if (mainState === 0) {
+      if (leftCornerFound && rightCornerFound) {
+        judgments.push(cornerDistance !== null && cornerDistance < 40
+          ? '双角点都存在且距离已接近交叉阈值，当前更接近交叉口判定。'
+          : '双角点都存在，但距离还未压到交叉阈值，当前仍保持正常巡线。');
+      } else if (leftCornerFound && rightStraight) {
+        judgments.push('左侧出现角点、右侧仍保持直边，当前更像左环岛进入前的候选状态。');
+      } else if (rightCornerFound && leftStraight) {
+        judgments.push('右侧出现角点、左侧仍保持直边，当前更像右环岛进入前的候选状态。');
+      } else {
+        judgments.push('当前没有同时触发角点与直边的强切换条件，状态机继续留在正常巡线。');
+      }
+    } else if (mainState === 3) {
+      if (subState === 1) {
+        judgments.push('当前处于 cross_begin：等待任一侧角点原图 y 超过阈值后，下一帧切入 cross_in。');
+      } else if (subState === 2) {
+        judgments.push(`当前处于 cross_in：正在按保存起始行向下搜线，当前探测停止行=${crossLossCount !== null ? crossLossCount : -1}（>=80 将退出）。`);
+      } else {
+        judgments.push(`交叉口状态下，当前探测停止行为 ${crossLossCount !== null ? crossLossCount : -1}，用于判断何时退出交叉口。`);
+      }
+    } else if (mainState === 1) {
+      judgments.push(`左环岛状态下，优先使用 ${formatRoutePreferredSource(preferredSource)} 构造中线。`);
+    } else if (mainState === 2) {
+      judgments.push(`右环岛状态下，优先使用 ${formatRoutePreferredSource(preferredSource)} 构造中线。`);
+    } else {
+      judgments.push('等待状态机首次更新。');
+    }
+
+    const counters = [
+      ['交叉停止行', Number.isFinite(crossLossCount) ? crossLossCount : null],
+      ['左侧丢线', Number.isFinite(leftLossCount) ? leftLossCount : null],
+      ['左侧恢复', Number.isFinite(leftGainCount) ? leftGainCount : null],
+      ['右侧丢线', Number.isFinite(rightLossCount) ? rightLossCount : null],
+      ['右侧恢复', Number.isFinite(rightGainCount) ? rightGainCount : null]
+    ].filter(([, value]) => value !== null);
+
+    return {
+      mainState,
+      subState,
+      preferredSource,
+      encoderSinceEnter,
+      mainStateLabel: mainState !== null ? formatRouteMainState(mainState) : '--',
+      subStateLabel: subState !== null ? formatRouteSubState(subState) : '--',
+      preferredSourceLabel: preferredSource !== null ? formatRoutePreferredSource(preferredSource) : '--',
+      crossLossCount,
+      leftLossCount,
+      leftGainCount,
+      rightLossCount,
+      rightGainCount,
+      cornerDistance,
+      clues,
+      judgments,
+      counters
+    };
+  }
+
   function drawCurveChartToCanvas(canvas, ctx, rawValues, options = {}) {
     const w = canvas.width;
     const h = canvas.height;
@@ -349,6 +486,15 @@
     push('ipm_track_valid', status.ipm_track_valid);
     if (hasValue(status.ipm_track_method)) push('ipm_track_method', formatTrackMethod(status.ipm_track_method));
     if (hasValue(status.ipm_centerline_source)) push('ipm_centerline_source', formatCenterlineSource(status.ipm_centerline_source));
+    if (Number.isFinite(Number(status.route_main_state))) push('route_main_state', formatRouteMainState(Number(status.route_main_state)));
+    if (Number.isFinite(Number(status.route_sub_state))) push('route_sub_state', formatRouteSubState(Number(status.route_sub_state)));
+    if (Number.isFinite(Number(status.route_preferred_source))) push('route_preferred_source', formatRoutePreferredSource(Number(status.route_preferred_source)));
+    if (Number.isFinite(Number(status.route_encoder_since_enter))) push('route_encoder_since_enter', status.route_encoder_since_enter);
+    if (Number.isFinite(Number(status.route_cross_loss_count))) push('route_cross_loss_count', status.route_cross_loss_count);
+    if (Number.isFinite(Number(status.route_left_loss_count))) push('route_left_loss_count', status.route_left_loss_count);
+    if (Number.isFinite(Number(status.route_left_gain_count))) push('route_left_gain_count', status.route_left_gain_count);
+    if (Number.isFinite(Number(status.route_right_loss_count))) push('route_right_loss_count', status.route_right_loss_count);
+    if (Number.isFinite(Number(status.route_right_gain_count))) push('route_right_gain_count', status.route_right_gain_count);
     push('ipm_track_index', status.ipm_track_index);
     if (Array.isArray(status.ipm_track_point)) push('ipm_track_point', formatArrayInline(status.ipm_track_point));
     push('left_boundary_corner_found', status.left_boundary_corner_found);
@@ -401,6 +547,10 @@
     formatTrackMethod,
     formatCenterlineSource,
     formatCenterlineSourceLabel,
+    formatRouteMainState,
+    formatRouteSubState,
+    formatRoutePreferredSource,
+    buildRouteStateSummary,
     drawCurveChartToCanvas,
     drawPolyline,
     drawPointSet,

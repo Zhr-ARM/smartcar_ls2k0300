@@ -222,6 +222,15 @@ void vision_image_processor_get_ipm_boundary_corner_state(bool *left_found, int 
                                                           bool *right_found, int *right_x, int *right_y);
 void vision_image_processor_get_ipm_boundary_corner_indices(int *left_index, int *right_index);
 void vision_image_processor_get_ipm_boundary_straight_state(bool *left_straight, bool *right_straight);
+int vision_image_processor_route_main_state();
+int vision_image_processor_route_sub_state();
+int vision_image_processor_route_preferred_source();
+uint32 vision_image_processor_route_encoder_since_state_enter();
+int vision_image_processor_route_cross_loss_count();
+int vision_image_processor_route_left_loss_count();
+int vision_image_processor_route_left_gain_count();
+int vision_image_processor_route_right_loss_count();
+int vision_image_processor_route_right_gain_count();
 // 逆透视处理链“平移中线”结果：
 // - from_left : 左边界向右法向平移得到；
 // - from_right: 右边界向左法向平移得到。

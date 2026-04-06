@@ -10,6 +10,90 @@
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .card { background: #111827; border: 1px solid #334155; border-radius: 10px; padding: 12px; }
     .title { margin-bottom: 10px; color: #cbd5e1; font-size: 14px; }
+    .route-state-card {
+      grid-column: 1 / -1;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(9, 14, 24, 0.98));
+      border-color: rgba(96, 165, 250, 0.45);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+    .route-state-top {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .route-state-stat {
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(71, 85, 105, 0.92);
+      border-radius: 12px;
+      padding: 10px 12px;
+      min-height: 82px;
+    }
+    .route-state-label {
+      color: #94a3b8;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .route-state-value {
+      color: #f8fafc;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+    .route-state-judgment {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(56, 189, 248, 0.26);
+      background: rgba(8, 15, 31, 0.92);
+      color: #dbeafe;
+      line-height: 1.55;
+      min-height: 52px;
+    }
+    .route-state-clues {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .route-state-chip {
+      border-radius: 999px;
+      padding: 7px 10px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(71, 85, 105, 0.95);
+      color: #cbd5e1;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .route-state-chip strong {
+      color: #f8fafc;
+      margin-right: 6px;
+    }
+    .route-state-counters {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .route-state-counter {
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(51, 65, 85, 0.9);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .route-state-counter-label {
+      color: #94a3b8;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+    .route-state-counter-value {
+      color: #f8fafc;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
     .view { position: relative; }
     canvas { width: 100%; background: #000; border-radius: 8px; image-rendering: pixelated; display: block; }
     .pixel-info {
@@ -224,6 +308,10 @@
         width: auto;
         margin: 0 0 12px;
       }
+      .route-state-top,
+      .route-state-counters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
   </style>
 </head>
@@ -346,6 +434,30 @@
       <div class="card" id="statusCard">
         <div class="title">状态数据</div>
         <pre id="status">loading...</pre>
+      </div>
+      <div class="card route-state-card" id="routeStateCard">
+        <div class="title">状态机数据</div>
+        <div class="route-state-top">
+          <div class="route-state-stat">
+            <div class="route-state-label">当前主状态</div>
+            <div class="route-state-value" id="routeMainStateValue">--</div>
+          </div>
+          <div class="route-state-stat">
+            <div class="route-state-label">当前子状态</div>
+            <div class="route-state-value" id="routeSubStateValue">--</div>
+          </div>
+          <div class="route-state-stat">
+            <div class="route-state-label">偏向来源</div>
+            <div class="route-state-value" id="routePreferredSourceValue">--</div>
+          </div>
+          <div class="route-state-stat">
+            <div class="route-state-label">进入当前状态后编码器</div>
+            <div class="route-state-value" id="routeEncoderValue">--</div>
+          </div>
+        </div>
+        <div class="route-state-judgment" id="routeStateJudgment">waiting...</div>
+        <div class="route-state-clues" id="routeStateClues"></div>
+        <div class="route-state-counters" id="routeStateCounters"></div>
       </div>
       <div class="card" id="curvatureCard">
         <div class="title">中线曲率图（横轴=索引，纵轴=曲率）</div>
@@ -492,6 +604,14 @@
     const ipmCard = document.getElementById('ipmCard');
     const ipmRawCard = document.getElementById('ipmRawCard');
     const statusCard = document.getElementById('statusCard');
+    const routeStateCard = document.getElementById('routeStateCard');
+    const routeMainStateValue = document.getElementById('routeMainStateValue');
+    const routeSubStateValue = document.getElementById('routeSubStateValue');
+    const routePreferredSourceValue = document.getElementById('routePreferredSourceValue');
+    const routeEncoderValue = document.getElementById('routeEncoderValue');
+    const routeStateJudgment = document.getElementById('routeStateJudgment');
+    const routeStateClues = document.getElementById('routeStateClues');
+    const routeStateCounters = document.getElementById('routeStateCounters');
     const curvatureCard = document.getElementById('curvatureCard');
     const leftBoundaryAngleCosCard = document.getElementById('leftBoundaryAngleCosCard');
     const rightBoundaryAngleCosCard = document.getElementById('rightBoundaryAngleCosCard');
@@ -565,6 +685,7 @@
       receiverCore.setElementVisible(document.querySelector('.grid'), true);
       receiverCore.setElementVisible(document.querySelector('.toolbar'), true);
       receiverCore.setElementVisible(statusCard, true);
+      receiverCore.setElementVisible(routeStateCard, true);
       receiverCore.setElementVisible(ipmCard, active);
       receiverCore.setElementVisible(ipmRawCard, active);
       receiverCore.setElementVisible(curvatureCard, active && toggleCenterlineCurvatureChart.checked);
@@ -676,19 +797,54 @@
       return [];
     }
 
+    function renderRouteStatePanel(status) {
+      const route = receiverCore.buildRouteStateSummary(status || {});
+      routeMainStateValue.textContent = route.mainStateLabel || '--';
+      routeSubStateValue.textContent = route.subStateLabel || '--';
+      routePreferredSourceValue.textContent = route.preferredSourceLabel || '--';
+      routeEncoderValue.textContent = route.encoderSinceEnter !== null ? `${route.encoderSinceEnter}` : '--';
+      routeStateJudgment.textContent = route.judgments.length > 0 ? route.judgments.join(' ') : '等待状态机数据...';
+
+      routeStateClues.innerHTML = '';
+      const clues = route.clues.length > 0 ? route.clues : ['暂无可用判定线索'];
+      for (const text of clues) {
+        const chip = document.createElement('div');
+        chip.className = 'route-state-chip';
+        chip.textContent = text;
+        routeStateClues.appendChild(chip);
+      }
+
+      routeStateCounters.innerHTML = '';
+      const counters = route.counters.length > 0 ? route.counters : [['状态计数', null]];
+      for (const [label, value] of counters) {
+        const counter = document.createElement('div');
+        counter.className = 'route-state-counter';
+        counter.innerHTML = `<div class="route-state-counter-label">${label}</div><div class="route-state-counter-value">${value === null ? '--' : value}</div>`;
+        routeStateCounters.appendChild(counter);
+      }
+    }
+
+    function renderStatusPanels(status) {
+      const renderStatus = getRenderStatus();
+      statusEl.textContent = buildStatusSummary(renderStatus);
+      renderRouteStatePanel(renderStatus);
+      if (hasValue(renderStatus.ipm_centerline_source)) {
+        ipmCenterlineSourceLabel.style.display = '';
+        ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(renderStatus.ipm_centerline_source);
+      } else {
+        ipmCenterlineSourceLabel.style.display = 'none';
+      }
+    }
+
     localWorker.onmessage = (ev) => {
       localWorkerBusy = false;
       latestLocalPayload = ev.data || {};
       if (!fullDebugModeActive) return;
       const renderStatus = getRenderStatus();
-      statusEl.textContent = buildStatusSummary(renderStatus);
+      renderStatusPanels(renderStatus);
       drawIpmBoundaries(renderStatus);
       drawCurvatureChart(renderStatus);
       drawBoundaryAngleCosCharts(renderStatus);
-      if (hasValue(renderStatus.ipm_centerline_source)) {
-        ipmCenterlineSourceLabel.style.display = '';
-        ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(renderStatus.ipm_centerline_source);
-      }
     };
 
     function setCardVisible(el, visible) {
@@ -790,6 +946,24 @@
       pushArray(trackRows, 'ipm_weighted_decision_point', status.ipm_weighted_decision_point);
       pushArray(trackRows, 'src_weighted_decision_point', status.src_weighted_decision_point);
       addSection('巡线跟踪', trackRows);
+
+      const routeRows = [];
+      if (hasValue(status.route_main_state)) {
+        push(routeRows, 'route_main_state', receiverCore.formatRouteMainState(status.route_main_state));
+      }
+      if (hasValue(status.route_sub_state)) {
+        push(routeRows, 'route_sub_state', receiverCore.formatRouteSubState(status.route_sub_state));
+      }
+      if (hasValue(status.route_preferred_source)) {
+        push(routeRows, 'route_preferred_source', receiverCore.formatRoutePreferredSource(status.route_preferred_source));
+      }
+      push(routeRows, 'route_encoder_since_enter', status.route_encoder_since_enter);
+      push(routeRows, 'route_cross_loss_count', status.route_cross_loss_count);
+      push(routeRows, 'route_left_loss_count', status.route_left_loss_count);
+      push(routeRows, 'route_left_gain_count', status.route_left_gain_count);
+      push(routeRows, 'route_right_loss_count', status.route_right_loss_count);
+      push(routeRows, 'route_right_gain_count', status.route_right_gain_count);
+      addSection('状态机', routeRows);
 
       const cornerRows = [];
       push(cornerRows, 'left_boundary_corner_found', status.left_boundary_corner_found);
@@ -1057,6 +1231,7 @@
           : `回放中，当前时间 ${fmtPlaybackTime(video.currentTime || 0)}`;
         playbackTimeLabel.textContent = `${fmtPlaybackTime(video.currentTime || 0)} / ${fmtPlaybackTime(duration)}`;
         playbackToggleBtn.textContent = video.paused ? '播放' : '暂停';
+        playbackStatus.textContent = formatStatusForPanel(synced || {});
         setParamPanelText(formatStatusForPanel(synced || {}));
         return;
       }
@@ -1206,11 +1381,6 @@
 
     function playLastRecording() {
       if (!lastRecording) return;
-      playbackStatus.textContent = JSON.stringify({
-        recorded_at_ms: lastRecording.savedAtMs,
-        duration_sec: lastRecording.durationSec,
-        frame_count: lastRecording.frameCount
-      }, null, 2);
       rebuildPlaybackGrid(lastRecording.urls || {}, lastRecording.videoLabels || {});
       paramPanelOpen = true;
       paramModal.style.display = 'flex';
@@ -1340,13 +1510,6 @@
         updateRecordingUi();
 
         savedLoadInfo.textContent = `加载成功\nfolder: ${folder}\n时长: ${(durationMs / 1000).toFixed(1)}s\n帧数: ${frameCount}`;
-        playbackStatus.textContent = JSON.stringify({
-          folder,
-          recorded_at_ms: loadedStatus.recorded_at_ms,
-          duration_sec: (durationMs / 1000).toFixed(1),
-          frame_count: frameCount
-        }, null, 2);
-
         rebuildPlaybackGrid(urls, videoLabels);
 
         paramPanelOpen = true;
@@ -1868,7 +2031,7 @@
         const renderStatus = getRenderStatus();
         updateTransportPanel(j);
         modeNote.textContent = buildModeExplanation(j);
-        statusEl.textContent = buildStatusSummary(renderStatus);
+        renderStatusPanels(renderStatus);
         if (isFull || shouldUseLocalCompute()) {
           drawIpmBoundaries(renderStatus);
           drawCurvatureChart(renderStatus);
@@ -2010,7 +2173,7 @@
       const isFull = receiverCore.isFullDebugProfile(latestStatus.web_data_profile);
       setDebugPageActive(isFull || shouldUseLocalCompute());
       modeNote.textContent = buildModeExplanation(latestStatus || {});
-      statusEl.textContent = buildStatusSummary(getRenderStatus() || {});
+      renderStatusPanels(getRenderStatus() || {});
       drawIpmBoundaries(getRenderStatus() || {});
       drawCurvatureChart(getRenderStatus() || {});
       drawBoundaryAngleCosCharts(getRenderStatus() || {});

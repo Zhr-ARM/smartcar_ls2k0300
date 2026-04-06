@@ -258,15 +258,15 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 边界三点法夹角 cos 计算步长（索引步长）。
     .ipm_boundary_angle_step = 3,
     // 角点候选 cos 阈值（<=阈值进入局部极小值检测）。
-    .ipm_boundary_corner_cos_threshold = 0.55f,
+    .ipm_boundary_corner_cos_threshold = 0.5f,
     // 角点 NMS 半径（索引半径）。
     .ipm_boundary_corner_nms_radius = 3,
     // 直边检测最小边界点数。
-    .ipm_boundary_straight_min_points = 20,
+    .ipm_boundary_straight_min_points = 30,
     // 直边检测起始检查窗口长度。
     .ipm_boundary_straight_check_count = 20,
     // 直边检测起始窗口内 cos 最小阈值。
-    .ipm_boundary_straight_min_cos = 0.90f,
+    .ipm_boundary_straight_min_cos = 0.95f,
     // ---------- 边界双处理流水线：中线生成 ----------
     // 边界法向平移距离，单位 px，用于生成平移中线。
     .ipm_boundary_shift_distance_px = 15.0f,

@@ -702,6 +702,15 @@ static void send_tcp_status()
                static_cast<int>(vision_image_processor_ipm_line_error_method()));
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_source, "ipm_centerline_source",
                static_cast<int>(vision_image_processor_ipm_line_error_source()));
+    append_int(true, "route_main_state", vision_image_processor_route_main_state());
+    append_int(true, "route_sub_state", vision_image_processor_route_sub_state());
+    append_int(true, "route_preferred_source", vision_image_processor_route_preferred_source());
+    append_int(true, "route_encoder_since_enter", static_cast<int>(vision_image_processor_route_encoder_since_state_enter()));
+    append_int(true, "route_cross_loss_count", vision_image_processor_route_cross_loss_count());
+    append_int(true, "route_left_loss_count", vision_image_processor_route_left_loss_count());
+    append_int(true, "route_left_gain_count", vision_image_processor_route_left_gain_count());
+    append_int(true, "route_right_loss_count", vision_image_processor_route_right_loss_count());
+    append_int(true, "route_right_gain_count", vision_image_processor_route_right_gain_count());
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_index, "ipm_track_index", ipm_track_index);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_track_point, "ipm_track_point",
                      {ipm_track_x, ipm_track_y});
