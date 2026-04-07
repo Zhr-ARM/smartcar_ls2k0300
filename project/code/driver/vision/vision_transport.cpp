@@ -642,8 +642,8 @@ static void send_tcp_status()
     if (!send_full_debug)
     {
         append_int(true, "ts_ms", ts_ms);
-        append_float(true, "base_speed", line_follow_thread_base_speed());
-        append_float(true, "adjusted_base_speed", line_follow_thread_adjusted_base_speed());
+        append_float(true, "base_speed", line_follow_thread_normal_speed_reference());
+        append_float(true, "adjusted_base_speed", line_follow_thread_applied_base_speed());
         append_float(true, "left_target_count", motor_thread_left_target_count());
         append_float(true, "right_target_count", motor_thread_right_target_count());
         append_float(true, "left_current_count", motor_thread_left_count());
@@ -661,8 +661,8 @@ static void send_tcp_status()
 
     append_int(g_vision_runtime_config.udp_web_tcp_send_ts_ms, "ts_ms", ts_ms);
     append_int(g_vision_runtime_config.udp_web_tcp_send_line_error, "line_error", line_error);
-    append_float(g_vision_runtime_config.udp_web_tcp_send_base_speed, "base_speed", line_follow_thread_base_speed());
-    append_float(g_vision_runtime_config.udp_web_tcp_send_base_speed, "adjusted_base_speed", line_follow_thread_adjusted_base_speed());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_base_speed, "base_speed", line_follow_thread_normal_speed_reference());
+    append_float(g_vision_runtime_config.udp_web_tcp_send_base_speed, "adjusted_base_speed", line_follow_thread_applied_base_speed());
     append_float(g_vision_runtime_config.udp_web_tcp_send_left_target_count, "left_target_count", motor_thread_left_target_count());
     append_float(g_vision_runtime_config.udp_web_tcp_send_right_target_count, "right_target_count", motor_thread_right_target_count());
     append_float(g_vision_runtime_config.udp_web_tcp_send_left_current_count, "left_current_count", motor_thread_left_count());

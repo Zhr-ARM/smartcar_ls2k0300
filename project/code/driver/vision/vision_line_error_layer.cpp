@@ -213,7 +213,7 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     {
         const float speed_k = g_ipm_line_error_speed_k.load();
         const float speed_b = g_ipm_line_error_speed_b.load();
-        const float current_speed = line_follow_thread_base_speed();
+        const float current_speed = line_follow_thread_applied_base_speed();
         const int cfg_index_min = g_ipm_line_error_index_min.load();
         const int cfg_index_max = g_ipm_line_error_index_max.load();
         const int range_min = std::min(cfg_index_min, cfg_index_max);

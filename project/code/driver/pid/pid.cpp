@@ -757,18 +757,44 @@ float PositionalPidController::compute(float current_value)
 }
 
 /**
+ * @brief 基于反馈值计算带 dt 的位置式 PID 输出
+ * @param current_value 当前反馈值
+ * @param dt_seconds 本次控制间隔
+ * @return 当前输出结果
+ */
+float PositionalPidController::compute(float current_value, float dt_seconds)
+{
+    float err = target_ - current_value;
+    return compute_by_error(err, dt_seconds);
+}
+
+/**
  * @brief 基于误差直接计算位置式 PID 输出
  * @param current_error 当前误差
  * @return 当前输出结果
  */
 float PositionalPidController::compute_by_error(float current_error)
 {
+    return compute_by_error(current_error, 1.0f);
+}
+
+/**
+ * @brief 基于误差直接计算带 dt 的位置式 PID 输出
+ * @param current_error 当前误差
+ * @param dt_seconds 本次控制间隔
+ * @return 当前输出结果
+ */
+float PositionalPidController::compute_by_error(float current_error, float dt_seconds)
+{
+    const float safe_dt_seconds =
+        (std::isfinite(dt_seconds) && dt_seconds > 1.0e-4f) ? dt_seconds : 1.0f;
+
     last_error_ = error_;
     error_ = current_error;
 
     float pout = error_ * kp_;
-    float dout = (error_ - last_error_) * kd_;
-    integral_ += error_ * ki_;
+    float dout = ((error_ - last_error_) / safe_dt_seconds) * kd_;
+    integral_ += error_ * ki_ * safe_dt_seconds;
     if (max_integral_ > 0.0f) {
         integral_ = clamp(integral_, -max_integral_, max_integral_);
     }

@@ -1090,6 +1090,30 @@ home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.s
 .PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.s
 
+home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.o: home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.i: home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.i
+
+home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.s: home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.s
+
 home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.o: home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o
 .PHONY : home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.o
 
@@ -1267,6 +1291,9 @@ help:
 	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.o"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.i"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.s"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.o"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.i"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.s"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.o"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.i"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.s"

@@ -46,7 +46,7 @@ void stop_all_motion_immediately()
 {
     // 先把目标清零，避免清线程前还有旧的速度目标继续下发。
     motor_thread_set_target_count(0.0f, 0.0f);
-    line_follow_thread_set_base_speed(0.0f);
+    line_follow_thread_set_normal_speed_reference(0.0f);
     brushless_driver.stop_all();
 }
 
@@ -214,7 +214,7 @@ int main(int, char**)
     vision_image_processor_set_ipm_line_error_index_range(g_vision_runtime_config.ipm_line_error_index_min,
                                                           g_vision_runtime_config.ipm_line_error_index_max); // line_error 随速度索引区间
 
-    printf("[VISION CFG] mode=%d max_fps=%u infer=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_angle_step=%d ipm_straight_min_pts=%d ipm_straight_check=%d ipm_straight_min_cos=%.2f ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d yaw_ref_mode=%d\r\n",
+    printf("[VISION CFG] mode=%d max_fps=%u infer=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_angle_step=%d ipm_straight_min_pts=%d ipm_straight_check=%d ipm_straight_min_cos=%.2f ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
            static_cast<int>(vision_thread_get_send_mode()),
            static_cast<unsigned int>(vision_thread_get_send_max_fps()),
            vision_thread_infer_enabled() ? 1 : 0,
@@ -243,13 +243,14 @@ int main(int, char**)
            static_cast<double>(g_vision_runtime_config.ipm_line_error_speed_k),
            static_cast<double>(g_vision_runtime_config.ipm_line_error_speed_b),
            g_vision_runtime_config.ipm_line_error_index_min,
-           g_vision_runtime_config.ipm_line_error_index_max,
-           g_vision_runtime_config.yaw_rate_ref_mode);
+           g_vision_runtime_config.ipm_line_error_index_max);
 
     uart_thread_init();
 
-    // 巡线基础速度配置（控制线程会在此基础上叠加转向差速）。
-    line_follow_thread_set_base_speed(200.0f);
+    // 巡线直道参考速度配置：
+    // 这里默认与 NORMAL 档基础速度保持一致；若想整体统一提速/降速，可改 pid_tuning 中的全局倍率，
+    // 或在这里把“期望直道参考速度”改成一个新的值，让所有状态按比例一起缩放。
+    line_follow_thread_set_normal_speed_reference(pid_tuning::route_line_follow::kNormalProfile.base_speed);
     
     // 为motor_thread设置目标计数，单位 counts/5ms。
     // 固定左右轮目标值为 800，便于速度环调参。

@@ -99,6 +99,7 @@ set(OLD_GLOB
   "/home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_infer_async.cpp"
   "/home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_line_error_layer.cpp"
   "/home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_pipeline.cpp"
+  "/home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_route_state_machine.cpp"
   "/home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_transport.cpp"
   )
 if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")

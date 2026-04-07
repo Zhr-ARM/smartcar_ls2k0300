@@ -363,10 +363,24 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_p
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.s"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp -o CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.s
 
+CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o: CMakeFiles/project.dir/flags.make
+CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o: /home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp
+CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o"
+	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o -c /home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp
+
+CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.i"
+	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp > CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.i
+
+CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.s"
+	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp -o CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.s
+
 CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o: /home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_23) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o -c /home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.i: cmake_force
@@ -380,7 +394,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_t
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.o: /home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_23) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_24) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.i: cmake_force
@@ -394,7 +408,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.o: /home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_24) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_25) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.i: cmake_force
@@ -408,7 +422,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp.o: /home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_25) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_26) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_function.cpp.i: cmake_force
@@ -422,7 +436,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_funct
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp.o: /home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_26) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_27) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant.cpp.i: cmake_force
@@ -436,7 +450,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_as
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp.o: /home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_27) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_28) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_assistant_interface.cpp.i: cmake_force
@@ -450,7 +464,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_components/seekfree_as
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp.o: /home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_28) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_29) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660ra.cpp.i: cmake_force
@@ -464,7 +478,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu66
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp.o: /home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_29) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_30) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu660rb.cpp.i: cmake_force
@@ -478,7 +492,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu66
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp.o: /home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_30) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu963ra.cpp.i: cmake_force
@@ -492,7 +506,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu96
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp.o: /home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_32) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_core.cpp.i: cmake_force
@@ -506,7 +520,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_imu_c
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp.o: /home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_32) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_33) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips200_fb.cpp.i: cmake_force
@@ -520,7 +534,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_ips20
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp.o: /home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_33) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_34) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.cpp.i: cmake_force
@@ -534,7 +548,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_device/zf_device_uvc.c
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp.o: /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_34) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_35) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.cpp.i: cmake_force
@@ -548,7 +562,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_adc.c
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp.o: /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_35) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_36) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay.cpp.i: cmake_force
@@ -562,7 +576,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_delay
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp.o: /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_36) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_37) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encoder.cpp.i: cmake_force
@@ -576,7 +590,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_encod
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp.o: /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_37) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_38) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.cpp.i: cmake_force
@@ -590,7 +604,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_file.
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp.o: /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_38) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_39) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.cpp.i: cmake_force
@@ -604,7 +618,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_gpio.
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp.o: /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_39) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_40) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.cpp.i: cmake_force
@@ -618,7 +632,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pit.c
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp.o: /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_40) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_41) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.cpp.i: cmake_force
@@ -632,7 +646,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_pwm.c
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp.o: /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_41) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_42) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_client.cpp.i: cmake_force
@@ -646,7 +660,7 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_tcp_c
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.o: CMakeFiles/project.dir/flags.make
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.o: /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.o: CMakeFiles/project.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_42) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_43) "Building CXX object CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.o"
 	/opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/bin/loongarch64-linux-gnu-g++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.o -MF CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.o.d -o CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.o -c /home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp
 
 CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.i: cmake_force
@@ -680,6 +694,7 @@ project_OBJECTS = \
 "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.o" \
 "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.o" \
 "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.o" \
+"CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o" \
 "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o" \
 "CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.o" \
 "CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.o" \
@@ -726,6 +741,7 @@ project: CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision
 project: CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_infer_async.cpp.o
 project: CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.o
 project: CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.o
+project: CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o
 project: CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o
 project: CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_fifo.cpp.o
 project: CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_common/zf_common_font.cpp.o
@@ -766,7 +782,7 @@ project: /opt/ls_2k0300_env/opencv_4_10_build/lib/libopencv_imgproc.so.4.10.0
 project: /opt/ls_2k0300_env/opencv_4_10_build/lib/libopencv_core.so.4.10.0
 project: /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/lib64/libgomp.so
 project: CMakeFiles/project.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_43) "Linking CXX executable project"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/zhr/2k0300/test1/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_44) "Linking CXX executable project"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/project.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

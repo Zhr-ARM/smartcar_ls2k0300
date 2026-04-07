@@ -79,6 +79,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_line_error_layer.cpp.o.d"
   "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.o"
   "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_pipeline.cpp.o.d"
+  "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o"
+  "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_route_state_machine.cpp.o.d"
   "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o"
   "CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_transport.cpp.o.d"
   "CMakeFiles/project.dir/main.cpp.o"

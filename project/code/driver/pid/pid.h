@@ -377,11 +377,27 @@ public:
     float compute(float current_value);
 
     /**
+     * @brief 基于当前反馈值计算带 dt 的位置式 PID 输出
+     * @param current_value 实际反馈值
+     * @param dt_seconds 本次控制间隔，单位秒
+     * @return 控制器计算结果
+     */
+    float compute(float current_value, float dt_seconds);
+
+    /**
      * @brief 纯误差驱动计算（常用于无明确稳态反馈的寻线模型）
      * @param current_error 偏差量
      * @return 控制器计算结果
      */
     float compute_by_error(float current_error);
+
+    /**
+     * @brief 纯误差驱动计算（带 dt 版本）
+     * @param current_error 偏差量
+     * @param dt_seconds 本次控制间隔，单位秒
+     * @return 控制器计算结果
+     */
+    float compute_by_error(float current_error, float dt_seconds);
 
     /**
      * @brief 重置控制器状态

@@ -312,6 +312,8 @@ CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/vision/vision_i
  /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_config.h \
  /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_frame_capture.h \
  /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_line_error_layer.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_route_state_machine.h \
+ /home/zhr/2k0300/test1/project/user/../code/app/motor_thread/motor_thread.h \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/opencv.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/opencv_modules.hpp \
  /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/core.hpp \

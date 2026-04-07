@@ -20,10 +20,10 @@ void line_follow_thread_cleanup();
 void line_follow_thread_print_info();
 
 /**
- * @brief 设置巡线控制的基础速度
- * @param speed 基础目标速度
+ * @brief 设置巡线直道参考速度
+ * @param speed NORMAL 档参考速度；其他状态会按各自 profile 相对缩放
  */
-void line_follow_thread_set_base_speed(float speed);
+void line_follow_thread_set_normal_speed_reference(float speed);
 
 /**
  * @brief 获取当前巡线误差，单位为像素
@@ -38,15 +38,15 @@ float line_follow_thread_error();
 float line_follow_thread_turn_output();
 
 /**
- * @brief 获取当前巡线基础速度
- * @return 当前基础速度设定值
+ * @brief 获取当前巡线直道参考速度
+ * @return 当前 NORMAL 档参考速度设定值
  */
-float line_follow_thread_base_speed();
+float line_follow_thread_normal_speed_reference();
 
 /**
  * @brief 获取当前实际参与左右轮目标合成的基础速度
- * @return 当前降速后的基础速度；若尚未进入有效控制周期则返回基础速度设定值
+ * @return 当前真正下发给左右轮合成逻辑的基础速度；若尚未进入有效控制周期则返回直道参考速度
  */
-float line_follow_thread_adjusted_base_speed();
+float line_follow_thread_applied_base_speed();
 
 #endif
