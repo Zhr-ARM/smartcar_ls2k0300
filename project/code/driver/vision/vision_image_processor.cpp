@@ -40,6 +40,16 @@ static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
 #define kIpmOutputWidth (vision_ipm_width())
 #define kIpmOutputHeight (vision_ipm_height())
 
+static inline int ipm_calibration_src_width()
+{
+    return std::clamp(g_vision_processor_config.ipm_calibration_src_width, 1, VISION_MAX_PROC_WIDTH);
+}
+
+static inline int ipm_calibration_src_height()
+{
+    return std::clamp(g_vision_processor_config.ipm_calibration_src_height, 1, VISION_MAX_PROC_HEIGHT);
+}
+
 static inline int scale_by_width(int ref_px)
 {
     if (ref_px <= 0)
@@ -67,8 +77,6 @@ static inline int scale_by_area(int ref_area_px)
     const int64_t scaled = static_cast<int64_t>(ref_area_px) * kProcWidth * kProcHeight;
     return std::max(1, static_cast<int>((scaled + kRefProcPixels / 2) / kRefProcPixels));
 }
-
-static constexpr int kMazeStartMinBoundaryGapPx = 5;
 
 // 原图坐标系边线缓存：x1/x2/x3 对应 左/中/右边线，y1/y2/y3 为对应 y。
 static uint16 g_xy_x1_boundary[VISION_BOUNDARY_NUM];
@@ -207,6 +215,7 @@ static int g_cross_in_saved_center_x = -1;
 
 // 迷宫法起始搜索行（可运行时配置）。
 static std::atomic<int> g_maze_start_row(vision_runtime_config_maze_start_row_px());
+static std::atomic<int> g_runtime_maze_start_row(vision_runtime_config_maze_start_row_px());
 static std::atomic<int> g_maze_trace_y_fallback_stop_delta(vision_runtime_config_maze_trace_y_fallback_stop_delta_px());
 static std::atomic<int> g_maze_trace_x_min(vision_processor_config_default_maze_trace_x_min_px());
 static std::atomic<int> g_maze_trace_x_max(vision_processor_config_default_maze_trace_x_max_px());
@@ -873,13 +882,15 @@ static bool src_point_to_ipm_point(int src_x, int src_y, int *ipm_x, int *ipm_y)
         return false;
     }
 
-    // 逆透视矩阵按 160x120 标定；在其他分辨率下先映射回标定坐标系。
+    // 逆透视矩阵按配置中的标定原图尺寸解释；当前处理分辨率变化时先映射回标定坐标系。
+    const int calib_w = ipm_calibration_src_width();
+    const int calib_h = ipm_calibration_src_height();
     const double src_x_ref = (kProcWidth > 1)
-                                 ? (static_cast<double>(src_x) * static_cast<double>(kRefProcWidth - 1) /
+                                 ? (static_cast<double>(src_x) * static_cast<double>(calib_w - 1) /
                                     static_cast<double>(kProcWidth - 1))
                                  : 0.0;
     const double src_y_ref = (kProcHeight > 1)
-                                 ? (static_cast<double>(src_y) * static_cast<double>(kRefProcHeight - 1) /
+                                 ? (static_cast<double>(src_y) * static_cast<double>(calib_h - 1) /
                                     static_cast<double>(kProcHeight - 1))
                                  : 0.0;
 
@@ -917,13 +928,15 @@ static bool ipm_point_to_src_point(int ipm_x, int ipm_y, int *src_x, int *src_y)
 
     const double src_x_ref = (h_inv[0][0] * ipm_x + h_inv[0][1] * ipm_y + h_inv[0][2]) / w;
     const double src_y_ref = (h_inv[1][0] * ipm_x + h_inv[1][1] * ipm_y + h_inv[1][2]) / w;
-    const int x = (kRefProcWidth > 1)
+    const int calib_w = ipm_calibration_src_width();
+    const int calib_h = ipm_calibration_src_height();
+    const int x = (calib_w > 1)
                       ? static_cast<int>(std::lround(src_x_ref * static_cast<double>(kProcWidth - 1) /
-                                                     static_cast<double>(kRefProcWidth - 1)))
+                                                     static_cast<double>(calib_w - 1)))
                       : 0;
-    const int y = (kRefProcHeight > 1)
+    const int y = (calib_h > 1)
                       ? static_cast<int>(std::lround(src_y_ref * static_cast<double>(kProcHeight - 1) /
-                                                     static_cast<double>(kRefProcHeight - 1)))
+                                                     static_cast<double>(calib_h - 1)))
                       : 0;
     if (x < 0 || x >= kProcWidth || y < 0 || y >= kProcHeight)
     {
@@ -1975,13 +1988,13 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                     &cross_left_proc_num,
                                                     kIpmOutputWidth,
                                                     kIpmOutputHeight,
-                                                    10,
+                                                    vision_runtime_config_cross_tail_extra_points(),
                                                     cross_step_px);
         extrapolate_boundary_tail_for_cross_inplace(cross_right_proc.data(),
                                                     &cross_right_proc_num,
                                                     kIpmOutputWidth,
                                                     kIpmOutputHeight,
-                                                    10,
+                                                    vision_runtime_config_cross_tail_extra_points(),
                                                     cross_step_px);
     }
 
@@ -2232,7 +2245,7 @@ static void validate_maze_start_pair(const uint8 *classify_img,
         return;
     }
 
-    if (right_start_x <= left_start_x || (right_start_x - left_start_x) <= kMazeStartMinBoundaryGapPx)
+    if (right_start_x <= left_start_x || (right_start_x - left_start_x) <= vision_runtime_config_maze_start_min_boundary_gap_px())
     {
         *left_ok = false;
         *right_ok = false;
@@ -2674,9 +2687,9 @@ bool vision_image_processor_process_step()
     int maze_start_row = std::clamp(g_maze_start_row.load(), 1, kProcHeight - 2);
     if (cross_in_active)
     {
-        const int cross_probe_start_x = std::clamp(scale_by_width(80), maze_trace_x_min, maze_trace_x_max);
-        const int cross_probe_min_row = std::clamp(scale_by_height(25), 1, kProcHeight - 2);
-        const int cross_probe_max_gap = std::max(1, scale_by_width(80));
+        const int cross_probe_start_x = std::clamp(vision_runtime_config_cross_probe_start_x_px(), maze_trace_x_min, maze_trace_x_max);
+        const int cross_probe_min_row = std::clamp(vision_runtime_config_cross_probe_min_row_px(), 1, kProcHeight - 2);
+        const int cross_probe_max_gap = std::max(1, vision_runtime_config_cross_probe_max_gap_px());
         const int cross_probe_stop_row = kProcHeight - 2;
 
         if (g_cross_in_saved_start_row < 0)
@@ -2756,20 +2769,22 @@ bool vision_image_processor_process_step()
     }
 
     g_cross_detected_stop_row.store(cross_detected_stop_row);
+    g_runtime_maze_start_row.store(maze_start_row);
 
-    // 起点搜索改为“基于同侧历史起点向对侧偏移10像素”：
-    // - 左边界：上一帧左起点 + 10（向右）；
-    // - 右边界：上一帧右起点 - 10（向左）。
+    // 起点搜索改为“基于同侧历史起点向对侧偏移 history_offset 像素”：
+    // - 左边界：上一帧左起点 + history_offset（向右）；
+    // - 右边界：上一帧右起点 - history_offset（向左）。
     // 无历史时退回到中心起搜。
+    const int history_start_offset_px = vision_runtime_config_maze_history_start_offset_px();
     const int left_search_center_x = cross_in_active
                                          ? cross_trace_center_x
                                          : ((g_last_maze_left_start_x >= maze_trace_x_min && g_last_maze_left_start_x <= maze_trace_x_max)
-                                                ? std::clamp(g_last_maze_left_start_x + 10, maze_trace_x_min, maze_trace_x_max)
+                                                ? std::clamp(g_last_maze_left_start_x + history_start_offset_px, maze_trace_x_min, maze_trace_x_max)
                                                 : fallback_center_x);
     const int right_search_center_x = cross_in_active
                                           ? cross_trace_center_x
                                           : ((g_last_maze_right_start_x >= maze_trace_x_min && g_last_maze_right_start_x <= maze_trace_x_max)
-                                                 ? std::clamp(g_last_maze_right_start_x - 10, maze_trace_x_min, maze_trace_x_max)
+                                                 ? std::clamp(g_last_maze_right_start_x - history_start_offset_px, maze_trace_x_min, maze_trace_x_max)
                                                  : fallback_center_x);
     const int left_search_row = maze_start_row;
     const int right_search_row = maze_start_row;
@@ -2874,7 +2889,7 @@ bool vision_image_processor_process_step()
     if (left_ok && right_ok)
     {
         const int start_gap = right_start_x - left_start_x;
-        if (start_gap > 0 && start_gap < kMazeStartMinBoundaryGapPx)
+        if (start_gap > 0 && start_gap < vision_runtime_config_maze_start_min_boundary_gap_px())
         {
             if (left_num <= right_num)
             {
@@ -2943,7 +2958,7 @@ bool vision_image_processor_process_step()
     g_last_maze_left_ok = left_ok;
     g_last_maze_right_ok = right_ok;
     // 规则：哪一边丢线，就把哪一边历史起点归为中心。
-    // 当前搜索策略为 left=hist+10, right=hist-10，因此这里用反推值写入 hist。
+    // 当前搜索策略为 left=hist+offset, right=hist-offset，因此这里用反推值写入 hist。
     const int center_x = std::clamp((maze_trace_x_min + maze_trace_x_max) / 2, maze_trace_x_min, maze_trace_x_max);
     if (left_ok)
     {
@@ -2951,7 +2966,7 @@ bool vision_image_processor_process_step()
     }
     else
     {
-        g_last_maze_left_start_x = std::clamp(center_x - 10, maze_trace_x_min, maze_trace_x_max);
+        g_last_maze_left_start_x = std::clamp(center_x - history_start_offset_px, maze_trace_x_min, maze_trace_x_max);
     }
     if (right_ok)
     {
@@ -2959,7 +2974,7 @@ bool vision_image_processor_process_step()
     }
     else
     {
-        g_last_maze_right_start_x = std::clamp(center_x + 10, maze_trace_x_min, maze_trace_x_max);
+        g_last_maze_right_start_x = std::clamp(center_x + history_start_offset_px, maze_trace_x_min, maze_trace_x_max);
     }
     g_last_total_us = static_cast<uint32>(std::chrono::duration_cast<std::chrono::microseconds>(t_maze_end - t0).count());
     g_processed_frame_seq.fetch_add(1U);
@@ -2981,6 +2996,11 @@ void vision_image_processor_set_maze_start_row(int row)
 int vision_image_processor_get_maze_start_row()
 {
     return g_maze_start_row.load();
+}
+
+int vision_image_processor_get_runtime_maze_start_row()
+{
+    return g_runtime_maze_start_row.load();
 }
 
 void vision_image_processor_set_maze_trace_x_range(int x_min, int x_max)

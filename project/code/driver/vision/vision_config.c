@@ -27,6 +27,27 @@ static inline int clamp_x_from_ratio(float ratio)
     const int x = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(width)));
     return std::clamp(x, 1, max_x);
 }
+
+static inline int clamp_width_delta_from_ratio(float ratio)
+{
+    const int width = vision_processing_width();
+    const int delta = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(width)));
+    return std::max(0, delta);
+}
+
+static inline int clamp_ipm_width_delta_from_ratio(float ratio)
+{
+    const int width = vision_ipm_width();
+    const int delta = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(width)));
+    return std::max(0, delta);
+}
+
+static inline int clamp_ipm_height_delta_from_ratio(float ratio)
+{
+    const int height = vision_ipm_height();
+    const int delta = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(height)));
+    return std::max(0, delta);
+}
 } // namespace
 
 const vision_runtime_config_t g_vision_runtime_config = {
@@ -274,6 +295,26 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .maze_start_row_ratio = 85.0f / 120.0f,
     // 迷宫法巡线回退停止阈值比例（y > min_y + delta 时停止）。
     .maze_trace_y_fallback_stop_delta_ratio = 15.0f / 120.0f,
+    // 左右起点最小间隔阈值比例。
+    .maze_start_min_boundary_gap_ratio = 5.0f / 160.0f,
+    // cross_in 下探起始中心 x 比例。
+    .cross_probe_start_x_ratio = 0.5,
+    // cross_in 下探最小起始行比例。
+    .cross_probe_min_row_ratio = 15.0f / 120.0f,
+    // cross_in 下探最大左右间隙比例。
+    .cross_probe_max_gap_ratio = 80.0f / 160.0f,
+    // 十字入口判定：左右角点欧氏距离阈值比例。
+    .route_cross_corner_distance_ratio = 40.0f / 280.0f,
+    // 十字 begin->in 判定：角点原图 y 阈值比例。
+    .route_cross_begin_corner_src_y_ratio = 0.5,
+    // 十字退出判定：cross_detected_stop_row 阈值比例。
+    .route_cross_stop_row_exit_ratio = 80.0f / 120.0f,
+    // 十字内边界尾部外推点数比例。
+    .cross_tail_extra_points_ratio = 10.0f / 140.0f,
+    // 历史起点向对侧偏移比例。
+    .maze_history_start_offset_ratio = 10.0f / 160.0f,
+    // 交叉路口状态机开关：当前先关闭，避免进入 cross begin/in 流程。
+    .route_cross_enabled = false,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = false,
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -356,15 +397,18 @@ const vision_processor_config_t g_vision_processor_config = {
     .demand_otsu_keep_full_binary_cache = true,
     // 是否启用逆透视流程。
     .enable_inverse_perspective = true,
+    // 当前这组逆透视矩阵按 320x240 原图重新标定。
+    .ipm_calibration_src_width = 320,
+    .ipm_calibration_src_height = 240,
     // 逆透视输出宽度。
     .ipm_output_width = VISION_MAX_IPM_WIDTH,
     // 逆透视输出高度。
     .ipm_output_height = VISION_MAX_IPM_HEIGHT,
     // 逆透视矩阵（标定参数）。
     .change_un_mat = {
-        {0.029630, -0.024954, -0.117149},
-        {-0.000000, 0.000207, 0.607059},
-        {-0.000000, -0.000323, 0.051471}
+        {-3.388202,5.186087,-294.277295},
+        {-0.244747,2.287130,-365.441576},
+        {-0.001079,0.032699,-4.681238}
     },
     // 相机内参矩阵（标定参数）。
     .camera_matrix = {
@@ -394,6 +438,51 @@ int vision_runtime_config_maze_start_row_px()
 int vision_runtime_config_maze_trace_y_fallback_stop_delta_px()
 {
     return clamp_delta_y_from_ratio(g_vision_runtime_config.maze_trace_y_fallback_stop_delta_ratio);
+}
+
+int vision_runtime_config_maze_start_min_boundary_gap_px()
+{
+    return clamp_width_delta_from_ratio(g_vision_runtime_config.maze_start_min_boundary_gap_ratio);
+}
+
+int vision_runtime_config_cross_probe_start_x_px()
+{
+    return clamp_x_from_ratio(g_vision_runtime_config.cross_probe_start_x_ratio);
+}
+
+int vision_runtime_config_cross_probe_min_row_px()
+{
+    return clamp_row_from_ratio(g_vision_runtime_config.cross_probe_min_row_ratio);
+}
+
+int vision_runtime_config_cross_probe_max_gap_px()
+{
+    return std::max(1, clamp_width_delta_from_ratio(g_vision_runtime_config.cross_probe_max_gap_ratio));
+}
+
+int vision_runtime_config_route_cross_corner_distance_px()
+{
+    return std::max(1, clamp_ipm_width_delta_from_ratio(g_vision_runtime_config.route_cross_corner_distance_ratio));
+}
+
+int vision_runtime_config_route_cross_begin_corner_src_y_px()
+{
+    return clamp_row_from_ratio(g_vision_runtime_config.route_cross_begin_corner_src_y_ratio);
+}
+
+int vision_runtime_config_route_cross_stop_row_exit_px()
+{
+    return clamp_row_from_ratio(g_vision_runtime_config.route_cross_stop_row_exit_ratio);
+}
+
+int vision_runtime_config_cross_tail_extra_points()
+{
+    return std::max(1, clamp_ipm_height_delta_from_ratio(g_vision_runtime_config.cross_tail_extra_points_ratio));
+}
+
+int vision_runtime_config_maze_history_start_offset_px()
+{
+    return std::max(1, clamp_width_delta_from_ratio(g_vision_runtime_config.maze_history_start_offset_ratio));
 }
 
 int vision_processor_config_default_maze_trace_x_min_px()

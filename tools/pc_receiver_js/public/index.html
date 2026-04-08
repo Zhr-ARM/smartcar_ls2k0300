@@ -1667,9 +1667,11 @@
       const mazeConfigPx = (renderStatus && renderStatus.maze_config_px && typeof renderStatus.maze_config_px === 'object')
         ? renderStatus.maze_config_px
         : null;
-      const guideYRaw = mazeConfigPx && Number.isFinite(Number(mazeConfigPx.start_row_px))
+      const guideYRaw = (renderStatus && Number.isFinite(Number(renderStatus.maze_runtime_start_row_px)))
+        ? Number(renderStatus.maze_runtime_start_row_px)
+        : (mazeConfigPx && Number.isFinite(Number(mazeConfigPx.start_row_px))
         ? Number(mazeConfigPx.start_row_px)
-        : Math.round(h * 100 / 120);
+        : Math.round(h * 100 / 120));
       const guideY = Math.max(0, Math.min(h - 1, Math.round(guideYRaw)));
       grayCtx.strokeStyle = '#ffffff';
       grayCtx.lineWidth = 1;

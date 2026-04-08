@@ -562,7 +562,17 @@ static void send_tcp_status()
                                                    &maze_left_ok,
                                                    &maze_right_ok);
     const int maze_start_row_px = vision_runtime_config_maze_start_row_px();
+    const int maze_runtime_start_row_px = vision_image_processor_get_runtime_maze_start_row();
     const int maze_fallback_delta_px = vision_runtime_config_maze_trace_y_fallback_stop_delta_px();
+    const int maze_start_min_gap_px = vision_runtime_config_maze_start_min_boundary_gap_px();
+    const int cross_probe_start_x_px = vision_runtime_config_cross_probe_start_x_px();
+    const int cross_probe_min_row_px = vision_runtime_config_cross_probe_min_row_px();
+    const int cross_probe_max_gap_px = vision_runtime_config_cross_probe_max_gap_px();
+    const int route_cross_corner_distance_px = vision_runtime_config_route_cross_corner_distance_px();
+    const int route_cross_begin_corner_src_y_px = vision_runtime_config_route_cross_begin_corner_src_y_px();
+    const int route_cross_stop_row_exit_px = vision_runtime_config_route_cross_stop_row_exit_px();
+    const int cross_tail_extra_points = vision_runtime_config_cross_tail_extra_points();
+    const int maze_history_start_offset_px = vision_runtime_config_maze_history_start_offset_px();
     const int maze_trace_x_min_px = vision_processor_config_default_maze_trace_x_min_px();
     const int maze_trace_x_max_px = vision_processor_config_default_maze_trace_x_max_px();
 
@@ -726,13 +736,32 @@ static void send_tcp_status()
     append_named_number_object(g_vision_runtime_config.udp_web_tcp_send_maze_config_ratio, "maze_config_ratio",
                                {{"start_row_ratio", g_vision_runtime_config.maze_start_row_ratio},
                                 {"fallback_delta_ratio", g_vision_runtime_config.maze_trace_y_fallback_stop_delta_ratio},
-                                {"x_min_ratio", g_vision_processor_config.default_maze_trace_x_min_ratio},
-                                {"x_max_ratio", g_vision_processor_config.default_maze_trace_x_max_ratio}});
+                               {"start_min_gap_ratio", g_vision_runtime_config.maze_start_min_boundary_gap_ratio},
+                               {"cross_probe_start_x_ratio", g_vision_runtime_config.cross_probe_start_x_ratio},
+                               {"cross_probe_min_row_ratio", g_vision_runtime_config.cross_probe_min_row_ratio},
+                               {"cross_probe_max_gap_ratio", g_vision_runtime_config.cross_probe_max_gap_ratio},
+                               {"route_cross_corner_distance_ratio", g_vision_runtime_config.route_cross_corner_distance_ratio},
+                               {"route_cross_begin_corner_src_y_ratio", g_vision_runtime_config.route_cross_begin_corner_src_y_ratio},
+                               {"route_cross_stop_row_exit_ratio", g_vision_runtime_config.route_cross_stop_row_exit_ratio},
+                               {"cross_tail_extra_points_ratio", g_vision_runtime_config.cross_tail_extra_points_ratio},
+                               {"history_start_offset_ratio", g_vision_runtime_config.maze_history_start_offset_ratio},
+                               {"x_min_ratio", g_vision_processor_config.default_maze_trace_x_min_ratio},
+                               {"x_max_ratio", g_vision_processor_config.default_maze_trace_x_max_ratio}});
     append_named_number_object(g_vision_runtime_config.udp_web_tcp_send_maze_config_px, "maze_config_px",
                                {{"start_row_px", static_cast<double>(maze_start_row_px)},
                                 {"fallback_delta_px", static_cast<double>(maze_fallback_delta_px)},
+                                {"start_min_gap_px", static_cast<double>(maze_start_min_gap_px)},
+                                {"cross_probe_start_x_px", static_cast<double>(cross_probe_start_x_px)},
+                                {"cross_probe_min_row_px", static_cast<double>(cross_probe_min_row_px)},
+                                {"cross_probe_max_gap_px", static_cast<double>(cross_probe_max_gap_px)},
+                                {"route_cross_corner_distance_px", static_cast<double>(route_cross_corner_distance_px)},
+                                {"route_cross_begin_corner_src_y_px", static_cast<double>(route_cross_begin_corner_src_y_px)},
+                                {"route_cross_stop_row_exit_px", static_cast<double>(route_cross_stop_row_exit_px)},
+                                {"cross_tail_extra_points", static_cast<double>(cross_tail_extra_points)},
+                                {"history_start_offset_px", static_cast<double>(maze_history_start_offset_px)},
                                 {"x_min_px", static_cast<double>(maze_trace_x_min_px)},
                                 {"x_max_px", static_cast<double>(maze_trace_x_max_px)}});
+    append_int(true, "maze_runtime_start_row_px", maze_runtime_start_row_px);
     append_bool(g_vision_runtime_config.udp_web_tcp_send_red_found, "red_found", red_found);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_red_rect, "red",
                      {red_x, red_y, red_w, red_h, red_cx, red_cy});

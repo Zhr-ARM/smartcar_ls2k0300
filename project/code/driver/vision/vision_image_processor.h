@@ -65,6 +65,7 @@ uint32 vision_image_processor_processed_frame_seq();
 // 是否调用：是，main.cpp 启动时配置。
 void vision_image_processor_set_maze_start_row(int row);
 int vision_image_processor_get_maze_start_row();
+int vision_image_processor_get_runtime_maze_start_row();
 // 原图迷宫法巡线水平区间限制（包含边界）。
 // 约定：巡线起点搜索和左右手追踪都只能在 [x_min, x_max] 内进行；
 // 一旦下一步触碰到区间边界，就立即停止巡线，避免去畸变黑边干扰。

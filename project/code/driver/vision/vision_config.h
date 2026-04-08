@@ -175,6 +175,26 @@ typedef struct
     float maze_start_row_ratio;
     // 迷宫法巡线回退停止阈值比例（相对图像高度，>=0）。
     float maze_trace_y_fallback_stop_delta_ratio;
+    // 左右起点最小间隔阈值比例（相对图像宽度，>=0）。
+    float maze_start_min_boundary_gap_ratio;
+    // cross_in 下探起始中心 x 比例（相对图像宽度，0~1）。
+    float cross_probe_start_x_ratio;
+    // cross_in 下探最小起始行比例（相对图像高度，0~1）。
+    float cross_probe_min_row_ratio;
+    // cross_in 下探最大左右间隙比例（相对图像宽度，>=0）。
+    float cross_probe_max_gap_ratio;
+    // 十字入口判定：左右角点欧氏距离阈值比例（相对 IPM 宽度，>=0）。
+    float route_cross_corner_distance_ratio;
+    // 十字 begin->in 判定：角点原图 y 阈值比例（相对图像高度，0~1）。
+    float route_cross_begin_corner_src_y_ratio;
+    // 十字退出判定：cross_detected_stop_row 阈值比例（相对图像高度，0~1）。
+    float route_cross_stop_row_exit_ratio;
+    // 十字内边界尾部外推点数比例（相对 IPM 高度，>=0）。
+    float cross_tail_extra_points_ratio;
+    // 历史起点向对侧偏移比例（相对图像宽度，>=0）。
+    float maze_history_start_offset_ratio;
+    // 交叉路口状态机开关：true=允许进入交叉状态，false=始终按普通巡线处理。
+    bool route_cross_enabled;
     // 去畸变开关：true=开启去畸变，false=关闭去畸变直通原图。
     bool undistort_enabled;
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -259,6 +279,10 @@ typedef struct
     bool demand_otsu_keep_full_binary_cache;
     // 是否启用“边线点逆透视 + IPM 边界输出”流程。
     bool enable_inverse_perspective;
+    // 逆透视矩阵标定时使用的原图宽度。
+    int ipm_calibration_src_width;
+    // 逆透视矩阵标定时使用的原图高度。
+    int ipm_calibration_src_height;
     // 逆透视输出宽度。
     int ipm_output_width;
     // 逆透视输出高度。
@@ -292,6 +316,15 @@ extern const vision_processor_config_t g_vision_processor_config;
 // 将分辨率无关比例配置换算为当前处理分辨率下的像素值。
 int vision_runtime_config_maze_start_row_px();
 int vision_runtime_config_maze_trace_y_fallback_stop_delta_px();
+int vision_runtime_config_maze_start_min_boundary_gap_px();
+int vision_runtime_config_cross_probe_start_x_px();
+int vision_runtime_config_cross_probe_min_row_px();
+int vision_runtime_config_cross_probe_max_gap_px();
+int vision_runtime_config_route_cross_corner_distance_px();
+int vision_runtime_config_route_cross_begin_corner_src_y_px();
+int vision_runtime_config_route_cross_stop_row_exit_px();
+int vision_runtime_config_cross_tail_extra_points();
+int vision_runtime_config_maze_history_start_offset_px();
 int vision_processor_config_default_maze_trace_x_min_px();
 int vision_processor_config_default_maze_trace_x_max_px();
 
