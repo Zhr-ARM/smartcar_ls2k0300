@@ -24,6 +24,10 @@ typedef enum
 
 typedef struct
 {
+    // 摄像头采图宽度（像素）。
+    int camera_width;
+    // 摄像头采图高度（像素）。
+    int camera_height;
     // ==================== 参数区域 3: 网页发送 ====================
     // 包括逐飞助手发送、UDP 视频发送、TCP 状态发送及其字段开关。
     // 图传输出模式：
@@ -119,6 +123,10 @@ typedef struct
     bool udp_web_tcp_send_perf_total_us;
     bool udp_web_tcp_send_maze_left_points_raw;
     bool udp_web_tcp_send_maze_right_points_raw;
+    // 发送迷宫法比例配置：[start_row_ratio, fallback_delta_ratio, x_min_ratio, x_max_ratio]。
+    bool udp_web_tcp_send_maze_config_ratio;
+    // 发送迷宫法当前像素配置：[start_row_px, fallback_delta_px, x_min_px, x_max_px]。
+    bool udp_web_tcp_send_maze_config_px;
     // 视觉检测结果。
     bool udp_web_tcp_send_red_found;
     bool udp_web_tcp_send_red_rect;
@@ -163,10 +171,10 @@ typedef struct
     // 包括迷宫法起点、去畸变、IPM 边界/中线后处理。
     // 采图模式：检测到红色矩形后，每 1s 保存一次推理 ROI 彩图。
     bool roi_capture_mode;
-    // 迷宫法左右起点搜索行，固定单行搜索。
-    int maze_start_row;
-    // 迷宫法巡线回退停止阈值：若后续 y > 当前最小 y + 阈值，则停止巡线。
-    int maze_trace_y_fallback_stop_delta;
+    // 迷宫法左右起点搜索行比例（相对图像高度，0~1）。
+    float maze_start_row_ratio;
+    // 迷宫法巡线回退停止阈值比例（相对图像高度，>=0）。
+    float maze_trace_y_fallback_stop_delta_ratio;
     // 去畸变开关：true=开启去畸变，false=关闭去畸变直通原图。
     bool undistort_enabled;
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -267,10 +275,10 @@ typedef struct
     int undistort_move_y;
     // line_error 默认采样行比例。
     float default_line_sample_ratio;
-    // 原图迷宫法巡线默认最小 x。
-    int default_maze_trace_x_min;
-    // 原图迷宫法巡线默认最大 x。
-    int default_maze_trace_x_max;
+    // 原图迷宫法巡线默认最小 x 比例（相对图像宽度，0~1）。
+    float default_maze_trace_x_min_ratio;
+    // 原图迷宫法巡线默认最大 x 比例（相对图像宽度，0~1）。
+    float default_maze_trace_x_max_ratio;
 } vision_processor_config_t;
 
 // 视觉运行时配置：
@@ -280,5 +288,11 @@ extern const vision_runtime_config_t g_vision_runtime_config;
 // 视觉处理器内部配置：
 // vision_image_processor.cpp 在初始化和算法处理中统一从这里读取。
 extern const vision_processor_config_t g_vision_processor_config;
+
+// 将分辨率无关比例配置换算为当前处理分辨率下的像素值。
+int vision_runtime_config_maze_start_row_px();
+int vision_runtime_config_maze_trace_y_fallback_stop_delta_px();
+int vision_processor_config_default_maze_trace_x_min_px();
+int vision_processor_config_default_maze_trace_x_max_px();
 
 #endif

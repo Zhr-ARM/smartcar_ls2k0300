@@ -192,8 +192,8 @@ float compute_signed_track_point_angle_deg(bool track_valid, int track_x, int tr
         return 0.0f;
     }
 
-    const float dx = static_cast<float>(track_x - (VISION_IPM_WIDTH / 2));
-    const float dy = static_cast<float>((VISION_IPM_HEIGHT - 1) - track_y);
+    const float dx = static_cast<float>(track_x - (vision_ipm_width() / 2));
+    const float dy = static_cast<float>((vision_ipm_height() - 1) - track_y);
     const float clamped_dy = std::max(dy, 1.0f);
     const float angle_rad = atan2f(-dx, clamped_dy);
     return angle_rad * (180.0f / 3.1415926f);
@@ -395,7 +395,7 @@ bool update_filtered_vision_inputs_if_new_frame(float *frame_dt_seconds_out)
     // 以半幅宽度归一化到近似[-1,1]范围，并对异常值做保护限幅。
     // 这样 PID 参数可以脱离具体分辨率，后续改摄像头宽度时更容易复用。
     const float normalized_error = std::clamp(
-        raw_error_px / ((float)VISION_DOWNSAMPLED_WIDTH * 0.5f),
+        raw_error_px / ((float)vision_processing_width() * 0.5f),
         -pid_tuning::line_follow::kNormalizedErrorLimit,
         pid_tuning::line_follow::kNormalizedErrorLimit);
 
@@ -515,7 +515,7 @@ void line_follow_loop()
 
         // 后面的 deadzone / 小误差降增益继续使用像素尺度判断，
         // 是为了让阈值更直观，便于你结合画面观察实际偏差量。
-        const float filtered_error_px = g_filtered_error * ((float)VISION_DOWNSAMPLED_WIDTH * 0.5f); // 滤波后的误差转换为像素值，用于直观判断
+        const float filtered_error_px = g_filtered_error * ((float)vision_processing_width() * 0.5f); // 滤波后的误差转换为像素值，用于直观判断
         const float abs_filtered_error_px = std::fabs(filtered_error_px); // 滤波后误差的绝对值像素大小
         float control_error = g_filtered_error; // 最终用于PID计算的控制误差量
 

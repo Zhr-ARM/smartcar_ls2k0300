@@ -8,11 +8,10 @@
 
 namespace
 {
-// 当前主链固定处理分辨率与 full 分辨率。
-static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
-static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
-static constexpr int kFullWidth = UVC_WIDTH;
-static constexpr int kFullHeight = UVC_HEIGHT;
+static inline int kProcWidth() { return vision_processing_width(); }
+static inline int kProcHeight() { return vision_processing_height(); }
+static inline int kFullWidth() { return vision_camera_width(); }
+static inline int kFullHeight() { return vision_camera_height(); }
 
 // 作用：清空 image_processor 内缓存的推理结果。
 // 调用关系：推理关闭、无结果、cleanup 时调用。
@@ -67,7 +66,7 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
     const uint8 *gray_data = vision_image_processor_gray_image();
     if (bgr_proc_data != nullptr)
     {
-        cv::Mat proc_frame(kProcHeight, kProcWidth, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
+        cv::Mat proc_frame(kProcHeight(), kProcWidth(), CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
         cv::rectangle(proc_frame,
                       cv::Rect(result->ncnn_roi_x, result->ncnn_roi_y, result->ncnn_roi_w, result->ncnn_roi_h),
                       cv::Scalar(0, 255, 0),
@@ -76,7 +75,7 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
     }
     if (gray_data != nullptr)
     {
-        cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, const_cast<uint8 *>(gray_data));
+        cv::Mat gray(kProcHeight(), kProcWidth(), CV_8UC1, const_cast<uint8 *>(gray_data));
         cv::rectangle(gray,
                       cv::Rect(result->ncnn_roi_x, result->ncnn_roi_y, result->ncnn_roi_w, result->ncnn_roi_h),
                       cv::Scalar(255),
@@ -132,11 +131,11 @@ bool vision_pipeline_process_step()
 
     // 3) 提交当前帧到异步推理线程（不会阻塞主线程）。
     vision_infer_async_submit_frame(bgr_proc_data,
-                                    kProcWidth,
-                                    kProcHeight,
+                                    kProcWidth(),
+                                    kProcHeight(),
                                     bgr_full_data,
-                                    kFullWidth,
-                                    kFullHeight);
+                                    kFullWidth(),
+                                    kFullHeight());
 
     // 4) 取“最近完成”的异步结果并回填到可视化状态。
     vision_infer_async_result_t latest{};

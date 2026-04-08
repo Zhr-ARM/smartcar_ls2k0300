@@ -24,7 +24,7 @@ uint8_t *bgr_image;
 
 VideoCapture cap;
 
-int8 uvc_camera_init(const char *path)
+int8 uvc_camera_init(const char *path, int width, int height)
 {
     cap.open(path);
 
@@ -39,8 +39,8 @@ int8 uvc_camera_init(const char *path)
     }
 
     cap.set(CAP_PROP_FOURCC, VideoWriter::fourcc('M', 'J', 'P', 'G'));  // 设置格式
-    cap.set(CAP_PROP_FRAME_WIDTH, UVC_WIDTH);                           // 设置摄像头宽度
-    cap.set(CAP_PROP_FRAME_HEIGHT, UVC_HEIGHT);                         // 设置摄像头高度
+    cap.set(CAP_PROP_FRAME_WIDTH, width);                               // 设置摄像头宽度
+    cap.set(CAP_PROP_FRAME_HEIGHT, height);                             // 设置摄像头高度
     cap.set(CAP_PROP_FPS, UVC_FPS);                                     // 显示屏幕帧率
 
     printf("get uvc width = %f.\r\n",  cap.get(CAP_PROP_FRAME_WIDTH));

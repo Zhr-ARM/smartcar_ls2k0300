@@ -1,6 +1,37 @@
 #include "driver/vision/vision_config.h"
 
+#include <algorithm>
+#include <cmath>
+
+namespace
+{
+static inline int clamp_row_from_ratio(float ratio)
+{
+    const int height = vision_processing_height();
+    const int max_row = std::max(1, height - 2);
+    const int row = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(height)));
+    return std::clamp(row, 1, max_row);
+}
+
+static inline int clamp_delta_y_from_ratio(float ratio)
+{
+    const int height = vision_processing_height();
+    const int delta = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(height)));
+    return std::max(0, delta);
+}
+
+static inline int clamp_x_from_ratio(float ratio)
+{
+    const int width = vision_processing_width();
+    const int max_x = std::max(1, width - 2);
+    const int x = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(width)));
+    return std::clamp(x, 1, max_x);
+}
+} // namespace
+
 const vision_runtime_config_t g_vision_runtime_config = {
+    .camera_width = 320,
+    .camera_height = 240,
     // ==================== 参数区域 3: 网页发送 ====================
     // 说明：发送相关参数集中在最前，包含逐飞助手、UDP 视频、TCP 状态上报。
     //
@@ -159,6 +190,10 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .udp_web_tcp_send_maze_left_points_raw = true,
     // 发送迷宫法真实右边界点数（未做网页显示数组补齐）。
     .udp_web_tcp_send_maze_right_points_raw = true,
+    // 发送迷宫法比例配置。
+    .udp_web_tcp_send_maze_config_ratio = true,
+    // 发送迷宫法当前像素配置。
+    .udp_web_tcp_send_maze_config_px = true,
 
     // ==================== TCP 检测结果字段 ====================
     // 发送是否检测到红色目标。
@@ -236,9 +271,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // ROI 抓图模式：检测到红框后周期性保存推理 ROI。
     .roi_capture_mode = false,
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
-    .maze_start_row = 85,
-    // 迷宫法巡线回退停止阈值（y > min_y + 阈值即停）。
-    .maze_trace_y_fallback_stop_delta = 15,
+    .maze_start_row_ratio = 85.0f / 120.0f,
+    // 迷宫法巡线回退停止阈值比例（y > min_y + delta 时停止）。
+    .maze_trace_y_fallback_stop_delta_ratio = 15.0f / 120.0f,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = false,
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -322,9 +357,9 @@ const vision_processor_config_t g_vision_processor_config = {
     // 是否启用逆透视流程。
     .enable_inverse_perspective = true,
     // 逆透视输出宽度。
-    .ipm_output_width = VISION_IPM_WIDTH,
+    .ipm_output_width = VISION_MAX_IPM_WIDTH,
     // 逆透视输出高度。
-    .ipm_output_height = VISION_IPM_HEIGHT,
+    .ipm_output_height = VISION_MAX_IPM_HEIGHT,
     // 逆透视矩阵（标定参数）。
     .change_un_mat = {
         {0.029630, -0.024954, -0.117149},
@@ -346,7 +381,27 @@ const vision_processor_config_t g_vision_processor_config = {
     // line_error 默认采样行比例。
     .default_line_sample_ratio = 0.55f,
     // 迷宫法默认允许搜索的最小 x，屏蔽左侧黑边。
-    .default_maze_trace_x_min = 1,
+    .default_maze_trace_x_min_ratio = 1.0f / 160.0f,
     // 迷宫法默认允许搜索的最大 x，屏蔽右侧黑边。
-    .default_maze_trace_x_max = 159
+    .default_maze_trace_x_max_ratio = 159.0f / 160.0f
 };
+
+int vision_runtime_config_maze_start_row_px()
+{
+    return clamp_row_from_ratio(g_vision_runtime_config.maze_start_row_ratio);
+}
+
+int vision_runtime_config_maze_trace_y_fallback_stop_delta_px()
+{
+    return clamp_delta_y_from_ratio(g_vision_runtime_config.maze_trace_y_fallback_stop_delta_ratio);
+}
+
+int vision_processor_config_default_maze_trace_x_min_px()
+{
+    return clamp_x_from_ratio(g_vision_processor_config.default_maze_trace_x_min_ratio);
+}
+
+int vision_processor_config_default_maze_trace_x_max_px()
+{
+    return clamp_x_from_ratio(g_vision_processor_config.default_maze_trace_x_max_ratio);
+}

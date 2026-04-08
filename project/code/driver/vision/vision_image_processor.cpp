@@ -29,12 +29,16 @@
 // - 控制使用：line_follow_thread 读取 line_error；
 // - 发送使用：transport 读取图像/边线/状态。
 
-#define VISION_BOUNDARY_NUM (VISION_DOWNSAMPLED_HEIGHT * 2)
+#define VISION_BOUNDARY_NUM (VISION_MAX_PROC_HEIGHT * 2)
 static constexpr int kRefProcWidth = 160;
 static constexpr int kRefProcHeight = 120;
 static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
-static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
-static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
+#define kProcWidth (vision_processing_width())
+#define kProcHeight (vision_processing_height())
+#define kFullWidth (vision_camera_width())
+#define kFullHeight (vision_camera_height())
+#define kIpmOutputWidth (vision_ipm_width())
+#define kIpmOutputHeight (vision_ipm_height())
 
 static inline int scale_by_width(int ref_px)
 {
@@ -64,8 +68,6 @@ static inline int scale_by_area(int ref_area_px)
     return std::max(1, static_cast<int>((scaled + kRefProcPixels / 2) / kRefProcPixels));
 }
 
-static constexpr int kIpmOutputWidth = VISION_IPM_WIDTH;
-static constexpr int kIpmOutputHeight = VISION_IPM_HEIGHT;
 static constexpr int kMazeStartMinBoundaryGapPx = 5;
 
 // 原图坐标系边线缓存：x1/x2/x3 对应 左/中/右边线，y1/y2/y3 为对应 y。
@@ -143,13 +145,13 @@ static int g_src_shift_right_center_count = 0;
 // 图像缓存：
 // - g_image_bgr_full: full 分辨率原图；
 // - g_image_bgr/g_image_gray/g_image_binary_u8/g_image_rgb565: 处理分辨率图像。
-static uint8 g_image_bgr_full[UVC_HEIGHT * UVC_WIDTH * 3];
-static uint8 g_image_bgr[kProcHeight * kProcWidth * 3];
-static uint8 g_image_gray[kProcHeight * kProcWidth];
-static uint8 g_image_binary_u8[kProcHeight * kProcWidth];
-static uint8 g_image_rgb565[kProcHeight * kProcWidth * 2];
+static uint8 g_image_bgr_full[VISION_MAX_CAMERA_HEIGHT * VISION_MAX_CAMERA_WIDTH * 3];
+static uint8 g_image_bgr[VISION_MAX_PROC_HEIGHT * VISION_MAX_PROC_WIDTH * 3];
+static uint8 g_image_gray[VISION_MAX_PROC_HEIGHT * VISION_MAX_PROC_WIDTH];
+static uint8 g_image_binary_u8[VISION_MAX_PROC_HEIGHT * VISION_MAX_PROC_WIDTH];
+static uint8 g_image_rgb565[VISION_MAX_PROC_HEIGHT * VISION_MAX_PROC_WIDTH * 2];
 // 调试输出缓存：逆透视彩色图。
-static uint8 g_image_ipm_bgr[kIpmOutputHeight * kIpmOutputWidth * 3];
+static uint8 g_image_ipm_bgr[VISION_MAX_IPM_HEIGHT * VISION_MAX_IPM_WIDTH * 3];
 // 去畸变映射表：输出(去畸变后)像素 -> 输入(原始畸变图)像素。
 static cv::Mat g_undistort_map_x;
 static cv::Mat g_undistort_map_y;
@@ -204,10 +206,10 @@ static int g_cross_in_saved_start_row = -1;
 static int g_cross_in_saved_center_x = -1;
 
 // 迷宫法起始搜索行（可运行时配置）。
-static std::atomic<int> g_maze_start_row(g_vision_runtime_config.maze_start_row);
-static std::atomic<int> g_maze_trace_y_fallback_stop_delta(g_vision_runtime_config.maze_trace_y_fallback_stop_delta);
-static std::atomic<int> g_maze_trace_x_min(g_vision_processor_config.default_maze_trace_x_min);
-static std::atomic<int> g_maze_trace_x_max(g_vision_processor_config.default_maze_trace_x_max);
+static std::atomic<int> g_maze_start_row(vision_runtime_config_maze_start_row_px());
+static std::atomic<int> g_maze_trace_y_fallback_stop_delta(vision_runtime_config_maze_trace_y_fallback_stop_delta_px());
+static std::atomic<int> g_maze_trace_x_min(vision_processor_config_default_maze_trace_x_min_px());
+static std::atomic<int> g_maze_trace_x_max(vision_processor_config_default_maze_trace_x_max_px());
 // 去畸变开关（默认开启）。
 static std::atomic<bool> g_undistort_enabled(g_vision_runtime_config.undistort_enabled);
 // 逆透视边界三角滤波开关（默认开启）。
@@ -238,6 +240,36 @@ static std::atomic<int> g_ipm_line_error_preferred_source(static_cast<int>(g_vis
 // 对外暴露控制量（line_follow_thread 直接读取）。
 int line_error = 0;
 float line_sample_ratio = g_vision_processor_config.default_line_sample_ratio;
+
+int vision_camera_width()
+{
+    return std::clamp(g_vision_runtime_config.camera_width, 1, VISION_MAX_CAMERA_WIDTH);
+}
+
+int vision_camera_height()
+{
+    return std::clamp(g_vision_runtime_config.camera_height, 1, VISION_MAX_CAMERA_HEIGHT);
+}
+
+int vision_processing_width()
+{
+    return vision_camera_width();
+}
+
+int vision_processing_height()
+{
+    return vision_camera_height();
+}
+
+int vision_ipm_width()
+{
+    return std::clamp(g_vision_processor_config.ipm_output_width, 1, VISION_MAX_IPM_WIDTH);
+}
+
+int vision_ipm_height()
+{
+    return std::clamp(g_vision_processor_config.ipm_output_height, 1, VISION_MAX_IPM_HEIGHT);
+}
 
 struct maze_point_t
 {
@@ -511,7 +543,7 @@ static uint8 compute_global_otsu_threshold_u8(const uint8 *gray_img)
 
     std::array<uint32, 256> histogram{};
     uint64_t gray_sum = 0;
-    constexpr int kPixelCount = kProcWidth * kProcHeight;
+    const int kPixelCount = kProcWidth * kProcHeight;
 
     for (int i = 0; i < kPixelCount; ++i)
     {
@@ -574,7 +606,7 @@ static void build_binary_image_from_gray_threshold(const uint8 *gray_img, uint8 
         return;
     }
 
-    constexpr int kPixelCount = kProcWidth * kProcHeight;
+    const int kPixelCount = kProcWidth * kProcHeight;
     for (int i = 0; i < kPixelCount; ++i)
     {
         g_image_binary_u8[i] = (gray_img[i] > threshold) ? static_cast<uint8>(255) : static_cast<uint8>(0);
@@ -2542,7 +2574,7 @@ bool vision_image_processor_process_step()
 
     // 固定160x120，处理分辨率与采图分辨率一致，无需降采样。
     // 当前先做去畸变（含配置中的 undistort_move_x/y 平移补偿），再进入后续灰度/二值/巡线流程。
-    cv::Mat bgr_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr_full);
+    cv::Mat bgr_full(kFullHeight, kFullWidth, CV_8UC3, g_image_bgr_full);
     cv::Mat bgr(kProcHeight, kProcWidth, CV_8UC3, g_image_bgr);
     if (g_undistort_enabled.load() && init_undistort_remap_table())
     {
@@ -2550,7 +2582,9 @@ bool vision_image_processor_process_step()
     }
     else
     {
-        std::memcpy(g_image_bgr, g_image_bgr_full, sizeof(g_image_bgr));
+        std::memcpy(g_image_bgr,
+                    g_image_bgr_full,
+                    static_cast<size_t>(kProcWidth) * kProcHeight * 3U);
     }
     cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);

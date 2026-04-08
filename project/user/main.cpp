@@ -185,7 +185,7 @@ int main(int, char**)
     vision_thread_set_roi_capture_mode(g_vision_runtime_config.roi_capture_mode); // ROI 抓图开关
 
     // [视觉处理]
-    vision_image_processor_set_maze_start_row(g_vision_runtime_config.maze_start_row); // 迷宫法起始搜索行
+    vision_image_processor_set_maze_start_row(vision_runtime_config_maze_start_row_px()); // 迷宫法起始搜索行
     vision_image_processor_set_undistort_enabled(g_vision_runtime_config.undistort_enabled); // 去畸变开关
     vision_image_processor_set_ipm_triangle_filter_enabled(g_vision_runtime_config.ipm_triangle_filter_enabled); // IPM三角滤波
     vision_image_processor_set_ipm_resample_enabled(g_vision_runtime_config.ipm_resample_enabled); // IPM等距采样开关
@@ -214,14 +214,23 @@ int main(int, char**)
     vision_image_processor_set_ipm_line_error_index_range(g_vision_runtime_config.ipm_line_error_index_min,
                                                           g_vision_runtime_config.ipm_line_error_index_max); // line_error 随速度索引区间
 
-    printf("[VISION CFG] mode=%d max_fps=%u infer=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_angle_step=%d ipm_straight_min_pts=%d ipm_straight_check=%d ipm_straight_min_cos=%.2f ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
+    printf("[VISION CFG] mode=%d max_fps=%u infer=%d client_send=%d screen=%d roi_capture=%d cam=%dx%d maze_row_ratio=%.4f maze_row=%d maze_fb_ratio=%.4f maze_fb=%d maze_x_min_ratio=%.4f maze_x_min=%d maze_x_max_ratio=%.4f maze_x_max=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_angle_step=%d ipm_straight_min_pts=%d ipm_straight_check=%d ipm_straight_min_cos=%.2f ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
            static_cast<int>(vision_thread_get_send_mode()),
            static_cast<unsigned int>(vision_thread_get_send_max_fps()),
            vision_thread_infer_enabled() ? 1 : 0,
            vision_thread_client_sender_enabled() ? 1 : 0,
            g_vision_runtime_config.screen_display_enabled ? 1 : 0,
            vision_thread_roi_capture_mode_enabled() ? 1 : 0,
+           vision_camera_width(),
+           vision_camera_height(),
+           static_cast<double>(g_vision_runtime_config.maze_start_row_ratio),
            vision_image_processor_get_maze_start_row(),
+           static_cast<double>(g_vision_runtime_config.maze_trace_y_fallback_stop_delta_ratio),
+           vision_runtime_config_maze_trace_y_fallback_stop_delta_px(),
+           static_cast<double>(g_vision_processor_config.default_maze_trace_x_min_ratio),
+           vision_processor_config_default_maze_trace_x_min_px(),
+           static_cast<double>(g_vision_processor_config.default_maze_trace_x_max_ratio),
+           vision_processor_config_default_maze_trace_x_max_px(),
            vision_image_processor_undistort_enabled() ? 1 : 0,
            vision_image_processor_ipm_triangle_filter_enabled() ? 1 : 0,
            vision_image_processor_ipm_resample_enabled() ? 1 : 0,

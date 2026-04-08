@@ -4,10 +4,12 @@
 #include "zf_common_headfile.h"
 #include <cstddef>
 
-#define VISION_DOWNSAMPLED_WIDTH 160
-#define VISION_DOWNSAMPLED_HEIGHT 120
-#define VISION_IPM_WIDTH 280
-#define VISION_IPM_HEIGHT 140
+#define VISION_MAX_CAMERA_WIDTH 320
+#define VISION_MAX_CAMERA_HEIGHT 240
+#define VISION_MAX_PROC_WIDTH VISION_MAX_CAMERA_WIDTH
+#define VISION_MAX_PROC_HEIGHT VISION_MAX_CAMERA_HEIGHT
+#define VISION_MAX_IPM_WIDTH 280
+#define VISION_MAX_IPM_HEIGHT 140
 
 // 轮廓线误差：在图像高度 line_sample_ratio 处，
 // 中线 x 与图像中心 x 的差值（右偏为正，左偏为负）。
@@ -19,6 +21,14 @@ extern int line_error;
 // 默认 0.55f（约在 y=66/120 位置取样）。
 // 如何修改：提高比例值会让采样行下移（更靠近车前近处）；降低则上移（更看远处）。
 extern float line_sample_ratio;
+
+// 当前运行时摄像头/处理/IPM 分辨率查询接口。
+int vision_camera_width();
+int vision_camera_height();
+int vision_processing_width();
+int vision_processing_height();
+int vision_ipm_width();
+int vision_ipm_height();
 
 typedef enum
 {
