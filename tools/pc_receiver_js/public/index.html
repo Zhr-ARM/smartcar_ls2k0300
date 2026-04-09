@@ -340,6 +340,16 @@
           <div class="transport-value" id="transportSyncValue">--</div>
           <div class="transport-subvalue" id="transportSyncSub">等待同步信息...</div>
         </div>
+        <div class="transport-stat">
+          <div class="transport-label">主板 CPU 占用</div>
+          <div class="transport-value" id="transportCpuValue">-- %</div>
+          <div class="transport-subvalue" id="transportCpuSub">主板端每秒采样</div>
+        </div>
+        <div class="transport-stat">
+          <div class="transport-label">主板内存占用</div>
+          <div class="transport-value" id="transportMemValue">-- %</div>
+          <div class="transport-subvalue" id="transportMemSub">主板端每秒采样</div>
+        </div>
       </div>
       <div class="transport-note" id="transportNote">等待图传数据...</div>
     </div>
@@ -583,6 +593,10 @@
     const transportModeSubEl = document.getElementById('transportModeSub');
     const transportSyncValueEl = document.getElementById('transportSyncValue');
     const transportSyncSubEl = document.getElementById('transportSyncSub');
+    const transportCpuValueEl = document.getElementById('transportCpuValue');
+    const transportCpuSubEl = document.getElementById('transportCpuSub');
+    const transportMemValueEl = document.getElementById('transportMemValue');
+    const transportMemSubEl = document.getElementById('transportMemSub');
     const transportNoteEl = document.getElementById('transportNote');
     const modeNote = document.getElementById('modeNote');
     const startRecordBtn = document.getElementById('startRecordBtn');
@@ -1969,6 +1983,18 @@
       transportModeSubEl.textContent = receiverCore.hasValue(status.udp_web_max_fps)
         ? `max fps ${status.udp_web_max_fps}`
         : 'max fps --';
+      transportCpuValueEl.textContent = receiverCore.hasValue(status.cpu_usage_percent)
+        ? `${Number(status.cpu_usage_percent).toFixed(1)} %`
+        : '-- %';
+      transportCpuSubEl.textContent = receiverCore.hasValue(status.cpu_usage_percent)
+        ? '主板端每秒采样'
+        : '等待主板状态...';
+      transportMemValueEl.textContent = receiverCore.hasValue(status.mem_usage_percent)
+        ? `${Number(status.mem_usage_percent).toFixed(1)} %`
+        : '-- %';
+      transportMemSubEl.textContent = receiverCore.hasValue(status.mem_usage_percent)
+        ? '主板端每秒采样'
+        : '等待主板状态...';
       updateTransportNote();
     }
 

@@ -18,6 +18,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -79,6 +80,173 @@ bool g_tcp_ready = false;     // TCP 初始化是否成功。
 char g_server_ip[64] = {0};   // 接收端 IP。
 uint16 g_video_port = 0;      // UDP 视频端口。
 uint16 g_meta_port = 0;       // TCP 状态端口。
+
+struct system_usage_cache_t
+{
+    uint64 last_refresh_us = 0;
+    uint64 prev_total_ticks = 0;
+    uint64 prev_idle_ticks = 0;
+    bool has_prev_cpu_sample = false;
+    float cpu_usage_percent = 0.0f;
+    float mem_usage_percent = 0.0f;
+};
+
+system_usage_cache_t g_system_usage_cache;
+
+static uint64 now_us();
+
+static bool read_cpu_usage_sample(uint64 *total_ticks, uint64 *idle_ticks)
+{
+    if (total_ticks == nullptr || idle_ticks == nullptr)
+    {
+        return false;
+    }
+
+    FILE *fp = std::fopen("/proc/stat", "r");
+    if (fp == nullptr)
+    {
+        return false;
+    }
+
+    char line[256] = {0};
+    const char *result = std::fgets(line, sizeof(line), fp);
+    std::fclose(fp);
+    if (result == nullptr)
+    {
+        return false;
+    }
+
+    unsigned long long user = 0;
+    unsigned long long nice = 0;
+    unsigned long long system = 0;
+    unsigned long long idle = 0;
+    unsigned long long iowait = 0;
+    unsigned long long irq = 0;
+    unsigned long long softirq = 0;
+    unsigned long long steal = 0;
+    const int parsed = std::sscanf(line,
+                                   "cpu %llu %llu %llu %llu %llu %llu %llu %llu",
+                                   &user,
+                                   &nice,
+                                   &system,
+                                   &idle,
+                                   &iowait,
+                                   &irq,
+                                   &softirq,
+                                   &steal);
+    if (parsed < 4)
+    {
+        return false;
+    }
+
+    *idle_ticks = static_cast<uint64>(idle + iowait);
+    *total_ticks = static_cast<uint64>(user + nice + system + idle + iowait + irq + softirq + steal);
+    return true;
+}
+
+static bool read_mem_usage_percent(float *mem_usage_percent)
+{
+    if (mem_usage_percent == nullptr)
+    {
+        return false;
+    }
+
+    FILE *fp = std::fopen("/proc/meminfo", "r");
+    if (fp == nullptr)
+    {
+        return false;
+    }
+
+    char key[64] = {0};
+    unsigned long long value_kb = 0;
+    char unit[32] = {0};
+    uint64 mem_total_kb = 0;
+    uint64 mem_available_kb = 0;
+    uint64 mem_free_kb = 0;
+    uint64 buffers_kb = 0;
+    uint64 cached_kb = 0;
+
+    while (std::fscanf(fp, "%63s %llu %31s", key, &value_kb, unit) == 3)
+    {
+        if (std::strcmp(key, "MemTotal:") == 0)
+        {
+            mem_total_kb = static_cast<uint64>(value_kb);
+        }
+        else if (std::strcmp(key, "MemAvailable:") == 0)
+        {
+            mem_available_kb = static_cast<uint64>(value_kb);
+        }
+        else if (std::strcmp(key, "MemFree:") == 0)
+        {
+            mem_free_kb = static_cast<uint64>(value_kb);
+        }
+        else if (std::strcmp(key, "Buffers:") == 0)
+        {
+            buffers_kb = static_cast<uint64>(value_kb);
+        }
+        else if (std::strcmp(key, "Cached:") == 0)
+        {
+            cached_kb = static_cast<uint64>(value_kb);
+        }
+    }
+    std::fclose(fp);
+
+    if (mem_total_kb == 0)
+    {
+        return false;
+    }
+
+    if (mem_available_kb == 0)
+    {
+        mem_available_kb = std::min(mem_total_kb, mem_free_kb + buffers_kb + cached_kb);
+    }
+
+    const double used_ratio = 1.0 - (static_cast<double>(mem_available_kb) / static_cast<double>(mem_total_kb));
+    *mem_usage_percent = static_cast<float>(std::clamp(used_ratio * 100.0, 0.0, 100.0));
+    return true;
+}
+
+static void refresh_system_usage_cache_if_needed()
+{
+    constexpr uint64 kRefreshIntervalUs = 1000000ULL;
+    const uint64 now = now_us();
+    if (g_system_usage_cache.last_refresh_us != 0 &&
+        (now - g_system_usage_cache.last_refresh_us) < kRefreshIntervalUs)
+    {
+        return;
+    }
+
+    uint64 total_ticks = 0;
+    uint64 idle_ticks = 0;
+    if (read_cpu_usage_sample(&total_ticks, &idle_ticks))
+    {
+        if (g_system_usage_cache.has_prev_cpu_sample &&
+            total_ticks >= g_system_usage_cache.prev_total_ticks &&
+            idle_ticks >= g_system_usage_cache.prev_idle_ticks)
+        {
+            const uint64 total_delta = total_ticks - g_system_usage_cache.prev_total_ticks;
+            const uint64 idle_delta = idle_ticks - g_system_usage_cache.prev_idle_ticks;
+            if (total_delta > 0)
+            {
+                const double busy_ratio = 1.0 - (static_cast<double>(idle_delta) / static_cast<double>(total_delta));
+                g_system_usage_cache.cpu_usage_percent =
+                    static_cast<float>(std::clamp(busy_ratio * 100.0, 0.0, 100.0));
+            }
+        }
+
+        g_system_usage_cache.prev_total_ticks = total_ticks;
+        g_system_usage_cache.prev_idle_ticks = idle_ticks;
+        g_system_usage_cache.has_prev_cpu_sample = true;
+    }
+
+    float mem_usage_percent = 0.0f;
+    if (read_mem_usage_percent(&mem_usage_percent))
+    {
+        g_system_usage_cache.mem_usage_percent = mem_usage_percent;
+    }
+
+    g_system_usage_cache.last_refresh_us = now;
+}
 
 static vision_web_image_format_enum sanitize_web_image_format(int format)
 {
@@ -399,6 +567,8 @@ static void send_tcp_status()
         return;
     }
 
+    refresh_system_usage_cache_if_needed();
+
     uint32 capture_wait_us = 0;
     uint32 preprocess_us = 0;
     uint32 otsu_us = 0;
@@ -642,6 +812,8 @@ static void send_tcp_status()
     if (!send_full_debug)
     {
         append_int(true, "ts_ms", ts_ms);
+        append_float(true, "cpu_usage_percent", g_system_usage_cache.cpu_usage_percent);
+        append_float(true, "mem_usage_percent", g_system_usage_cache.mem_usage_percent);
         append_float(true, "base_speed", line_follow_thread_normal_speed_reference());
         append_float(true, "adjusted_base_speed", line_follow_thread_applied_base_speed());
         append_float(true, "left_target_count", motor_thread_left_target_count());
@@ -661,6 +833,12 @@ static void send_tcp_status()
 
     append_int(g_vision_runtime_config.udp_web_tcp_send_ts_ms, "ts_ms", ts_ms);
     append_int(g_vision_runtime_config.udp_web_tcp_send_line_error, "line_error", line_error);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_cpu_usage_percent,
+                 "cpu_usage_percent",
+                 g_system_usage_cache.cpu_usage_percent);
+    append_float(g_vision_runtime_config.udp_web_tcp_send_mem_usage_percent,
+                 "mem_usage_percent",
+                 g_system_usage_cache.mem_usage_percent);
     append_float(g_vision_runtime_config.udp_web_tcp_send_base_speed, "base_speed", line_follow_thread_normal_speed_reference());
     append_float(g_vision_runtime_config.udp_web_tcp_send_base_speed, "adjusted_base_speed", line_follow_thread_applied_base_speed());
     append_float(g_vision_runtime_config.udp_web_tcp_send_left_target_count, "left_target_count", motor_thread_left_target_count());

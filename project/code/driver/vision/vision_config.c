@@ -97,6 +97,10 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // ==================== TCP 字段（视觉相关） ====================
     // 发送当前巡线误差 line_error。
     .udp_web_tcp_send_line_error = true,
+    // 发送主板 CPU 占用百分比（主板端每秒更新一次）。
+    .udp_web_tcp_send_cpu_usage_percent = true,
+    // 发送主板内存占用百分比（主板端每秒更新一次）。
+    .udp_web_tcp_send_mem_usage_percent = true,
 
     // ==================== TCP 字段（电机相关） ====================
     // 发送当前基础巡航速度 base_speed。
@@ -219,7 +223,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    .udp_web_server_ip = "10.131.211.102",
+    .udp_web_server_ip = "172.21.79.179",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -227,7 +231,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 逐飞助手独立 UDP 通道开关。
     .assistant_udp_enabled = false,
     // 逐飞助手接收端 IP。
-    .assistant_server_ip = "10.131.211.102",
+    .assistant_server_ip = "172.21.79.179",
     // 逐飞助手接收端端口。
     .assistant_server_port = 8899,
 
@@ -314,7 +318,7 @@ const vision_processor_config_t g_vision_processor_config = {
     // 迷宫法单侧最大输出点数。
     .maze_trace_max_points = 120,
     // 迷宫法允许追踪的纵向区域百分比，100 表示全高。
-    .maze_lower_region_percent = 100,
+    .maze_lower_region_percent = 85,
     // OTSU 策略：true=按需 OTSU，false=先生成整图二值图。
     .demand_otsu_enable = true,
     // 按需 OTSU 时是否保留整图二值缓存，便于调试和发送。

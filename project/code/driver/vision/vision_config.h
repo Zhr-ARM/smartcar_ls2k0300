@@ -87,6 +87,8 @@ typedef struct
     bool udp_web_tcp_send_ts_ms;
     // TCP 状态字段开关（视觉相关）。
     bool udp_web_tcp_send_line_error;
+    bool udp_web_tcp_send_cpu_usage_percent;
+    bool udp_web_tcp_send_mem_usage_percent;
     // TCP 状态字段开关（电机相关）。
     bool udp_web_tcp_send_base_speed;
     bool udp_web_tcp_send_left_target_count;
