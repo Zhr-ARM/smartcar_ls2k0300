@@ -1,58 +1,6 @@
 #include "driver/vision/vision_config.h"
 
-#include <algorithm>
-#include <cmath>
-
-namespace
-{
-static inline int clamp_row_from_ratio(float ratio)
-{
-    const int height = vision_processing_height();
-    const int max_row = std::max(1, height - 2);
-    const int row = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(height)));
-    return std::clamp(row, 1, max_row);
-}
-
-static inline int clamp_delta_y_from_ratio(float ratio)
-{
-    const int height = vision_processing_height();
-    const int delta = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(height)));
-    return std::max(0, delta);
-}
-
-static inline int clamp_x_from_ratio(float ratio)
-{
-    const int width = vision_processing_width();
-    const int max_x = std::max(1, width - 2);
-    const int x = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(width)));
-    return std::clamp(x, 1, max_x);
-}
-
-static inline int clamp_width_delta_from_ratio(float ratio)
-{
-    const int width = vision_processing_width();
-    const int delta = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(width)));
-    return std::max(0, delta);
-}
-
-static inline int clamp_ipm_width_delta_from_ratio(float ratio)
-{
-    const int width = vision_ipm_width();
-    const int delta = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(width)));
-    return std::max(0, delta);
-}
-
-static inline int clamp_ipm_height_delta_from_ratio(float ratio)
-{
-    const int height = vision_ipm_height();
-    const int delta = static_cast<int>(std::lround(static_cast<double>(ratio) * static_cast<double>(height)));
-    return std::max(0, delta);
-}
-} // namespace
-
 const vision_runtime_config_t g_vision_runtime_config = {
-    .camera_width = 320,
-    .camera_height = 240,
     // ==================== 参数区域 3: 网页发送 ====================
     // 说明：发送相关参数集中在最前，包含逐飞助手、UDP 视频、TCP 状态上报。
     //
@@ -211,10 +159,6 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .udp_web_tcp_send_maze_left_points_raw = true,
     // 发送迷宫法真实右边界点数（未做网页显示数组补齐）。
     .udp_web_tcp_send_maze_right_points_raw = true,
-    // 发送迷宫法比例配置。
-    .udp_web_tcp_send_maze_config_ratio = true,
-    // 发送迷宫法当前像素配置。
-    .udp_web_tcp_send_maze_config_px = true,
 
     // ==================== TCP 检测结果字段 ====================
     // 发送是否检测到红色目标。
@@ -234,19 +178,14 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 发送当前采用的是左偏移中线还是右偏移中线。
     .udp_web_tcp_send_ipm_centerline_source = false,
     // 发送当前实际命中的中线点索引。
-    // 适用模式：固定索引 / 加权索引 / 速度索引 三种模式都会更新。
-    .udp_web_tcp_send_ipm_track_index = true,
+    .udp_web_tcp_send_ipm_track_index = false,
     // 发送当前实际跟踪点坐标 [x, y]。
-    // 适用模式：固定索引 / 加权索引 / 速度索引 三种模式都会更新。
     .udp_web_tcp_send_ipm_track_point = true,
-    // 发送首个有效加权配置点的当前偏差。
-    // 适用模式：仅加权索引模式；固定索引 / 速度索引模式下该值无实际意义。
+    // 发送首点的当前偏差。
     .udp_web_tcp_send_ipm_weighted_first_point_error = false,
-    // 发送逆透视图上的“首个有效加权配置点”坐标。
-    // 适用模式：仅加权索引模式；固定索引 / 速度索引模式下不会产生该点。
+    // 发送逆透视图上的决策点坐标。
     .udp_web_tcp_send_ipm_weighted_decision_point = false,
-    // 发送原图上的“首个有效加权配置点”坐标。
-    // 适用模式：仅加权索引模式；固定索引 / 速度索引模式下不会产生该点。
+    // 发送原图上的决策点坐标。
     .udp_web_tcp_send_src_weighted_decision_point = false,
 
     // ==================== TCP 原图边界点列 ====================
@@ -280,7 +219,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    .udp_web_server_ip = "172.21.79.179",
+    .udp_web_server_ip = "10.131.211.102",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -288,7 +227,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 逐飞助手独立 UDP 通道开关。
     .assistant_udp_enabled = false,
     // 逐飞助手接收端 IP。
-    .assistant_server_ip = "172.21.79.179",
+    .assistant_server_ip = "10.131.211.102",
     // 逐飞助手接收端端口。
     .assistant_server_port = 8899,
 
@@ -297,29 +236,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // ROI 抓图模式：检测到红框后周期性保存推理 ROI。
     .roi_capture_mode = false,
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
-    .maze_start_row_ratio = 70.0f / 120.0f,
-    // 迷宫法巡线回退停止阈值比例（y > min_y + delta 时停止）。
-    .maze_trace_y_fallback_stop_delta_ratio = 15.0f / 120.0f,
-    // 左右起点最小间隔阈值比例。
-    .maze_start_min_boundary_gap_ratio = 5.0f / 160.0f,
-    // cross_in 下探起始中心 x 比例。
-    .cross_probe_start_x_ratio = 0.5,
-    // cross_in 下探最小起始行比例。
-    .cross_probe_min_row_ratio = 15.0f / 120.0f,
-    // cross_in 下探最大左右间隙比例。
-    .cross_probe_max_gap_ratio = 80.0f / 160.0f,
-    // 十字入口判定：左右角点欧氏距离阈值比例。
-    .route_cross_corner_distance_ratio = 40.0f / 280.0f,
-    // 十字 begin->in 判定：角点原图 y 阈值比例。
-    .route_cross_begin_corner_src_y_ratio = 0.5,
-    // 十字退出判定：cross_detected_stop_row 阈值比例。
-    .route_cross_stop_row_exit_ratio = 80.0f / 120.0f,
-    // 十字内边界尾部外推点数比例。
-    .cross_tail_extra_points_ratio = 10.0f / 140.0f,
-    // 历史起点向对侧偏移比例。
-    .maze_history_start_offset_ratio = 10.0f / 160.0f,
-    // 交叉路口状态机开关：当前先关闭，避免进入 cross begin/in 流程。
-    .route_cross_enabled = false,
+    .maze_start_row = 85,
+    // 迷宫法巡线回退停止阈值（y > min_y + 阈值即停）。
+    .maze_trace_y_fallback_stop_delta = 15,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = false,
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -387,10 +306,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_line_error_index_min = 0,
     // 随速度索引模式允许的最大索引。
     .ipm_line_error_index_max = 30,
-    // 以上参数中：
-    // - fixed_index 仅固定索引模式使用；
-    // - weighted_point_count / point_indices / weights 仅加权索引模式使用；
-    // - speed_k / speed_b / index_min / index_max 仅速度索引模式使用。
+    // 基准速度方案B已移除，偏差层仅保留方案A所需参数。
 };
 
 const vision_processor_config_t g_vision_processor_config = {
@@ -405,18 +321,15 @@ const vision_processor_config_t g_vision_processor_config = {
     .demand_otsu_keep_full_binary_cache = true,
     // 是否启用逆透视流程。
     .enable_inverse_perspective = true,
-    // 当前这组逆透视矩阵按 320x240 原图重新标定。
-    .ipm_calibration_src_width = 320,
-    .ipm_calibration_src_height = 240,
     // 逆透视输出宽度。
-    .ipm_output_width = VISION_MAX_IPM_WIDTH,
+    .ipm_output_width = VISION_IPM_WIDTH,
     // 逆透视输出高度。
-    .ipm_output_height = VISION_MAX_IPM_HEIGHT,
+    .ipm_output_height = VISION_IPM_HEIGHT,
     // 逆透视矩阵（标定参数）。
     .change_un_mat = {
-        {0.984834,-0.995022,13.212810},
-        {0.013224,0.175287,0.625211},
-        {-0.000193,-0.006323,0.981946}
+        {0.029630, -0.024954, -0.117149},
+        {-0.000000, 0.000207, 0.607059},
+        {-0.000000, -0.000323, 0.051471}
     },
     // 相机内参矩阵（标定参数）。
     .camera_matrix = {
@@ -433,72 +346,7 @@ const vision_processor_config_t g_vision_processor_config = {
     // line_error 默认采样行比例。
     .default_line_sample_ratio = 0.55f,
     // 迷宫法默认允许搜索的最小 x，屏蔽左侧黑边。
-    .default_maze_trace_x_min_ratio = 1.0f / 160.0f,
+    .default_maze_trace_x_min = 1,
     // 迷宫法默认允许搜索的最大 x，屏蔽右侧黑边。
-    .default_maze_trace_x_max_ratio = 159.0f / 160.0f
+    .default_maze_trace_x_max = 159
 };
-
-int vision_runtime_config_maze_start_row_px()
-{
-    return clamp_row_from_ratio(g_vision_runtime_config.maze_start_row_ratio);
-}
-
-int vision_runtime_config_maze_trace_y_fallback_stop_delta_px()
-{
-    return clamp_delta_y_from_ratio(g_vision_runtime_config.maze_trace_y_fallback_stop_delta_ratio);
-}
-
-int vision_runtime_config_maze_start_min_boundary_gap_px()
-{
-    return clamp_width_delta_from_ratio(g_vision_runtime_config.maze_start_min_boundary_gap_ratio);
-}
-
-int vision_runtime_config_cross_probe_start_x_px()
-{
-    return clamp_x_from_ratio(g_vision_runtime_config.cross_probe_start_x_ratio);
-}
-
-int vision_runtime_config_cross_probe_min_row_px()
-{
-    return clamp_row_from_ratio(g_vision_runtime_config.cross_probe_min_row_ratio);
-}
-
-int vision_runtime_config_cross_probe_max_gap_px()
-{
-    return std::max(1, clamp_width_delta_from_ratio(g_vision_runtime_config.cross_probe_max_gap_ratio));
-}
-
-int vision_runtime_config_route_cross_corner_distance_px()
-{
-    return std::max(1, clamp_ipm_width_delta_from_ratio(g_vision_runtime_config.route_cross_corner_distance_ratio));
-}
-
-int vision_runtime_config_route_cross_begin_corner_src_y_px()
-{
-    return clamp_row_from_ratio(g_vision_runtime_config.route_cross_begin_corner_src_y_ratio);
-}
-
-int vision_runtime_config_route_cross_stop_row_exit_px()
-{
-    return clamp_row_from_ratio(g_vision_runtime_config.route_cross_stop_row_exit_ratio);
-}
-
-int vision_runtime_config_cross_tail_extra_points()
-{
-    return std::max(1, clamp_ipm_height_delta_from_ratio(g_vision_runtime_config.cross_tail_extra_points_ratio));
-}
-
-int vision_runtime_config_maze_history_start_offset_px()
-{
-    return std::max(1, clamp_width_delta_from_ratio(g_vision_runtime_config.maze_history_start_offset_ratio));
-}
-
-int vision_processor_config_default_maze_trace_x_min_px()
-{
-    return clamp_x_from_ratio(g_vision_processor_config.default_maze_trace_x_min_ratio);
-}
-
-int vision_processor_config_default_maze_trace_x_max_px()
-{
-    return clamp_x_from_ratio(g_vision_processor_config.default_maze_trace_x_max_ratio);
-}

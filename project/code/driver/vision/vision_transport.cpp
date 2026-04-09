@@ -28,7 +28,7 @@ namespace
 static constexpr uint32 kClientDefaultMaxFps = 30;
 static constexpr uint32 kClientMaxFpsUpper = 240;
 // RGB565 临时缓存：仅在 VISION_SEND_RGB565 模式使用。
-static std::vector<uint8> g_image_rgb565_frame(VISION_MAX_PROC_WIDTH * VISION_MAX_PROC_HEIGHT * 2);
+static std::vector<uint8> g_image_rgb565_frame(VISION_DOWNSAMPLED_WIDTH * VISION_DOWNSAMPLED_HEIGHT * 2);
 // 客户端发送模式与开关。
 static std::atomic<int> g_send_mode(VISION_SEND_BINARY);
 static std::atomic<bool> g_send_enabled(true);
@@ -49,11 +49,8 @@ constexpr uint32 kUdpHeaderSize = 20;
 constexpr uint32 kMagic = 0x56535544;
 constexpr int kGrayJpegQuality = 100;
 constexpr int kRgbJpegQuality = 80;
-
-static inline int proc_width() { return vision_processing_width(); }
-static inline int proc_height() { return vision_processing_height(); }
-static inline int ipm_width() { return vision_ipm_width(); }
-static inline int ipm_height() { return vision_ipm_height(); }
+constexpr int kIpmCanvasWidth = VISION_IPM_WIDTH;
+constexpr int kIpmCanvasHeight = VISION_IPM_HEIGHT;
 
 #pragma pack(push, 1)
 struct udp_chunk_header_t
@@ -151,8 +148,8 @@ static void update_rgb565_from_bgr_source(const uint8 *bgr_data)
     }
     convert_bgr_to_rgb565_be(bgr_data,
                              g_image_rgb565_frame.data(),
-                             proc_width(),
-                             proc_height());
+                             VISION_DOWNSAMPLED_WIDTH,
+                             VISION_DOWNSAMPLED_HEIGHT);
 }
 
 static bool mode_enable_boundary_packet(vision_send_mode_enum mode)
@@ -177,20 +174,20 @@ static void config_camera_send_packet(vision_send_mode_enum mode)
         case VISION_SEND_RGB565:
             seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_RGB565,
                                                          g_image_rgb565_frame.data(),
-                                                         proc_width(),
-                                                         proc_height());
+                                                         VISION_DOWNSAMPLED_WIDTH,
+                                                         VISION_DOWNSAMPLED_HEIGHT);
             break;
         case VISION_SEND_BINARY:
             seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_GRAY,
                                                          const_cast<uint8 *>(vision_image_processor_binary_downsampled_u8_image()),
-                                                         proc_width(),
-                                                         proc_height());
+                                                         VISION_DOWNSAMPLED_WIDTH,
+                                                         VISION_DOWNSAMPLED_HEIGHT);
             break;
         default:
             seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_GRAY,
                                                          const_cast<uint8 *>(vision_image_processor_gray_downsampled_image()),
-                                                         proc_width(),
-                                                         proc_height());
+                                                         VISION_DOWNSAMPLED_WIDTH,
+                                                         VISION_DOWNSAMPLED_HEIGHT);
             break;
     }
 
@@ -286,8 +283,8 @@ static bool build_gray_image(std::vector<uint8> *image_out, int *width, int *hei
     {
         return false;
     }
-    const int w = proc_width();
-    const int h = proc_height();
+    const int w = VISION_DOWNSAMPLED_WIDTH;
+    const int h = VISION_DOWNSAMPLED_HEIGHT;
     const uint8 *gray = vision_image_processor_gray_downsampled_image();
     const vision_web_image_format_enum format =
         sanitize_web_image_format(g_vision_runtime_config.udp_web_gray_image_format);
@@ -307,8 +304,8 @@ static bool build_binary_image(std::vector<uint8> *image_out, int *width, int *h
     {
         return false;
     }
-    const int w = proc_width();
-    const int h = proc_height();
+    const int w = VISION_DOWNSAMPLED_WIDTH;
+    const int h = VISION_DOWNSAMPLED_HEIGHT;
     const uint8 *binary = vision_image_processor_binary_downsampled_u8_image();
     const vision_web_image_format_enum format =
         sanitize_web_image_format(g_vision_runtime_config.udp_web_binary_image_format);
@@ -328,8 +325,8 @@ static bool build_rgb_image(std::vector<uint8> *image_out, int *width, int *heig
     {
         return false;
     }
-    const int w = proc_width();
-    const int h = proc_height();
+    const int w = VISION_DOWNSAMPLED_WIDTH;
+    const int h = VISION_DOWNSAMPLED_HEIGHT;
     const uint8 *bgr = vision_image_processor_bgr_downsampled_image();
     if (bgr == nullptr)
     {
@@ -561,20 +558,6 @@ static void send_tcp_status()
                                                    &maze_right_points_raw,
                                                    &maze_left_ok,
                                                    &maze_right_ok);
-    const int maze_start_row_px = vision_runtime_config_maze_start_row_px();
-    const int maze_runtime_start_row_px = vision_image_processor_get_runtime_maze_start_row();
-    const int maze_fallback_delta_px = vision_runtime_config_maze_trace_y_fallback_stop_delta_px();
-    const int maze_start_min_gap_px = vision_runtime_config_maze_start_min_boundary_gap_px();
-    const int cross_probe_start_x_px = vision_runtime_config_cross_probe_start_x_px();
-    const int cross_probe_min_row_px = vision_runtime_config_cross_probe_min_row_px();
-    const int cross_probe_max_gap_px = vision_runtime_config_cross_probe_max_gap_px();
-    const int route_cross_corner_distance_px = vision_runtime_config_route_cross_corner_distance_px();
-    const int route_cross_begin_corner_src_y_px = vision_runtime_config_route_cross_begin_corner_src_y_px();
-    const int route_cross_stop_row_exit_px = vision_runtime_config_route_cross_stop_row_exit_px();
-    const int cross_tail_extra_points = vision_runtime_config_cross_tail_extra_points();
-    const int maze_history_start_offset_px = vision_runtime_config_maze_history_start_offset_px();
-    const int maze_trace_x_min_px = vision_processor_config_default_maze_trace_x_min_px();
-    const int maze_trace_x_max_px = vision_processor_config_default_maze_trace_x_max_px();
 
     const int64_t ts_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                               std::chrono::steady_clock::now().time_since_epoch())
@@ -612,31 +595,6 @@ static void send_tcp_status()
         }
         append_key(name);
         line += std::to_string(value);
-    };
-
-    auto append_named_number_object = [&append_key, &line](bool enabled,
-                                                           const char *name,
-                                                           const std::initializer_list<std::pair<const char *, double>> &fields) {
-        if (!enabled)
-        {
-            return;
-        }
-        append_key(name);
-        line += "{";
-        bool first = true;
-        for (const auto &field : fields)
-        {
-            if (!first)
-            {
-                line += ",";
-            }
-            first = false;
-            line += "\"";
-            line += field.first;
-            line += "\":";
-            line += std::to_string(field.second);
-        }
-        line += "}";
     };
 
     auto append_bool = [&append_key, &line](bool enabled, const char *name, bool value) {
@@ -694,7 +652,7 @@ static void send_tcp_status()
         append_float(true, "right_filtered_count", motor_thread_right_filtered_count());
         append_int(true, "otsu_threshold", otsu_threshold);
         append_int_array(true, "gray_size",
-                         {proc_width(), proc_height()});
+                         {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
         line += "}";
         line += "\n";
         tcp_client_send_data(reinterpret_cast<const uint8 *>(line.data()), static_cast<uint32>(line.size()));
@@ -733,35 +691,6 @@ static void send_tcp_status()
     append_int(g_vision_runtime_config.udp_web_tcp_send_perf_total_us, "total_us", total_us);
     append_int(g_vision_runtime_config.udp_web_tcp_send_maze_left_points_raw, "maze_left_points_raw", maze_left_points_raw);
     append_int(g_vision_runtime_config.udp_web_tcp_send_maze_right_points_raw, "maze_right_points_raw", maze_right_points_raw);
-    append_named_number_object(g_vision_runtime_config.udp_web_tcp_send_maze_config_ratio, "maze_config_ratio",
-                               {{"start_row_ratio", g_vision_runtime_config.maze_start_row_ratio},
-                                {"fallback_delta_ratio", g_vision_runtime_config.maze_trace_y_fallback_stop_delta_ratio},
-                               {"start_min_gap_ratio", g_vision_runtime_config.maze_start_min_boundary_gap_ratio},
-                               {"cross_probe_start_x_ratio", g_vision_runtime_config.cross_probe_start_x_ratio},
-                               {"cross_probe_min_row_ratio", g_vision_runtime_config.cross_probe_min_row_ratio},
-                               {"cross_probe_max_gap_ratio", g_vision_runtime_config.cross_probe_max_gap_ratio},
-                               {"route_cross_corner_distance_ratio", g_vision_runtime_config.route_cross_corner_distance_ratio},
-                               {"route_cross_begin_corner_src_y_ratio", g_vision_runtime_config.route_cross_begin_corner_src_y_ratio},
-                               {"route_cross_stop_row_exit_ratio", g_vision_runtime_config.route_cross_stop_row_exit_ratio},
-                               {"cross_tail_extra_points_ratio", g_vision_runtime_config.cross_tail_extra_points_ratio},
-                               {"history_start_offset_ratio", g_vision_runtime_config.maze_history_start_offset_ratio},
-                               {"x_min_ratio", g_vision_processor_config.default_maze_trace_x_min_ratio},
-                               {"x_max_ratio", g_vision_processor_config.default_maze_trace_x_max_ratio}});
-    append_named_number_object(g_vision_runtime_config.udp_web_tcp_send_maze_config_px, "maze_config_px",
-                               {{"start_row_px", static_cast<double>(maze_start_row_px)},
-                                {"fallback_delta_px", static_cast<double>(maze_fallback_delta_px)},
-                                {"start_min_gap_px", static_cast<double>(maze_start_min_gap_px)},
-                                {"cross_probe_start_x_px", static_cast<double>(cross_probe_start_x_px)},
-                                {"cross_probe_min_row_px", static_cast<double>(cross_probe_min_row_px)},
-                                {"cross_probe_max_gap_px", static_cast<double>(cross_probe_max_gap_px)},
-                                {"route_cross_corner_distance_px", static_cast<double>(route_cross_corner_distance_px)},
-                                {"route_cross_begin_corner_src_y_px", static_cast<double>(route_cross_begin_corner_src_y_px)},
-                                {"route_cross_stop_row_exit_px", static_cast<double>(route_cross_stop_row_exit_px)},
-                                {"cross_tail_extra_points", static_cast<double>(cross_tail_extra_points)},
-                                {"history_start_offset_px", static_cast<double>(maze_history_start_offset_px)},
-                                {"x_min_px", static_cast<double>(maze_trace_x_min_px)},
-                                {"x_max_px", static_cast<double>(maze_trace_x_max_px)}});
-    append_int(true, "maze_runtime_start_row_px", maze_runtime_start_row_px);
     append_bool(g_vision_runtime_config.udp_web_tcp_send_red_found, "red_found", red_found);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_red_rect, "red",
                      {red_x, red_y, red_w, red_h, red_cx, red_cy});
@@ -837,13 +766,13 @@ static void send_tcp_status()
     };
 
     append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
-                  "left_boundary", x1, y1, left_dot_num, proc_width(), proc_height());
+                  "left_boundary", x1, y1, left_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
-                  "right_boundary", x3, y3, right_dot_num, proc_width(), proc_height());
+                  "right_boundary", x3, y3, right_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
-                  "left_boundary_corner", src_corner_left_x, src_corner_left_y, src_corner_left_num, proc_width(), proc_height());
+                  "left_boundary_corner", src_corner_left_x, src_corner_left_y, src_corner_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
-                  "right_boundary_corner", src_corner_right_x, src_corner_right_y, src_corner_right_num, proc_width(), proc_height());
+                  "right_boundary_corner", src_corner_right_x, src_corner_right_y, src_corner_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_bool(g_vision_runtime_config.udp_web_tcp_send_left_boundary, "left_boundary_corner_found", src_left_corner_found);
     append_bool(g_vision_runtime_config.udp_web_tcp_send_right_boundary, "right_boundary_corner_found", src_right_corner_found);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_left_boundary && src_left_corner_found, "left_boundary_corner_point",
@@ -851,13 +780,13 @@ static void send_tcp_status()
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_right_boundary && src_right_corner_found, "right_boundary_corner_point",
                      {src_right_corner_state_x, src_right_corner_state_y});
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary,
-                  "ipm_left_boundary", ipm_x1, ipm_y1, ipm_left_dot_num, ipm_width(), ipm_height());
+                  "ipm_left_boundary", ipm_x1, ipm_y1, ipm_left_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary,
-                  "ipm_right_boundary", ipm_x3, ipm_y3, ipm_right_dot_num, ipm_width(), ipm_height());
+                  "ipm_right_boundary", ipm_x3, ipm_y3, ipm_right_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary,
-                  "ipm_left_boundary_corner", ipm_corner_left_x, ipm_corner_left_y, ipm_corner_left_num, ipm_width(), ipm_height());
+                  "ipm_left_boundary_corner", ipm_corner_left_x, ipm_corner_left_y, ipm_corner_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary,
-                  "ipm_right_boundary_corner", ipm_corner_right_x, ipm_corner_right_y, ipm_corner_right_num, ipm_width(), ipm_height());
+                  "ipm_right_boundary_corner", ipm_corner_right_x, ipm_corner_right_y, ipm_corner_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_bool(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary, "ipm_left_boundary_corner_found", ipm_left_corner_found);
     append_bool(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary, "ipm_right_boundary_corner_found", ipm_right_corner_found);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary, "ipm_left_boundary_corner_index", ipm_left_corner_index);
@@ -888,15 +817,15 @@ static void send_tcp_status()
                   selected_ipm_center_x,
                   selected_ipm_center_y,
                   selected_ipm_center_num,
-                  ipm_width(),
-                  ipm_height());
+                  kIpmCanvasWidth,
+                  kIpmCanvasHeight);
     append_points(send_selected_src_centerline,
                   "src_centerline_selected_shift",
                   selected_src_center_x,
                   selected_src_center_y,
                   selected_src_center_num,
-                  proc_width(),
-                  proc_height());
+                  VISION_DOWNSAMPLED_WIDTH,
+                  VISION_DOWNSAMPLED_HEIGHT);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_count,
                "ipm_centerline_selected_count",
                selected_ipm_center_num);
@@ -906,20 +835,20 @@ static void send_tcp_status()
     append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
                        "ipm_centerline_selected_curvature",
                        selected_ipm_curvature,
-                       static_cast<uint16>(std::clamp(selected_ipm_curvature_count, 0, proc_height() * 2)));
+                       static_cast<uint16>(std::clamp(selected_ipm_curvature_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
     append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
                        "ipm_left_boundary_angle_cos",
                        left_ipm_boundary_angle_cos,
-                       static_cast<uint16>(std::clamp(left_ipm_boundary_angle_cos_count, 0, proc_height() * 2)));
+                       static_cast<uint16>(std::clamp(left_ipm_boundary_angle_cos_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
     append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
                        "ipm_right_boundary_angle_cos",
                        right_ipm_boundary_angle_cos,
-                       static_cast<uint16>(std::clamp(right_ipm_boundary_angle_cos_count, 0, proc_height() * 2)));
+                       static_cast<uint16>(std::clamp(right_ipm_boundary_angle_cos_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
 
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_gray_size, "gray_size",
-                     {proc_width(), proc_height()});
+                     {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_size, "ipm_size",
-                     {ipm_width(), ipm_height()});
+                     {kIpmCanvasWidth, kIpmCanvasHeight});
 
     line += "}";
     line += "\n";

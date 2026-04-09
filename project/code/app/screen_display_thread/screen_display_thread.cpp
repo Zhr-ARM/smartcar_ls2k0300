@@ -19,6 +19,8 @@ namespace
 {
 // 车载屏显刷新周期：20Hz，兼顾可读性与CPU占用。
 constexpr int32 SCREEN_REFRESH_PERIOD_MS = 50;
+constexpr int32 VISION_PROC_WIDTH = VISION_DOWNSAMPLED_WIDTH;
+constexpr int32 VISION_PROC_HEIGHT = VISION_DOWNSAMPLED_HEIGHT;
 constexpr int32 OVERLAY_LINE_THICKNESS_PX = 3;
 
 std::thread g_screen_display_thread;
@@ -31,8 +33,8 @@ void draw_thick_overlay_line(int32 x_start,
                              uint16 color,
                              int32 thickness)
 {
-    int32 max_x = vision_processing_width() - 1;
-    int32 max_y = vision_processing_height() - 1;
+    int32 max_x = VISION_PROC_WIDTH - 1;
+    int32 max_y = VISION_PROC_HEIGHT - 1;
 
     int32 sx = std::clamp(x_start, 0, max_x);
     int32 sy = std::clamp(y_start, 0, max_y);
@@ -97,23 +99,20 @@ void draw_thick_overlay_line(int32 x_start,
 void screen_display_loop()
 {
     // 使用本地快照避免上游图像缓冲区在刷新时被并发改写导致撕裂。
-    std::vector<uint8> img_snapshot(VISION_MAX_PROC_WIDTH * VISION_MAX_PROC_HEIGHT * 2, 0);
+    std::vector<uint8> img_snapshot(VISION_PROC_WIDTH * VISION_PROC_HEIGHT * 2, 0);
 
     while (g_screen_display_running.load())
     {
         vision_thread_send_mode_enum mode = vision_thread_get_send_mode();
-
-        const int32 vision_proc_width = vision_processing_width();
-        const int32 vision_proc_height = vision_processing_height();
 
         if (mode == VISION_THREAD_SEND_BINARY)
         {
             const uint8 *img = vision_image_processor_binary_downsampled_u8_image();
             if (img != nullptr)
             {
-                std::memcpy(img_snapshot.data(), img, static_cast<size_t>(vision_proc_width) * vision_proc_height);
+                std::memcpy(img_snapshot.data(), img, VISION_PROC_WIDTH * VISION_PROC_HEIGHT);
                 // 二值图(0/255的数组)作为灰度图画出来就是黑白的
-                ips200_show_gray_image(0, 0, img_snapshot.data(), vision_proc_width, vision_proc_height);
+                ips200_show_gray_image(0, 0, img_snapshot.data(), VISION_PROC_WIDTH, VISION_PROC_HEIGHT);
             }
         }
         else if (mode == VISION_THREAD_SEND_RGB565)
@@ -121,8 +120,8 @@ void screen_display_loop()
             const uint8 *img = vision_image_processor_rgb565_downsampled_image();
             if (img != nullptr)
             {
-                std::memcpy(img_snapshot.data(), img, static_cast<size_t>(vision_proc_width) * vision_proc_height * 2U);
-                ips200_show_rgb565_image(0, 0, img_snapshot.data(), vision_proc_width, vision_proc_height);
+                std::memcpy(img_snapshot.data(), img, VISION_PROC_WIDTH * VISION_PROC_HEIGHT * 2);
+                ips200_show_rgb565_image(0, 0, img_snapshot.data(), VISION_PROC_WIDTH, VISION_PROC_HEIGHT);
             }
         }
         else // VISION_THREAD_SEND_GRAY
@@ -130,15 +129,15 @@ void screen_display_loop()
             const uint8 *img = vision_image_processor_gray_downsampled_image();
             if (img != nullptr)
             {
-                std::memcpy(img_snapshot.data(), img, static_cast<size_t>(vision_proc_width) * vision_proc_height);
-                ips200_show_gray_image(0, 0, img_snapshot.data(), vision_proc_width, vision_proc_height);
+                std::memcpy(img_snapshot.data(), img, VISION_PROC_WIDTH * VISION_PROC_HEIGHT);
+                ips200_show_gray_image(0, 0, img_snapshot.data(), VISION_PROC_WIDTH, VISION_PROC_HEIGHT);
             }
         }
 
         const float error_px = line_follow_thread_error();
-        const int32 x_center = vision_proc_width / 2;
+        const int32 x_center = VISION_PROC_WIDTH / 2;
         const float ratio = std::clamp(line_sample_ratio, 0.0f, 1.0f);
-        int32 sample_y = std::clamp<int32>(static_cast<int32>(vision_proc_height * ratio), 0, vision_proc_height - 1);
+        int32 sample_y = std::clamp<int32>(static_cast<int32>(VISION_PROC_HEIGHT * ratio), 0, VISION_PROC_HEIGHT - 1);
 
         // 获取并绘制视觉边界数据
         uint16 *x1 = nullptr, *x2 = nullptr, *x3 = nullptr;
@@ -167,22 +166,22 @@ void screen_display_loop()
         char buf[96];
 
         std::snprintf(buf, sizeof(buf), "Bat:%5.2fV", battery_monitor.voltage_v());
-        ips200_show_string(0, vision_proc_height + 10, buf);
+        ips200_show_string(0, VISION_PROC_HEIGHT + 10, buf);
 
         std::snprintf(buf, sizeof(buf), "Err:%+6.1f", error_px);
-        ips200_show_string(0, vision_proc_height + 30, buf);
+        ips200_show_string(0, VISION_PROC_HEIGHT + 30, buf);
 
         std::snprintf(buf, sizeof(buf), "TarL:%7.1f", motor_thread_left_target_count());
-        ips200_show_string(0, vision_proc_height + 50, buf);
+        ips200_show_string(0, VISION_PROC_HEIGHT + 50, buf);
 
         std::snprintf(buf, sizeof(buf), "TarR:%7.1f", motor_thread_right_target_count());
-        ips200_show_string(0, vision_proc_height + 70, buf);
+        ips200_show_string(0, VISION_PROC_HEIGHT + 70, buf);
 
         std::snprintf(buf, sizeof(buf), "Out:%+6.1f", line_follow_thread_turn_output());
-        ips200_show_string(0, vision_proc_height + 90, buf);
+        ips200_show_string(0, VISION_PROC_HEIGHT + 90, buf);
 
         std::snprintf(buf, sizeof(buf), "SmpY:%3d(%.2f)", sample_y, ratio);
-        ips200_show_string(0, vision_proc_height + 110, buf);
+        ips200_show_string(0, VISION_PROC_HEIGHT + 110, buf);
 
         system_delay_ms(SCREEN_REFRESH_PERIOD_MS);
     }

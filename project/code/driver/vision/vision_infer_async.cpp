@@ -21,10 +21,11 @@
 
 namespace
 {
-static inline int kProcWidth() { return vision_processing_width(); }
-static inline int kProcHeight() { return vision_processing_height(); }
-static inline int kFullWidth() { return vision_camera_width(); }
-static inline int kFullHeight() { return vision_camera_height(); }
+// 固定分辨率参数：当前工程采图/处理固定为 160x120，full 为 UVC 原始尺寸。
+static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
+static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
+static constexpr int kFullWidth = UVC_WIDTH;
+static constexpr int kFullHeight = UVC_HEIGHT;
 
 static constexpr int kRefProcWidth = 160;
 static constexpr int kRefProcHeight = 120;
@@ -102,7 +103,7 @@ static inline int scale_by_width(int ref_px)
     {
         return 0;
     }
-    return std::max(1, (ref_px * kProcWidth() + kRefProcWidth / 2) / kRefProcWidth);
+    return std::max(1, (ref_px * kProcWidth + kRefProcWidth / 2) / kRefProcWidth);
 }
 
 static inline int scale_by_height(int ref_px)
@@ -111,7 +112,7 @@ static inline int scale_by_height(int ref_px)
     {
         return 0;
     }
-    return std::max(1, (ref_px * kProcHeight() + kRefProcHeight / 2) / kRefProcHeight);
+    return std::max(1, (ref_px * kProcHeight + kRefProcHeight / 2) / kRefProcHeight);
 }
 
 static inline int scale_by_area(int ref_area_px)
@@ -120,7 +121,7 @@ static inline int scale_by_area(int ref_area_px)
     {
         return 0;
     }
-    const int64_t scaled = static_cast<int64_t>(ref_area_px) * kProcWidth() * kProcHeight();
+    const int64_t scaled = static_cast<int64_t>(ref_area_px) * kProcWidth * kProcHeight;
     return std::max(1, static_cast<int>((scaled + kRefProcPixels / 2) / kRefProcPixels));
 }
 
@@ -130,67 +131,67 @@ static inline int scale_full_height(int ref_px)
     {
         return 0;
     }
-    return std::max(1, (ref_px * kFullHeight() + kRefFullHeight / 2) / kRefFullHeight);
+    return std::max(1, (ref_px * kFullHeight + kRefFullHeight / 2) / kRefFullHeight);
 }
 
 static inline int map_proc_to_full_x(int x_proc)
 {
-    if (kProcWidth() <= 1)
+    if (kProcWidth <= 1)
     {
         return 0;
     }
-    return std::clamp((x_proc * (kFullWidth() - 1)) / (kProcWidth() - 1), 0, kFullWidth() - 1);
+    return std::clamp((x_proc * (kFullWidth - 1)) / (kProcWidth - 1), 0, kFullWidth - 1);
 }
 
 static inline int map_proc_to_full_y(int y_proc)
 {
-    if (kProcHeight() <= 1)
+    if (kProcHeight <= 1)
     {
         return 0;
     }
-    return std::clamp((y_proc * (kFullHeight() - 1)) / (kProcHeight() - 1), 0, kFullHeight() - 1);
+    return std::clamp((y_proc * (kFullHeight - 1)) / (kProcHeight - 1), 0, kFullHeight - 1);
 }
 
 static inline int map_full_to_proc_x(int x_full)
 {
-    if (kFullWidth() <= 1)
+    if (kFullWidth <= 1)
     {
         return 0;
     }
-    return std::clamp((x_full * (kProcWidth() - 1)) / (kFullWidth() - 1), 0, kProcWidth() - 1);
+    return std::clamp((x_full * (kProcWidth - 1)) / (kFullWidth - 1), 0, kProcWidth - 1);
 }
 
 static inline int map_full_to_proc_y(int y_full)
 {
-    if (kFullHeight() <= 1)
+    if (kFullHeight <= 1)
     {
         return 0;
     }
-    return std::clamp((y_full * (kProcHeight() - 1)) / (kFullHeight() - 1), 0, kProcHeight() - 1);
+    return std::clamp((y_full * (kProcHeight - 1)) / (kFullHeight - 1), 0, kProcHeight - 1);
 }
 
 static cv::Rect build_ncnn_full_roi_from_red_rect_proc(int cx_proc, int red_y_proc, int red_h_proc)
 {
-    const int roi_w_proc = std::min(scale_by_width(kInferRoiSizeProcRef), kProcWidth());
-    const int roi_h_proc = std::min(scale_by_height(kInferRoiSizeProcRef), kProcHeight());
-    const int roi_w = std::max(1, std::min((roi_w_proc * kFullWidth() + kProcWidth() / 2) / kProcWidth(), kFullWidth()));
-    const int roi_h = std::max(1, std::min((roi_h_proc * kFullHeight() + kProcHeight() / 2) / kProcHeight(), kFullHeight()));
+    const int roi_w_proc = std::min(scale_by_width(kInferRoiSizeProcRef), kProcWidth);
+    const int roi_h_proc = std::min(scale_by_height(kInferRoiSizeProcRef), kProcHeight);
+    const int roi_w = std::max(1, std::min((roi_w_proc * kFullWidth + kProcWidth / 2) / kProcWidth, kFullWidth));
+    const int roi_h = std::max(1, std::min((roi_h_proc * kFullHeight + kProcHeight / 2) / kProcHeight, kFullHeight));
     const int cx_full = map_proc_to_full_x(cx_proc);
     const int red_top_full = map_proc_to_full_y(red_y_proc);
-    const int red_h_full = std::max(1, (red_h_proc * kFullHeight() + kProcHeight() / 2) / kProcHeight());
+    const int red_h_full = std::max(1, (red_h_proc * kFullHeight + kProcHeight / 2) / kProcHeight);
     const int red_bottom_full = red_top_full + std::max(0, red_h_full - 1);
-    const int roi_bottom = std::min(kFullHeight() - 1, red_bottom_full + scale_full_height(kInferBottomOffsetFullRef));
+    const int roi_bottom = std::min(kFullHeight - 1, red_bottom_full + scale_full_height(kInferBottomOffsetFullRef));
 
     int roi_x = cx_full - roi_w / 2;
     int roi_y = roi_bottom - roi_h + 1;
-    roi_x = std::clamp(roi_x, 0, std::max(0, kFullWidth() - roi_w));
-    roi_y = std::clamp(roi_y, 0, std::max(0, kFullHeight() - roi_h));
+    roi_x = std::clamp(roi_x, 0, std::max(0, kFullWidth - roi_w));
+    roi_y = std::clamp(roi_y, 0, std::max(0, kFullHeight - roi_h));
     return cv::Rect(roi_x, roi_y, roi_w, roi_h);
 }
 
 static cv::Rect map_full_roi_to_proc(const cv::Rect &full_roi)
 {
-    cv::Rect safe = full_roi & cv::Rect(0, 0, kFullWidth(), kFullHeight());
+    cv::Rect safe = full_roi & cv::Rect(0, 0, kFullWidth, kFullHeight);
     if (safe.width <= 0 || safe.height <= 0)
     {
         return cv::Rect(0, 0, 0, 0);
@@ -276,12 +277,12 @@ static void try_save_infer_roi_png(const cv::Mat &frame, const cv::Rect &ncnn_ro
 
 static cv::Rect fallback_center_roi()
 {
-    const int rw = std::clamp(kProcWidth() / 2, scale_by_width(kRedSearchMinWRef), kProcWidth());
-    const int rh = std::clamp(kProcHeight() / 2, scale_by_height(kRedSearchMinHRef), kProcHeight());
-    int rx = (kProcWidth() - rw) / 2;
-    int ry = (kProcHeight() - rh) / 2;
-    rx = std::clamp(rx, 0, std::max(0, kProcWidth() - rw));
-    ry = std::clamp(ry, 0, std::max(0, kProcHeight() - rh));
+    const int rw = std::clamp(kProcWidth / 2, scale_by_width(kRedSearchMinWRef), kProcWidth);
+    const int rh = std::clamp(kProcHeight / 2, scale_by_height(kRedSearchMinHRef), kProcHeight);
+    int rx = (kProcWidth - rw) / 2;
+    int ry = (kProcHeight - rh) / 2;
+    rx = std::clamp(rx, 0, std::max(0, kProcWidth - rw));
+    ry = std::clamp(ry, 0, std::max(0, kProcHeight - rh));
     return cv::Rect(rx, ry, rw, rh);
 }
 
@@ -290,13 +291,13 @@ static cv::Rect build_red_search_roi_from_x_line()
 {
     const int kExpandX = scale_by_width(kRedSearchExpandXRef);
     const int kMinRoiW = scale_by_width(kRedSearchMinWRef);
-    const int kMinRoiH = std::min(kProcHeight(), scale_by_height(kRedSearchMinHRef));
-    const int center_x = std::clamp(scale_by_width(kRedSearchCenterXRef), 0, kProcWidth() - 1);
+    const int kMinRoiH = std::min(kProcHeight, scale_by_height(kRedSearchMinHRef));
+    const int center_x = std::clamp(scale_by_width(kRedSearchCenterXRef), 0, kProcWidth - 1);
 
     int x0 = std::max(0, center_x - kExpandX);
-    int x1 = std::min(kProcWidth() - 1, center_x + kExpandX);
+    int x1 = std::min(kProcWidth - 1, center_x + kExpandX);
     int y0 = 0;
-    int y1 = kProcHeight() - 1;
+    int y1 = kProcHeight - 1;
 
     int rw = x1 - x0 + 1;
     int rh = y1 - y0 + 1;
@@ -304,7 +305,7 @@ static cv::Rect build_red_search_roi_from_x_line()
     {
         const int cx = (x0 + x1) / 2;
         x0 = std::max(0, cx - kMinRoiW / 2);
-        x1 = std::min(kProcWidth() - 1, x0 + kMinRoiW - 1);
+        x1 = std::min(kProcWidth - 1, x0 + kMinRoiW - 1);
         x0 = std::max(0, x1 - kMinRoiW + 1);
         rw = x1 - x0 + 1;
     }
@@ -312,7 +313,7 @@ static cv::Rect build_red_search_roi_from_x_line()
     {
         const int cy = (y0 + y1) / 2;
         y0 = std::max(0, cy - kMinRoiH / 2);
-        y1 = std::min(kProcHeight() - 1, y0 + kMinRoiH - 1);
+        y1 = std::min(kProcHeight - 1, y0 + kMinRoiH - 1);
         y0 = std::max(0, y1 - kMinRoiH + 1);
         rh = y1 - y0 + 1;
     }
@@ -466,7 +467,7 @@ static void run_infer_worker()
 
         if (found)
         {
-            red_bbox &= cv::Rect(0, 0, kProcWidth(), kProcHeight());
+            red_bbox &= cv::Rect(0, 0, kProcWidth, kProcHeight);
             result.found = true;
             result.red_x = red_bbox.x;
             result.red_y = red_bbox.y;
@@ -482,7 +483,7 @@ static void run_infer_worker()
             try_save_infer_roi_png(job.full_bgr, ncnn_full_roi);
             if (g_infer_enabled.load())
             {
-                cv::Rect safe_full_roi = ncnn_full_roi & cv::Rect(0, 0, kFullWidth(), kFullHeight());
+                cv::Rect safe_full_roi = ncnn_full_roi & cv::Rect(0, 0, kFullWidth, kFullHeight);
                 if (safe_full_roi.width > 0 && safe_full_roi.height > 0)
                 {
                     cv::Mat roi_bgr = job.full_bgr(safe_full_roi).clone();
@@ -750,13 +751,13 @@ void vision_infer_async_submit_frame(const uint8 *bgr_proc_data,
         return;
     }
     // 尺寸不匹配时直接丢弃（保护当前固定分辨率流程）。
-    if (proc_width != kProcWidth() || proc_height != kProcHeight() || full_width != kFullWidth() || full_height != kFullHeight())
+    if (proc_width != kProcWidth || proc_height != kProcHeight || full_width != kFullWidth || full_height != kFullHeight)
     {
         return;
     }
 
-    cv::Mat proc_frame(kProcHeight(), kProcWidth(), CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
-    cv::Mat full_frame(kFullHeight(), kFullWidth(), CV_8UC3, const_cast<uint8 *>(bgr_full_data));
+    cv::Mat proc_frame(kProcHeight, kProcWidth, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
+    cv::Mat full_frame(kFullHeight, kFullWidth, CV_8UC3, const_cast<uint8 *>(bgr_full_data));
     {
         std::lock_guard<std::mutex> lock(g_infer_mutex);
         g_infer_job.proc_bgr = proc_frame.clone();

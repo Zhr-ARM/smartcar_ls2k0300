@@ -479,12 +479,6 @@
     push('rx_udp_estimated_peak_mbps', status.rx_udp_estimated_peak_mbps);
     push('maze_left_points_raw', status.maze_left_points_raw);
     push('maze_right_points_raw', status.maze_right_points_raw);
-    if (status && typeof status.maze_config_ratio === 'object' && !Array.isArray(status.maze_config_ratio)) {
-      push('maze_config_ratio', JSON.stringify(status.maze_config_ratio));
-    }
-    if (status && typeof status.maze_config_px === 'object' && !Array.isArray(status.maze_config_px)) {
-      push('maze_config_px', JSON.stringify(status.maze_config_px));
-    }
     push('red_found', status.red_found);
     if (Array.isArray(status.red)) push('red', formatArrayInline(status.red));
     push('roi_valid', status.roi_valid);

@@ -1,5 +1,4 @@
 #include "driver/vision/vision_route_state_machine.h"
-#include "driver/vision/vision_config.h"
 
 #include <algorithm>
 #include <cmath>
@@ -11,6 +10,9 @@ static constexpr int kCircleEdgeVisibleMinCount = 2;
 static constexpr int kCircleLossTrigger = 3;
 static constexpr int kCircleGainTrigger = 3;
 static constexpr uint32 kCircleEncoderSwitchThreshold = 40000;
+static constexpr int kCrossCornerDistanceThreshold = 40;
+static constexpr int kCrossBeginCornerSrcYThreshold = 45;
+static constexpr int kCrossStopRowExitThreshold = 80;
 static constexpr int kDualStraightEscapeFrames = 5;
 static constexpr int kCircleEntryWindowFrames = 10;
 static constexpr int kCircleEntryHitThreshold = 8;
@@ -358,11 +360,6 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
         return;
     }
 
-    const bool cross_enabled = g_vision_runtime_config.route_cross_enabled;
-    const int cross_corner_distance_threshold_px = vision_runtime_config_route_cross_corner_distance_px();
-    const int cross_begin_corner_src_y_threshold_px = vision_runtime_config_route_cross_begin_corner_src_y_px();
-    const int cross_stop_row_exit_threshold_px = vision_runtime_config_route_cross_stop_row_exit_px();
-
     const bool left_corner_found = input->left_corner_found;
     const bool right_corner_found = input->right_corner_found;
     const bool left_corner_valid = left_corner_found && corner_index_valid(input->left_corner_index);
@@ -405,7 +402,7 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
                               g_right_circle_entry_window,
                               right_circle_entry_hit);
 
-        if (cross_enabled && left_corner_valid && right_corner_valid && corner_distance < cross_corner_distance_threshold_px)
+        if (left_corner_valid && right_corner_valid && corner_distance < kCrossCornerDistanceThreshold)
         {
             enter_main_state(VISION_ROUTE_MAIN_CROSS, VISION_ROUTE_SUB_CROSS_BEGIN, input->base_preferred_source);
             return;
@@ -428,15 +425,9 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
 
     if (g_main_state == VISION_ROUTE_MAIN_CROSS)
     {
-        if (!cross_enabled)
-        {
-            enter_main_state(VISION_ROUTE_MAIN_NORMAL, VISION_ROUTE_SUB_NONE, input->base_preferred_source);
-            return;
-        }
-
         g_preferred_source = input->base_preferred_source;
-        const bool left_corner_src_ready = left_corner_valid && (input->left_corner_src_y > cross_begin_corner_src_y_threshold_px);
-        const bool right_corner_src_ready = right_corner_valid && (input->right_corner_src_y > cross_begin_corner_src_y_threshold_px);
+        const bool left_corner_src_ready = left_corner_valid && (input->left_corner_src_y > kCrossBeginCornerSrcYThreshold);
+        const bool right_corner_src_ready = right_corner_valid && (input->right_corner_src_y > kCrossBeginCornerSrcYThreshold);
 
         if (g_sub_state == VISION_ROUTE_SUB_NONE)
         {
@@ -464,7 +455,7 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
         if (g_sub_state == VISION_ROUTE_SUB_CROSS_IN)
         {
             g_cross_loss_count = std::max(input->cross_detected_stop_row, 0);
-            if (input->cross_detected_stop_row >= cross_stop_row_exit_threshold_px)
+            if (input->cross_detected_stop_row >= kCrossStopRowExitThreshold)
             {
                 enter_main_state(VISION_ROUTE_MAIN_NORMAL, VISION_ROUTE_SUB_NONE, input->base_preferred_source);
             }

@@ -876,11 +876,6 @@
       const pushArray = (rows, name, value) => {
         if (Array.isArray(value)) rows.push(`${name}: ${fmtArrayInline(value)}`);
       };
-      const pushObject = (rows, name, value) => {
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-          rows.push(`${name}: ${JSON.stringify(value)}`);
-        }
-      };
       const pushCount = (rows, name, value) => {
         if (Array.isArray(value)) rows.push(`${name}: count=${value.length}`);
       };
@@ -928,8 +923,6 @@
       push(perfRows, 'total_us', status.total_us);
       push(perfRows, 'maze_left_points_raw', status.maze_left_points_raw);
       push(perfRows, 'maze_right_points_raw', status.maze_right_points_raw);
-      pushObject(perfRows, 'maze_config_ratio', status.maze_config_ratio);
-      pushObject(perfRows, 'maze_config_px', status.maze_config_px);
       addSection('性能统计', perfRows);
 
       const detectRows = [];
@@ -1566,29 +1559,28 @@
       if (Array.isArray(centerData) && centerData.length > 0) {
         drawSeries(ctx, centerData, '#facc15', 2, 1);
       }
-      const anchorPoint = (Array.isArray(centerData) && centerData.length > 0 && Array.isArray(centerData[0]) && centerData[0].length >= 2)
-        ? centerData[0]
-        : null;
-      const anchorX = anchorPoint ? Math.max(0, Math.min(w - 1, Number(anchorPoint[0] || 0) | 0)) : Math.max(0, Math.min(w - 1, Math.floor(w / 2)));
-      const anchorY = anchorPoint ? Math.max(0, Math.min(h - 1, Number(anchorPoint[1] || 0) | 0)) : Math.max(0, Math.min(h - 1, h));
       if (canvas === ipmCanvas && status.ipm_track_valid) {
         const tp = Array.isArray(status.ipm_track_point) ? status.ipm_track_point : [0, 0];
         const tx = Math.max(0, Math.min(w - 1, tp[0] | 0));
         const ty = Math.max(0, Math.min(h - 1, tp[1] | 0));
+        const cx = Math.max(0, Math.min(w - 1, Math.floor(w / 2)));
+        const cy = Math.max(0, Math.min(h - 1, h));
         ctx.strokeStyle = '#93c5fd';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(anchorX, anchorY);
+        ctx.moveTo(cx, cy);
         ctx.lineTo(tx, ty);
-        ctx.lineTo(tx, anchorY);
+        ctx.lineTo(tx, cy);
         ctx.stroke();
-        drawPointSet(ctx, [[anchorX, anchorY], [tx, ty], [tx, anchorY]], '#93c5fd', 2);
+        drawPointSet(ctx, [[cx, cy], [tx, ty], [tx, cy]], '#93c5fd', 2);
       }
       drawDecisionPoint(ctx, status.ipm_weighted_decision_point);
       if (showIpmAnchorDot) {
+        const cx = Math.max(0, Math.min(w - 1, Math.floor(w / 2)));
+        const cy = Math.max(0, Math.min(h - 1, h));
         ctx.fillStyle = '#38bdf8';
         ctx.beginPath();
-        ctx.arc(anchorX, anchorY, 1, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 1, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1657,29 +1649,21 @@
       if (grayCanvas.height !== h) grayCanvas.height = h;
       grayCtx.drawImage(rawGrayCanvas, 0, 0, w, h);
       activeGraySource = sourceMode;
-      const renderStatus = getRenderStatus();
-      const centerX = Math.max(0, Math.min(w - 1, Math.floor(w / 2)));
+      const centerX = Math.max(0, Math.min(w - 1, 80));
       grayCtx.strokeStyle = '#ffffff';
       grayCtx.lineWidth = 1;
       grayCtx.beginPath();
       grayCtx.moveTo(centerX + 0.5, 0);
       grayCtx.lineTo(centerX + 0.5, h);
       grayCtx.stroke();
-      const mazeConfigPx = (renderStatus && renderStatus.maze_config_px && typeof renderStatus.maze_config_px === 'object')
-        ? renderStatus.maze_config_px
-        : null;
-      const guideYRaw = (renderStatus && Number.isFinite(Number(renderStatus.maze_runtime_start_row_px)))
-        ? Number(renderStatus.maze_runtime_start_row_px)
-        : (mazeConfigPx && Number.isFinite(Number(mazeConfigPx.start_row_px))
-        ? Number(mazeConfigPx.start_row_px)
-        : Math.round(h * 100 / 120));
-      const guideY = Math.max(0, Math.min(h - 1, Math.round(guideYRaw)));
+      const guideY = Math.max(0, Math.min(h - 1, 100));
       grayCtx.strokeStyle = '#ffffff';
       grayCtx.lineWidth = 1;
       grayCtx.beginPath();
       grayCtx.moveTo(0, guideY + 0.5);
       grayCtx.lineTo(w, guideY + 0.5);
       grayCtx.stroke();
+      const renderStatus = getRenderStatus();
       const left = renderStatus.left_boundary || [];
       const right = renderStatus.right_boundary || [];
       if (showGrayBoundaries) {

@@ -20,7 +20,7 @@ void vision_frame_capture_cleanup();
 // 作用：阻塞等待新帧并拷贝到 out_bgr。
 // 意义：为处理层提供“最新帧 + 可统计等待耗时”的统一入口。
 // 如何修改：
-// - out_bgr_bytes 需至少为当前 camera_width * camera_height * 3；
+// - out_bgr_bytes 需至少为 UVC_WIDTH * UVC_HEIGHT * 3；
 // - timeout_ms 可调等待超时（大值更稳，小值更实时）；
 // - wait_us 返回本次等待耗时（可用于性能上报）。
 // 是否调用：是，每帧调用（由 vision_image_processor_process_step 调用）。

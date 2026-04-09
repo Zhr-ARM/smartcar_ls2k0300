@@ -48,7 +48,7 @@ bool g_ipm_line_error_track_valid = false;
 int g_ipm_line_error_track_index = -1;
 int g_ipm_line_error_track_x = 0;
 int g_ipm_line_error_track_y = 0;
-std::array<float, VISION_MAX_PROC_HEIGHT * 2> g_selected_centerline_curvature = {};
+std::array<float, VISION_DOWNSAMPLED_HEIGHT * 2> g_selected_centerline_curvature = {};
 int g_selected_centerline_curvature_count = 0;
 float g_mean_abs_offset = 0.0f;
 
@@ -97,7 +97,7 @@ static void compute_selected_centerline_curvature(const uint16 *xs, const uint16
         g_selected_centerline_curvature[i] = x1 * y2 - x2 * y1;
     }
 
-    std::array<float, VISION_MAX_PROC_HEIGHT * 2> curvature_src = g_selected_centerline_curvature;
+    std::array<float, VISION_DOWNSAMPLED_HEIGHT * 2> curvature_src = g_selected_centerline_curvature;
     for (int i = 1; i + 1 < n; ++i)
     {
         g_selected_centerline_curvature[i] = (curvature_src[i - 1] +

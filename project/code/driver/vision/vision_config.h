@@ -24,10 +24,6 @@ typedef enum
 
 typedef struct
 {
-    // 摄像头采图宽度（像素）。
-    int camera_width;
-    // 摄像头采图高度（像素）。
-    int camera_height;
     // ==================== 参数区域 3: 网页发送 ====================
     // 包括逐飞助手发送、UDP 视频发送、TCP 状态发送及其字段开关。
     // 图传输出模式：
@@ -123,10 +119,6 @@ typedef struct
     bool udp_web_tcp_send_perf_total_us;
     bool udp_web_tcp_send_maze_left_points_raw;
     bool udp_web_tcp_send_maze_right_points_raw;
-    // 发送迷宫法比例配置：[start_row_ratio, fallback_delta_ratio, x_min_ratio, x_max_ratio]。
-    bool udp_web_tcp_send_maze_config_ratio;
-    // 发送迷宫法当前像素配置：[start_row_px, fallback_delta_px, x_min_px, x_max_px]。
-    bool udp_web_tcp_send_maze_config_px;
     // 视觉检测结果。
     bool udp_web_tcp_send_red_found;
     bool udp_web_tcp_send_red_rect;
@@ -171,30 +163,10 @@ typedef struct
     // 包括迷宫法起点、去畸变、IPM 边界/中线后处理。
     // 采图模式：检测到红色矩形后，每 1s 保存一次推理 ROI 彩图。
     bool roi_capture_mode;
-    // 迷宫法左右起点搜索行比例（相对图像高度，0~1）。
-    float maze_start_row_ratio;
-    // 迷宫法巡线回退停止阈值比例（相对图像高度，>=0）。
-    float maze_trace_y_fallback_stop_delta_ratio;
-    // 左右起点最小间隔阈值比例（相对图像宽度，>=0）。
-    float maze_start_min_boundary_gap_ratio;
-    // cross_in 下探起始中心 x 比例（相对图像宽度，0~1）。
-    float cross_probe_start_x_ratio;
-    // cross_in 下探最小起始行比例（相对图像高度，0~1）。
-    float cross_probe_min_row_ratio;
-    // cross_in 下探最大左右间隙比例（相对图像宽度，>=0）。
-    float cross_probe_max_gap_ratio;
-    // 十字入口判定：左右角点欧氏距离阈值比例（相对 IPM 宽度，>=0）。
-    float route_cross_corner_distance_ratio;
-    // 十字 begin->in 判定：角点原图 y 阈值比例（相对图像高度，0~1）。
-    float route_cross_begin_corner_src_y_ratio;
-    // 十字退出判定：cross_detected_stop_row 阈值比例（相对图像高度，0~1）。
-    float route_cross_stop_row_exit_ratio;
-    // 十字内边界尾部外推点数比例（相对 IPM 高度，>=0）。
-    float cross_tail_extra_points_ratio;
-    // 历史起点向对侧偏移比例（相对图像宽度，>=0）。
-    float maze_history_start_offset_ratio;
-    // 交叉路口状态机开关：true=允许进入交叉状态，false=始终按普通巡线处理。
-    bool route_cross_enabled;
+    // 迷宫法左右起点搜索行，固定单行搜索。
+    int maze_start_row;
+    // 迷宫法巡线回退停止阈值：若后续 y > 当前最小 y + 阈值，则停止巡线。
+    int maze_trace_y_fallback_stop_delta;
     // 去畸变开关：true=开启去畸变，false=关闭去畸变直通原图。
     bool undistort_enabled;
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -279,10 +251,6 @@ typedef struct
     bool demand_otsu_keep_full_binary_cache;
     // 是否启用“边线点逆透视 + IPM 边界输出”流程。
     bool enable_inverse_perspective;
-    // 逆透视矩阵标定时使用的原图宽度。
-    int ipm_calibration_src_width;
-    // 逆透视矩阵标定时使用的原图高度。
-    int ipm_calibration_src_height;
     // 逆透视输出宽度。
     int ipm_output_width;
     // 逆透视输出高度。
@@ -299,10 +267,10 @@ typedef struct
     int undistort_move_y;
     // line_error 默认采样行比例。
     float default_line_sample_ratio;
-    // 原图迷宫法巡线默认最小 x 比例（相对图像宽度，0~1）。
-    float default_maze_trace_x_min_ratio;
-    // 原图迷宫法巡线默认最大 x 比例（相对图像宽度，0~1）。
-    float default_maze_trace_x_max_ratio;
+    // 原图迷宫法巡线默认最小 x。
+    int default_maze_trace_x_min;
+    // 原图迷宫法巡线默认最大 x。
+    int default_maze_trace_x_max;
 } vision_processor_config_t;
 
 // 视觉运行时配置：
@@ -312,20 +280,5 @@ extern const vision_runtime_config_t g_vision_runtime_config;
 // 视觉处理器内部配置：
 // vision_image_processor.cpp 在初始化和算法处理中统一从这里读取。
 extern const vision_processor_config_t g_vision_processor_config;
-
-// 将分辨率无关比例配置换算为当前处理分辨率下的像素值。
-int vision_runtime_config_maze_start_row_px();
-int vision_runtime_config_maze_trace_y_fallback_stop_delta_px();
-int vision_runtime_config_maze_start_min_boundary_gap_px();
-int vision_runtime_config_cross_probe_start_x_px();
-int vision_runtime_config_cross_probe_min_row_px();
-int vision_runtime_config_cross_probe_max_gap_px();
-int vision_runtime_config_route_cross_corner_distance_px();
-int vision_runtime_config_route_cross_begin_corner_src_y_px();
-int vision_runtime_config_route_cross_stop_row_exit_px();
-int vision_runtime_config_cross_tail_extra_points();
-int vision_runtime_config_maze_history_start_offset_px();
-int vision_processor_config_default_maze_trace_x_min_px();
-int vision_processor_config_default_maze_trace_x_max_px();
 
 #endif
