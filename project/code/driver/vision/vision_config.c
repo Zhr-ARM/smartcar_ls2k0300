@@ -234,14 +234,19 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 发送当前采用的是左偏移中线还是右偏移中线。
     .udp_web_tcp_send_ipm_centerline_source = false,
     // 发送当前实际命中的中线点索引。
-    .udp_web_tcp_send_ipm_track_index = false,
+    // 适用模式：固定索引 / 加权索引 / 速度索引 三种模式都会更新。
+    .udp_web_tcp_send_ipm_track_index = true,
     // 发送当前实际跟踪点坐标 [x, y]。
+    // 适用模式：固定索引 / 加权索引 / 速度索引 三种模式都会更新。
     .udp_web_tcp_send_ipm_track_point = true,
-    // 发送首点的当前偏差。
+    // 发送首个有效加权配置点的当前偏差。
+    // 适用模式：仅加权索引模式；固定索引 / 速度索引模式下该值无实际意义。
     .udp_web_tcp_send_ipm_weighted_first_point_error = false,
-    // 发送逆透视图上的决策点坐标。
+    // 发送逆透视图上的“首个有效加权配置点”坐标。
+    // 适用模式：仅加权索引模式；固定索引 / 速度索引模式下不会产生该点。
     .udp_web_tcp_send_ipm_weighted_decision_point = false,
-    // 发送原图上的决策点坐标。
+    // 发送原图上的“首个有效加权配置点”坐标。
+    // 适用模式：仅加权索引模式；固定索引 / 速度索引模式下不会产生该点。
     .udp_web_tcp_send_src_weighted_decision_point = false,
 
     // ==================== TCP 原图边界点列 ====================
@@ -292,7 +297,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // ROI 抓图模式：检测到红框后周期性保存推理 ROI。
     .roi_capture_mode = false,
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
-    .maze_start_row_ratio = 85.0f / 120.0f,
+    .maze_start_row_ratio = 70.0f / 120.0f,
     // 迷宫法巡线回退停止阈值比例（y > min_y + delta 时停止）。
     .maze_trace_y_fallback_stop_delta_ratio = 15.0f / 120.0f,
     // 左右起点最小间隔阈值比例。
@@ -382,7 +387,10 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_line_error_index_min = 0,
     // 随速度索引模式允许的最大索引。
     .ipm_line_error_index_max = 30,
-    // 基准速度方案B已移除，偏差层仅保留方案A所需参数。
+    // 以上参数中：
+    // - fixed_index 仅固定索引模式使用；
+    // - weighted_point_count / point_indices / weights 仅加权索引模式使用；
+    // - speed_k / speed_b / index_min / index_max 仅速度索引模式使用。
 };
 
 const vision_processor_config_t g_vision_processor_config = {
@@ -406,9 +414,9 @@ const vision_processor_config_t g_vision_processor_config = {
     .ipm_output_height = VISION_MAX_IPM_HEIGHT,
     // 逆透视矩阵（标定参数）。
     .change_un_mat = {
-        {-3.388202,5.186087,-294.277295},
-        {-0.244747,2.287130,-365.441576},
-        {-0.001079,0.032699,-4.681238}
+        {0.984834,-0.995022,13.212810},
+        {0.013224,0.175287,0.625211},
+        {-0.000193,-0.006323,0.981946}
     },
     // 相机内参矩阵（标定参数）。
     .camera_matrix = {

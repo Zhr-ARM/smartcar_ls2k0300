@@ -677,177 +677,6 @@ static bool init_undistort_remap_table()
     return true;
 }
 
-[[maybe_unused]] static cv::Rect build_red_search_roi_from_midline()
-{
-    const int width = kProcWidth;
-    const int height = kProcHeight;
-
-    // 无中线时回退到图像中部窗口。
-    auto fallback_center_roi = [width, height]() -> cv::Rect {
-        const int rw = std::clamp(width / 2, scale_by_width(48), width);
-        const int rh = std::clamp(height / 2, scale_by_height(36), height);
-        int rx = (width - rw) / 2;
-        int ry = (height - rh) / 2;
-        rx = std::clamp(rx, 0, std::max(0, width - rw));
-        ry = std::clamp(ry, 0, std::max(0, height - rh));
-        return cv::Rect(rx, ry, rw, rh);
-    };
-
-    if (g_boundary_count <= 0)
-    {
-        return fallback_center_roi();
-    }
-
-    int min_x = width - 1;
-    int max_x = 0;
-    int min_y = height - 1;
-    int max_y = 0;
-    int valid = 0;
-    for (int i = 0; i < g_boundary_count; ++i)
-    {
-        const int x = std::clamp(static_cast<int>(g_xy_x2_boundary[i]), 0, width - 1);
-        const int y = std::clamp(static_cast<int>(g_xy_y2_boundary[i]), 0, height - 1);
-        min_x = std::min(min_x, x);
-        max_x = std::max(max_x, x);
-        min_y = std::min(min_y, y);
-        max_y = std::max(max_y, y);
-        ++valid;
-    }
-    if (valid <= 0)
-    {
-        return fallback_center_roi();
-    }
-
-    // 只在中线附近搜索，减少计算量。
-    const int kExpandX = scale_by_width(28);
-    const int kExpandY = scale_by_height(24);
-    int x0 = std::max(0, min_x - kExpandX);
-    int y0 = std::max(0, min_y - kExpandY);
-    int x1 = std::min(width - 1, max_x + kExpandX);
-    int y1 = std::min(height - 1, max_y + kExpandY);
-
-    // 保证ROI最小尺寸，避免中线太短导致窗口过小。
-    const int kMinRoiW = scale_by_width(48);
-    const int kMinRoiH = scale_by_height(36);
-    int rw = x1 - x0 + 1;
-    int rh = y1 - y0 + 1;
-    if (rw < kMinRoiW)
-    {
-        const int cx = (x0 + x1) / 2;
-        x0 = std::max(0, cx - kMinRoiW / 2);
-        x1 = std::min(width - 1, x0 + kMinRoiW - 1);
-        x0 = std::max(0, x1 - kMinRoiW + 1);
-        rw = x1 - x0 + 1;
-    }
-    if (rh < kMinRoiH)
-    {
-        const int cy = (y0 + y1) / 2;
-        y0 = std::max(0, cy - kMinRoiH / 2);
-        y1 = std::min(height - 1, y0 + kMinRoiH - 1);
-        y0 = std::max(0, y1 - kMinRoiH + 1);
-        rh = y1 - y0 + 1;
-    }
-
-    if (rw <= 0 || rh <= 0)
-    {
-        return fallback_center_roi();
-    }
-    return cv::Rect(x0, y0, rw, rh);
-}
-
-[[maybe_unused]] static bool detect_red_rectangle_bbox(const cv::Mat &bgr, cv::Rect *bbox, int *area_px)
-{
-    if (bbox == nullptr || area_px == nullptr || bgr.empty() || bgr.type() != CV_8UC3)
-    {
-        return false;
-    }
-
-    const cv::Rect roi = build_red_search_roi_from_midline();
-    if (roi.width <= 0 || roi.height <= 0)
-    {
-        return false;
-    }
-
-    cv::Mat mask(roi.height, roi.width, CV_8UC1, cv::Scalar(0));
-    for (int y = 0; y < roi.height; ++y)
-    {
-        const cv::Vec3b *src = bgr.ptr<cv::Vec3b>(roi.y + y);
-        uint8 *dst = mask.ptr<uint8>(y);
-        for (int x = 0; x < roi.width; ++x)
-        {
-            const cv::Vec3b &px = src[roi.x + x];
-            const int b = static_cast<int>(px[0]);
-            const int g = static_cast<int>(px[1]);
-            const int r = static_cast<int>(px[2]);
-            const int rg = r - g;
-            const int rb = r - b;
-            if (r >= 80 && rg >= 28 && rb >= 22)
-            {
-                dst[x] = 255;
-            }
-        }
-    }
-
-    cv::Mat labels;
-    cv::Mat stats;
-    cv::Mat centroids;
-    const int comp_num = cv::connectedComponentsWithStats(mask, labels, stats, centroids, 8, CV_32S);
-    if (comp_num <= 1)
-    {
-        return false;
-    }
-
-    const int kExpectedAreaPx = scale_by_area(60);
-    const int kAreaMinPx = scale_by_area(20);
-    const int kAreaMaxPx = scale_by_area(450);
-    const int kMinCompW = scale_by_width(3);
-    const int kMinCompH = scale_by_height(3);
-
-    int best_label = -1;
-    int best_score = std::numeric_limits<int>::max();
-    int best_area = 0;
-    for (int i = 1; i < comp_num; ++i)
-    {
-        const int area = stats.at<int>(i, cv::CC_STAT_AREA);
-        const int w = stats.at<int>(i, cv::CC_STAT_WIDTH);
-        const int h = stats.at<int>(i, cv::CC_STAT_HEIGHT);
-        if (area < kAreaMinPx || area > kAreaMaxPx || w < kMinCompW || h < kMinCompH)
-        {
-            continue;
-        }
-
-        const int side_min = std::min(w, h);
-        const int side_max = std::max(w, h);
-        if (side_min <= 0 || (side_max > side_min * 6))
-        {
-            continue;
-        }
-
-        const int area_cost = std::abs(area - kExpectedAreaPx);
-        const int shape_cost = std::abs((w * 10) - (h * 24)); // 12:5 近似为 24:10
-        const int score = area_cost * 4 + shape_cost;
-        if (score < best_score || (score == best_score && area > best_area))
-        {
-            best_score = score;
-            best_label = i;
-            best_area = area;
-        }
-    }
-
-    if (best_label < 0)
-    {
-        return false;
-    }
-
-    const int x = stats.at<int>(best_label, cv::CC_STAT_LEFT) + roi.x;
-    const int y = stats.at<int>(best_label, cv::CC_STAT_TOP) + roi.y;
-    const int w = stats.at<int>(best_label, cv::CC_STAT_WIDTH);
-    const int h = stats.at<int>(best_label, cv::CC_STAT_HEIGHT);
-    *bbox = cv::Rect(x, y, w, h);
-    *area_px = best_area;
-    return true;
-}
-
 static bool init_ipm_forward_matrix()
 {
     cv::Mat h_inv(3, 3, CV_64F, const_cast<double *>(&g_vision_processor_config.change_un_mat[0][0]));
@@ -1641,8 +1470,19 @@ static void prepend_ipm_bottom_midpoint_bridge_inplace(maze_point_t *pts,
         return;
     }
 
-    const int anchor_x = width / 2;
-    const int anchor_y = height - 1;
+    int anchor_x = width / 2;
+    int anchor_y = height - 1;
+    const int src_anchor_x = kProcWidth / 2;
+    const int src_anchor_y = std::clamp(g_maze_start_row.load(), 1, kProcHeight - 2);
+    int projected_anchor_x = 0;
+    int projected_anchor_y = 0;
+    // 中线桥接锚点优先使用“正常巡线起始扫线行中点”的逆透视结果；
+    // 若该点投影失败，再退回到 IPM 底部中点。
+    if (src_point_to_ipm_point(src_anchor_x, src_anchor_y, &projected_anchor_x, &projected_anchor_y))
+    {
+        anchor_x = std::clamp(projected_anchor_x, 0, width - 1);
+        anchor_y = std::clamp(projected_anchor_y, 0, height - 1);
+    }
     const int first_x = std::clamp(pts[0].x, 0, width - 1);
     const int first_y = std::clamp(pts[0].y, 0, height - 1);
 
@@ -1764,8 +1604,7 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                            uint8 classify_white_threshold,
                                                            int y_min,
                                                            int maze_trace_x_min,
-                                                           int maze_trace_x_max,
-                                                           int preferred_source)
+                                                           int maze_trace_x_max)
 {
     // 关闭整图逆透视彩色调试图，避免 warpPerspective + resize 带来的额外耗时。
     std::memset(g_image_ipm_bgr, 0, kIpmOutputWidth * kIpmOutputHeight * 3);
@@ -2919,8 +2758,7 @@ bool vision_image_processor_process_step()
                                                         classify_white_threshold,
                                                         y_min,
                                                         maze_trace_x_min,
-                                                        maze_trace_x_max,
-                                                        g_ipm_line_error_preferred_source.load());
+                                                        maze_trace_x_max);
         const bool selected_is_right =
             (vision_line_error_layer_source() == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT));
         const uint16 *sel_ipm_x = selected_is_right ? g_ipm_shift_right_center_x : g_ipm_shift_left_center_x;
