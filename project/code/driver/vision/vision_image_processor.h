@@ -216,6 +216,23 @@ void vision_image_processor_get_boundaries(uint16 **x1, uint16 **x2, uint16 **x3
                                            uint16 **y1, uint16 **y2, uint16 **y3,
                                            uint16 *dot_num);
 void vision_image_processor_get_boundary_side_counts(uint16 *left_dot_num, uint16 *right_dot_num);
+// 八邻域原始轮廓点与生长方向，dir 与同索引点对齐：
+// - dir=0..7 对应 seeds_l/seeds_r 的循环索引；
+// - dir=255 表示该点没有有效后继方向（通常是最后一点或非八邻域模式）。
+void vision_image_processor_get_eight_neighbor_left_trace(uint16 **x, uint16 **y, uint8 **dir, uint16 *dot_num, int *first_frame_touch_index);
+void vision_image_processor_get_eight_neighbor_right_trace(uint16 **x, uint16 **y, uint8 **dir, uint16 *dot_num, int *first_frame_touch_index);
+// 八邻域 dir 软模板识别到的十字下角点：
+// 模板为 {4,5} 前平台 -> 短过渡(允许少量 3) -> 2 后平台；
+// 输出角点偏向前平台末端，优先取最后一个 dir=4。
+void vision_image_processor_get_cross_lower_corner_state(bool *left_found,
+                                                         int *left_index,
+                                                         int *left_x,
+                                                         int *left_y,
+                                                         bool *right_found,
+                                                         int *right_index,
+                                                         int *right_x,
+                                                         int *right_y,
+                                                         bool *pair_valid);
 // 逆透视后边界数据（另存，供控制等后续模块使用）
 void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
                                                uint16 **y1, uint16 **y2, uint16 **y3,

@@ -67,6 +67,12 @@ static inline int scale_by_area(int ref_area_px)
 static constexpr int kIpmOutputWidth = VISION_IPM_WIDTH;
 static constexpr int kIpmOutputHeight = VISION_IPM_HEIGHT;
 static constexpr int kMazeStartMinBoundaryGapPx = 5;
+static constexpr int kBinaryMorphWhiteHigh = 255 * 5;
+static constexpr int kBinaryMorphWhiteLow = 255 * 2;
+static constexpr int kInitialFrameWallKeepMaxYSpan = 15;
+static constexpr int kCrossLowerFitPointCount = 10;
+static constexpr int kCrossLowerExtrapolateYSpan = 30;
+static constexpr int kCrossLowerFitMinPointCount = 2;
 
 // 原图坐标系边线缓存：x1/x2/x3 对应 左/中/右边线，y1/y2/y3 为对应 y。
 static uint16 g_xy_x1_boundary[VISION_BOUNDARY_NUM];
@@ -78,6 +84,27 @@ static uint16 g_xy_y3_boundary[VISION_BOUNDARY_NUM];
 static int g_boundary_count = 0;
 static int g_boundary_left_count = 0;
 static int g_boundary_right_count = 0;
+// 八邻域原始轮廓点与每一步生长方向：dir 与同索引轮廓点对齐，0..7 为 seeds 索引，255 表示无后继方向。
+static uint16 g_eight_left_trace_x[VISION_BOUNDARY_NUM];
+static uint16 g_eight_left_trace_y[VISION_BOUNDARY_NUM];
+static uint8 g_eight_left_trace_dir[VISION_BOUNDARY_NUM];
+static uint16 g_eight_right_trace_x[VISION_BOUNDARY_NUM];
+static uint16 g_eight_right_trace_y[VISION_BOUNDARY_NUM];
+static uint8 g_eight_right_trace_dir[VISION_BOUNDARY_NUM];
+static int g_eight_left_trace_count = 0;
+static int g_eight_right_trace_count = 0;
+static int g_eight_left_first_frame_touch_index = -1;
+static int g_eight_right_first_frame_touch_index = -1;
+// 八邻域 dir 十字下角点检测结果：角点取在 4/5 -> 2 跳变过程附近。
+static std::atomic<bool> g_cross_lower_left_corner_found(false);
+static std::atomic<bool> g_cross_lower_right_corner_found(false);
+static std::atomic<bool> g_cross_lower_corner_pair_valid(false);
+static std::atomic<int> g_cross_lower_left_corner_index(-1);
+static std::atomic<int> g_cross_lower_right_corner_index(-1);
+static std::atomic<int> g_cross_lower_left_corner_x(0);
+static std::atomic<int> g_cross_lower_left_corner_y(0);
+static std::atomic<int> g_cross_lower_right_corner_x(0);
+static std::atomic<int> g_cross_lower_right_corner_y(0);
 // 逆透视后边界数组（另存）
 // 逆透视坐标系边线缓存：供网页状态上报和调试显示使用。
 static uint16 g_ipm_xy_x1_boundary[VISION_BOUNDARY_NUM];
@@ -207,6 +234,15 @@ static int g_cross_in_saved_center_x = -1;
 static std::atomic<int> g_maze_start_row(g_vision_runtime_config.maze_start_row);
 static std::atomic<int> g_maze_trace_method(g_vision_runtime_config.maze_trace_method);
 static std::atomic<int> g_maze_trace_y_fallback_stop_delta(g_vision_runtime_config.maze_trace_y_fallback_stop_delta);
+static std::atomic<bool> g_cross_lower_corner_dir_enabled(g_vision_runtime_config.cross_lower_corner_dir_enabled);
+static std::atomic<int> g_cross_lower_corner_pre_window(g_vision_runtime_config.cross_lower_corner_pre_window);
+static std::atomic<int> g_cross_lower_corner_post_window(g_vision_runtime_config.cross_lower_corner_post_window);
+static std::atomic<int> g_cross_lower_corner_pre_min_votes(g_vision_runtime_config.cross_lower_corner_pre_min_votes);
+static std::atomic<int> g_cross_lower_corner_post_min_votes(g_vision_runtime_config.cross_lower_corner_post_min_votes);
+static std::atomic<int> g_cross_lower_corner_transition_max_len(g_vision_runtime_config.cross_lower_corner_transition_max_len);
+static std::atomic<int> g_cross_lower_corner_transition_max_dir3_count(g_vision_runtime_config.cross_lower_corner_transition_max_dir3_count);
+static std::atomic<int> g_cross_lower_corner_post_max_dir3_count(g_vision_runtime_config.cross_lower_corner_post_max_dir3_count);
+static std::atomic<int> g_cross_lower_corner_pair_y_diff_max(g_vision_runtime_config.cross_lower_corner_pair_y_diff_max);
 static std::atomic<int> g_maze_trace_x_min(g_vision_processor_config.default_maze_trace_x_min);
 static std::atomic<int> g_maze_trace_x_max(g_vision_processor_config.default_maze_trace_x_max);
 // 去畸变开关（默认开启）。
@@ -246,6 +282,13 @@ struct maze_point_t
     int y;
 };
 
+struct cross_lower_corner_detection_t
+{
+    bool found = false;
+    int index = -1;
+    maze_point_t point{0, 0};
+};
+
 static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
                                            int left_num,
                                            const maze_point_t *right_pts,
@@ -257,7 +300,15 @@ static void prepend_ipm_bottom_midpoint_bridge_inplace(maze_point_t *pts,
                                                        float step_px);
 static int previous_src_centerline_first_x();
 static inline bool pixel_is_white(const uint8 *img, int x, int y, uint8 white_threshold);
+static void filter_binary_image_inplace(uint8 *binary_img);
+static void draw_binary_black_frame(uint8 *binary_img);
 static void resample_boundary_points_equal_spacing_inplace(maze_point_t *pts, int *num, int width, int height, float step_px);
+static void clear_eight_neighbor_trace_cache();
+static void save_eight_neighbor_trace_cache(bool is_left, const maze_point_t *pts, const uint8 *dirs, int count, int first_frame_touch_index);
+static void clear_cross_lower_corner_detection_cache();
+static cross_lower_corner_detection_t detect_cross_lower_corner_from_dirs(const maze_point_t *pts, const uint8 *dirs, int count);
+static void update_cross_lower_corner_detection_cache(const maze_point_t *left_pts, const uint8 *left_dirs, int left_count,
+                                                      const maze_point_t *right_pts, const uint8 *right_dirs, int right_count);
 static bool init_undistort_remap_table();
 static bool init_ipm_forward_matrix();
 static bool ipm_point_to_src_point(int ipm_x, int ipm_y, int *src_x, int *src_y);
@@ -282,7 +333,9 @@ static int trace_boundary_eight_neighbor(const uint8 *classify_img,
                                          int x_max,
                                          bool prefer_left_bias,
                                          maze_point_t *pts,
-                                         int max_pts);
+                                         uint8 *dirs,
+                                         int max_pts,
+                                         int *first_frame_touch_index);
 static int trace_left_boundary_selected_method(const uint8 *classify_img,
                                                uint8 white_threshold,
                                                bool wall_is_white,
@@ -292,7 +345,9 @@ static int trace_left_boundary_selected_method(const uint8 *classify_img,
                                                int x_min,
                                                int x_max,
                                                maze_point_t *pts,
-                                               int max_pts);
+                                               uint8 *dirs,
+                                               int max_pts,
+                                               int *first_frame_touch_index);
 static int trace_right_boundary_selected_method(const uint8 *classify_img,
                                                 uint8 white_threshold,
                                                 bool wall_is_white,
@@ -302,7 +357,9 @@ static int trace_right_boundary_selected_method(const uint8 *classify_img,
                                                 int x_min,
                                                 int x_max,
                                                 maze_point_t *pts,
-                                                int max_pts);
+                                                uint8 *dirs,
+                                                int max_pts,
+                                                int *first_frame_touch_index);
 static void validate_maze_start_pair(const uint8 *classify_img,
                                      uint8 white_threshold,
                                      int x_min,
@@ -337,18 +394,26 @@ static constexpr int kDirFrontRight[4][2] = {
     {-1, 1},
     {-1, -1}
 };
-static constexpr int kDir8[8][2] = {
-    {0, -1},
-    {1, -1},
-    {1, 0},
-    {1, 1},
+static constexpr int kEightNeighborLeftSeeds[8][2] = {
     {0, 1},
     {-1, 1},
     {-1, 0},
-    {-1, -1}
+    {-1, -1},
+    {0, -1},
+    {1, -1},
+    {1, 0},
+    {1, 1}
 };
-static constexpr int kEightNeighborLeftPriority[8] = {7, 0, 1, 6, 2, 5, 4, 3};
-static constexpr int kEightNeighborRightPriority[8] = {1, 0, 7, 2, 6, 3, 4, 5};
+static constexpr int kEightNeighborRightSeeds[8][2] = {
+    {0, 1},
+    {1, 1},
+    {1, 0},
+    {1, -1},
+    {0, -1},
+    {-1, -1},
+    {-1, 0},
+    {-1, 1}
+};
 
 static void get_maze_trace_x_range_clamped(int *x_min, int *x_max)
 {
@@ -623,6 +688,271 @@ static void build_binary_image_from_gray_threshold(const uint8 *gray_img, uint8 
     {
         g_image_binary_u8[i] = (gray_img[i] > threshold) ? static_cast<uint8>(255) : static_cast<uint8>(0);
     }
+}
+
+static void filter_binary_image_inplace(uint8 *binary_img)
+{
+    if (binary_img == nullptr)
+    {
+        return;
+    }
+
+    for (int y = 1; y < kProcHeight - 1; ++y)
+    {
+        for (int x = 1; x < kProcWidth - 1; ++x)
+        {
+            const int idx = y * kProcWidth + x;
+            const int neighbor_sum =
+                binary_img[(y - 1) * kProcWidth + (x - 1)] +
+                binary_img[(y - 1) * kProcWidth + x] +
+                binary_img[(y - 1) * kProcWidth + (x + 1)] +
+                binary_img[y * kProcWidth + (x - 1)] +
+                binary_img[y * kProcWidth + (x + 1)] +
+                binary_img[(y + 1) * kProcWidth + (x - 1)] +
+                binary_img[(y + 1) * kProcWidth + x] +
+                binary_img[(y + 1) * kProcWidth + (x + 1)];
+
+            if (neighbor_sum >= kBinaryMorphWhiteHigh && binary_img[idx] == 0)
+            {
+                binary_img[idx] = 255;
+            }
+            else if (neighbor_sum <= kBinaryMorphWhiteLow && binary_img[idx] == 255)
+            {
+                binary_img[idx] = 0;
+            }
+        }
+    }
+}
+
+static void draw_binary_black_frame(uint8 *binary_img)
+{
+    if (binary_img == nullptr)
+    {
+        return;
+    }
+
+    for (int y = 0; y < kProcHeight; ++y)
+    {
+        binary_img[y * kProcWidth + 0] = 0;
+        binary_img[y * kProcWidth + 1] = 0;
+        binary_img[y * kProcWidth + (kProcWidth - 2)] = 0;
+        binary_img[y * kProcWidth + (kProcWidth - 1)] = 0;
+    }
+    for (int x = 0; x < kProcWidth; ++x)
+    {
+        binary_img[x] = 0;
+        binary_img[kProcWidth + x] = 0;
+    }
+}
+
+static void clear_eight_neighbor_trace_cache()
+{
+    g_eight_left_trace_count = 0;
+    g_eight_right_trace_count = 0;
+    g_eight_left_first_frame_touch_index = -1;
+    g_eight_right_first_frame_touch_index = -1;
+    std::fill_n(g_eight_left_trace_dir, VISION_BOUNDARY_NUM, static_cast<uint8>(255));
+    std::fill_n(g_eight_right_trace_dir, VISION_BOUNDARY_NUM, static_cast<uint8>(255));
+}
+
+static void save_eight_neighbor_trace_cache(bool is_left,
+                                            const maze_point_t *pts,
+                                            const uint8 *dirs,
+                                            int count,
+                                            int first_frame_touch_index)
+{
+    uint16 *xs = is_left ? g_eight_left_trace_x : g_eight_right_trace_x;
+    uint16 *ys = is_left ? g_eight_left_trace_y : g_eight_right_trace_y;
+    uint8 *out_dirs = is_left ? g_eight_left_trace_dir : g_eight_right_trace_dir;
+    int *out_count = is_left ? &g_eight_left_trace_count : &g_eight_right_trace_count;
+    int *out_touch = is_left ? &g_eight_left_first_frame_touch_index : &g_eight_right_first_frame_touch_index;
+
+    const int safe_count = (pts && dirs) ? std::clamp(count, 0, VISION_BOUNDARY_NUM) : 0;
+    for (int i = 0; i < safe_count; ++i)
+    {
+        xs[i] = static_cast<uint16>(std::clamp(pts[i].x, 0, kProcWidth - 1));
+        ys[i] = static_cast<uint16>(std::clamp(pts[i].y, 0, kProcHeight - 1));
+        out_dirs[i] = dirs[i];
+    }
+    if (safe_count < VISION_BOUNDARY_NUM)
+    {
+        std::fill_n(out_dirs + safe_count, VISION_BOUNDARY_NUM - safe_count, static_cast<uint8>(255));
+    }
+
+    *out_count = safe_count;
+    *out_touch = first_frame_touch_index;
+}
+
+static void clear_cross_lower_corner_detection_cache()
+{
+    g_cross_lower_left_corner_found.store(false);
+    g_cross_lower_right_corner_found.store(false);
+    g_cross_lower_corner_pair_valid.store(false);
+    g_cross_lower_left_corner_index.store(-1);
+    g_cross_lower_right_corner_index.store(-1);
+    g_cross_lower_left_corner_x.store(0);
+    g_cross_lower_left_corner_y.store(0);
+    g_cross_lower_right_corner_x.store(0);
+    g_cross_lower_right_corner_y.store(0);
+}
+
+static inline bool cross_lower_pre_dir(uint8 dir)
+{
+    return dir == 4 || dir == 5;
+}
+
+static inline bool cross_lower_transition_dir(uint8 dir)
+{
+    return dir == 2 || dir == 3 || dir == 4 || dir == 5;
+}
+
+static inline bool cross_lower_post_dir(uint8 dir)
+{
+    return dir == 2;
+}
+
+static int pick_cross_lower_corner_index_near_transition(const uint8 *dirs,
+                                                         int transition_start,
+                                                         int transition_end,
+                                                         int post_start,
+                                                         int post_end)
+{
+    // 角点偏向跳变过程：若短过渡区出现 dir=3，优先取第一个 3；否则取后平台第一个 dir=2。
+    for (int i = transition_start; i < transition_end; ++i)
+    {
+        if (dirs[i] == 3)
+        {
+            return i;
+        }
+    }
+    for (int i = post_start; i < post_end; ++i)
+    {
+        if (dirs[i] == 2)
+        {
+            return i;
+        }
+    }
+    return post_start;
+}
+
+static cross_lower_corner_detection_t detect_cross_lower_corner_from_dirs(const maze_point_t *pts,
+                                                                          const uint8 *dirs,
+                                                                          int count)
+{
+    cross_lower_corner_detection_t result{};
+    if (!g_cross_lower_corner_dir_enabled.load() || pts == nullptr || dirs == nullptr || count <= 0)
+    {
+        return result;
+    }
+
+    // 软模板：
+    //   1) 前平台窗口以 dir=4/5 为主，容忍 5 侧混入 4；
+    //   2) 中间过渡区长度受限，允许短 3 平台；
+    //   3) 后平台窗口以 dir=2 为主；
+    //   4) 命中后角点取跳变过程中的第一个 3；若无 3，则取后平台第一个 2。
+    const int pre_win = std::clamp(g_cross_lower_corner_pre_window.load(), 1, VISION_BOUNDARY_NUM);
+    const int post_win = std::clamp(g_cross_lower_corner_post_window.load(), 1, VISION_BOUNDARY_NUM);
+    const int need_pre = std::clamp(g_cross_lower_corner_pre_min_votes.load(), 1, pre_win);
+    const int need_post = std::clamp(g_cross_lower_corner_post_min_votes.load(), 1, post_win);
+    const int transition_max = std::clamp(g_cross_lower_corner_transition_max_len.load(), 0, VISION_BOUNDARY_NUM);
+    const int transition_max_dir3 = std::clamp(g_cross_lower_corner_transition_max_dir3_count.load(), 0, transition_max);
+    const int post_max_dir3 = std::clamp(g_cross_lower_corner_post_max_dir3_count.load(), 0, post_win);
+
+    for (int i = pre_win; i + post_win < count; ++i)
+    {
+        int pre_votes = 0;
+        for (int k = i - pre_win; k < i; ++k)
+        {
+            if (cross_lower_pre_dir(dirs[k]))
+            {
+                ++pre_votes;
+            }
+        }
+        if (pre_votes < need_pre)
+        {
+            continue;
+        }
+
+        for (int transition_len = 0; transition_len <= transition_max && i + transition_len + post_win <= count; ++transition_len)
+        {
+            bool transition_ok = true;
+            int dir3_count = 0;
+            for (int k = i; k < i + transition_len; ++k)
+            {
+                if (!cross_lower_transition_dir(dirs[k]))
+                {
+                    transition_ok = false;
+                    break;
+                }
+                if (dirs[k] == 3)
+                {
+                    ++dir3_count;
+                }
+            }
+            if (!transition_ok || dir3_count > transition_max_dir3)
+            {
+                continue;
+            }
+
+            int post_votes = 0;
+            int post_dir3_count = 0;
+            const int post_start = i + transition_len;
+            for (int k = post_start; k < post_start + post_win; ++k)
+            {
+                if (cross_lower_post_dir(dirs[k]))
+                {
+                    ++post_votes;
+                }
+                if (dirs[k] == 3)
+                {
+                    ++post_dir3_count;
+                }
+            }
+            if (post_votes < need_post || post_dir3_count > post_max_dir3)
+            {
+                continue;
+            }
+
+            const int corner_idx = pick_cross_lower_corner_index_near_transition(dirs,
+                                                                                 i,
+                                                                                 post_start,
+                                                                                 post_start,
+                                                                                 post_start + post_win);
+            result.found = true;
+            result.index = corner_idx;
+            result.point = pts[corner_idx];
+            return result;
+        }
+    }
+
+    return result;
+}
+
+static void update_cross_lower_corner_detection_cache(const maze_point_t *left_pts,
+                                                      const uint8 *left_dirs,
+                                                      int left_count,
+                                                      const maze_point_t *right_pts,
+                                                      const uint8 *right_dirs,
+                                                      int right_count)
+{
+    clear_cross_lower_corner_detection_cache();
+
+    const cross_lower_corner_detection_t left =
+        detect_cross_lower_corner_from_dirs(left_pts, left_dirs, std::clamp(left_count, 0, VISION_BOUNDARY_NUM));
+    const cross_lower_corner_detection_t right =
+        detect_cross_lower_corner_from_dirs(right_pts, right_dirs, std::clamp(right_count, 0, VISION_BOUNDARY_NUM));
+    const int y_diff_max = std::max(0, g_cross_lower_corner_pair_y_diff_max.load());
+    const bool pair_valid = left.found && right.found && std::abs(left.point.y - right.point.y) <= y_diff_max;
+
+    g_cross_lower_left_corner_found.store(left.found);
+    g_cross_lower_right_corner_found.store(right.found);
+    g_cross_lower_corner_pair_valid.store(pair_valid);
+    g_cross_lower_left_corner_index.store(left.index);
+    g_cross_lower_right_corner_index.store(right.index);
+    g_cross_lower_left_corner_x.store(left.point.x);
+    g_cross_lower_left_corner_y.store(left.point.y);
+    g_cross_lower_right_corner_x.store(right.point.x);
+    g_cross_lower_right_corner_y.store(right.point.y);
 }
 
 static bool init_undistort_remap_table()
@@ -2458,38 +2788,17 @@ static inline bool pixel_is_path(const uint8 *img, int x, int y, uint8 white_thr
     return !pixel_is_wall(img, x, y, white_threshold, wall_is_white);
 }
 
-static bool eight_neighbor_boundary_candidate(const uint8 *classify_img,
-                                              uint8 white_threshold,
-                                              bool wall_is_white,
-                                              int x,
-                                              int y,
-                                              int y_min,
-                                              int x_min,
-                                              int x_max)
+static bool binary_point_in_trace_range(int x, int y, int y_min, int x_min, int x_max)
 {
-    if (classify_img == nullptr || x <= x_min || x >= x_max || y <= 0 || y >= (kProcHeight - 1) || y < y_min)
-    {
-        return false;
-    }
-    if (!pixel_is_path(classify_img, x, y, white_threshold, wall_is_white))
-    {
-        return false;
-    }
+    return x > 0 && x < (kProcWidth - 1) &&
+           y > 0 && y < (kProcHeight - 1) &&
+           x >= x_min && x <= x_max &&
+           y >= y_min;
+}
 
-    for (int i = 0; i < 8; ++i)
-    {
-        const int nx = x + kDir8[i][0];
-        const int ny = y + kDir8[i][1];
-        if (nx < 0 || nx >= kProcWidth || ny < 0 || ny >= kProcHeight)
-        {
-            continue;
-        }
-        if (pixel_is_wall(classify_img, nx, ny, white_threshold, wall_is_white))
-        {
-            return true;
-        }
-    }
-    return false;
+static bool point_touches_artificial_frame(int x, int y)
+{
+    return x <= 1 || x >= (kProcWidth - 2) || y <= 1;
 }
 
 static int trace_boundary_eight_neighbor(const uint8 *classify_img,
@@ -2502,86 +2811,86 @@ static int trace_boundary_eight_neighbor(const uint8 *classify_img,
                                          int x_max,
                                          bool prefer_left_bias,
                                          maze_point_t *pts,
-                                         int max_pts)
+                                         uint8 *dirs,
+                                         int max_pts,
+                                         int *first_frame_touch_index)
 {
-    if (classify_img == nullptr || pts == nullptr || max_pts <= 0 || start_x <= x_min || start_x >= x_max)
+    if (classify_img == nullptr || pts == nullptr || dirs == nullptr || max_pts <= 0 || start_x < x_min || start_x > x_max)
     {
+        if (first_frame_touch_index) *first_frame_touch_index = -1;
         return 0;
     }
 
-    if (!eight_neighbor_boundary_candidate(classify_img,
-                                           white_threshold,
-                                           wall_is_white,
-                                           start_x,
-                                           start_y,
-                                           y_min,
-                                           x_min,
-                                           x_max))
-    {
-        return 0;
-    }
-
-    std::array<uint8, kProcWidth * kProcHeight> visited{};
+    std::fill_n(dirs, max_pts, static_cast<uint8>(255));
+    const int (*seeds)[2] = prefer_left_bias ? kEightNeighborLeftSeeds : kEightNeighborRightSeeds;
     int x = start_x;
     int y = start_y;
-    int min_y_seen = start_y;
     const int y_fallback_stop_delta = std::max(0, g_maze_trace_y_fallback_stop_delta.load());
-    const int *priority = prefer_left_bias ? kEightNeighborLeftPriority : kEightNeighborRightPriority;
+    int min_y_seen = start_y;
+    int first_touch = -1;
     int step = 0;
 
     while (step < max_pts &&
-           x > x_min && x < x_max &&
-           y > 0 && y < (kProcHeight - 1) &&
-           y >= y_min)
+           binary_point_in_trace_range(x, y, y_min, x_min, x_max))
     {
-        const int index = y * kProcWidth + x;
-        if (visited[index] != 0)
+        pts[step] = {x, y};
+        if (first_touch < 0 && point_touches_artificial_frame(x, y))
         {
-            break;
+            first_touch = step;
         }
-        visited[index] = 1;
-        pts[step++] = {x, y};
+        ++step;
 
-        int best_dir = -1;
-        int best_score = std::numeric_limits<int>::max();
-        for (int order = 0; order < 8; ++order)
+        maze_point_t candidates[8]{};
+        int candidate_dirs[8]{};
+        int candidate_count = 0;
+        for (int i = 0; i < 8; ++i)
         {
-            const int dir = priority[order];
-            const int nx = x + kDir8[dir][0];
-            const int ny = y + kDir8[dir][1];
-            if (!eight_neighbor_boundary_candidate(classify_img,
-                                                   white_threshold,
-                                                   wall_is_white,
-                                                   nx,
-                                                   ny,
-                                                   y_min,
-                                                   x_min,
-                                                   x_max))
+            const int nx0 = x + seeds[i][0];
+            const int ny0 = y + seeds[i][1];
+            const int next = (i + 1) & 7;
+            const int nx1 = x + seeds[next][0];
+            const int ny1 = y + seeds[next][1];
+            if (!binary_point_in_trace_range(nx0, ny0, y_min, x_min, x_max) ||
+                !binary_point_in_trace_range(nx1, ny1, y_min, x_min, x_max))
             {
                 continue;
             }
-            if (visited[ny * kProcWidth + nx] != 0)
+            if (pixel_is_wall(classify_img, nx0, ny0, white_threshold, wall_is_white) &&
+                pixel_is_path(classify_img, nx1, ny1, white_threshold, wall_is_white))
             {
-                continue;
-            }
-
-            const int dy_penalty = std::max(0, ny - y) * 10;
-            const int lateral_penalty = prefer_left_bias ? std::max(0, nx - x) : std::max(0, x - nx);
-            const int score = dy_penalty + lateral_penalty + order;
-            if (score < best_score)
-            {
-                best_score = score;
-                best_dir = dir;
+                candidates[candidate_count] = {nx0, ny0};
+                candidate_dirs[candidate_count] = i;
+                ++candidate_count;
             }
         }
 
-        if (best_dir < 0)
+        if (candidate_count <= 0)
         {
             break;
         }
 
-        x += kDir8[best_dir][0];
-        y += kDir8[best_dir][1];
+        int best = 0;
+        for (int i = 1; i < candidate_count; ++i)
+        {
+            if (candidates[i].y < candidates[best].y ||
+                (candidates[i].y == candidates[best].y && candidate_dirs[i] < candidate_dirs[best]))
+            {
+                best = i;
+            }
+        }
+
+        if (step >= 3 &&
+            pts[step - 1].x == pts[step - 2].x &&
+            pts[step - 1].x == pts[step - 3].x &&
+            pts[step - 1].y == pts[step - 2].y &&
+            pts[step - 1].y == pts[step - 3].y)
+        {
+            break;
+        }
+
+        x = candidates[best].x;
+        y = candidates[best].y;
+        dirs[step - 1] = static_cast<uint8>(candidate_dirs[best]);
         min_y_seen = std::min(min_y_seen, y);
         if (y > min_y_seen + y_fallback_stop_delta)
         {
@@ -2589,6 +2898,7 @@ static int trace_boundary_eight_neighbor(const uint8 *classify_img,
         }
     }
 
+    if (first_frame_touch_index) *first_frame_touch_index = first_touch;
     return step;
 }
 
@@ -2601,7 +2911,9 @@ static int trace_left_boundary_selected_method(const uint8 *classify_img,
                                                int x_min,
                                                int x_max,
                                                maze_point_t *pts,
-                                               int max_pts)
+                                               uint8 *dirs,
+                                               int max_pts,
+                                               int *first_frame_touch_index)
 {
     const vision_trace_method_enum method =
         static_cast<vision_trace_method_enum>(g_maze_trace_method.load());
@@ -2617,9 +2929,12 @@ static int trace_left_boundary_selected_method(const uint8 *classify_img,
                                              x_max,
                                              true,
                                              pts,
-                                             max_pts);
+                                             dirs,
+                                             max_pts,
+                                             first_frame_touch_index);
     }
 
+    if (first_frame_touch_index) *first_frame_touch_index = -1;
     return maze_trace_left_hand(classify_img,
                                 white_threshold,
                                 wall_is_white,
@@ -2641,7 +2956,9 @@ static int trace_right_boundary_selected_method(const uint8 *classify_img,
                                                 int x_min,
                                                 int x_max,
                                                 maze_point_t *pts,
-                                                int max_pts)
+                                                uint8 *dirs,
+                                                int max_pts,
+                                                int *first_frame_touch_index)
 {
     const vision_trace_method_enum method =
         static_cast<vision_trace_method_enum>(g_maze_trace_method.load());
@@ -2657,9 +2974,12 @@ static int trace_right_boundary_selected_method(const uint8 *classify_img,
                                              x_max,
                                              false,
                                              pts,
-                                             max_pts);
+                                             dirs,
+                                             max_pts,
+                                             first_frame_touch_index);
     }
 
+    if (first_frame_touch_index) *first_frame_touch_index = -1;
     return maze_trace_right_hand(classify_img,
                                  white_threshold,
                                  wall_is_white,
@@ -2670,6 +2990,262 @@ static int trace_right_boundary_selected_method(const uint8 *classify_img,
                                  x_max,
                                  pts,
                                  max_pts);
+}
+
+static int extract_one_point_per_row_from_contour(const maze_point_t *raw_pts,
+                                                  int raw_num,
+                                                  bool is_left,
+                                                  bool skip_artificial_frame,
+                                                  maze_point_t *out_pts,
+                                                  int max_out_pts)
+{
+    if (raw_pts == nullptr || out_pts == nullptr || raw_num <= 0 || max_out_pts <= 0)
+    {
+        return 0;
+    }
+
+    std::array<int, kProcHeight> border_x{};
+    border_x.fill(-1);
+    int initial_frame_end = 0;
+    bool keep_initial_frame_wall = false;
+    if (skip_artificial_frame && point_touches_artificial_frame(raw_pts[0].x, raw_pts[0].y))
+    {
+        while (initial_frame_end < raw_num &&
+               point_touches_artificial_frame(raw_pts[initial_frame_end].x, raw_pts[initial_frame_end].y))
+        {
+            ++initial_frame_end;
+        }
+        if (initial_frame_end > 0 && initial_frame_end < raw_num)
+        {
+            const int initial_frame_y_span = std::abs(raw_pts[0].y - raw_pts[initial_frame_end - 1].y);
+            keep_initial_frame_wall = initial_frame_y_span < kInitialFrameWallKeepMaxYSpan;
+        }
+    }
+
+    for (int i = 0; i < raw_num; ++i)
+    {
+        const bool is_initial_frame_wall = keep_initial_frame_wall && i < initial_frame_end;
+        if (skip_artificial_frame &&
+            !is_initial_frame_wall &&
+            point_touches_artificial_frame(raw_pts[i].x, raw_pts[i].y))
+        {
+            continue;
+        }
+
+        const int y = std::clamp(raw_pts[i].y, 0, kProcHeight - 1);
+        if (y <= 0 || y >= kProcHeight - 1 || border_x[y] >= 0)
+        {
+            continue;
+        }
+
+        const int adjusted_x = raw_pts[i].x + (is_left ? 1 : -1);
+        border_x[y] = std::clamp(adjusted_x, 0, kProcWidth - 1);
+    }
+
+    int out_num = 0;
+    for (int y = kProcHeight - 2; y >= 1 && out_num < max_out_pts; --y)
+    {
+        if (border_x[y] < 0)
+        {
+            continue;
+        }
+        out_pts[out_num++] = {border_x[y], y};
+    }
+
+    return out_num;
+}
+
+static bool initial_frame_wall_can_be_kept_for_ipm(const maze_point_t *raw_pts, int raw_num)
+{
+    if (raw_pts == nullptr || raw_num <= 1 || !point_touches_artificial_frame(raw_pts[0].x, raw_pts[0].y))
+    {
+        return false;
+    }
+
+    int initial_frame_end = 0;
+    while (initial_frame_end < raw_num &&
+           point_touches_artificial_frame(raw_pts[initial_frame_end].x, raw_pts[initial_frame_end].y))
+    {
+        ++initial_frame_end;
+    }
+
+    if (initial_frame_end <= 0 || initial_frame_end >= raw_num)
+    {
+        return false;
+    }
+
+    const int initial_frame_y_span = std::abs(raw_pts[0].y - raw_pts[initial_frame_end - 1].y);
+    return initial_frame_y_span < kInitialFrameWallKeepMaxYSpan;
+}
+
+static int trace_num_for_ipm_artificial_frame_policy(const maze_point_t *raw_pts,
+                                                     int raw_num,
+                                                     int first_frame_touch_index)
+{
+    if (raw_num <= 0)
+    {
+        return 0;
+    }
+    if (first_frame_touch_index < 0)
+    {
+        return raw_num;
+    }
+    if (first_frame_touch_index == 0 && initial_frame_wall_can_be_kept_for_ipm(raw_pts, raw_num))
+    {
+        return raw_num;
+    }
+    return std::min(raw_num, first_frame_touch_index + 1);
+}
+
+static int rebuild_boundary_points_from_row_table(const std::array<int, kProcHeight> &border_x,
+                                                  maze_point_t *pts,
+                                                  int max_pts)
+{
+    if (pts == nullptr || max_pts <= 0)
+    {
+        return 0;
+    }
+
+    int out_num = 0;
+    for (int y = kProcHeight - 2; y >= 1 && out_num < max_pts; --y)
+    {
+        if (border_x[y] < 0)
+        {
+            continue;
+        }
+        pts[out_num++] = {std::clamp(border_x[y], 0, kProcWidth - 1), y};
+    }
+    return out_num;
+}
+
+static bool fit_src_boundary_x_by_y_above_corner(const maze_point_t *pts,
+                                                 int num,
+                                                 int corner_y,
+                                                 float *slope,
+                                                 float *intercept)
+{
+    if (pts == nullptr || slope == nullptr || intercept == nullptr || num <= 0)
+    {
+        return false;
+    }
+
+    double sum_y = 0.0;
+    double sum_x = 0.0;
+    double sum_yx = 0.0;
+    double sum_y2 = 0.0;
+    int fit_num = 0;
+    for (int i = 0; i < num && fit_num < kCrossLowerFitPointCount; ++i)
+    {
+        // 每行数组按 y 从大到小排列；遇到 y < corner_y 后就是角点上方的边界点。
+        if (pts[i].y >= corner_y)
+        {
+            continue;
+        }
+
+        const double y = static_cast<double>(pts[i].y);
+        const double x = static_cast<double>(pts[i].x);
+        sum_y += y;
+        sum_x += x;
+        sum_yx += y * x;
+        sum_y2 += y * y;
+        ++fit_num;
+    }
+
+    if (fit_num < kCrossLowerFitMinPointCount)
+    {
+        return false;
+    }
+
+    const double denom = static_cast<double>(fit_num) * sum_y2 - sum_y * sum_y;
+    if (std::fabs(denom) < 1e-6)
+    {
+        return false;
+    }
+
+    const double k = (static_cast<double>(fit_num) * sum_yx - sum_y * sum_x) / denom;
+    const double b = (sum_x - k * sum_y) / static_cast<double>(fit_num);
+    *slope = static_cast<float>(k);
+    *intercept = static_cast<float>(b);
+    return true;
+}
+
+static int extrapolate_cross_lower_boundary_inplace(maze_point_t *pts,
+                                                    int num,
+                                                    int corner_y,
+                                                    int max_pts)
+{
+    if (pts == nullptr || num <= 0 || max_pts <= 0)
+    {
+        return num;
+    }
+
+    float slope = 0.0f;
+    float intercept = 0.0f;
+    if (!fit_src_boundary_x_by_y_above_corner(pts, num, corner_y, &slope, &intercept))
+    {
+        return num;
+    }
+
+    std::array<int, kProcHeight> border_x{};
+    border_x.fill(-1);
+    for (int i = 0; i < num; ++i)
+    {
+        const int y = std::clamp(pts[i].y, 0, kProcHeight - 1);
+        if (y <= 0 || y >= kProcHeight - 1)
+        {
+            continue;
+        }
+        border_x[y] = std::clamp(pts[i].x, 0, kProcWidth - 1);
+    }
+
+    const int start_y = std::clamp(corner_y, 1, kProcHeight - 2);
+    const int end_y = std::clamp(corner_y - kCrossLowerExtrapolateYSpan, 1, kProcHeight - 2);
+    for (int y = start_y; y >= end_y; --y)
+    {
+        const int x = static_cast<int>(std::lround(slope * static_cast<float>(y) + intercept));
+        border_x[y] = std::clamp(x, 0, kProcWidth - 1);
+    }
+
+    return rebuild_boundary_points_from_row_table(border_x, pts, std::min(max_pts, VISION_BOUNDARY_NUM));
+}
+
+static void extrapolate_cross_lower_boundaries_if_pair_valid(maze_point_t *left_pts,
+                                                            int *left_num,
+                                                            maze_point_t *right_pts,
+                                                            int *right_num,
+                                                            int max_pts)
+{
+    if (!g_cross_lower_corner_pair_valid.load() || left_num == nullptr || right_num == nullptr)
+    {
+        return;
+    }
+
+    if (left_pts != nullptr && *left_num > 0)
+    {
+        *left_num = extrapolate_cross_lower_boundary_inplace(left_pts,
+                                                            *left_num,
+                                                            g_cross_lower_left_corner_y.load(),
+                                                            max_pts);
+    }
+    if (right_pts != nullptr && *right_num > 0)
+    {
+        *right_num = extrapolate_cross_lower_boundary_inplace(right_pts,
+                                                             *right_num,
+                                                             g_cross_lower_right_corner_y.load(),
+                                                             max_pts);
+    }
+}
+
+static int copy_boundary_points(const maze_point_t *src, int src_num, maze_point_t *dst, int max_dst)
+{
+    if (src == nullptr || dst == nullptr || src_num <= 0 || max_dst <= 0)
+    {
+        return 0;
+    }
+
+    const int count = std::min(src_num, max_dst);
+    std::copy_n(src, count, dst);
+    return count;
 }
 
 static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
@@ -2841,14 +3417,7 @@ bool vision_image_processor_process_step()
     if (g_vision_processor_config.demand_otsu_enable)
     {
         otsu_threshold = compute_global_otsu_threshold_u8(g_image_gray);
-        if (g_vision_processor_config.demand_otsu_keep_full_binary_cache)
-        {
-            build_binary_image_from_gray_threshold(g_image_gray, otsu_threshold);
-        }
-        else
-        {
-            std::fill_n(g_image_binary_u8, kProcWidth * kProcHeight, static_cast<uint8>(0));
-        }
+        build_binary_image_from_gray_threshold(g_image_gray, otsu_threshold);
     }
     else
     {
@@ -2857,23 +3426,15 @@ bool vision_image_processor_process_step()
         const double otsu_value = cv::threshold(gray_ipm, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
         otsu_threshold = static_cast<uint8>(std::clamp(static_cast<int>(std::lround(otsu_value)), 0, 255));
     }
+    filter_binary_image_inplace(g_image_binary_u8);
+    draw_binary_black_frame(g_image_binary_u8);
     g_last_otsu_threshold = otsu_threshold;
     auto t_otsu_end = std::chrono::steady_clock::now();
 
     auto t_maze_start = t_otsu_end;
     const int y_min = std::max(1, kProcHeight - (kProcHeight * g_vision_processor_config.maze_lower_region_percent) / 100);
-    const uint8 *classify_img = nullptr;
+    const uint8 *classify_img = g_image_binary_u8;
     uint8 classify_white_threshold = 127;
-    if (g_vision_processor_config.demand_otsu_enable)
-    {
-        classify_img = g_image_gray;
-        classify_white_threshold = otsu_threshold;
-    }
-    else
-    {
-        classify_img = g_image_binary_u8;
-        classify_white_threshold = 127;
-    }
 
     int left_start_x = 0;
     int left_start_y = 0;
@@ -2885,11 +3446,27 @@ bool vision_image_processor_process_step()
     bool right_wall_is_white = false;
     int cross_detected_stop_row = -1;
 
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> left_trace_pts{};
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> right_trace_pts{};
+    std::array<uint8, VISION_BOUNDARY_NUM> left_trace_dirs{};
+    std::array<uint8, VISION_BOUNDARY_NUM> right_trace_dirs{};
     std::array<maze_point_t, VISION_BOUNDARY_NUM> left_pts{};
     std::array<maze_point_t, VISION_BOUNDARY_NUM> right_pts{};
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> left_ipm_pts{};
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> right_ipm_pts{};
 
+    int left_trace_num = 0;
+    int right_trace_num = 0;
     int left_num = 0;
     int right_num = 0;
+    int left_ipm_num = 0;
+    int right_ipm_num = 0;
+    int left_first_frame_touch_index = -1;
+    int right_first_frame_touch_index = -1;
+    clear_eight_neighbor_trace_cache();
+    clear_cross_lower_corner_detection_cache();
+    left_trace_dirs.fill(255);
+    right_trace_dirs.fill(255);
     auto t_maze_setup_end = std::chrono::steady_clock::now();
 
     get_maze_trace_x_range_clamped(&maze_trace_x_min, &maze_trace_x_max);
@@ -3032,6 +3609,9 @@ bool vision_image_processor_process_step()
                              &right_ok,
                              right_start_x,
                              right_start_y);
+    const vision_trace_method_enum trace_method =
+        static_cast<vision_trace_method_enum>(g_maze_trace_method.load());
+    const bool trace_with_eight_neighbor = (trace_method == VISION_TRACE_METHOD_EIGHT_NEIGHBOR);
     // 单边识别修正：
     // - 仅右边存在时，检查起点左侧5点白黑票；
     // - 仅左边存在时，检查起点右侧5点白黑票。
@@ -3068,36 +3648,122 @@ bool vision_image_processor_process_step()
             left_ok = false;
         }
     }
+    if (trace_with_eight_neighbor)
+    {
+        if (left_ok && left_start_x > maze_trace_x_min)
+        {
+            --left_start_x;
+        }
+        if (right_ok && right_start_x < maze_trace_x_max)
+        {
+            ++right_start_x;
+        }
+        left_wall_is_white = false;
+        right_wall_is_white = false;
+    }
     auto t_maze_start_search_end = std::chrono::steady_clock::now();
 
     if (left_ok)
     {
-        const int left_max_pts = std::min(static_cast<int>(left_pts.size()), g_vision_processor_config.maze_trace_max_points);
-        left_num = trace_left_boundary_selected_method(classify_img,
-                                                       classify_white_threshold,
-                                                       left_wall_is_white,
-                                                       left_start_x,
-                                                       left_start_y,
-                                                       y_min,
-                                                       maze_trace_x_min,
-                                                       maze_trace_x_max,
-                                                       left_pts.data(),
-                                                       left_max_pts);
+        const int left_max_pts = std::min(static_cast<int>(left_trace_pts.size()), g_vision_processor_config.maze_trace_max_points);
+        left_trace_num = trace_left_boundary_selected_method(classify_img,
+                                                             classify_white_threshold,
+                                                             left_wall_is_white,
+                                                             left_start_x,
+                                                             left_start_y,
+                                                             y_min,
+                                                             maze_trace_x_min,
+                                                             maze_trace_x_max,
+                                                             left_trace_pts.data(),
+                                                             left_trace_dirs.data(),
+                                                             left_max_pts,
+                                                             &left_first_frame_touch_index);
     }
     auto t_maze_left_trace_end = std::chrono::steady_clock::now();
     if (right_ok)
     {
-        const int right_max_pts = std::min(static_cast<int>(right_pts.size()), g_vision_processor_config.maze_trace_max_points);
-        right_num = trace_right_boundary_selected_method(classify_img,
-                                                         classify_white_threshold,
-                                                         right_wall_is_white,
-                                                         right_start_x,
-                                                         right_start_y,
-                                                         y_min,
-                                                         maze_trace_x_min,
-                                                         maze_trace_x_max,
+        const int right_max_pts = std::min(static_cast<int>(right_trace_pts.size()), g_vision_processor_config.maze_trace_max_points);
+        right_trace_num = trace_right_boundary_selected_method(classify_img,
+                                                               classify_white_threshold,
+                                                               right_wall_is_white,
+                                                               right_start_x,
+                                                               right_start_y,
+                                                               y_min,
+                                                               maze_trace_x_min,
+                                                               maze_trace_x_max,
+                                                               right_trace_pts.data(),
+                                                               right_trace_dirs.data(),
+                                                               right_max_pts,
+                                                               &right_first_frame_touch_index);
+    }
+
+    if (trace_with_eight_neighbor)
+    {
+        save_eight_neighbor_trace_cache(true,
+                                        left_trace_pts.data(),
+                                        left_trace_dirs.data(),
+                                        left_trace_num,
+                                        left_first_frame_touch_index);
+        save_eight_neighbor_trace_cache(false,
+                                        right_trace_pts.data(),
+                                        right_trace_dirs.data(),
+                                        right_trace_num,
+                                        right_first_frame_touch_index);
+        update_cross_lower_corner_detection_cache(left_trace_pts.data(),
+                                                  left_trace_dirs.data(),
+                                                  left_trace_num,
+                                                  right_trace_pts.data(),
+                                                  right_trace_dirs.data(),
+                                                  right_trace_num);
+
+        left_num = extract_one_point_per_row_from_contour(left_trace_pts.data(),
+                                                          left_trace_num,
+                                                          true,
+                                                          false,
+                                                          left_pts.data(),
+                                                          static_cast<int>(left_pts.size()));
+        right_num = extract_one_point_per_row_from_contour(right_trace_pts.data(),
+                                                           right_trace_num,
+                                                           false,
+                                                           false,
+                                                           right_pts.data(),
+                                                           static_cast<int>(right_pts.size()));
+
+        const int left_ipm_trace_num = trace_num_for_ipm_artificial_frame_policy(left_trace_pts.data(),
+                                                                                 left_trace_num,
+                                                                                 left_first_frame_touch_index);
+        const int right_ipm_trace_num = trace_num_for_ipm_artificial_frame_policy(right_trace_pts.data(),
+                                                                                  right_trace_num,
+                                                                                  right_first_frame_touch_index);
+        left_ipm_num = extract_one_point_per_row_from_contour(left_trace_pts.data(),
+                                                              left_ipm_trace_num,
+                                                              true,
+                                                              true,
+                                                              left_ipm_pts.data(),
+                                                              static_cast<int>(left_ipm_pts.size()));
+        right_ipm_num = extract_one_point_per_row_from_contour(right_trace_pts.data(),
+                                                               right_ipm_trace_num,
+                                                               false,
+                                                               true,
+                                                               right_ipm_pts.data(),
+                                                               static_cast<int>(right_ipm_pts.size()));
+        extrapolate_cross_lower_boundaries_if_pair_valid(left_pts.data(),
+                                                         &left_num,
                                                          right_pts.data(),
-                                                         right_max_pts);
+                                                         &right_num,
+                                                         static_cast<int>(left_pts.size()));
+        extrapolate_cross_lower_boundaries_if_pair_valid(left_ipm_pts.data(),
+                                                         &left_ipm_num,
+                                                         right_ipm_pts.data(),
+                                                         &right_ipm_num,
+                                                         static_cast<int>(left_ipm_pts.size()));
+    }
+    else
+    {
+        left_num = copy_boundary_points(left_trace_pts.data(), left_trace_num, left_pts.data(), static_cast<int>(left_pts.size()));
+        right_num = copy_boundary_points(right_trace_pts.data(), right_trace_num, right_pts.data(), static_cast<int>(right_pts.size()));
+        left_ipm_num = copy_boundary_points(left_pts.data(), left_num, left_ipm_pts.data(), static_cast<int>(left_ipm_pts.size()));
+        right_ipm_num = copy_boundary_points(right_pts.data(), right_num, right_ipm_pts.data(), static_cast<int>(right_ipm_pts.size()));
     }
 
     if (left_ok && right_ok)
@@ -3109,11 +3775,13 @@ bool vision_image_processor_process_step()
             {
                 left_ok = false;
                 left_num = 0;
+                left_ipm_num = 0;
             }
             else
             {
                 right_ok = false;
                 right_num = 0;
+                right_ipm_num = 0;
             }
         }
     }
@@ -3125,10 +3793,10 @@ bool vision_image_processor_process_step()
 
     if (g_vision_processor_config.enable_inverse_perspective)
     {
-        render_ipm_boundary_image_and_update_boundaries(left_pts.data(),
-                                                        left_num,
-                                                        right_pts.data(),
-                                                        right_num,
+        render_ipm_boundary_image_and_update_boundaries(left_ipm_pts.data(),
+                                                        left_ipm_num,
+                                                        right_ipm_pts.data(),
+                                                        right_ipm_num,
                                                         classify_img,
                                                         classify_white_threshold,
                                                         y_min,
@@ -3657,6 +4325,45 @@ void vision_image_processor_get_boundary_side_counts(uint16 *left_dot_num, uint1
 {
     if (left_dot_num) *left_dot_num = static_cast<uint16>(g_boundary_left_count);
     if (right_dot_num) *right_dot_num = static_cast<uint16>(g_boundary_right_count);
+}
+
+void vision_image_processor_get_eight_neighbor_left_trace(uint16 **x, uint16 **y, uint8 **dir, uint16 *dot_num, int *first_frame_touch_index)
+{
+    if (x) *x = g_eight_left_trace_x;
+    if (y) *y = g_eight_left_trace_y;
+    if (dir) *dir = g_eight_left_trace_dir;
+    if (dot_num) *dot_num = static_cast<uint16>(g_eight_left_trace_count);
+    if (first_frame_touch_index) *first_frame_touch_index = g_eight_left_first_frame_touch_index;
+}
+
+void vision_image_processor_get_eight_neighbor_right_trace(uint16 **x, uint16 **y, uint8 **dir, uint16 *dot_num, int *first_frame_touch_index)
+{
+    if (x) *x = g_eight_right_trace_x;
+    if (y) *y = g_eight_right_trace_y;
+    if (dir) *dir = g_eight_right_trace_dir;
+    if (dot_num) *dot_num = static_cast<uint16>(g_eight_right_trace_count);
+    if (first_frame_touch_index) *first_frame_touch_index = g_eight_right_first_frame_touch_index;
+}
+
+void vision_image_processor_get_cross_lower_corner_state(bool *left_found,
+                                                         int *left_index,
+                                                         int *left_x,
+                                                         int *left_y,
+                                                         bool *right_found,
+                                                         int *right_index,
+                                                         int *right_x,
+                                                         int *right_y,
+                                                         bool *pair_valid)
+{
+    if (left_found) *left_found = g_cross_lower_left_corner_found.load();
+    if (left_index) *left_index = g_cross_lower_left_corner_index.load();
+    if (left_x) *left_x = g_cross_lower_left_corner_x.load();
+    if (left_y) *left_y = g_cross_lower_left_corner_y.load();
+    if (right_found) *right_found = g_cross_lower_right_corner_found.load();
+    if (right_index) *right_index = g_cross_lower_right_corner_index.load();
+    if (right_x) *right_x = g_cross_lower_right_corner_x.load();
+    if (right_y) *right_y = g_cross_lower_right_corner_y.load();
+    if (pair_valid) *pair_valid = g_cross_lower_corner_pair_valid.load();
 }
 
 void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,

@@ -223,7 +223,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    .udp_web_server_ip = "172.21.79.179",
+    .udp_web_server_ip = "172.21.79.129",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -231,7 +231,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 逐飞助手独立 UDP 通道开关。
     .assistant_udp_enabled = false,
     // 逐飞助手接收端 IP。
-    .assistant_server_ip = "172.21.79.179",
+    .assistant_server_ip = "172.21.79.129",
     // 逐飞助手接收端端口。
     .assistant_server_port = 8899,
 
@@ -240,11 +240,29 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // ROI 抓图模式：检测到红框后周期性保存推理 ROI。
     .roi_capture_mode = false,
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
-    .maze_start_row = 85,
+    .maze_start_row = 100,
     // 原图巡线方法：0=迷宫法，1=八邻域法。
     .maze_trace_method = 1,
     // 迷宫法巡线回退停止阈值（y > min_y + 阈值即停）。
     .maze_trace_y_fallback_stop_delta = 15,
+    // 十字下角点 dir 模板识别开关：仅依赖八邻域原始 dir/points，不直接改线。
+    .cross_lower_corner_dir_enabled = true,
+    // 前平台窗口：检测十字下角点前，要求最近一段主要由 dir=4/5 组成。
+    .cross_lower_corner_pre_window = 8,
+    // 后平台窗口：检测十字下角点后，要求后续一段主要由 dir=2 组成。
+    .cross_lower_corner_post_window = 8,
+    // 前平台最少票数：8 个点里至少 6 个为 4/5，允许 5 中混入 4。
+    .cross_lower_corner_pre_min_votes = 6,
+    // 后平台最少票数：8 个点里至少 6 个为 2。
+    .cross_lower_corner_post_min_votes = 6,
+    // 最大过渡长度：允许 {4,5} 与 2 之间存在很短的过渡平台。
+    .cross_lower_corner_transition_max_len = 4,
+    // 过渡区最大 dir=3 数量：容忍短 3 平台，但过滤长 3 平台误判。
+    .cross_lower_corner_transition_max_dir3_count = 3,
+    // 后平台窗口最大 dir=3 数量：限制 2 平台内频繁夹 3 的弯道误判。
+    .cross_lower_corner_post_max_dir3_count = 1,
+    // 左右下角点 y 坐标最大差值：用于判断双下角点是否稳定同时成立。
+    .cross_lower_corner_pair_y_diff_max = 30,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = false,
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -322,7 +340,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 const vision_processor_config_t g_vision_processor_config = {
     // ==================== 视觉处理器内部参数 ====================
     // 迷宫法单侧最大输出点数。
-    .maze_trace_max_points = 120,
+    .maze_trace_max_points = 180,
     // 迷宫法允许追踪的纵向区域百分比，100 表示全高。
     .maze_lower_region_percent = 85,
     // OTSU 策略：true=按需 OTSU，false=先生成整图二值图。

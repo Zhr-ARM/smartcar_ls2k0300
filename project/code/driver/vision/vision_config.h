@@ -171,6 +171,24 @@ typedef struct
     int maze_trace_method;
     // 迷宫法巡线回退停止阈值：若后续 y > 当前最小 y + 阈值，则停止巡线。
     int maze_trace_y_fallback_stop_delta;
+    // 十字下角点 dir 模板识别开关：用于八邻域原始 dir 序列，检测 {4,5} 平台 -> 短过渡 -> 2 平台。
+    bool cross_lower_corner_dir_enabled;
+    // 十字下角点识别：前平台窗口长度，窗口内 dir=4/5 视为有效票。
+    int cross_lower_corner_pre_window;
+    // 十字下角点识别：后平台窗口长度，窗口内 dir=2 视为有效票。
+    int cross_lower_corner_post_window;
+    // 十字下角点识别：前平台窗口内至少需要多少个 dir=4/5。
+    int cross_lower_corner_pre_min_votes;
+    // 十字下角点识别：后平台窗口内至少需要多少个 dir=2。
+    int cross_lower_corner_post_min_votes;
+    // 十字下角点识别：前后平台之间允许的最大过渡长度，过渡区允许 2/3/4/5。
+    int cross_lower_corner_transition_max_len;
+    // 十字下角点识别：过渡区允许的最大 dir=3 数量，避免把长 3 平台误判为角点。
+    int cross_lower_corner_transition_max_dir3_count;
+    // 十字下角点识别：后平台窗口内允许的最大 dir=3 数量，避免 2 平台频繁夹 3 时误判。
+    int cross_lower_corner_post_max_dir3_count;
+    // 十字下角点识别：左右候选角点 y 坐标最大允许差，超出则双边稳定标志无效。
+    int cross_lower_corner_pair_y_diff_max;
     // 去畸变开关：true=开启去畸变，false=关闭去畸变直通原图。
     bool undistort_enabled;
     // ---------- 边界双处理流水线：共同预处理 ----------

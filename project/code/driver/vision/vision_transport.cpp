@@ -604,6 +604,44 @@ static void send_tcp_status()
     uint16 right_dot_num = 0;
     vision_image_processor_get_boundaries(&x1, nullptr, &x3, &y1, nullptr, &y3, &dot_num);
     vision_image_processor_get_boundary_side_counts(&left_dot_num, &right_dot_num);
+    uint16 *eight_left_x = nullptr;
+    uint16 *eight_left_y = nullptr;
+    uint8 *eight_left_dir = nullptr;
+    uint16 eight_left_num = 0;
+    int eight_left_first_frame_touch_index = -1;
+    uint16 *eight_right_x = nullptr;
+    uint16 *eight_right_y = nullptr;
+    uint8 *eight_right_dir = nullptr;
+    uint16 eight_right_num = 0;
+    int eight_right_first_frame_touch_index = -1;
+    vision_image_processor_get_eight_neighbor_left_trace(&eight_left_x,
+                                                         &eight_left_y,
+                                                         &eight_left_dir,
+                                                         &eight_left_num,
+                                                         &eight_left_first_frame_touch_index);
+    vision_image_processor_get_eight_neighbor_right_trace(&eight_right_x,
+                                                          &eight_right_y,
+                                                          &eight_right_dir,
+                                                          &eight_right_num,
+                                                          &eight_right_first_frame_touch_index);
+    bool cross_lower_left_found = false;
+    int cross_lower_left_index = -1;
+    int cross_lower_left_x = 0;
+    int cross_lower_left_y = 0;
+    bool cross_lower_right_found = false;
+    int cross_lower_right_index = -1;
+    int cross_lower_right_x = 0;
+    int cross_lower_right_y = 0;
+    bool cross_lower_pair_valid = false;
+    vision_image_processor_get_cross_lower_corner_state(&cross_lower_left_found,
+                                                        &cross_lower_left_index,
+                                                        &cross_lower_left_x,
+                                                        &cross_lower_left_y,
+                                                        &cross_lower_right_found,
+                                                        &cross_lower_right_index,
+                                                        &cross_lower_right_x,
+                                                        &cross_lower_right_y,
+                                                        &cross_lower_pair_valid);
     uint16 *ipm_x1 = nullptr;
     uint16 *ipm_x3 = nullptr;
     uint16 *ipm_y1 = nullptr;
@@ -734,7 +772,7 @@ static void send_tcp_status()
                               .count();
 
     std::string line;
-    line.reserve(8192);
+    line.reserve(16384);
     line += "{";
     bool first_field = true;
 
@@ -943,10 +981,74 @@ static void send_tcp_status()
         line += "]";
     };
 
+    auto append_u8_array = [&append_key, &line](bool enabled, const char *name, const uint8 *values, uint16 n) {
+        if (!enabled)
+        {
+            return;
+        }
+        append_key(name);
+        line += "[";
+        for (uint16 i = 0; i < n; ++i)
+        {
+            if (i > 0)
+            {
+                line += ",";
+            }
+            line += std::to_string(static_cast<int>(values ? values[i] : 255));
+        }
+        line += "]";
+    };
+
     append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
                   "left_boundary", x1, y1, left_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
                   "right_boundary", x3, y3, right_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
+                  "eight_left_trace", eight_left_x, eight_left_y, eight_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
+                  "eight_right_trace", eight_right_x, eight_right_y, eight_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_u8_array(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
+                    "eight_left_trace_dir", eight_left_dir, eight_left_num);
+    append_u8_array(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
+                    "eight_right_trace_dir", eight_right_dir, eight_right_num);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
+               "eight_left_first_frame_touch_index",
+               eight_left_first_frame_touch_index);
+    append_int(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
+               "eight_right_first_frame_touch_index",
+               eight_right_first_frame_touch_index);
+    const bool eight_left_touch_valid =
+        eight_left_first_frame_touch_index >= 0 &&
+        eight_left_first_frame_touch_index < static_cast<int>(eight_left_num) &&
+        eight_left_x != nullptr &&
+        eight_left_y != nullptr;
+    const bool eight_right_touch_valid =
+        eight_right_first_frame_touch_index >= 0 &&
+        eight_right_first_frame_touch_index < static_cast<int>(eight_right_num) &&
+        eight_right_x != nullptr &&
+        eight_right_y != nullptr;
+    append_int_array(g_vision_runtime_config.udp_web_tcp_send_left_boundary && eight_left_touch_valid,
+                     "eight_left_first_frame_touch_point",
+                     {eight_left_x[eight_left_first_frame_touch_index], eight_left_y[eight_left_first_frame_touch_index]});
+    append_int_array(g_vision_runtime_config.udp_web_tcp_send_right_boundary && eight_right_touch_valid,
+                     "eight_right_first_frame_touch_point",
+                     {eight_right_x[eight_right_first_frame_touch_index], eight_right_y[eight_right_first_frame_touch_index]});
+    append_bool(true, "cross_lower_corner_dir_enabled", g_vision_runtime_config.cross_lower_corner_dir_enabled);
+    append_int(true, "cross_lower_corner_pre_window", g_vision_runtime_config.cross_lower_corner_pre_window);
+    append_int(true, "cross_lower_corner_post_window", g_vision_runtime_config.cross_lower_corner_post_window);
+    append_int(true, "cross_lower_corner_pre_min_votes", g_vision_runtime_config.cross_lower_corner_pre_min_votes);
+    append_int(true, "cross_lower_corner_post_min_votes", g_vision_runtime_config.cross_lower_corner_post_min_votes);
+    append_int(true, "cross_lower_corner_transition_max_len", g_vision_runtime_config.cross_lower_corner_transition_max_len);
+    append_int(true, "cross_lower_corner_transition_max_dir3_count", g_vision_runtime_config.cross_lower_corner_transition_max_dir3_count);
+    append_int(true, "cross_lower_corner_post_max_dir3_count", g_vision_runtime_config.cross_lower_corner_post_max_dir3_count);
+    append_int(true, "cross_lower_corner_pair_y_diff_max", g_vision_runtime_config.cross_lower_corner_pair_y_diff_max);
+    append_bool(true, "cross_lower_left_corner_found", cross_lower_left_found);
+    append_bool(true, "cross_lower_right_corner_found", cross_lower_right_found);
+    append_bool(true, "cross_lower_corner_pair_valid", cross_lower_pair_valid);
+    append_int(true, "cross_lower_left_corner_index", cross_lower_left_index);
+    append_int(true, "cross_lower_right_corner_index", cross_lower_right_index);
+    append_int_array(cross_lower_left_found, "cross_lower_left_corner_point", {cross_lower_left_x, cross_lower_left_y});
+    append_int_array(cross_lower_right_found, "cross_lower_right_corner_point", {cross_lower_right_x, cross_lower_right_y});
     append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
                   "left_boundary_corner", src_corner_left_x, src_corner_left_y, src_corner_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,

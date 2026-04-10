@@ -378,7 +378,7 @@
         透视图显示锚点圆 (x=140,y=140,r=1)
       </label>
       <label style="margin-left: 16px;">
-        <input type="checkbox" id="toggleBoundaryPointMode" />
+        <input type="checkbox" id="toggleBoundaryPointMode" checked />
         边界/中线按采样点显示（关闭=连线）
       </label>
       <label style="margin-left: 16px;">
@@ -388,6 +388,10 @@
       <label style="margin-left: 16px;">
         <input type="checkbox" id="toggleBoundaryAngleCosCharts" checked />
         显示边界角点cos图
+      </label>
+      <label style="margin-left: 16px;">
+        <input type="checkbox" id="toggleTraceDirCharts" checked />
+        显示八邻域dir图
       </label>
       <label style="margin-left: 16px;">
         <input type="checkbox" id="toggleLocalCompute" />
@@ -487,6 +491,18 @@
           <canvas id="rightBoundaryAngleCosCanvas" width="480" height="220"></canvas>
         </div>
       </div>
+      <div class="card" id="leftTraceDirCard">
+        <div class="title">左八邻域 dir 图（横轴=索引，纵轴=dir）</div>
+        <div class="view">
+          <canvas id="leftTraceDirCanvas" width="480" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card" id="rightTraceDirCard">
+        <div class="title">右八邻域 dir 图（横轴=索引，纵轴=dir）</div>
+        <div class="view">
+          <canvas id="rightTraceDirCanvas" width="480" height="220"></canvas>
+        </div>
+      </div>
     </div>
   </div>
   <div class="param-modal" id="paramModal">
@@ -578,6 +594,10 @@
     const leftBoundaryAngleCosCtx = leftBoundaryAngleCosCanvas.getContext('2d');
     const rightBoundaryAngleCosCanvas = document.getElementById('rightBoundaryAngleCosCanvas');
     const rightBoundaryAngleCosCtx = rightBoundaryAngleCosCanvas.getContext('2d');
+    const leftTraceDirCanvas = document.getElementById('leftTraceDirCanvas');
+    const leftTraceDirCtx = leftTraceDirCanvas.getContext('2d');
+    const rightTraceDirCanvas = document.getElementById('rightTraceDirCanvas');
+    const rightTraceDirCtx = rightTraceDirCanvas.getContext('2d');
     const rgbPixelInfo = document.getElementById('rgbPixelInfo');
     const grayPixelInfo = document.getElementById('grayPixelInfo');
     const binaryPixelInfo = document.getElementById('binaryPixelInfo');
@@ -629,6 +649,8 @@
     const curvatureCard = document.getElementById('curvatureCard');
     const leftBoundaryAngleCosCard = document.getElementById('leftBoundaryAngleCosCard');
     const rightBoundaryAngleCosCard = document.getElementById('rightBoundaryAngleCosCard');
+    const leftTraceDirCard = document.getElementById('leftTraceDirCard');
+    const rightTraceDirCard = document.getElementById('rightTraceDirCard');
     const playbackStatus = document.getElementById('playbackStatus');
     const playbackGrid = document.getElementById('playbackGrid');
     const paramModal = document.getElementById('paramModal');
@@ -648,6 +670,7 @@
     const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
     const toggleCenterlineCurvatureChart = document.getElementById('toggleCenterlineCurvatureChart');
     const toggleBoundaryAngleCosCharts = document.getElementById('toggleBoundaryAngleCosCharts');
+    const toggleTraceDirCharts = document.getElementById('toggleTraceDirCharts');
     const toggleLocalCompute = document.getElementById('toggleLocalCompute');
     const curvatureYMinInput = document.getElementById('curvatureYMinInput');
     const curvatureYMaxInput = document.getElementById('curvatureYMaxInput');
@@ -663,9 +686,10 @@
     let showGrayBoundaries = true;
     let showMeanCenterline = false;
     let showIpmAnchorDot = true;
-    let boundaryPointMode = false;
+    let boundaryPointMode = true;
     let showCenterlineCurvatureChart = true;
     let showBoundaryAngleCosCharts = true;
+    let showTraceDirCharts = true;
     let recordingState = null;
     let lastRecording = null;
     let paramPanelOpen = false;
@@ -705,6 +729,8 @@
       receiverCore.setElementVisible(curvatureCard, active && toggleCenterlineCurvatureChart.checked);
       receiverCore.setElementVisible(leftBoundaryAngleCosCard, active && toggleBoundaryAngleCosCharts.checked);
       receiverCore.setElementVisible(rightBoundaryAngleCosCard, active && toggleBoundaryAngleCosCharts.checked);
+      receiverCore.setElementVisible(leftTraceDirCard, active && toggleTraceDirCharts.checked);
+      receiverCore.setElementVisible(rightTraceDirCard, active && toggleTraceDirCharts.checked);
     }
 
     function shouldUseLocalCompute() {
@@ -811,6 +837,14 @@
       return [];
     }
 
+    function getTraceDirSeries(status, key) {
+      const dirs = Array.isArray(status[key]) ? status[key] : [];
+      return dirs.map((raw) => {
+        const dir = Number(raw);
+        return Number.isFinite(dir) && dir >= 0 && dir <= 7 ? dir : null;
+      });
+    }
+
     function renderRouteStatePanel(status) {
       const route = receiverCore.buildRouteStateSummary(status || {});
       routeMainStateValue.textContent = route.mainStateLabel || '--';
@@ -859,6 +893,7 @@
       drawIpmBoundaries(renderStatus);
       drawCurvatureChart(renderStatus);
       drawBoundaryAngleCosCharts(renderStatus);
+      drawTraceDirCharts(renderStatus);
     };
 
     function setCardVisible(el, visible) {
@@ -959,6 +994,10 @@
       push(trackRows, 'ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
       pushArray(trackRows, 'ipm_weighted_decision_point', status.ipm_weighted_decision_point);
       pushArray(trackRows, 'src_weighted_decision_point', status.src_weighted_decision_point);
+      push(trackRows, 'eight_left_first_frame_touch_index', status.eight_left_first_frame_touch_index);
+      push(trackRows, 'eight_right_first_frame_touch_index', status.eight_right_first_frame_touch_index);
+      pushArray(trackRows, 'eight_left_first_frame_touch_point', status.eight_left_first_frame_touch_point);
+      pushArray(trackRows, 'eight_right_first_frame_touch_point', status.eight_right_first_frame_touch_point);
       addSection('巡线跟踪', trackRows);
 
       const routeRows = [];
@@ -992,11 +1031,31 @@
       pushArray(cornerRows, 'ipm_right_boundary_corner_point', status.ipm_right_boundary_corner_point);
       push(cornerRows, 'ipm_left_boundary_straight', status.ipm_left_boundary_straight);
       push(cornerRows, 'ipm_right_boundary_straight', status.ipm_right_boundary_straight);
+      push(cornerRows, 'cross_lower_corner_dir_enabled', status.cross_lower_corner_dir_enabled);
+      push(cornerRows, 'cross_lower_corner_pair_valid', status.cross_lower_corner_pair_valid);
+      push(cornerRows, 'cross_lower_left_corner_found', status.cross_lower_left_corner_found);
+      push(cornerRows, 'cross_lower_right_corner_found', status.cross_lower_right_corner_found);
+      push(cornerRows, 'cross_lower_left_corner_index', status.cross_lower_left_corner_index);
+      push(cornerRows, 'cross_lower_right_corner_index', status.cross_lower_right_corner_index);
+      pushArray(cornerRows, 'cross_lower_left_corner_point', status.cross_lower_left_corner_point);
+      pushArray(cornerRows, 'cross_lower_right_corner_point', status.cross_lower_right_corner_point);
+      push(cornerRows, 'cross_lower_corner_pre_window', status.cross_lower_corner_pre_window);
+      push(cornerRows, 'cross_lower_corner_post_window', status.cross_lower_corner_post_window);
+      push(cornerRows, 'cross_lower_corner_pre_min_votes', status.cross_lower_corner_pre_min_votes);
+      push(cornerRows, 'cross_lower_corner_post_min_votes', status.cross_lower_corner_post_min_votes);
+      push(cornerRows, 'cross_lower_corner_transition_max_len', status.cross_lower_corner_transition_max_len);
+      push(cornerRows, 'cross_lower_corner_transition_max_dir3_count', status.cross_lower_corner_transition_max_dir3_count);
+      push(cornerRows, 'cross_lower_corner_post_max_dir3_count', status.cross_lower_corner_post_max_dir3_count);
+      push(cornerRows, 'cross_lower_corner_pair_y_diff_max', status.cross_lower_corner_pair_y_diff_max);
       addSection('角点与直边', cornerRows);
 
       const arrayRows = [];
       pushCount(arrayRows, 'left_boundary', status.left_boundary);
       pushCount(arrayRows, 'right_boundary', status.right_boundary);
+      pushCount(arrayRows, 'eight_left_trace', status.eight_left_trace);
+      pushCount(arrayRows, 'eight_right_trace', status.eight_right_trace);
+      pushCount(arrayRows, 'eight_left_trace_dir', status.eight_left_trace_dir);
+      pushCount(arrayRows, 'eight_right_trace_dir', status.eight_right_trace_dir);
       pushCount(arrayRows, 'left_boundary_corner', status.left_boundary_corner);
       pushCount(arrayRows, 'right_boundary_corner', status.right_boundary_corner);
       pushCount(arrayRows, 'ipm_left_boundary', status.ipm_left_boundary);
@@ -1639,6 +1698,167 @@
       drawCurveChartToCanvas(rightBoundaryAngleCosCanvas, rightBoundaryAngleCosCtx, getRightBoundaryAngleCos(status), -1.0, 1.0);
     }
 
+    function drawTraceDirChart(canvas, ctx, rawValues, color, sideLabel, cornerIndex, pairValid) {
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, w, h);
+
+      const values = Array.isArray(rawValues) ? rawValues.slice() : [];
+      while (values.length > 0 && values[values.length - 1] === null) values.pop();
+
+      const marginLeft = 44;
+      const marginRight = 18;
+      const marginTop = 18;
+      const marginBottom = 30;
+      const plotW = Math.max(1, w - marginLeft - marginRight);
+      const plotH = Math.max(1, h - marginTop - marginBottom);
+      const xAt = (idx) => marginLeft + (idx * plotW) / Math.max(1, values.length - 1);
+      const yAt = (dir) => marginTop + ((7 - dir) * plotH) / 7;
+
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(marginLeft, marginTop, plotW, plotH);
+      ctx.stroke();
+
+      ctx.font = '12px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+      ctx.textBaseline = 'middle';
+      for (let dir = 0; dir <= 7; dir += 1) {
+        const y = yAt(dir);
+        ctx.strokeStyle = dir % 2 === 0 ? 'rgba(148, 163, 184, 0.35)' : 'rgba(148, 163, 184, 0.18)';
+        ctx.setLineDash(dir % 2 === 0 ? [] : [3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(marginLeft, y);
+        ctx.lineTo(marginLeft + plotW, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillText(String(dir), 20, y);
+      }
+
+      const xDivs = Math.min(8, Math.max(1, values.length - 1));
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#94a3b8';
+      for (let i = 0; i <= xDivs; i += 1) {
+        const idx = values.length > 1 ? Math.round((i * (values.length - 1)) / xDivs) : 0;
+        const x = xAt(idx);
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x, marginTop);
+        ctx.lineTo(x, marginTop + plotH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillText(String(idx), Math.max(marginLeft, Math.min(marginLeft + plotW - 18, x - 8)), marginTop + plotH + 18);
+      }
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillText(`${sideLabel} dir | count=${values.length}`, marginLeft, 13);
+      if (values.length < 1) {
+        ctx.fillStyle = '#64748b';
+        ctx.fillText('No dir data', marginLeft + plotW * 0.5 - 30, marginTop + plotH * 0.5);
+        return;
+      }
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let started = false;
+      let prevValidIdx = -1;
+      let prevValidDir = null;
+      for (let i = 0; i < values.length; i += 1) {
+        const dir = values[i];
+        if (dir === null) continue;
+        const x = xAt(i);
+        const y = yAt(dir);
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else if (prevValidIdx >= 0 && prevValidDir !== null) {
+          const prevX = xAt(prevValidIdx);
+          const prevY = yAt(prevValidDir);
+          ctx.lineTo(x, prevY);
+          ctx.lineTo(x, y);
+        }
+        prevValidIdx = i;
+        prevValidDir = dir;
+      }
+      ctx.stroke();
+
+      let lastLabelX = -999;
+      let previousDir = null;
+      ctx.textBaseline = 'alphabetic';
+      for (let i = 0; i < values.length; i += 1) {
+        const dir = values[i];
+        if (dir === null) continue;
+        const x = xAt(i);
+        const y = yAt(dir);
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (previousDir !== null && dir !== previousDir) {
+          ctx.strokeStyle = '#facc15';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath();
+          ctx.moveTo(x, marginTop);
+          ctx.lineTo(x, marginTop + plotH);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#facc15';
+          if (x - lastLabelX > 42) {
+            const labelY = Math.max(marginTop + 12, Math.min(marginTop + plotH - 6, y - 7));
+            ctx.fillText(`${i}:${dir}`, Math.min(x + 3, marginLeft + plotW - 36), labelY);
+            lastLabelX = x;
+          }
+        }
+        previousDir = dir;
+      }
+
+      const ci = Number(cornerIndex);
+      if (Number.isInteger(ci) && ci >= 0 && ci < values.length) {
+        const x = xAt(ci);
+        const dir = values[ci];
+        const y = dir === null ? marginTop + plotH * 0.5 : yAt(dir);
+        ctx.strokeStyle = pairValid ? '#fb923c' : '#fde047';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(x, marginTop);
+        ctx.lineTo(x, marginTop + plotH);
+        ctx.stroke();
+        ctx.fillStyle = pairValid ? '#fb923c' : '#fde047';
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillText(`corner ${ci}:${dir === null ? 'N/A' : dir}`, Math.min(x + 4, marginLeft + plotW - 72), Math.max(marginTop + 12, y - 10));
+      }
+    }
+
+    function drawTraceDirCharts(status) {
+      setCardVisible(leftTraceDirCard, showTraceDirCharts);
+      setCardVisible(rightTraceDirCard, showTraceDirCharts);
+      if (!showTraceDirCharts) return;
+      drawTraceDirChart(leftTraceDirCanvas,
+                        leftTraceDirCtx,
+                        getTraceDirSeries(status, 'eight_left_trace_dir'),
+                        '#ff4d4f',
+                        'Left',
+                        status.cross_lower_left_corner_index,
+                        status.cross_lower_corner_pair_valid);
+      drawTraceDirChart(rightTraceDirCanvas,
+                        rightTraceDirCtx,
+                        getTraceDirSeries(status, 'eight_right_trace_dir'),
+                        '#c084fc',
+                        'Right',
+                        status.cross_lower_right_corner_index,
+                        status.cross_lower_corner_pair_valid);
+    }
+
     function renderGrayFrameFromSource(source, w, h, sourceMode) {
       if (!source || !w || !h) return;
       if (rawGrayCanvas.width !== w) rawGrayCanvas.width = w;
@@ -1755,6 +1975,88 @@
         dst[i + 3] = 255;
       }
       binaryCtx.putImageData(binaryImage, 0, 0);
+      drawBinaryTraceOverlay(getRenderStatus() || {});
+    }
+
+    function drawBinaryTraceOverlay(status) {
+      drawSeries(binaryCtx, status.eight_left_trace || [], '#ff4d4f', 2, 1);
+      drawSeries(binaryCtx, status.eight_right_trace || [], '#c084fc', 2, 1);
+      drawSeries(binaryCtx, status.left_boundary || [], '#38bdf8', 2, 1);
+      drawSeries(binaryCtx, status.right_boundary || [], '#22c55e', 2, 1);
+
+      const leftTouch = getTraceTouchPoint(status.eight_left_trace, status.eight_left_first_frame_touch_index, status.eight_left_first_frame_touch_point);
+      const rightTouch = getTraceTouchPoint(status.eight_right_trace, status.eight_right_first_frame_touch_index, status.eight_right_first_frame_touch_point);
+      drawPointSet(binaryCtx, leftTouch ? [leftTouch] : [], '#facc15', 3);
+      drawPointSet(binaryCtx, rightTouch ? [rightTouch] : [], '#facc15', 3);
+      drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_left_corner_point, 'L下角', status.cross_lower_corner_pair_valid);
+      drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_right_corner_point, 'R下角', status.cross_lower_corner_pair_valid);
+    }
+
+    function drawCrossLowerCornerPoint(ctx, point, label, pairValid) {
+      if (!Array.isArray(point) || point.length < 2) return;
+      const x = Number(point[0]);
+      const y = Number(point[1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+      const fill = pairValid ? '#fb923c' : '#fde047';
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = '#111827';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = '10px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+      ctx.textBaseline = 'bottom';
+      ctx.fillStyle = fill;
+      ctx.fillText(label, Math.min(binaryCanvas.width - 28, x + 5), Math.max(10, y - 4));
+    }
+
+    function getTraceTouchPoint(points, index, explicitPoint) {
+      if (Array.isArray(explicitPoint) && explicitPoint.length >= 2) return explicitPoint;
+      const idx = Number(index);
+      if (!Number.isInteger(idx) || idx < 0 || !Array.isArray(points) || idx >= points.length) return null;
+      const p = points[idx];
+      return Array.isArray(p) && p.length >= 2 ? p : null;
+    }
+
+    function formatTraceDir(dir) {
+      const d = Number(dir);
+      if (!Number.isFinite(d)) return 'N/A';
+      if (d === 255) return '255(末端/无下一步)';
+      return `${d}`;
+    }
+
+    function binaryTraceHoverText(status, x, y) {
+      const left = Array.isArray(status.eight_left_trace) ? status.eight_left_trace : [];
+      const right = Array.isArray(status.eight_right_trace) ? status.eight_right_trace : [];
+      const leftHit = findNearestBoundaryPoint(left, x, y, 2.5);
+      const rightHit = findNearestBoundaryPoint(right, x, y, 2.5);
+      let hit = null;
+      let sideLabel = '';
+      let dirs = [];
+      if (leftHit && rightHit) {
+        if (leftHit.distSq <= rightHit.distSq) {
+          hit = leftHit;
+          sideLabel = 'L';
+          dirs = Array.isArray(status.eight_left_trace_dir) ? status.eight_left_trace_dir : [];
+        } else {
+          hit = rightHit;
+          sideLabel = 'R';
+          dirs = Array.isArray(status.eight_right_trace_dir) ? status.eight_right_trace_dir : [];
+        }
+      } else if (leftHit) {
+        hit = leftHit;
+        sideLabel = 'L';
+        dirs = Array.isArray(status.eight_left_trace_dir) ? status.eight_left_trace_dir : [];
+      } else if (rightHit) {
+        hit = rightHit;
+        sideLabel = 'R';
+        dirs = Array.isArray(status.eight_right_trace_dir) ? status.eight_right_trace_dir : [];
+      }
+      if (!hit) return '';
+      return ` | 原始巡线:${sideLabel} idx:${hit.index} dir:${formatTraceDir(dirs[hit.index])}`;
     }
 
     function pixelTextFromCanvas(activeCanvas, activeCtx, x, y) {
@@ -2062,6 +2364,7 @@
           drawIpmBoundaries(renderStatus);
           drawCurvatureChart(renderStatus);
           drawBoundaryAngleCosCharts(renderStatus);
+          drawTraceDirCharts(renderStatus);
           if (hasValue(renderStatus.ipm_centerline_source)) {
             ipmCenterlineSourceLabel.style.display = '';
             ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(renderStatus.ipm_centerline_source);
@@ -2089,7 +2392,7 @@
 
     bindPixelProbe(rgbCanvas, rgbCtx, rgbPixelInfo);
     bindPixelProbe(grayCanvas, grayCtx, grayPixelInfo);
-    bindPixelProbe(binaryCanvas, binaryCtx, binaryPixelInfo);
+    bindPixelProbe(binaryCanvas, binaryCtx, binaryPixelInfo, (x, y) => binaryTraceHoverText(getRenderStatus() || {}, x, y));
     bindPixelProbe(ipmCanvas, ipmCtx, ipmPixelInfo, (x, y) => ipmBoundaryHoverText(getRenderStatus() || {}, x, y));
     bindPixelProbe(ipmRawCanvas, ipmRawCtx, ipmRawPixelInfo);
 
@@ -2192,6 +2495,10 @@
       showBoundaryAngleCosCharts = !!toggleBoundaryAngleCosCharts.checked;
       drawBoundaryAngleCosCharts(getRenderStatus() || {});
     });
+    toggleTraceDirCharts.addEventListener('change', () => {
+      showTraceDirCharts = !!toggleTraceDirCharts.checked;
+      drawTraceDirCharts(getRenderStatus() || {});
+    });
     toggleLocalCompute.checked = localComputeEnabled;
     toggleLocalCompute.addEventListener('change', () => {
       localComputeEnabled = !!toggleLocalCompute.checked;
@@ -2203,6 +2510,7 @@
       drawIpmBoundaries(getRenderStatus() || {});
       drawCurvatureChart(getRenderStatus() || {});
       drawBoundaryAngleCosCharts(getRenderStatus() || {});
+      drawTraceDirCharts(getRenderStatus() || {});
       if (grayFrameReady) renderGrayFrame();
     });
     curvatureYMinInput.addEventListener('change', applyCurvatureYRangeFromInput);
@@ -2211,6 +2519,7 @@
     curvatureYMaxInput.addEventListener('blur', applyCurvatureYRangeFromInput);
     showCenterlineCurvatureChart = !!toggleCenterlineCurvatureChart.checked;
     showBoundaryAngleCosCharts = !!toggleBoundaryAngleCosCharts.checked;
+    showTraceDirCharts = !!toggleTraceDirCharts.checked;
     rebuildPlaybackGrid({}, {});
     setDebugPageActive(true);
     setInterval(pullStatus, 120);
