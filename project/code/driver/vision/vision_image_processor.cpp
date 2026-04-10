@@ -258,6 +258,8 @@ static std::atomic<float> g_ipm_boundary_spike_reverse_cos_threshold(g_vision_ru
 static std::atomic<int> g_ipm_boundary_angle_step(g_vision_runtime_config.ipm_boundary_angle_step);
 static std::atomic<float> g_ipm_boundary_corner_cos_threshold(g_vision_runtime_config.ipm_boundary_corner_cos_threshold);
 static std::atomic<int> g_ipm_boundary_corner_nms_radius(g_vision_runtime_config.ipm_boundary_corner_nms_radius);
+static std::atomic<bool> g_ipm_boundary_truncate_at_first_corner_enabled(
+    g_vision_runtime_config.ipm_boundary_truncate_at_first_corner_enabled);
 static std::atomic<int> g_ipm_boundary_straight_min_points(g_vision_runtime_config.ipm_boundary_straight_min_points);
 static std::atomic<int> g_ipm_boundary_straight_check_count(g_vision_runtime_config.ipm_boundary_straight_check_count);
 static std::atomic<float> g_ipm_boundary_straight_min_cos(g_vision_runtime_config.ipm_boundary_straight_min_cos);
@@ -2215,23 +2217,26 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                          g_ipm_right_boundary_corner_indices,
                                          &g_ipm_right_boundary_corner_count);
 
-    // 若识别到直角角点，按首个角点截断其后边界，再进入曲率与中线计算。
-    truncate_by_first_corner_inplace(left_proc.data(),
-                                     &left_proc_num,
-                                     left_angle.data(),
-                                     &left_angle_num,
-                                     g_ipm_left_boundary_angle_cos,
-                                     &g_ipm_left_boundary_angle_cos_count,
-                                     g_ipm_left_boundary_corner_indices,
-                                     &g_ipm_left_boundary_corner_count);
-    truncate_by_first_corner_inplace(right_proc.data(),
-                                     &right_proc_num,
-                                     right_angle.data(),
-                                     &right_angle_num,
-                                     g_ipm_right_boundary_angle_cos,
-                                     &g_ipm_right_boundary_angle_cos_count,
-                                     g_ipm_right_boundary_corner_indices,
-                                     &g_ipm_right_boundary_corner_count);
+    // 可选：若识别到直角角点，按首个角点截断其后边界，再进入曲率与中线计算。
+    if (g_ipm_boundary_truncate_at_first_corner_enabled.load())
+    {
+        truncate_by_first_corner_inplace(left_proc.data(),
+                                         &left_proc_num,
+                                         left_angle.data(),
+                                         &left_angle_num,
+                                         g_ipm_left_boundary_angle_cos,
+                                         &g_ipm_left_boundary_angle_cos_count,
+                                         g_ipm_left_boundary_corner_indices,
+                                         &g_ipm_left_boundary_corner_count);
+        truncate_by_first_corner_inplace(right_proc.data(),
+                                         &right_proc_num,
+                                         right_angle.data(),
+                                         &right_angle_num,
+                                         g_ipm_right_boundary_angle_cos,
+                                         &g_ipm_right_boundary_angle_cos_count,
+                                         g_ipm_right_boundary_corner_indices,
+                                         &g_ipm_right_boundary_corner_count);
+    }
 
     build_corner_points_from_indices(left_angle.data(),
                                      left_angle_num,
@@ -3097,6 +3102,79 @@ static int trace_num_for_ipm_artificial_frame_policy(const maze_point_t *raw_pts
     return std::min(raw_num, first_frame_touch_index + 1);
 }
 
+static int find_first_artificial_frame_touch_index(const maze_point_t *pts, int num)
+{
+    if (pts == nullptr || num <= 0)
+    {
+        return -1;
+    }
+
+    for (int i = 0; i < num; ++i)
+    {
+        if (point_touches_artificial_frame(pts[i].x, pts[i].y))
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int trim_initial_artificial_frame_prefix_inplace(maze_point_t *pts,
+                                                        uint8 *dirs,
+                                                        int *num)
+{
+    if (pts == nullptr || num == nullptr || *num <= 0)
+    {
+        return 0;
+    }
+
+    const int in_num = std::clamp(*num, 0, VISION_BOUNDARY_NUM);
+    if (in_num <= 0 || !point_touches_artificial_frame(pts[0].x, pts[0].y))
+    {
+        return 0;
+    }
+
+    int prefix_end = 0;
+    while (prefix_end < in_num &&
+           point_touches_artificial_frame(pts[prefix_end].x, pts[prefix_end].y))
+    {
+        ++prefix_end;
+    }
+
+    // 只有“起始贴着图像边界，随后重新回到真实边界”时，才删除这段前缀。
+    if (prefix_end <= 0 || prefix_end >= in_num)
+    {
+        return 0;
+    }
+
+    const int initial_frame_y_span = std::abs(pts[0].y - pts[prefix_end - 1].y);
+    if (initial_frame_y_span >= kInitialFrameWallKeepMaxYSpan)
+    {
+        if (dirs != nullptr)
+        {
+            std::fill_n(dirs, VISION_BOUNDARY_NUM, static_cast<uint8>(255));
+        }
+        *num = 0;
+        return prefix_end;
+    }
+
+    const int remaining = in_num - prefix_end;
+    for (int i = 0; i < remaining; ++i)
+    {
+        pts[i] = pts[i + prefix_end];
+        if (dirs != nullptr)
+        {
+            dirs[i] = dirs[i + prefix_end];
+        }
+    }
+    if (dirs != nullptr)
+    {
+        std::fill_n(dirs + remaining, VISION_BOUNDARY_NUM - remaining, static_cast<uint8>(255));
+    }
+    *num = remaining;
+    return prefix_end;
+}
+
 static int rebuild_boundary_points_from_row_table(const std::array<int, kProcHeight> &border_x,
                                                   maze_point_t *pts,
                                                   int max_pts)
@@ -3118,13 +3196,12 @@ static int rebuild_boundary_points_from_row_table(const std::array<int, kProcHei
     return out_num;
 }
 
-static bool fit_src_boundary_x_by_y_above_corner(const maze_point_t *pts,
-                                                 int num,
-                                                 int corner_y,
-                                                 float *slope,
-                                                 float *intercept)
+static bool fit_src_boundary_slope_by_y_below_corner(const maze_point_t *pts,
+                                                     int num,
+                                                     int corner_y,
+                                                     float *slope)
 {
-    if (pts == nullptr || slope == nullptr || intercept == nullptr || num <= 0)
+    if (pts == nullptr || slope == nullptr || num <= 0)
     {
         return false;
     }
@@ -3136,8 +3213,8 @@ static bool fit_src_boundary_x_by_y_above_corner(const maze_point_t *pts,
     int fit_num = 0;
     for (int i = 0; i < num && fit_num < kCrossLowerFitPointCount; ++i)
     {
-        // 每行数组按 y 从大到小排列；遇到 y < corner_y 后就是角点上方的边界点。
-        if (pts[i].y >= corner_y)
+        // 每行数组按 y 从大到小排列；仅使用角点下方（更靠近车体）的边界点估计方向。
+        if (pts[i].y <= corner_y)
         {
             continue;
         }
@@ -3163,14 +3240,13 @@ static bool fit_src_boundary_x_by_y_above_corner(const maze_point_t *pts,
     }
 
     const double k = (static_cast<double>(fit_num) * sum_yx - sum_y * sum_x) / denom;
-    const double b = (sum_x - k * sum_y) / static_cast<double>(fit_num);
     *slope = static_cast<float>(k);
-    *intercept = static_cast<float>(b);
     return true;
 }
 
 static int extrapolate_cross_lower_boundary_inplace(maze_point_t *pts,
                                                     int num,
+                                                    int corner_x,
                                                     int corner_y,
                                                     int max_pts)
 {
@@ -3180,11 +3256,12 @@ static int extrapolate_cross_lower_boundary_inplace(maze_point_t *pts,
     }
 
     float slope = 0.0f;
-    float intercept = 0.0f;
-    if (!fit_src_boundary_x_by_y_above_corner(pts, num, corner_y, &slope, &intercept))
+    if (!fit_src_boundary_slope_by_y_below_corner(pts, num, corner_y, &slope))
     {
         return num;
     }
+
+    const float intercept = static_cast<float>(corner_x) - slope * static_cast<float>(corner_y);
 
     std::array<int, kProcHeight> border_x{};
     border_x.fill(-1);
@@ -3195,12 +3272,18 @@ static int extrapolate_cross_lower_boundary_inplace(maze_point_t *pts,
         {
             continue;
         }
+        // 角点之后的真实边界不再使用，仅保留角点及其下方边界。
+        if (y < corner_y)
+        {
+            continue;
+        }
         border_x[y] = std::clamp(pts[i].x, 0, kProcWidth - 1);
     }
 
+    border_x[std::clamp(corner_y, 1, kProcHeight - 2)] = std::clamp(corner_x, 0, kProcWidth - 1);
     const int start_y = std::clamp(corner_y, 1, kProcHeight - 2);
     const int end_y = std::clamp(corner_y - kCrossLowerExtrapolateYSpan, 1, kProcHeight - 2);
-    for (int y = start_y; y >= end_y; --y)
+    for (int y = start_y - 1; y >= end_y; --y)
     {
         const int x = static_cast<int>(std::lround(slope * static_cast<float>(y) + intercept));
         border_x[y] = std::clamp(x, 0, kProcWidth - 1);
@@ -3224,6 +3307,7 @@ static void extrapolate_cross_lower_boundaries_if_pair_valid(maze_point_t *left_
     {
         *left_num = extrapolate_cross_lower_boundary_inplace(left_pts,
                                                             *left_num,
+                                                            g_cross_lower_left_corner_x.load(),
                                                             g_cross_lower_left_corner_y.load(),
                                                             max_pts);
     }
@@ -3231,6 +3315,7 @@ static void extrapolate_cross_lower_boundaries_if_pair_valid(maze_point_t *left_
     {
         *right_num = extrapolate_cross_lower_boundary_inplace(right_pts,
                                                              *right_num,
+                                                             g_cross_lower_right_corner_x.load(),
                                                              g_cross_lower_right_corner_y.load(),
                                                              max_pts);
     }
@@ -3716,6 +3801,13 @@ bool vision_image_processor_process_step()
                                                   right_trace_dirs.data(),
                                                   right_trace_num);
 
+        trim_initial_artificial_frame_prefix_inplace(left_trace_pts.data(),
+                                                     left_trace_dirs.data(),
+                                                     &left_trace_num);
+        trim_initial_artificial_frame_prefix_inplace(right_trace_pts.data(),
+                                                     right_trace_dirs.data(),
+                                                     &right_trace_num);
+
         left_num = extract_one_point_per_row_from_contour(left_trace_pts.data(),
                                                           left_trace_num,
                                                           true,
@@ -3725,16 +3817,20 @@ bool vision_image_processor_process_step()
         right_num = extract_one_point_per_row_from_contour(right_trace_pts.data(),
                                                            right_trace_num,
                                                            false,
-                                                           false,
-                                                           right_pts.data(),
-                                                           static_cast<int>(right_pts.size()));
+                                                          false,
+                                                          right_pts.data(),
+                                                          static_cast<int>(right_pts.size()));
 
+        const int left_trimmed_first_frame_touch_index = find_first_artificial_frame_touch_index(left_trace_pts.data(),
+                                                                                                 left_trace_num);
+        const int right_trimmed_first_frame_touch_index = find_first_artificial_frame_touch_index(right_trace_pts.data(),
+                                                                                                   right_trace_num);
         const int left_ipm_trace_num = trace_num_for_ipm_artificial_frame_policy(left_trace_pts.data(),
                                                                                  left_trace_num,
-                                                                                 left_first_frame_touch_index);
+                                                                                 left_trimmed_first_frame_touch_index);
         const int right_ipm_trace_num = trace_num_for_ipm_artificial_frame_policy(right_trace_pts.data(),
                                                                                   right_trace_num,
-                                                                                  right_first_frame_touch_index);
+                                                                                  right_trimmed_first_frame_touch_index);
         left_ipm_num = extract_one_point_per_row_from_contour(left_trace_pts.data(),
                                                               left_ipm_trace_num,
                                                               true,

@@ -212,6 +212,8 @@ typedef struct
     float ipm_boundary_corner_cos_threshold;
     // 角点 NMS 半径（索引半径）。
     int ipm_boundary_corner_nms_radius;
+    // 是否在检测到首个角点后截断其后的边界点。
+    bool ipm_boundary_truncate_at_first_corner_enabled;
     // 直边检测要求的最小边界点数。
     int ipm_boundary_straight_min_points;
     // 直边检测检查窗口长度（从边界起点开始按索引检查）。

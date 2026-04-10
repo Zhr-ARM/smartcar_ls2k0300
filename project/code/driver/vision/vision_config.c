@@ -285,6 +285,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_boundary_corner_cos_threshold = 0.5f,
     // 角点 NMS 半径（索引半径）。
     .ipm_boundary_corner_nms_radius = 3,
+    // 检测到首个角点后是否截断其后的边界。
+    .ipm_boundary_truncate_at_first_corner_enabled = false,
     // 直边检测最小边界点数。
     .ipm_boundary_straight_min_points = 30,
     // 直边检测起始检查窗口长度。
