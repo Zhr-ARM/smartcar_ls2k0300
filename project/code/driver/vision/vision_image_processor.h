@@ -233,6 +233,11 @@ void vision_image_processor_get_cross_lower_corner_state(bool *left_found,
                                                          int *right_x,
                                                          int *right_y,
                                                          bool *pair_valid);
+void vision_image_processor_get_src_circle_feature_state(bool *left_entry,
+                                                         bool *right_entry,
+                                                         bool *exit_clear,
+                                                         bool *left_has_frame_wall,
+                                                         bool *right_has_frame_wall);
 // 逆透视后边界数据（另存，供控制等后续模块使用）
 void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
                                                uint16 **y1, uint16 **y2, uint16 **y3,

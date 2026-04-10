@@ -149,26 +149,47 @@
     const leftGainCount = Number.isFinite(leftGainCountRaw) ? leftGainCountRaw : null;
     const rightLossCount = Number.isFinite(rightLossCountRaw) ? rightLossCountRaw : null;
     const rightGainCount = Number.isFinite(rightGainCountRaw) ? rightGainCountRaw : null;
-    const leftCornerFound = !!(status && status.ipm_left_boundary_corner_found);
-    const rightCornerFound = !!(status && status.ipm_right_boundary_corner_found);
-    const leftStraight = !!(status && status.ipm_left_boundary_straight);
-    const rightStraight = !!(status && status.ipm_right_boundary_straight);
-    const leftCornerPoint = Array.isArray(status && status.ipm_left_boundary_corner_point) ? status.ipm_left_boundary_corner_point : null;
-    const rightCornerPoint = Array.isArray(status && status.ipm_right_boundary_corner_point) ? status.ipm_right_boundary_corner_point : null;
+    const leftCornerFound = !!(status && status.cross_lower_left_corner_found);
+    const rightCornerFound = !!(status && status.cross_lower_right_corner_found);
+    const leftStraight = !leftCornerFound && !toBool(status && status.src_left_trace_has_frame_wall);
+    const rightStraight = !rightCornerFound && !toBool(status && status.src_right_trace_has_frame_wall);
+    const leftCornerPoint = Array.isArray(status && status.cross_lower_left_corner_point) ? status.cross_lower_left_corner_point : null;
+    const rightCornerPoint = Array.isArray(status && status.cross_lower_right_corner_point) ? status.cross_lower_right_corner_point : null;
     const cornerDistance = pointDistance(leftCornerPoint, rightCornerPoint);
+    const leftEntryFeature = toBool(status && status.src_circle_left_entry);
+    const rightEntryFeature = toBool(status && status.src_circle_right_entry);
+    const exitClearFeature = toBool(status && status.src_circle_exit_clear);
+    const leftHasFrameWall = toBool(status && status.src_left_trace_has_frame_wall);
+    const rightHasFrameWall = toBool(status && status.src_right_trace_has_frame_wall);
+
+    function toBool(value) {
+      if (value === true || value === false) return value;
+      const n = Number(value);
+      return Number.isFinite(n) ? n !== 0 : !!value;
+    }
 
     const clues = [];
-    if (leftCornerFound || rightCornerFound) {
-      clues.push(`角点检测：左=${leftCornerFound ? '有' : '无'}，右=${rightCornerFound ? '有' : '无'}`);
-    }
-    if (leftStraight || rightStraight) {
-      clues.push(`直边检测：左=${leftStraight ? '有' : '无'}，右=${rightStraight ? '有' : '无'}`);
-    }
+    clues.push(`原图角点：左=${leftCornerFound ? '有' : '无'}，右=${rightCornerFound ? '有' : '无'}`);
+    clues.push(`边框墙：左=${leftHasFrameWall ? '有' : '无'}，右=${rightHasFrameWall ? '有' : '无'}`);
+    clues.push(`入口特征：左=${leftEntryFeature ? '命中' : '未命中'}，右=${rightEntryFeature ? '命中' : '未命中'}`);
+    clues.push(`出环清空：${exitClearFeature ? '命中' : '未命中'}`);
     if (cornerDistance !== null) {
       clues.push(`双角点距离：${cornerDistance.toFixed(1)} px`);
     }
 
     const judgments = [];
+    let nextStateLabel = '保持当前状态';
+    const nextReasons = [];
+    const conditionLines = [];
+
+    const pushCondition = (label, value, detail) => {
+      conditionLines.push({
+        label,
+        value,
+        detail
+      });
+    };
+
     if (mainState === 0) {
       if (leftCornerFound && rightCornerFound) {
         judgments.push(cornerDistance !== null && cornerDistance < 40
@@ -181,20 +202,90 @@
       } else {
         judgments.push('当前没有同时触发角点与直边的强切换条件，状态机继续留在正常巡线。');
       }
+
+      pushCondition('左环入口特征', leftEntryFeature ? '命中' : '未命中', '单侧角点 + 同侧连续边框墙 + 对侧局部无边框墙');
+      pushCondition('右环入口特征', rightEntryFeature ? '命中' : '未命中', '单侧角点 + 同侧连续边框墙 + 对侧局部无边框墙');
+      pushCondition('双角点交叉候选', (leftCornerFound && rightCornerFound && cornerDistance !== null && cornerDistance < 40) ? '命中' : '未命中', '双侧都检测到角点且距离 < 40');
+
+      if (leftEntryFeature) {
+        nextStateLabel = '左环岛-开始';
+        nextReasons.push('当前滑窗累计左环入口命中时，下一步会进入左环岛开始态。');
+      } else if (rightEntryFeature) {
+        nextStateLabel = '右环岛-开始';
+        nextReasons.push('当前滑窗累计右环入口命中时，下一步会进入右环岛开始态。');
+      } else if (leftCornerFound && rightCornerFound && cornerDistance !== null && cornerDistance < 40) {
+        nextStateLabel = '十字-准备进入';
+        nextReasons.push('双角点距离已压到交叉阈值内。');
+      } else {
+        nextReasons.push('当前入口特征未形成稳定命中，保持正常巡线。');
+      }
     } else if (mainState === 3) {
       if (subState === 1) {
         judgments.push('当前处于 cross_begin：等待任一侧角点原图 y 超过阈值后，下一帧切入 cross_in。');
+        nextStateLabel = '十字-穿越中';
+        nextReasons.push('任一侧角点 y 超过 45 后，从 cross_begin 切到 cross_in。');
+        pushCondition('左角点 y > 45', Number(status && status.cross_lower_left_corner_point && status.cross_lower_left_corner_point[1]) > 45 ? '命中' : '未命中', `当前 y=${Array.isArray(status && status.cross_lower_left_corner_point) ? status.cross_lower_left_corner_point[1] : '--'}`);
+        pushCondition('右角点 y > 45', Number(status && status.cross_lower_right_corner_point && status.cross_lower_right_corner_point[1]) > 45 ? '命中' : '未命中', `当前 y=${Array.isArray(status && status.cross_lower_right_corner_point) ? status.cross_lower_right_corner_point[1] : '--'}`);
       } else if (subState === 2) {
         judgments.push(`当前处于 cross_in：正在按保存起始行向下搜线，当前探测停止行=${crossLossCount !== null ? crossLossCount : -1}（>=80 将退出）。`);
+        nextStateLabel = (crossLossCount !== null && crossLossCount >= 80) ? '正常巡线' : '十字-穿越中';
+        nextReasons.push('cross_detected_stop_row >= 80 时退出十字。');
+        pushCondition('cross_detected_stop_row >= 80', (crossLossCount !== null && crossLossCount >= 80) ? '命中' : '未命中', `当前=${crossLossCount !== null ? crossLossCount : '--'}`);
       } else {
         judgments.push(`交叉口状态下，当前探测停止行为 ${crossLossCount !== null ? crossLossCount : -1}，用于判断何时退出交叉口。`);
+        nextReasons.push('等待 cross_begin / cross_in 细分判据推进。');
       }
     } else if (mainState === 1) {
       judgments.push(`左环岛状态下，优先使用 ${formatRoutePreferredSource(preferredSource)} 构造中线。`);
+      pushCondition('左侧丢线计数', leftLossCount !== null ? leftLossCount : '--', 'BEGIN 阶段需要先累计丢线');
+      pushCondition('左侧恢复计数', leftGainCount !== null ? leftGainCount : '--', 'BEGIN 阶段丢线后重新看到左边界');
+      pushCondition('出环清空特征', exitClearFeature ? '命中' : '未命中', '双侧无角点且双侧无边框墙');
+      if (subState === 3) {
+        nextStateLabel = '左环岛-入环';
+        nextReasons.push('左侧先丢线，再恢复到最少可见点数后，进入入环阶段。');
+      } else if (subState === 4) {
+        nextStateLabel = '左环岛-运行';
+        nextReasons.push('编码器累计超过 40000 后切到运行阶段。');
+        pushCondition('encoder > 40000', encoderSinceEnter !== null && encoderSinceEnter > 40000 ? '命中' : '未命中', `当前=${encoderSinceEnter !== null ? encoderSinceEnter : '--'}`);
+      } else if (subState === 5) {
+        nextStateLabel = '左环岛-出环';
+        nextReasons.push('出环清空特征连续命中后切到出环阶段。');
+      } else if (subState === 6) {
+        nextStateLabel = '左环岛-结束';
+        nextReasons.push('出环清空特征成立时切到结束阶段。');
+      } else if (subState === 7) {
+        nextStateLabel = '正常巡线';
+        nextReasons.push('结束阶段继续命中出环清空特征时回到正常巡线。');
+      } else {
+        nextReasons.push('等待左环内部子状态推进。');
+      }
     } else if (mainState === 2) {
       judgments.push(`右环岛状态下，优先使用 ${formatRoutePreferredSource(preferredSource)} 构造中线。`);
+      pushCondition('右侧丢线计数', rightLossCount !== null ? rightLossCount : '--', 'BEGIN 阶段需要先累计丢线');
+      pushCondition('右侧恢复计数', rightGainCount !== null ? rightGainCount : '--', 'BEGIN 阶段丢线后重新看到右边界');
+      pushCondition('出环清空特征', exitClearFeature ? '命中' : '未命中', '双侧无角点且双侧无边框墙');
+      if (subState === 8) {
+        nextStateLabel = '右环岛-入环';
+        nextReasons.push('右侧先丢线，再恢复到最少可见点数后，进入入环阶段。');
+      } else if (subState === 9) {
+        nextStateLabel = '右环岛-运行';
+        nextReasons.push('编码器累计超过 40000 后切到运行阶段。');
+        pushCondition('encoder > 40000', encoderSinceEnter !== null && encoderSinceEnter > 40000 ? '命中' : '未命中', `当前=${encoderSinceEnter !== null ? encoderSinceEnter : '--'}`);
+      } else if (subState === 10) {
+        nextStateLabel = '右环岛-出环';
+        nextReasons.push('出环清空特征连续命中后切到出环阶段。');
+      } else if (subState === 11) {
+        nextStateLabel = '右环岛-结束';
+        nextReasons.push('出环清空特征成立时切到结束阶段。');
+      } else if (subState === 12) {
+        nextStateLabel = '正常巡线';
+        nextReasons.push('结束阶段继续命中出环清空特征时回到正常巡线。');
+      } else {
+        nextReasons.push('等待右环内部子状态推进。');
+      }
     } else {
       judgments.push('等待状态机首次更新。');
+      nextReasons.push('等待有效状态数据。');
     }
 
     const counters = [
@@ -219,6 +310,9 @@
       rightLossCount,
       rightGainCount,
       cornerDistance,
+      nextStateLabel,
+      nextReasons,
+      conditionLines,
       clues,
       judgments,
       counters

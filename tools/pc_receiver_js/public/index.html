@@ -21,6 +21,12 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
     }
+    .route-state-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
     .route-state-stat {
       background: rgba(15, 23, 42, 0.88);
       border: 1px solid rgba(71, 85, 105, 0.92);
@@ -51,6 +57,37 @@
       color: #dbeafe;
       line-height: 1.55;
       min-height: 52px;
+    }
+    .route-state-block {
+      background: rgba(8, 15, 31, 0.92);
+      border: 1px solid rgba(51, 65, 85, 0.92);
+      border-radius: 12px;
+      padding: 12px 14px;
+      min-height: 132px;
+    }
+    .route-state-block-title {
+      color: #cbd5e1;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .route-state-next {
+      color: #f8fafc;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 8px;
+    }
+    .route-state-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .route-state-line strong {
+      color: #f8fafc;
+      margin-right: 6px;
     }
     .route-state-clues {
       display: flex;
@@ -470,6 +507,17 @@
           </div>
         </div>
         <div class="route-state-judgment" id="routeStateJudgment">waiting...</div>
+        <div class="route-state-grid">
+          <div class="route-state-block">
+            <div class="route-state-block-title">下一步状态</div>
+            <div class="route-state-next" id="routeNextStateValue">--</div>
+            <div class="route-state-lines" id="routeNextReason"></div>
+          </div>
+          <div class="route-state-block">
+            <div class="route-state-block-title">触发条件与当前判定</div>
+            <div class="route-state-lines" id="routeConditionLines"></div>
+          </div>
+        </div>
         <div class="route-state-clues" id="routeStateClues"></div>
         <div class="route-state-counters" id="routeStateCounters"></div>
       </div>
@@ -644,6 +692,9 @@
     const routePreferredSourceValue = document.getElementById('routePreferredSourceValue');
     const routeEncoderValue = document.getElementById('routeEncoderValue');
     const routeStateJudgment = document.getElementById('routeStateJudgment');
+    const routeNextStateValue = document.getElementById('routeNextStateValue');
+    const routeNextReason = document.getElementById('routeNextReason');
+    const routeConditionLines = document.getElementById('routeConditionLines');
     const routeStateClues = document.getElementById('routeStateClues');
     const routeStateCounters = document.getElementById('routeStateCounters');
     const curvatureCard = document.getElementById('curvatureCard');
@@ -852,6 +903,27 @@
       routePreferredSourceValue.textContent = route.preferredSourceLabel || '--';
       routeEncoderValue.textContent = route.encoderSinceEnter !== null ? `${route.encoderSinceEnter}` : '--';
       routeStateJudgment.textContent = route.judgments.length > 0 ? route.judgments.join(' ') : '等待状态机数据...';
+      routeNextStateValue.textContent = route.nextStateLabel || '--';
+
+      routeNextReason.innerHTML = '';
+      const nextReasons = route.nextReasons.length > 0 ? route.nextReasons : ['等待状态机数据...'];
+      for (const text of nextReasons) {
+        const line = document.createElement('div');
+        line.className = 'route-state-line';
+        line.textContent = text;
+        routeNextReason.appendChild(line);
+      }
+
+      routeConditionLines.innerHTML = '';
+      const conditionLines = route.conditionLines.length > 0
+        ? route.conditionLines
+        : [{ label: '判定条件', value: '--', detail: '等待状态机数据...' }];
+      for (const item of conditionLines) {
+        const line = document.createElement('div');
+        line.className = 'route-state-line';
+        line.innerHTML = `<strong>${item.label}</strong>${item.value}${item.detail ? ` | ${item.detail}` : ''}`;
+        routeConditionLines.appendChild(line);
+      }
 
       routeStateClues.innerHTML = '';
       const clues = route.clues.length > 0 ? route.clues : ['暂无可用判定线索'];
@@ -999,24 +1071,6 @@
       pushArray(trackRows, 'eight_left_first_frame_touch_point', status.eight_left_first_frame_touch_point);
       pushArray(trackRows, 'eight_right_first_frame_touch_point', status.eight_right_first_frame_touch_point);
       addSection('巡线跟踪', trackRows);
-
-      const routeRows = [];
-      if (hasValue(status.route_main_state)) {
-        push(routeRows, 'route_main_state', receiverCore.formatRouteMainState(status.route_main_state));
-      }
-      if (hasValue(status.route_sub_state)) {
-        push(routeRows, 'route_sub_state', receiverCore.formatRouteSubState(status.route_sub_state));
-      }
-      if (hasValue(status.route_preferred_source)) {
-        push(routeRows, 'route_preferred_source', receiverCore.formatRoutePreferredSource(status.route_preferred_source));
-      }
-      push(routeRows, 'route_encoder_since_enter', status.route_encoder_since_enter);
-      push(routeRows, 'route_cross_loss_count', status.route_cross_loss_count);
-      push(routeRows, 'route_left_loss_count', status.route_left_loss_count);
-      push(routeRows, 'route_left_gain_count', status.route_left_gain_count);
-      push(routeRows, 'route_right_loss_count', status.route_right_loss_count);
-      push(routeRows, 'route_right_gain_count', status.route_right_gain_count);
-      addSection('状态机', routeRows);
 
       const cornerRows = [];
       push(cornerRows, 'left_boundary_corner_found', status.left_boundary_corner_found);

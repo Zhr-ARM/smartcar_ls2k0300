@@ -642,6 +642,16 @@ static void send_tcp_status()
                                                         &cross_lower_right_x,
                                                         &cross_lower_right_y,
                                                         &cross_lower_pair_valid);
+    bool src_circle_left_entry = false;
+    bool src_circle_right_entry = false;
+    bool src_circle_exit_clear = false;
+    bool src_left_trace_has_frame_wall = false;
+    bool src_right_trace_has_frame_wall = false;
+    vision_image_processor_get_src_circle_feature_state(&src_circle_left_entry,
+                                                        &src_circle_right_entry,
+                                                        &src_circle_exit_clear,
+                                                        &src_left_trace_has_frame_wall,
+                                                        &src_right_trace_has_frame_wall);
     uint16 *ipm_x1 = nullptr;
     uint16 *ipm_x3 = nullptr;
     uint16 *ipm_y1 = nullptr;
@@ -927,6 +937,11 @@ static void send_tcp_status()
     append_int(true, "route_left_gain_count", vision_image_processor_route_left_gain_count());
     append_int(true, "route_right_loss_count", vision_image_processor_route_right_loss_count());
     append_int(true, "route_right_gain_count", vision_image_processor_route_right_gain_count());
+    append_bool(true, "src_circle_left_entry", src_circle_left_entry);
+    append_bool(true, "src_circle_right_entry", src_circle_right_entry);
+    append_bool(true, "src_circle_exit_clear", src_circle_exit_clear);
+    append_bool(true, "src_left_trace_has_frame_wall", src_left_trace_has_frame_wall);
+    append_bool(true, "src_right_trace_has_frame_wall", src_right_trace_has_frame_wall);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_index, "ipm_track_index", ipm_track_index);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_track_point, "ipm_track_point",
                      {ipm_track_x, ipm_track_y});

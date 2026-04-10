@@ -50,6 +50,11 @@ typedef struct
     int right_corner_index;
     bool left_straight;
     bool right_straight;
+    bool left_circle_entry_feature;
+    bool right_circle_entry_feature;
+    bool circle_exit_clear_feature;
+    bool left_has_frame_wall;
+    bool right_has_frame_wall;
     int cross_detected_stop_row;
     int left_boundary_count;
     int right_boundary_count;
