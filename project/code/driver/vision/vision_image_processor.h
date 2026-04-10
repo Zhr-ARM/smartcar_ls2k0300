@@ -34,6 +34,12 @@ typedef enum
     VISION_IPM_LINE_ERROR_SPEED_INDEX = 2
 } vision_ipm_line_error_method_enum;
 
+typedef enum
+{
+    VISION_TRACE_METHOD_MAZE = 0,
+    VISION_TRACE_METHOD_EIGHT_NEIGHBOR = 1
+} vision_trace_method_enum;
+
 // 作用：初始化图像处理模块（内部通过 vision_frame_capture 初始化采图）。
 // 参数：camera_path 为空时使用默认相机路径。
 // 是否调用：是，vision_pipeline_init 调用。
@@ -55,6 +61,11 @@ uint32 vision_image_processor_processed_frame_seq();
 // 是否调用：是，main.cpp 启动时配置。
 void vision_image_processor_set_maze_start_row(int row);
 int vision_image_processor_get_maze_start_row();
+// 原图边界追踪方法：
+// - VISION_TRACE_METHOD_MAZE: 当前默认的左手/右手迷宫法；
+// - VISION_TRACE_METHOD_EIGHT_NEIGHBOR: 基于 8 邻域的边界跟踪。
+void vision_image_processor_set_trace_method(vision_trace_method_enum method);
+vision_trace_method_enum vision_image_processor_trace_method();
 // 原图迷宫法巡线水平区间限制（包含边界）。
 // 约定：巡线起点搜索和左右手追踪都只能在 [x_min, x_max] 内进行；
 // 一旦下一步触碰到区间边界，就立即停止巡线，避免去畸变黑边干扰。

@@ -205,6 +205,7 @@ static int g_cross_in_saved_center_x = -1;
 
 // 迷宫法起始搜索行（可运行时配置）。
 static std::atomic<int> g_maze_start_row(g_vision_runtime_config.maze_start_row);
+static std::atomic<int> g_maze_trace_method(g_vision_runtime_config.maze_trace_method);
 static std::atomic<int> g_maze_trace_y_fallback_stop_delta(g_vision_runtime_config.maze_trace_y_fallback_stop_delta);
 static std::atomic<int> g_maze_trace_x_min(g_vision_processor_config.default_maze_trace_x_min);
 static std::atomic<int> g_maze_trace_x_max(g_vision_processor_config.default_maze_trace_x_max);
@@ -271,6 +272,37 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
                                      int *start_y,
                                      bool *wall_is_white,
                                      int preferred_center_x);
+static int trace_boundary_eight_neighbor(const uint8 *classify_img,
+                                         uint8 white_threshold,
+                                         bool wall_is_white,
+                                         int start_x,
+                                         int start_y,
+                                         int y_min,
+                                         int x_min,
+                                         int x_max,
+                                         bool prefer_left_bias,
+                                         maze_point_t *pts,
+                                         int max_pts);
+static int trace_left_boundary_selected_method(const uint8 *classify_img,
+                                               uint8 white_threshold,
+                                               bool wall_is_white,
+                                               int start_x,
+                                               int start_y,
+                                               int y_min,
+                                               int x_min,
+                                               int x_max,
+                                               maze_point_t *pts,
+                                               int max_pts);
+static int trace_right_boundary_selected_method(const uint8 *classify_img,
+                                                uint8 white_threshold,
+                                                bool wall_is_white,
+                                                int start_x,
+                                                int start_y,
+                                                int y_min,
+                                                int x_min,
+                                                int x_max,
+                                                maze_point_t *pts,
+                                                int max_pts);
 static void validate_maze_start_pair(const uint8 *classify_img,
                                      uint8 white_threshold,
                                      int x_min,
@@ -305,6 +337,18 @@ static constexpr int kDirFrontRight[4][2] = {
     {-1, 1},
     {-1, -1}
 };
+static constexpr int kDir8[8][2] = {
+    {0, -1},
+    {1, -1},
+    {1, 0},
+    {1, 1},
+    {0, 1},
+    {-1, 1},
+    {-1, 0},
+    {-1, -1}
+};
+static constexpr int kEightNeighborLeftPriority[8] = {7, 0, 1, 6, 2, 5, 4, 3};
+static constexpr int kEightNeighborRightPriority[8] = {1, 0, 7, 2, 6, 3, 4, 5};
 
 static void get_maze_trace_x_range_clamped(int *x_min, int *x_max)
 {
@@ -2409,6 +2453,225 @@ static int maze_trace_right_hand(const uint8 *classify_img,
     return step;
 }
 
+static inline bool pixel_is_path(const uint8 *img, int x, int y, uint8 white_threshold, bool wall_is_white)
+{
+    return !pixel_is_wall(img, x, y, white_threshold, wall_is_white);
+}
+
+static bool eight_neighbor_boundary_candidate(const uint8 *classify_img,
+                                              uint8 white_threshold,
+                                              bool wall_is_white,
+                                              int x,
+                                              int y,
+                                              int y_min,
+                                              int x_min,
+                                              int x_max)
+{
+    if (classify_img == nullptr || x <= x_min || x >= x_max || y <= 0 || y >= (kProcHeight - 1) || y < y_min)
+    {
+        return false;
+    }
+    if (!pixel_is_path(classify_img, x, y, white_threshold, wall_is_white))
+    {
+        return false;
+    }
+
+    for (int i = 0; i < 8; ++i)
+    {
+        const int nx = x + kDir8[i][0];
+        const int ny = y + kDir8[i][1];
+        if (nx < 0 || nx >= kProcWidth || ny < 0 || ny >= kProcHeight)
+        {
+            continue;
+        }
+        if (pixel_is_wall(classify_img, nx, ny, white_threshold, wall_is_white))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+static int trace_boundary_eight_neighbor(const uint8 *classify_img,
+                                         uint8 white_threshold,
+                                         bool wall_is_white,
+                                         int start_x,
+                                         int start_y,
+                                         int y_min,
+                                         int x_min,
+                                         int x_max,
+                                         bool prefer_left_bias,
+                                         maze_point_t *pts,
+                                         int max_pts)
+{
+    if (classify_img == nullptr || pts == nullptr || max_pts <= 0 || start_x <= x_min || start_x >= x_max)
+    {
+        return 0;
+    }
+
+    if (!eight_neighbor_boundary_candidate(classify_img,
+                                           white_threshold,
+                                           wall_is_white,
+                                           start_x,
+                                           start_y,
+                                           y_min,
+                                           x_min,
+                                           x_max))
+    {
+        return 0;
+    }
+
+    std::array<uint8, kProcWidth * kProcHeight> visited{};
+    int x = start_x;
+    int y = start_y;
+    int min_y_seen = start_y;
+    const int y_fallback_stop_delta = std::max(0, g_maze_trace_y_fallback_stop_delta.load());
+    const int *priority = prefer_left_bias ? kEightNeighborLeftPriority : kEightNeighborRightPriority;
+    int step = 0;
+
+    while (step < max_pts &&
+           x > x_min && x < x_max &&
+           y > 0 && y < (kProcHeight - 1) &&
+           y >= y_min)
+    {
+        const int index = y * kProcWidth + x;
+        if (visited[index] != 0)
+        {
+            break;
+        }
+        visited[index] = 1;
+        pts[step++] = {x, y};
+
+        int best_dir = -1;
+        int best_score = std::numeric_limits<int>::max();
+        for (int order = 0; order < 8; ++order)
+        {
+            const int dir = priority[order];
+            const int nx = x + kDir8[dir][0];
+            const int ny = y + kDir8[dir][1];
+            if (!eight_neighbor_boundary_candidate(classify_img,
+                                                   white_threshold,
+                                                   wall_is_white,
+                                                   nx,
+                                                   ny,
+                                                   y_min,
+                                                   x_min,
+                                                   x_max))
+            {
+                continue;
+            }
+            if (visited[ny * kProcWidth + nx] != 0)
+            {
+                continue;
+            }
+
+            const int dy_penalty = std::max(0, ny - y) * 10;
+            const int lateral_penalty = prefer_left_bias ? std::max(0, nx - x) : std::max(0, x - nx);
+            const int score = dy_penalty + lateral_penalty + order;
+            if (score < best_score)
+            {
+                best_score = score;
+                best_dir = dir;
+            }
+        }
+
+        if (best_dir < 0)
+        {
+            break;
+        }
+
+        x += kDir8[best_dir][0];
+        y += kDir8[best_dir][1];
+        min_y_seen = std::min(min_y_seen, y);
+        if (y > min_y_seen + y_fallback_stop_delta)
+        {
+            break;
+        }
+    }
+
+    return step;
+}
+
+static int trace_left_boundary_selected_method(const uint8 *classify_img,
+                                               uint8 white_threshold,
+                                               bool wall_is_white,
+                                               int start_x,
+                                               int start_y,
+                                               int y_min,
+                                               int x_min,
+                                               int x_max,
+                                               maze_point_t *pts,
+                                               int max_pts)
+{
+    const vision_trace_method_enum method =
+        static_cast<vision_trace_method_enum>(g_maze_trace_method.load());
+    if (method == VISION_TRACE_METHOD_EIGHT_NEIGHBOR)
+    {
+        return trace_boundary_eight_neighbor(classify_img,
+                                             white_threshold,
+                                             wall_is_white,
+                                             start_x,
+                                             start_y,
+                                             y_min,
+                                             x_min,
+                                             x_max,
+                                             true,
+                                             pts,
+                                             max_pts);
+    }
+
+    return maze_trace_left_hand(classify_img,
+                                white_threshold,
+                                wall_is_white,
+                                start_x,
+                                start_y,
+                                y_min,
+                                x_min,
+                                x_max,
+                                pts,
+                                max_pts);
+}
+
+static int trace_right_boundary_selected_method(const uint8 *classify_img,
+                                                uint8 white_threshold,
+                                                bool wall_is_white,
+                                                int start_x,
+                                                int start_y,
+                                                int y_min,
+                                                int x_min,
+                                                int x_max,
+                                                maze_point_t *pts,
+                                                int max_pts)
+{
+    const vision_trace_method_enum method =
+        static_cast<vision_trace_method_enum>(g_maze_trace_method.load());
+    if (method == VISION_TRACE_METHOD_EIGHT_NEIGHBOR)
+    {
+        return trace_boundary_eight_neighbor(classify_img,
+                                             white_threshold,
+                                             wall_is_white,
+                                             start_x,
+                                             start_y,
+                                             y_min,
+                                             x_min,
+                                             x_max,
+                                             false,
+                                             pts,
+                                             max_pts);
+    }
+
+    return maze_trace_right_hand(classify_img,
+                                 white_threshold,
+                                 wall_is_white,
+                                 start_x,
+                                 start_y,
+                                 y_min,
+                                 x_min,
+                                 x_max,
+                                 pts,
+                                 max_pts);
+}
+
 static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
                                            int left_num,
                                            const maze_point_t *right_pts,
@@ -2810,31 +3073,31 @@ bool vision_image_processor_process_step()
     if (left_ok)
     {
         const int left_max_pts = std::min(static_cast<int>(left_pts.size()), g_vision_processor_config.maze_trace_max_points);
-        left_num = maze_trace_left_hand(classify_img,
-                                        classify_white_threshold,
-                                        left_wall_is_white,
-                                        left_start_x,
-                                        left_start_y,
-                                        y_min,
-                                        maze_trace_x_min,
-                                        maze_trace_x_max,
-                                        left_pts.data(),
-                                        left_max_pts);
+        left_num = trace_left_boundary_selected_method(classify_img,
+                                                       classify_white_threshold,
+                                                       left_wall_is_white,
+                                                       left_start_x,
+                                                       left_start_y,
+                                                       y_min,
+                                                       maze_trace_x_min,
+                                                       maze_trace_x_max,
+                                                       left_pts.data(),
+                                                       left_max_pts);
     }
     auto t_maze_left_trace_end = std::chrono::steady_clock::now();
     if (right_ok)
     {
         const int right_max_pts = std::min(static_cast<int>(right_pts.size()), g_vision_processor_config.maze_trace_max_points);
-        right_num = maze_trace_right_hand(classify_img,
-                                          classify_white_threshold,
-                                          right_wall_is_white,
-                                          right_start_x,
-                                          right_start_y,
-                                          y_min,
-                                          maze_trace_x_min,
-                                          maze_trace_x_max,
-                                          right_pts.data(),
-                                          right_max_pts);
+        right_num = trace_right_boundary_selected_method(classify_img,
+                                                         classify_white_threshold,
+                                                         right_wall_is_white,
+                                                         right_start_x,
+                                                         right_start_y,
+                                                         y_min,
+                                                         maze_trace_x_min,
+                                                         maze_trace_x_max,
+                                                         right_pts.data(),
+                                                         right_max_pts);
     }
 
     if (left_ok && right_ok)
@@ -2947,6 +3210,21 @@ void vision_image_processor_set_maze_start_row(int row)
 int vision_image_processor_get_maze_start_row()
 {
     return g_maze_start_row.load();
+}
+
+void vision_image_processor_set_trace_method(vision_trace_method_enum method)
+{
+    const int method_value = (method == VISION_TRACE_METHOD_EIGHT_NEIGHBOR)
+                                 ? static_cast<int>(VISION_TRACE_METHOD_EIGHT_NEIGHBOR)
+                                 : static_cast<int>(VISION_TRACE_METHOD_MAZE);
+    g_maze_trace_method.store(method_value);
+}
+
+vision_trace_method_enum vision_image_processor_trace_method()
+{
+    return (g_maze_trace_method.load() == static_cast<int>(VISION_TRACE_METHOD_EIGHT_NEIGHBOR))
+               ? VISION_TRACE_METHOD_EIGHT_NEIGHBOR
+               : VISION_TRACE_METHOD_MAZE;
 }
 
 void vision_image_processor_set_maze_trace_x_range(int x_min, int x_max)

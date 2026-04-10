@@ -1,4 +1,5 @@
 #include "driver/vision/vision_route_state_machine.h"
+#include "driver/vision/vision_config.h"
 
 #include <algorithm>
 #include <cmath>
@@ -199,7 +200,7 @@ static void step_circle_left(const vision_route_state_input_t &input)
         case VISION_ROUTE_SUB_CIRCLE_LEFT_IN:
             g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_LEFT;
             g_encoder_since_state_enter += input.frame_encoder_delta;
-            if (g_encoder_since_state_enter > kCircleEncoderSwitchThreshold || left_count <= kCircleEdgeVisibleMinCount)
+            if (g_encoder_since_state_enter > kCircleEncoderSwitchThreshold)
             {
                 g_sub_state = VISION_ROUTE_SUB_CIRCLE_LEFT_RUNNING;
                 g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_RIGHT;
@@ -284,7 +285,7 @@ static void step_circle_right(const vision_route_state_input_t &input)
         case VISION_ROUTE_SUB_CIRCLE_RIGHT_IN:
             g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_RIGHT;
             g_encoder_since_state_enter += input.frame_encoder_delta;
-            if (g_encoder_since_state_enter > kCircleEncoderSwitchThreshold || right_count <= kCircleEdgeVisibleMinCount)
+            if (g_encoder_since_state_enter > kCircleEncoderSwitchThreshold)
             {
                 g_sub_state = VISION_ROUTE_SUB_CIRCLE_RIGHT_RUNNING;
                 g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_LEFT;
@@ -365,9 +366,24 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
     const bool left_corner_valid = left_corner_found && corner_index_valid(input->left_corner_index);
     const bool right_corner_valid = right_corner_found && corner_index_valid(input->right_corner_index);
     const bool both_straight = input->left_straight && input->right_straight;
+    const bool cross_detection_enabled = g_vision_runtime_config.route_cross_detection_enabled;
+    const bool circle_detection_enabled = g_vision_runtime_config.route_circle_detection_enabled;
     const int corner_distance = corner_distance_px(*input);
     const bool left_circle_entry_hit = left_corner_valid && input->right_straight;
     const bool right_circle_entry_hit = right_corner_valid && input->left_straight;
+
+    if (!cross_detection_enabled && g_main_state == VISION_ROUTE_MAIN_CROSS)
+    {
+        enter_main_state(VISION_ROUTE_MAIN_NORMAL, VISION_ROUTE_SUB_NONE, input->base_preferred_source);
+        return;
+    }
+
+    if (!circle_detection_enabled &&
+        (g_main_state == VISION_ROUTE_MAIN_CIRCLE_LEFT || g_main_state == VISION_ROUTE_MAIN_CIRCLE_RIGHT))
+    {
+        enter_main_state(VISION_ROUTE_MAIN_NORMAL, VISION_ROUTE_SUB_NONE, input->base_preferred_source);
+        return;
+    }
 
     if (both_straight)
     {
@@ -402,19 +418,22 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
                               g_right_circle_entry_window,
                               right_circle_entry_hit);
 
-        if (left_corner_valid && right_corner_valid && corner_distance < kCrossCornerDistanceThreshold)
+        if (cross_detection_enabled &&
+            left_corner_valid &&
+            right_corner_valid &&
+            corner_distance < kCrossCornerDistanceThreshold)
         {
             enter_main_state(VISION_ROUTE_MAIN_CROSS, VISION_ROUTE_SUB_CROSS_BEGIN, input->base_preferred_source);
             return;
         }
 
-        if (g_left_circle_entry_window >= kCircleEntryHitThreshold)
+        if (circle_detection_enabled && g_left_circle_entry_window >= kCircleEntryHitThreshold)
         {
             set_circle_left_state(VISION_ROUTE_SUB_CIRCLE_LEFT_BEGIN, VISION_ROUTE_PREFERRED_SOURCE_RIGHT);
             return;
         }
 
-        if (g_right_circle_entry_window >= kCircleEntryHitThreshold)
+        if (circle_detection_enabled && g_right_circle_entry_window >= kCircleEntryHitThreshold)
         {
             set_circle_right_state(VISION_ROUTE_SUB_CIRCLE_RIGHT_BEGIN, VISION_ROUTE_PREFERRED_SOURCE_LEFT);
             return;

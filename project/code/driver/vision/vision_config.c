@@ -241,6 +241,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .roi_capture_mode = false,
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
     .maze_start_row = 85,
+    // 原图巡线方法：0=迷宫法，1=八邻域法。
+    .maze_trace_method = 1,
     // 迷宫法巡线回退停止阈值（y > min_y + 阈值即停）。
     .maze_trace_y_fallback_stop_delta = 15,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
@@ -288,6 +290,10 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_centerline_curvature_step = 3,
     // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。
     .keep_last_centerline_on_double_loss = true,
+    // 状态机十字识别开关。
+    .route_cross_detection_enabled = false,
+    // 状态机圆环识别开关。
+    .route_circle_detection_enabled = true,
     // ==================== 参数区域 2: 偏差计算 ====================
     // 说明：line_error 取点参数集中在这里。
     // line_error 平移中线偏好源：0=偏好左，1=偏好右，2=无偏好(自动按边界点数)。

@@ -167,6 +167,8 @@ typedef struct
     bool roi_capture_mode;
     // 迷宫法左右起点搜索行，固定单行搜索。
     int maze_start_row;
+    // 原图巡线方法：0=迷宫法，1=八邻域法。
+    int maze_trace_method;
     // 迷宫法巡线回退停止阈值：若后续 y > 当前最小 y + 阈值，则停止巡线。
     int maze_trace_y_fallback_stop_delta;
     // 去畸变开关：true=开启去畸变，false=关闭去畸变直通原图。
@@ -216,6 +218,10 @@ typedef struct
     int ipm_centerline_curvature_step;
     // 双边都丢线时是否保持上一帧平移中线数组。
     bool keep_last_centerline_on_double_loss;
+    // 状态机十字识别开关：true=允许进入十字状态，false=禁用十字识别。
+    bool route_cross_detection_enabled;
+    // 状态机圆环识别开关：true=允许进入圆环状态，false=禁用圆环识别。
+    bool route_circle_detection_enabled;
 
     // ==================== 参数区域 2: 偏差计算 ====================
     // 包括 line_error 取点策略与索引范围约束参数。
