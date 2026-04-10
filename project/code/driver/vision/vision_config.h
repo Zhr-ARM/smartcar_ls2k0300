@@ -189,6 +189,8 @@ typedef struct
     int cross_lower_corner_post_max_dir3_count;
     // 十字下角点识别：左右候选角点 y 坐标最大允许差，超出则双边稳定标志无效。
     int cross_lower_corner_pair_y_diff_max;
+    // 十字补线触发的下角点最小 y 阈值，只有角点 y 严格大于该值才补线。
+    int cross_lower_corner_extrapolate_min_y;
     // 去畸变开关：true=开启去畸变，false=关闭去畸变直通原图。
     bool undistort_enabled;
     // ---------- 边界双处理流水线：共同预处理 ----------

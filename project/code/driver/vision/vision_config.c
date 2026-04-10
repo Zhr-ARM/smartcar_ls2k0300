@@ -252,17 +252,19 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 后平台窗口：检测十字下角点后，要求后续一段主要由 dir=2 组成。
     .cross_lower_corner_post_window = 8,
     // 前平台最少票数：8 个点里至少 6 个为 4/5，允许 5 中混入 4。
-    .cross_lower_corner_pre_min_votes = 6,
+    .cross_lower_corner_pre_min_votes = 5,
     // 后平台最少票数：8 个点里至少 6 个为 2。
-    .cross_lower_corner_post_min_votes = 6,
+    .cross_lower_corner_post_min_votes = 5,
     // 最大过渡长度：允许 {4,5} 与 2 之间存在很短的过渡平台。
     .cross_lower_corner_transition_max_len = 4,
     // 过渡区最大 dir=3 数量：容忍短 3 平台，但过滤长 3 平台误判。
     .cross_lower_corner_transition_max_dir3_count = 3,
     // 后平台窗口最大 dir=3 数量：限制 2 平台内频繁夹 3 的弯道误判。
-    .cross_lower_corner_post_max_dir3_count = 1,
+    .cross_lower_corner_post_max_dir3_count = 3,
     // 左右下角点 y 坐标最大差值：用于判断双下角点是否稳定同时成立。
     .cross_lower_corner_pair_y_diff_max = 30,
+    // 十字补线触发的下角点最小 y 阈值。
+    .cross_lower_corner_extrapolate_min_y = 35,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = false,
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -286,7 +288,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 角点 NMS 半径（索引半径）。
     .ipm_boundary_corner_nms_radius = 3,
     // 检测到首个角点后是否截断其后的边界。
-    .ipm_boundary_truncate_at_first_corner_enabled = false,
+    .ipm_boundary_truncate_at_first_corner_enabled = true,
     // 直边检测最小边界点数。
     .ipm_boundary_straight_min_points = 30,
     // 直边检测起始检查窗口长度。

@@ -159,7 +159,7 @@ inline constexpr Profile make_normal_profile()
 {
     Profile profile{};
 
-    profile.base_speed = 200.0f; // NORMAL 档基础速度：直道默认按 300 count/5ms 行驶。
+    profile.base_speed = 250.0f; // NORMAL 档基础速度：直道默认按 300 count/5ms 行驶。
     profile.straight_full_speed_error_threshold_px = 1.0f; // NORMAL 档直道满速阈值：整条路径均值误差小于 1px 才允许直通满速。
 
     profile.position_dynamic_kp_quad_a = 6000.0f; // NORMAL 档位置环动态Kp二次项：误差越大，Kp 增长越快。

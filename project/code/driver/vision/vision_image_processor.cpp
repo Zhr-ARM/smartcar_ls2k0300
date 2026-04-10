@@ -372,6 +372,11 @@ static void validate_maze_start_pair(const uint8 *classify_img,
                                      bool *right_ok,
                                      int right_start_x,
                                      int right_start_y);
+static int truncate_boundary_at_cross_lower_corner_inplace(maze_point_t *pts,
+                                                           int num,
+                                                           int corner_x,
+                                                           int corner_y,
+                                                           int max_pts);
 
 /* 前进方向定义：
  *   0
@@ -3263,6 +3268,46 @@ static int extrapolate_cross_lower_boundary_inplace(maze_point_t *pts,
 
     const float intercept = static_cast<float>(corner_x) - slope * static_cast<float>(corner_y);
 
+    num = truncate_boundary_at_cross_lower_corner_inplace(pts, num, corner_x, corner_y, max_pts);
+    if (num <= 0)
+    {
+        return num;
+    }
+
+    std::array<int, kProcHeight> border_x{};
+    border_x.fill(-1);
+    for (int i = 0; i < num; ++i)
+    {
+        const int y = std::clamp(pts[i].y, 0, kProcHeight - 1);
+        if (y <= 0 || y >= kProcHeight - 1)
+        {
+            continue;
+        }
+        border_x[y] = std::clamp(pts[i].x, 0, kProcWidth - 1);
+    }
+
+    const int start_y = std::clamp(corner_y, 1, kProcHeight - 2);
+    const int end_y = std::clamp(corner_y - kCrossLowerExtrapolateYSpan, 1, kProcHeight - 2);
+    for (int y = start_y - 1; y >= end_y; --y)
+    {
+        const int x = static_cast<int>(std::lround(slope * static_cast<float>(y) + intercept));
+        border_x[y] = std::clamp(x, 0, kProcWidth - 1);
+    }
+
+    return rebuild_boundary_points_from_row_table(border_x, pts, std::min(max_pts, VISION_BOUNDARY_NUM));
+}
+
+static int truncate_boundary_at_cross_lower_corner_inplace(maze_point_t *pts,
+                                                           int num,
+                                                           int corner_x,
+                                                           int corner_y,
+                                                           int max_pts)
+{
+    if (pts == nullptr || num <= 0 || max_pts <= 0)
+    {
+        return num;
+    }
+
     std::array<int, kProcHeight> border_x{};
     border_x.fill(-1);
     for (int i = 0; i < num; ++i)
@@ -3281,14 +3326,6 @@ static int extrapolate_cross_lower_boundary_inplace(maze_point_t *pts,
     }
 
     border_x[std::clamp(corner_y, 1, kProcHeight - 2)] = std::clamp(corner_x, 0, kProcWidth - 1);
-    const int start_y = std::clamp(corner_y, 1, kProcHeight - 2);
-    const int end_y = std::clamp(corner_y - kCrossLowerExtrapolateYSpan, 1, kProcHeight - 2);
-    for (int y = start_y - 1; y >= end_y; --y)
-    {
-        const int x = static_cast<int>(std::lround(slope * static_cast<float>(y) + intercept));
-        border_x[y] = std::clamp(x, 0, kProcWidth - 1);
-    }
-
     return rebuild_boundary_points_from_row_table(border_x, pts, std::min(max_pts, VISION_BOUNDARY_NUM));
 }
 
@@ -3298,12 +3335,20 @@ static void extrapolate_cross_lower_boundaries_if_pair_valid(maze_point_t *left_
                                                             int *right_num,
                                                             int max_pts)
 {
-    if (!g_cross_lower_corner_pair_valid.load() || left_num == nullptr || right_num == nullptr)
+    if (left_num == nullptr || right_num == nullptr)
     {
         return;
     }
 
-    if (left_pts != nullptr && *left_num > 0)
+    const int extrapolate_min_y = g_vision_runtime_config.cross_lower_corner_extrapolate_min_y;
+    const bool left_corner_valid =
+        g_cross_lower_left_corner_found.load() &&
+        (g_cross_lower_left_corner_y.load() > extrapolate_min_y);
+    const bool right_corner_valid =
+        g_cross_lower_right_corner_found.load() &&
+        (g_cross_lower_right_corner_y.load() > extrapolate_min_y);
+
+    if (left_corner_valid && left_pts != nullptr && *left_num > 0)
     {
         *left_num = extrapolate_cross_lower_boundary_inplace(left_pts,
                                                             *left_num,
@@ -3311,7 +3356,7 @@ static void extrapolate_cross_lower_boundaries_if_pair_valid(maze_point_t *left_
                                                             g_cross_lower_left_corner_y.load(),
                                                             max_pts);
     }
-    if (right_pts != nullptr && *right_num > 0)
+    if (right_corner_valid && right_pts != nullptr && *right_num > 0)
     {
         *right_num = extrapolate_cross_lower_boundary_inplace(right_pts,
                                                              *right_num,
@@ -3794,12 +3839,6 @@ bool vision_image_processor_process_step()
                                         right_trace_dirs.data(),
                                         right_trace_num,
                                         right_first_frame_touch_index);
-        update_cross_lower_corner_detection_cache(left_trace_pts.data(),
-                                                  left_trace_dirs.data(),
-                                                  left_trace_num,
-                                                  right_trace_pts.data(),
-                                                  right_trace_dirs.data(),
-                                                  right_trace_num);
 
         trim_initial_artificial_frame_prefix_inplace(left_trace_pts.data(),
                                                      left_trace_dirs.data(),
@@ -3807,6 +3846,22 @@ bool vision_image_processor_process_step()
         trim_initial_artificial_frame_prefix_inplace(right_trace_pts.data(),
                                                      right_trace_dirs.data(),
                                                      &right_trace_num);
+        const int left_trimmed_first_frame_touch_index = find_first_artificial_frame_touch_index(left_trace_pts.data(),
+                                                                                                 left_trace_num);
+        const int right_trimmed_first_frame_touch_index = find_first_artificial_frame_touch_index(right_trace_pts.data(),
+                                                                                                   right_trace_num);
+        const int left_corner_trace_num = trace_num_for_ipm_artificial_frame_policy(left_trace_pts.data(),
+                                                                                    left_trace_num,
+                                                                                    left_trimmed_first_frame_touch_index);
+        const int right_corner_trace_num = trace_num_for_ipm_artificial_frame_policy(right_trace_pts.data(),
+                                                                                     right_trace_num,
+                                                                                     right_trimmed_first_frame_touch_index);
+        update_cross_lower_corner_detection_cache(left_trace_pts.data(),
+                                                  left_trace_dirs.data(),
+                                                  left_corner_trace_num,
+                                                  right_trace_pts.data(),
+                                                  right_trace_dirs.data(),
+                                                  right_corner_trace_num);
 
         left_num = extract_one_point_per_row_from_contour(left_trace_pts.data(),
                                                           left_trace_num,
@@ -3821,10 +3876,6 @@ bool vision_image_processor_process_step()
                                                           right_pts.data(),
                                                           static_cast<int>(right_pts.size()));
 
-        const int left_trimmed_first_frame_touch_index = find_first_artificial_frame_touch_index(left_trace_pts.data(),
-                                                                                                 left_trace_num);
-        const int right_trimmed_first_frame_touch_index = find_first_artificial_frame_touch_index(right_trace_pts.data(),
-                                                                                                   right_trace_num);
         const int left_ipm_trace_num = trace_num_for_ipm_artificial_frame_policy(left_trace_pts.data(),
                                                                                  left_trace_num,
                                                                                  left_trimmed_first_frame_touch_index);
@@ -3843,6 +3894,32 @@ bool vision_image_processor_process_step()
                                                                true,
                                                                right_ipm_pts.data(),
                                                                static_cast<int>(right_ipm_pts.size()));
+        if (g_cross_lower_left_corner_found.load())
+        {
+            left_num = truncate_boundary_at_cross_lower_corner_inplace(left_pts.data(),
+                                                                       left_num,
+                                                                       g_cross_lower_left_corner_x.load(),
+                                                                       g_cross_lower_left_corner_y.load(),
+                                                                       static_cast<int>(left_pts.size()));
+            left_ipm_num = truncate_boundary_at_cross_lower_corner_inplace(left_ipm_pts.data(),
+                                                                           left_ipm_num,
+                                                                           g_cross_lower_left_corner_x.load(),
+                                                                           g_cross_lower_left_corner_y.load(),
+                                                                           static_cast<int>(left_ipm_pts.size()));
+        }
+        if (g_cross_lower_right_corner_found.load())
+        {
+            right_num = truncate_boundary_at_cross_lower_corner_inplace(right_pts.data(),
+                                                                        right_num,
+                                                                        g_cross_lower_right_corner_x.load(),
+                                                                        g_cross_lower_right_corner_y.load(),
+                                                                        static_cast<int>(right_pts.size()));
+            right_ipm_num = truncate_boundary_at_cross_lower_corner_inplace(right_ipm_pts.data(),
+                                                                            right_ipm_num,
+                                                                            g_cross_lower_right_corner_x.load(),
+                                                                            g_cross_lower_right_corner_y.load(),
+                                                                            static_cast<int>(right_ipm_pts.size()));
+        }
         extrapolate_cross_lower_boundaries_if_pair_valid(left_pts.data(),
                                                          &left_num,
                                                          right_pts.data(),
