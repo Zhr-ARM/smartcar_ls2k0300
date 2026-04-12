@@ -243,13 +243,14 @@ const pid_tuning::route_line_follow::Profile &select_route_line_follow_profile(i
 }
 
 void configure_line_follow_controllers_for_profile(const pid_tuning::route_line_follow::Profile &profile,
-                                                   float position_kp)
+                                                   float position_kp,
+                                                   float yaw_rate_kp)
 {
     position_pid1.set_params(position_kp, profile.position_ki, profile.position_kd);
     position_pid1.set_integral_limit(profile.position_max_integral);
     position_pid1.set_output_limit(profile.position_max_output);
 
-    position_pid2.set_params(profile.yaw_rate_kp, profile.yaw_rate_ki, profile.yaw_rate_kd);
+    position_pid2.set_params(yaw_rate_kp, profile.yaw_rate_ki, profile.yaw_rate_kd);
     position_pid2.set_integral_limit(profile.yaw_rate_max_integral);
     position_pid2.set_output_limit(profile.yaw_rate_max_output);
 }
@@ -539,7 +540,31 @@ void line_follow_loop()
             dynamic_kp_unclamped,
             route_profile.position_dynamic_kp_min,
             route_profile.position_dynamic_kp_max);
-        configure_line_follow_controllers_for_profile(route_profile, dynamic_kp);
+
+        // 第二条支路：角速度环 PID。
+        // 当前固定采用“跟踪点夹角 -> 目标横摆角速度”的路线：
+        // 1) 跟踪点偏角负责告诉车头“该往哪边、该多快转”；
+        // 2) IMU 负责反馈“车身现在实际转了多少”；
+        // 3) 角速度环去逼近这个由夹角生成的目标横摆角速度。
+        // 这样位置环和角速度环职责更清楚：位置环回中线，角速度环管车头朝向。
+        float yaw_rate_ref_dps = 0.0f;
+        yaw_rate_ref_dps = std::clamp(
+            g_filtered_track_point_angle_deg * route_profile.yaw_rate_ref_from_track_point_gain_dps,
+            -route_profile.yaw_rate_ref_limit_dps,
+            route_profile.yaw_rate_ref_limit_dps);
+        //角速度的差
+        const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 目标角速度与实际角速度之差
+        const float yaw_rate_error_norm =
+            yaw_rate_error_dps / std::max(route_profile.yaw_rate_ref_limit_dps, 1.0f);
+        const float yaw_rate_error_sq = yaw_rate_error_norm * yaw_rate_error_norm;
+        const float dynamic_yaw_rate_kp_unclamped =
+            route_profile.yaw_rate_kp +
+            route_profile.yaw_rate_dynamic_kp_quad_a * yaw_rate_error_sq;
+        const float dynamic_yaw_rate_kp = std::clamp(
+            dynamic_yaw_rate_kp_unclamped,
+            route_profile.yaw_rate_dynamic_kp_min,
+            route_profile.yaw_rate_dynamic_kp_max);
+        configure_line_follow_controllers_for_profile(route_profile, dynamic_kp, dynamic_yaw_rate_kp);
 
         // ---------------- 并级控制核心 ----------------
         // 第一条支路：位置环 PID，只负责“把车拉回中线”。
@@ -559,19 +584,6 @@ void line_follow_loop()
         }
         const float position_output = g_position_output_state;
 
-        // 第二条支路：角速度环 PID。
-        // 当前固定采用“跟踪点夹角 -> 目标横摆角速度”的路线：
-        // 1) 跟踪点偏角负责告诉车头“该往哪边、该多快转”；
-        // 2) IMU 负责反馈“车身现在实际转了多少”；
-        // 3) 角速度环去逼近这个由夹角生成的目标横摆角速度。
-        // 这样位置环和角速度环职责更清楚：位置环回中线，角速度环管车头朝向。
-        float yaw_rate_ref_dps = 0.0f;
-        yaw_rate_ref_dps = std::clamp(
-            g_filtered_track_point_angle_deg * route_profile.yaw_rate_ref_from_track_point_gain_dps,
-            -route_profile.yaw_rate_ref_limit_dps,
-            route_profile.yaw_rate_ref_limit_dps);
-        //角速度的差
-        const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 目标角速度与实际角速度之差
         if (vision_updated || imu_updated)
         {
             const float yaw_rate_pid_dt_fallback =
