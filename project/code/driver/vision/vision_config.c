@@ -223,7 +223,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    .udp_web_server_ip = "172.21.79.129",
+    .udp_web_server_ip = "10.120.166.102",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -317,7 +317,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 状态机十字识别开关。
     .route_cross_detection_enabled = false,
     // 状态机圆环识别开关。
-    .route_circle_detection_enabled = false,
+    .route_circle_detection_enabled = true,
     // 圆环入口判定：对侧边界最少点数。
     .route_circle_entry_min_boundary_count = 20,
     // 圆环入口判定：角点索引距离边界尾部至少保留的余量。
