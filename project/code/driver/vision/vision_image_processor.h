@@ -233,11 +233,15 @@ void vision_image_processor_get_cross_lower_corner_state(bool *left_found,
                                                          int *right_x,
                                                          int *right_y,
                                                          bool *pair_valid);
-void vision_image_processor_get_src_circle_feature_state(bool *left_entry,
-                                                         bool *right_entry,
-                                                         bool *exit_clear,
-                                                         bool *left_has_frame_wall,
-                                                         bool *right_has_frame_wall);
+void vision_image_processor_get_src_trace_frame_wall_state(bool *left_has_frame_wall,
+                                                           bool *right_has_frame_wall);
+void vision_image_processor_get_src_start_frame_wall_rows(int *left_rows, int *right_rows);
+void vision_image_processor_get_src_circle_guide_lines(uint16 **left_x,
+                                                       uint16 **left_y,
+                                                       uint16 *left_num,
+                                                       uint16 **right_x,
+                                                       uint16 **right_y,
+                                                       uint16 *right_num);
 // 逆透视后边界数据（另存，供控制等后续模块使用）
 void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
                                                uint16 **y1, uint16 **y2, uint16 **y3,
@@ -251,6 +255,7 @@ void vision_image_processor_get_ipm_boundary_corners(uint16 **left_x, uint16 **l
 // 左右边界“首个角点”的实时状态，方便状态机直接读取。
 void vision_image_processor_get_src_boundary_corner_state(bool *left_found, int *left_x, int *left_y,
                                                           bool *right_found, int *right_x, int *right_y);
+void vision_image_processor_get_src_boundary_straight_state(bool *left_straight, bool *right_straight);
 void vision_image_processor_get_ipm_boundary_corner_state(bool *left_found, int *left_x, int *left_y,
                                                           bool *right_found, int *right_x, int *right_y);
 void vision_image_processor_get_ipm_boundary_corner_indices(int *left_index, int *right_index);

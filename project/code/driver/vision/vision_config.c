@@ -223,7 +223,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    .udp_web_server_ip = "10.120.166.102",
+    .udp_web_server_ip = "172.21.79.129",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -245,26 +245,28 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .maze_trace_method = 1,
     // 迷宫法巡线回退停止阈值（y > min_y + 阈值即停）。
     .maze_trace_y_fallback_stop_delta = 15,
-    // 十字下角点 dir 模板识别开关：仅依赖八邻域原始 dir/points，不直接改线。
+    // 十字下角点 dir 模板识别开关：仅依赖八邻域原始 dir/points，按相邻平台跳变模板识别。
     .cross_lower_corner_dir_enabled = true,
-    // 前平台窗口：检测十字下角点前，要求最近一段主要由 dir=4/5 组成。
+    // 前平台窗口：检测十字下角点前，要求最近一段形成较长的 {4,5} 或 {5,6} 平台。
     .cross_lower_corner_pre_window = 8,
-    // 后平台窗口：检测十字下角点后，要求后续一段主要由 dir=2 组成。
+    // 后平台窗口：检测十字下角点后，要求后续一段形成较长的 {1,2} 或 {2,3} 平台。
     .cross_lower_corner_post_window = 8,
-    // 前平台最少票数：8 个点里至少 6 个为 4/5，允许 5 中混入 4。
-    .cross_lower_corner_pre_min_votes = 6,
-    // 后平台最少票数：8 个点里至少 6 个为 2。
-    .cross_lower_corner_post_min_votes = 6,
-    // 最大过渡长度：允许 {4,5} 与 2 之间存在很短的过渡平台。
-    .cross_lower_corner_transition_max_len = 3,
-    // 过渡区最大 dir=3 数量：容忍短 3 平台，但过滤长 3 平台误判。
-    .cross_lower_corner_transition_max_dir3_count = 2,
-    // 后平台窗口最大 dir=3 数量：限制 2 平台内频繁夹 3 的弯道误判。
-    .cross_lower_corner_post_max_dir3_count = 1,
+    // 前平台最少票数：窗口内至少有这些点数落在 {4,5} 或 {5,6} 这两组相邻平台之一。
+    .cross_lower_corner_pre_min_votes = 7,
+    // 后平台最少票数：窗口内至少有这些点数落在 {1,2} 或 {2,3} 这两组相邻平台之一。
+    .cross_lower_corner_post_min_votes = 7,
+    // 最大过渡长度：允许前后长平台之间只存在很短的跳变区，跳变区可短暂扫过 1..6。
+    .cross_lower_corner_transition_max_len = 4,
     // 左右下角点 y 坐标最大差值：用于判断双下角点是否稳定同时成立。
     .cross_lower_corner_pair_y_diff_max = 30,
     // 十字补线触发的下角点最小 y 阈值。
     .cross_lower_corner_extrapolate_min_y = 35,
+    // 十字下角点补线向上的延伸长度（按 y 行数计算）。
+    .cross_lower_corner_extrapolate_y_span = 15,
+    // 原图直边判断：检查边界数组前 60 个点。
+    .src_boundary_straight_check_count = 60,
+    // 原图直边判断：前 N 个点中 90% 以上为 dir=4/5 判定为直边。
+    .src_boundary_straight_dir45_ratio_min = 0.90f,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = false,
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -297,7 +299,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_boundary_straight_min_cos = 0.95f,
     // ---------- 边界双处理流水线：中线生成 ----------
     // 边界法向平移距离，单位 px，用于生成平移中线。
-    .ipm_boundary_shift_distance_px = 15.0f,
+    .ipm_boundary_shift_distance_px = 14.0f,
     // 中线独立后处理总开关。
     .ipm_centerline_postprocess_enabled = true,
     // 中线三角滤波开关。
@@ -315,7 +317,21 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 状态机十字识别开关。
     .route_cross_detection_enabled = false,
     // 状态机圆环识别开关。
-    .route_circle_detection_enabled = true,
+    .route_circle_detection_enabled = false,
+    // 圆环入口判定：对侧边界最少点数。
+    .route_circle_entry_min_boundary_count = 20,
+    // 圆环入口判定：角点索引距离边界尾部至少保留的余量。
+    .route_circle_entry_corner_tail_margin = 20,
+    // 圆环状态 1/5 的起始贴边连续行数阈值。
+    .route_circle_stage_frame_wall_rows_enter = 15,
+    // 圆环状态 3 的对侧起始贴边连续行数触发阈值。
+    .route_circle_stage3_frame_wall_rows_trigger = 70,
+    // 圆环补线：贴边连续段最小长度阈值。
+    .circle_guide_min_frame_wall_segment_len = 8,
+    // 圆环 state3 补线锚点向后偏移索引。
+    .circle_guide_anchor_offset_stage3 = 40,
+    // 圆环 state5 补线锚点向后偏移索引。
+    .circle_guide_anchor_offset_stage5 = 0,
     // ==================== 参数区域 2: 偏差计算 ====================
     // 说明：line_error 取点参数集中在这里。
     // line_error 平移中线偏好源：0=偏好左，1=偏好右，2=无偏好(自动按边界点数)。

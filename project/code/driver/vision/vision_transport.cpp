@@ -642,16 +642,26 @@ static void send_tcp_status()
                                                         &cross_lower_right_x,
                                                         &cross_lower_right_y,
                                                         &cross_lower_pair_valid);
-    bool src_circle_left_entry = false;
-    bool src_circle_right_entry = false;
-    bool src_circle_exit_clear = false;
     bool src_left_trace_has_frame_wall = false;
     bool src_right_trace_has_frame_wall = false;
-    vision_image_processor_get_src_circle_feature_state(&src_circle_left_entry,
-                                                        &src_circle_right_entry,
-                                                        &src_circle_exit_clear,
-                                                        &src_left_trace_has_frame_wall,
-                                                        &src_right_trace_has_frame_wall);
+    int src_left_start_frame_wall_rows = 0;
+    int src_right_start_frame_wall_rows = 0;
+    uint16 *src_left_circle_guide_x = nullptr;
+    uint16 *src_left_circle_guide_y = nullptr;
+    uint16 src_left_circle_guide_num = 0;
+    uint16 *src_right_circle_guide_x = nullptr;
+    uint16 *src_right_circle_guide_y = nullptr;
+    uint16 src_right_circle_guide_num = 0;
+    vision_image_processor_get_src_trace_frame_wall_state(&src_left_trace_has_frame_wall,
+                                                          &src_right_trace_has_frame_wall);
+    vision_image_processor_get_src_start_frame_wall_rows(&src_left_start_frame_wall_rows,
+                                                         &src_right_start_frame_wall_rows);
+    vision_image_processor_get_src_circle_guide_lines(&src_left_circle_guide_x,
+                                                      &src_left_circle_guide_y,
+                                                      &src_left_circle_guide_num,
+                                                      &src_right_circle_guide_x,
+                                                      &src_right_circle_guide_y,
+                                                      &src_right_circle_guide_num);
     uint16 *ipm_x1 = nullptr;
     uint16 *ipm_x3 = nullptr;
     uint16 *ipm_y1 = nullptr;
@@ -691,12 +701,16 @@ static void send_tcp_status()
     bool src_right_corner_found = false;
     int src_right_corner_state_x = 0;
     int src_right_corner_state_y = 0;
+    bool src_left_boundary_straight = false;
+    bool src_right_boundary_straight = false;
     vision_image_processor_get_src_boundary_corner_state(&src_left_corner_found,
                                                          &src_left_corner_state_x,
                                                          &src_left_corner_state_y,
                                                          &src_right_corner_found,
                                                          &src_right_corner_state_x,
                                                          &src_right_corner_state_y);
+    vision_image_processor_get_src_boundary_straight_state(&src_left_boundary_straight,
+                                                           &src_right_boundary_straight);
     bool ipm_left_corner_found = false;
     int ipm_left_corner_state_x = 0;
     int ipm_left_corner_state_y = 0;
@@ -937,11 +951,10 @@ static void send_tcp_status()
     append_int(true, "route_left_gain_count", vision_image_processor_route_left_gain_count());
     append_int(true, "route_right_loss_count", vision_image_processor_route_right_loss_count());
     append_int(true, "route_right_gain_count", vision_image_processor_route_right_gain_count());
-    append_bool(true, "src_circle_left_entry", src_circle_left_entry);
-    append_bool(true, "src_circle_right_entry", src_circle_right_entry);
-    append_bool(true, "src_circle_exit_clear", src_circle_exit_clear);
     append_bool(true, "src_left_trace_has_frame_wall", src_left_trace_has_frame_wall);
     append_bool(true, "src_right_trace_has_frame_wall", src_right_trace_has_frame_wall);
+    append_int(true, "left_start_frame_wall_rows", src_left_start_frame_wall_rows);
+    append_int(true, "right_start_frame_wall_rows", src_right_start_frame_wall_rows);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_index, "ipm_track_index", ipm_track_index);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_track_point, "ipm_track_point",
                      {ipm_track_x, ipm_track_y});
@@ -1018,6 +1031,20 @@ static void send_tcp_status()
                   "left_boundary", x1, y1, left_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
                   "right_boundary", x3, y3, right_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+    append_points(true,
+                  "left_circle_guide_line",
+                  src_left_circle_guide_x,
+                  src_left_circle_guide_y,
+                  src_left_circle_guide_num,
+                  VISION_DOWNSAMPLED_WIDTH,
+                  VISION_DOWNSAMPLED_HEIGHT);
+    append_points(true,
+                  "right_circle_guide_line",
+                  src_right_circle_guide_x,
+                  src_right_circle_guide_y,
+                  src_right_circle_guide_num,
+                  VISION_DOWNSAMPLED_WIDTH,
+                  VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
                   "eight_left_trace", eight_left_x, eight_left_y, eight_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
@@ -1054,8 +1081,6 @@ static void send_tcp_status()
     append_int(true, "cross_lower_corner_pre_min_votes", g_vision_runtime_config.cross_lower_corner_pre_min_votes);
     append_int(true, "cross_lower_corner_post_min_votes", g_vision_runtime_config.cross_lower_corner_post_min_votes);
     append_int(true, "cross_lower_corner_transition_max_len", g_vision_runtime_config.cross_lower_corner_transition_max_len);
-    append_int(true, "cross_lower_corner_transition_max_dir3_count", g_vision_runtime_config.cross_lower_corner_transition_max_dir3_count);
-    append_int(true, "cross_lower_corner_post_max_dir3_count", g_vision_runtime_config.cross_lower_corner_post_max_dir3_count);
     append_int(true, "cross_lower_corner_pair_y_diff_max", g_vision_runtime_config.cross_lower_corner_pair_y_diff_max);
     append_bool(true, "cross_lower_left_corner_found", cross_lower_left_found);
     append_bool(true, "cross_lower_right_corner_found", cross_lower_right_found);
@@ -1070,6 +1095,8 @@ static void send_tcp_status()
                   "right_boundary_corner", src_corner_right_x, src_corner_right_y, src_corner_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_bool(g_vision_runtime_config.udp_web_tcp_send_left_boundary, "left_boundary_corner_found", src_left_corner_found);
     append_bool(g_vision_runtime_config.udp_web_tcp_send_right_boundary, "right_boundary_corner_found", src_right_corner_found);
+    append_bool(g_vision_runtime_config.udp_web_tcp_send_left_boundary, "left_boundary_straight", src_left_boundary_straight);
+    append_bool(g_vision_runtime_config.udp_web_tcp_send_right_boundary, "right_boundary_straight", src_right_boundary_straight);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_left_boundary && src_left_corner_found, "left_boundary_corner_point",
                      {src_left_corner_state_x, src_left_corner_state_y});
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_right_boundary && src_right_corner_found, "right_boundary_corner_point",

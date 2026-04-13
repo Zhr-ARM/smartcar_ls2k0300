@@ -99,6 +99,10 @@ function renderOverlayResult(payload) {
       overlayCtx.fill();
     }
   }
+  if (frameModeSelect.value === 'binary') {
+    drawBoundaryStraightLabel(overlayCtx, isActiveFlag(latestStatus.left_boundary_straight), 'L直边', 6, 14, 'left');
+    drawBoundaryStraightLabel(overlayCtx, isActiveFlag(latestStatus.right_boundary_straight), 'R直边', overlayCanvas.width - 6, 14, 'right');
+  }
 
   const info = {
     summary: payload.summary || 'worker ready',
@@ -106,6 +110,36 @@ function renderOverlayResult(payload) {
     recommendation: payload.recommendation || ''
   };
   resultText.textContent = JSON.stringify(info, null, 2);
+}
+
+function drawBoundaryStraightLabel(ctx, active, label, anchorX, anchorY, side) {
+  if (!active) return;
+  ctx.save();
+  ctx.font = '11px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+  ctx.textBaseline = 'middle';
+  const padX = 6;
+  const boxH = 16;
+  const textW = ctx.measureText(label).width;
+  const boxW = Math.ceil(textW + padX * 2);
+  const x = side === 'right' ? Math.max(0, anchorX - boxW) : Math.min(overlayCanvas.width - boxW, anchorX);
+  const y = Math.max(0, Math.min(overlayCanvas.height - boxH, anchorY - boxH / 2));
+  ctx.fillStyle = 'rgba(34, 197, 94, 0.88)';
+  ctx.fillRect(x, y, boxW, boxH);
+  ctx.strokeStyle = '#052e16';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, boxW, boxH);
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillText(label, x + padX, y + boxH / 2);
+  ctx.restore();
+}
+
+function isActiveFlag(value) {
+  if (value === true || value === 1) return true;
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase();
+    return v === '1' || v === 'true';
+  }
+  return false;
 }
 
 async function pullStatus() {

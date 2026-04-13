@@ -104,20 +104,22 @@ const char *route_sub_state_name(int route_sub_state)
 {
     switch (route_sub_state)
     {
-        case VISION_ROUTE_SUB_NONE:                 return "NONE";
-        case VISION_ROUTE_SUB_CROSS_BEGIN:          return "CROSS_BEGIN";
-        case VISION_ROUTE_SUB_CROSS_IN:             return "CROSS_IN";
-        case VISION_ROUTE_SUB_CIRCLE_LEFT_BEGIN:    return "CIRCLE_LEFT_BEGIN";
-        case VISION_ROUTE_SUB_CIRCLE_LEFT_IN:       return "CIRCLE_LEFT_IN";
-        case VISION_ROUTE_SUB_CIRCLE_LEFT_RUNNING:  return "CIRCLE_LEFT_RUNNING";
-        case VISION_ROUTE_SUB_CIRCLE_LEFT_OUT:      return "CIRCLE_LEFT_OUT";
-        case VISION_ROUTE_SUB_CIRCLE_LEFT_END:      return "CIRCLE_LEFT_END";
-        case VISION_ROUTE_SUB_CIRCLE_RIGHT_BEGIN:   return "CIRCLE_RIGHT_BEGIN";
-        case VISION_ROUTE_SUB_CIRCLE_RIGHT_IN:      return "CIRCLE_RIGHT_IN";
-        case VISION_ROUTE_SUB_CIRCLE_RIGHT_RUNNING: return "CIRCLE_RIGHT_RUNNING";
-        case VISION_ROUTE_SUB_CIRCLE_RIGHT_OUT:     return "CIRCLE_RIGHT_OUT";
-        case VISION_ROUTE_SUB_CIRCLE_RIGHT_END:     return "CIRCLE_RIGHT_END";
-        default:                                    return "UNKNOWN_SUB";
+        case VISION_ROUTE_SUB_NONE:            return "NONE";
+        case VISION_ROUTE_SUB_CROSS_BEGIN:     return "CROSS_BEGIN";
+        case VISION_ROUTE_SUB_CROSS_IN:        return "CROSS_IN";
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_1:   return "CIRCLE_LEFT_1";
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_2:   return "CIRCLE_LEFT_2";
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_3:   return "CIRCLE_LEFT_3";
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_4:   return "CIRCLE_LEFT_4";
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_5:   return "CIRCLE_LEFT_5";
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_6:   return "CIRCLE_LEFT_6";
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_1:  return "CIRCLE_RIGHT_1";
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_2:  return "CIRCLE_RIGHT_2";
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:  return "CIRCLE_RIGHT_3";
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:  return "CIRCLE_RIGHT_4";
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:  return "CIRCLE_RIGHT_5";
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_6:  return "CIRCLE_RIGHT_6";
+        default:                               return "UNKNOWN_SUB";
     }
 }
 
@@ -132,20 +134,22 @@ const char *route_profile_name_for_state(int route_main_state, int route_sub_sta
         case VISION_ROUTE_MAIN_CIRCLE_RIGHT:
             switch (route_sub_state)
             {
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_BEGIN:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_BEGIN:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_1:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_2:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_1:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_2:
                     return "CIRCLE_ENTER";
 
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_IN:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_RUNNING:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_IN:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_RUNNING:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_3:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_4:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:
                     return "CIRCLE_INSIDE";
 
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_OUT:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_END:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_OUT:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_END:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_5:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_6:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_6:
                     return "CIRCLE_EXIT";
 
                 default:
@@ -217,20 +221,22 @@ const pid_tuning::route_line_follow::Profile &select_route_line_follow_profile(i
         case VISION_ROUTE_MAIN_CIRCLE_RIGHT:
             switch (route_sub_state)
             {
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_BEGIN:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_BEGIN:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_1:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_2:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_1:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_2:
                     return kCircleEnterProfile;
 
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_IN:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_RUNNING:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_IN:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_RUNNING:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_3:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_4:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:
                     return kCircleInsideProfile;
 
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_OUT:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_END:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_OUT:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_END:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_5:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_6:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_6:
                     return kCircleExitProfile;
 
                 default:

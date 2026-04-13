@@ -545,10 +545,24 @@
           <canvas id="leftTraceDirCanvas" width="480" height="220"></canvas>
         </div>
       </div>
+      <div class="card" id="leftTraceDirZoomCard">
+        <div class="title">左八邻域 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
+        <div class="meta" id="leftTraceDirZoomMeta">等待 dir 数据</div>
+        <div class="view">
+          <canvas id="leftTraceDirZoomCanvas" width="720" height="260"></canvas>
+        </div>
+      </div>
       <div class="card" id="rightTraceDirCard">
         <div class="title">右八邻域 dir 图（横轴=索引，纵轴=dir）</div>
         <div class="view">
           <canvas id="rightTraceDirCanvas" width="480" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card" id="rightTraceDirZoomCard">
+        <div class="title">右八邻域 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
+        <div class="meta" id="rightTraceDirZoomMeta">等待 dir 数据</div>
+        <div class="view">
+          <canvas id="rightTraceDirZoomCanvas" width="720" height="260"></canvas>
         </div>
       </div>
     </div>
@@ -646,6 +660,10 @@
     const leftTraceDirCtx = leftTraceDirCanvas.getContext('2d');
     const rightTraceDirCanvas = document.getElementById('rightTraceDirCanvas');
     const rightTraceDirCtx = rightTraceDirCanvas.getContext('2d');
+    const leftTraceDirZoomCanvas = document.getElementById('leftTraceDirZoomCanvas');
+    const leftTraceDirZoomCtx = leftTraceDirZoomCanvas.getContext('2d');
+    const rightTraceDirZoomCanvas = document.getElementById('rightTraceDirZoomCanvas');
+    const rightTraceDirZoomCtx = rightTraceDirZoomCanvas.getContext('2d');
     const rgbPixelInfo = document.getElementById('rgbPixelInfo');
     const grayPixelInfo = document.getElementById('grayPixelInfo');
     const binaryPixelInfo = document.getElementById('binaryPixelInfo');
@@ -702,6 +720,10 @@
     const rightBoundaryAngleCosCard = document.getElementById('rightBoundaryAngleCosCard');
     const leftTraceDirCard = document.getElementById('leftTraceDirCard');
     const rightTraceDirCard = document.getElementById('rightTraceDirCard');
+    const leftTraceDirZoomCard = document.getElementById('leftTraceDirZoomCard');
+    const rightTraceDirZoomCard = document.getElementById('rightTraceDirZoomCard');
+    const leftTraceDirZoomMeta = document.getElementById('leftTraceDirZoomMeta');
+    const rightTraceDirZoomMeta = document.getElementById('rightTraceDirZoomMeta');
     const playbackStatus = document.getElementById('playbackStatus');
     const playbackGrid = document.getElementById('playbackGrid');
     const paramModal = document.getElementById('paramModal');
@@ -758,6 +780,11 @@
     let grayFetchSeq = 0;
     let grayFetchInFlight = false;
     let activeGraySource = 'none';
+    const traceDirZoomHalfWindow = 10;
+    const traceDirZoomState = {
+      left: { hoverIndex: null },
+      right: { hoverIndex: null }
+    };
     const localWorker = new Worker('/pipeline_worker.js');
 
     function hasValue(value) {
@@ -782,6 +809,8 @@
       receiverCore.setElementVisible(rightBoundaryAngleCosCard, active && toggleBoundaryAngleCosCharts.checked);
       receiverCore.setElementVisible(leftTraceDirCard, active && toggleTraceDirCharts.checked);
       receiverCore.setElementVisible(rightTraceDirCard, active && toggleTraceDirCharts.checked);
+      receiverCore.setElementVisible(leftTraceDirZoomCard, active && toggleTraceDirCharts.checked);
+      receiverCore.setElementVisible(rightTraceDirZoomCard, active && toggleTraceDirCharts.checked);
     }
 
     function shouldUseLocalCompute() {
@@ -1075,6 +1104,8 @@
       const cornerRows = [];
       push(cornerRows, 'left_boundary_corner_found', status.left_boundary_corner_found);
       push(cornerRows, 'right_boundary_corner_found', status.right_boundary_corner_found);
+      push(cornerRows, 'left_boundary_straight', status.left_boundary_straight);
+      push(cornerRows, 'right_boundary_straight', status.right_boundary_straight);
       pushArray(cornerRows, 'left_boundary_corner_point', status.left_boundary_corner_point);
       pushArray(cornerRows, 'right_boundary_corner_point', status.right_boundary_corner_point);
       push(cornerRows, 'ipm_left_boundary_corner_found', status.ipm_left_boundary_corner_found);
@@ -1093,13 +1124,13 @@
       push(cornerRows, 'cross_lower_right_corner_index', status.cross_lower_right_corner_index);
       pushArray(cornerRows, 'cross_lower_left_corner_point', status.cross_lower_left_corner_point);
       pushArray(cornerRows, 'cross_lower_right_corner_point', status.cross_lower_right_corner_point);
+      push(cornerRows, 'left_start_frame_wall_rows', status.left_start_frame_wall_rows);
+      push(cornerRows, 'right_start_frame_wall_rows', status.right_start_frame_wall_rows);
       push(cornerRows, 'cross_lower_corner_pre_window', status.cross_lower_corner_pre_window);
       push(cornerRows, 'cross_lower_corner_post_window', status.cross_lower_corner_post_window);
       push(cornerRows, 'cross_lower_corner_pre_min_votes', status.cross_lower_corner_pre_min_votes);
       push(cornerRows, 'cross_lower_corner_post_min_votes', status.cross_lower_corner_post_min_votes);
       push(cornerRows, 'cross_lower_corner_transition_max_len', status.cross_lower_corner_transition_max_len);
-      push(cornerRows, 'cross_lower_corner_transition_max_dir3_count', status.cross_lower_corner_transition_max_dir3_count);
-      push(cornerRows, 'cross_lower_corner_post_max_dir3_count', status.cross_lower_corner_post_max_dir3_count);
       push(cornerRows, 'cross_lower_corner_pair_y_diff_max', status.cross_lower_corner_pair_y_diff_max);
       addSection('角点与直边', cornerRows);
 
@@ -1752,7 +1783,59 @@
       drawCurveChartToCanvas(rightBoundaryAngleCosCanvas, rightBoundaryAngleCosCtx, getRightBoundaryAngleCos(status), -1.0, 1.0);
     }
 
-    function drawTraceDirChart(canvas, ctx, rawValues, color, sideLabel, cornerIndex, pairValid) {
+    function getTraceDirChartLayout(canvas, pointCount) {
+      const w = canvas.width;
+      const h = canvas.height;
+      const marginLeft = 44;
+      const marginRight = 18;
+      const marginTop = 18;
+      const marginBottom = 30;
+      const plotW = Math.max(1, w - marginLeft - marginRight);
+      const plotH = Math.max(1, h - marginTop - marginBottom);
+      const safeCount = Math.max(1, pointCount);
+      return {
+        marginLeft,
+        marginRight,
+        marginTop,
+        marginBottom,
+        plotW,
+        plotH,
+        xAt(idx) {
+          return marginLeft + (idx * plotW) / Math.max(1, safeCount - 1);
+        },
+        yAt(dir) {
+          return marginTop + ((7 - dir) * plotH) / 7;
+        }
+      };
+    }
+
+    function getTraceDirFocusIndex(values, sideKey, cornerIndex) {
+      const hoverIndex = Number(traceDirZoomState[sideKey]?.hoverIndex);
+      if (Number.isInteger(hoverIndex) && hoverIndex >= 0 && hoverIndex < values.length) return hoverIndex;
+      const ci = Number(cornerIndex);
+      if (Number.isInteger(ci) && ci >= 0 && ci < values.length) return ci;
+      return values.length > 0 ? Math.floor((values.length - 1) / 2) : 0;
+    }
+
+    function drawTraceDirFocusBand(ctx, layout, values, focusIndex) {
+      if (!Array.isArray(values) || values.length < 1) return;
+      if (!Number.isInteger(focusIndex) || focusIndex < 0 || focusIndex >= values.length) return;
+      const start = Math.max(0, focusIndex - traceDirZoomHalfWindow);
+      const end = Math.min(values.length - 1, focusIndex + traceDirZoomHalfWindow);
+      const startX = layout.xAt(start);
+      const endX = layout.xAt(end);
+      const bandW = Math.max(2, endX - startX);
+      ctx.save();
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+      ctx.fillRect(startX, layout.marginTop, bandW, layout.plotH);
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(startX, layout.marginTop, bandW, layout.plotH);
+      ctx.restore();
+    }
+
+    function drawTraceDirChart(canvas, ctx, rawValues, color, sideLabel, cornerIndex, pairValid, sideKey) {
       const w = canvas.width;
       const h = canvas.height;
       ctx.fillStyle = '#020617';
@@ -1761,20 +1844,21 @@
       const values = Array.isArray(rawValues) ? rawValues.slice() : [];
       while (values.length > 0 && values[values.length - 1] === null) values.pop();
 
-      const marginLeft = 44;
-      const marginRight = 18;
-      const marginTop = 18;
-      const marginBottom = 30;
-      const plotW = Math.max(1, w - marginLeft - marginRight);
-      const plotH = Math.max(1, h - marginTop - marginBottom);
-      const xAt = (idx) => marginLeft + (idx * plotW) / Math.max(1, values.length - 1);
-      const yAt = (dir) => marginTop + ((7 - dir) * plotH) / 7;
+      const layout = getTraceDirChartLayout(canvas, values.length);
+      const marginLeft = layout.marginLeft;
+      const marginTop = layout.marginTop;
+      const plotW = layout.plotW;
+      const plotH = layout.plotH;
+      const xAt = layout.xAt;
+      const yAt = layout.yAt;
 
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.rect(marginLeft, marginTop, plotW, plotH);
       ctx.stroke();
+
+      drawTraceDirFocusBand(ctx, layout, values, getTraceDirFocusIndex(values, sideKey, cornerIndex));
 
       ctx.font = '12px "Noto Sans SC", "Microsoft YaHei", sans-serif';
       ctx.textBaseline = 'middle';
@@ -1893,9 +1977,196 @@
       }
     }
 
+    function drawTraceDirZoomChart(canvas, ctx, metaEl, rawValues, color, sideLabel, cornerIndex, pairValid, sideKey) {
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, w, h);
+
+      const values = Array.isArray(rawValues) ? rawValues.slice() : [];
+      while (values.length > 0 && values[values.length - 1] === null) values.pop();
+
+      const layout = getTraceDirChartLayout(canvas, values.length);
+      const marginLeft = layout.marginLeft;
+      const marginTop = layout.marginTop;
+      const plotW = layout.plotW;
+      const plotH = layout.plotH;
+      const yAt = layout.yAt;
+
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(marginLeft, marginTop, plotW, plotH);
+      ctx.stroke();
+
+      ctx.font = '12px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+      ctx.textBaseline = 'middle';
+      for (let dir = 0; dir <= 7; dir += 1) {
+        const y = yAt(dir);
+        ctx.strokeStyle = dir % 2 === 0 ? 'rgba(148, 163, 184, 0.35)' : 'rgba(148, 163, 184, 0.18)';
+        ctx.setLineDash(dir % 2 === 0 ? [] : [3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(marginLeft, y);
+        ctx.lineTo(marginLeft + plotW, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillText(String(dir), 20, y);
+      }
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillText(`${sideLabel} dir zoom`, marginLeft, 13);
+      if (values.length < 1) {
+        if (metaEl) metaEl.textContent = '等待 dir 数据';
+        ctx.fillStyle = '#64748b';
+        ctx.fillText('No dir data', marginLeft + plotW * 0.5 - 30, marginTop + plotH * 0.5);
+        return;
+      }
+
+      const focusIndex = getTraceDirFocusIndex(values, sideKey, cornerIndex);
+      const start = Math.max(0, focusIndex - traceDirZoomHalfWindow);
+      const end = Math.min(values.length - 1, focusIndex + traceDirZoomHalfWindow);
+      const zoomValues = [];
+      for (let idx = start; idx <= end; idx += 1) {
+        zoomValues.push({ idx, dir: values[idx] });
+      }
+      const zoomLayout = getTraceDirChartLayout(canvas, zoomValues.length);
+      const zoomXAt = zoomLayout.xAt;
+      const zoomYAt = zoomLayout.yAt;
+
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.06)';
+      ctx.fillRect(zoomLayout.marginLeft, zoomLayout.marginTop, zoomLayout.plotW, zoomLayout.plotH);
+
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#94a3b8';
+      for (let offset = 0; offset < zoomValues.length; offset += 1) {
+        const x = zoomXAt(offset);
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x, zoomLayout.marginTop);
+        ctx.lineTo(x, zoomLayout.marginTop + zoomLayout.plotH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const idxText = String(zoomValues[offset].idx);
+        const textW = ctx.measureText(idxText).width;
+        ctx.fillText(idxText, Math.max(zoomLayout.marginLeft, Math.min(zoomLayout.marginLeft + zoomLayout.plotW - textW, x - textW / 2)), zoomLayout.marginTop + zoomLayout.plotH + 18);
+      }
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let started = false;
+      let prevValidOffset = -1;
+      let prevValidDir = null;
+      for (let offset = 0; offset < zoomValues.length; offset += 1) {
+        const dir = zoomValues[offset].dir;
+        if (dir === null) continue;
+        const x = zoomXAt(offset);
+        const y = zoomYAt(dir);
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else if (prevValidOffset >= 0 && prevValidDir !== null) {
+          const prevX = zoomXAt(prevValidOffset);
+          const prevY = zoomYAt(prevValidDir);
+          ctx.lineTo(x, prevY);
+          ctx.lineTo(x, y);
+        }
+        prevValidOffset = offset;
+        prevValidDir = dir;
+      }
+      ctx.stroke();
+
+      let previousDir = null;
+      for (let offset = 0; offset < zoomValues.length; offset += 1) {
+        const dir = zoomValues[offset].dir;
+        if (dir === null) continue;
+        const idx = zoomValues[offset].idx;
+        const x = zoomXAt(offset);
+        const y = zoomYAt(dir);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (previousDir !== null && dir !== previousDir) {
+          ctx.strokeStyle = '#facc15';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath();
+          ctx.moveTo(x, zoomLayout.marginTop);
+          ctx.lineTo(x, zoomLayout.marginTop + zoomLayout.plotH);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        ctx.fillStyle = idx === focusIndex ? '#f8fafc' : '#facc15';
+        const labelY = Math.max(zoomLayout.marginTop + 12, Math.min(zoomLayout.marginTop + zoomLayout.plotH - 6, y - 8));
+        ctx.fillText(`${idx}:${dir}`, Math.max(zoomLayout.marginLeft, Math.min(zoomLayout.marginLeft + zoomLayout.plotW - 28, x - 10)), labelY);
+        previousDir = dir;
+      }
+
+      const focusOffset = focusIndex - start;
+      if (focusOffset >= 0 && focusOffset < zoomValues.length) {
+        const focusDir = zoomValues[focusOffset].dir;
+        const focusX = zoomXAt(focusOffset);
+        const focusY = focusDir === null ? zoomLayout.marginTop + zoomLayout.plotH * 0.5 : zoomYAt(focusDir);
+        ctx.strokeStyle = pairValid ? '#fb923c' : '#fde047';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(focusX, zoomLayout.marginTop);
+        ctx.lineTo(focusX, zoomLayout.marginTop + zoomLayout.plotH);
+        ctx.stroke();
+        ctx.fillStyle = pairValid ? '#fb923c' : '#fde047';
+        ctx.beginPath();
+        ctx.arc(focusX, focusY, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (metaEl) {
+        const ci = Number(cornerIndex);
+        const cornerText = Number.isInteger(ci) && ci >= 0 && ci < values.length ? `${ci}:${values[ci]}` : 'none';
+        const modeText = Number.isInteger(traceDirZoomState[sideKey]?.hoverIndex) ? '鼠标联动' : '自动定位';
+        metaEl.textContent = `${sideLabel} idx=[${start}, ${end}] center=${focusIndex}:${values[focusIndex]} corner=${cornerText} 窗口=${end - start + 1} ${modeText}`;
+      }
+    }
+
+    function updateTraceDirHoverFromEvent(canvas, event, sideKey) {
+      const status = getRenderStatus();
+      const values = getTraceDirSeries(status, sideKey === 'left' ? 'eight_left_trace_dir' : 'eight_right_trace_dir');
+      if (!values.length) {
+        traceDirZoomState[sideKey].hoverIndex = null;
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width) return;
+      const x = event.clientX - rect.left;
+      const marginLeft = 44 * (rect.width / canvas.width);
+      const marginRight = 18 * (rect.width / canvas.width);
+      const plotWidth = Math.max(1, rect.width - marginLeft - marginRight);
+      const clampedX = Math.max(marginLeft, Math.min(rect.width - marginRight, x));
+      const ratio = (clampedX - marginLeft) / plotWidth;
+      traceDirZoomState[sideKey].hoverIndex = Math.max(0, Math.min(values.length - 1, Math.round(ratio * Math.max(1, values.length - 1))));
+      drawTraceDirCharts(status || {});
+    }
+
+    function bindTraceDirZoomHandlers(canvas, sideKey) {
+      if (!canvas) return;
+      canvas.addEventListener('mousemove', (event) => {
+        updateTraceDirHoverFromEvent(canvas, event, sideKey);
+      });
+      canvas.addEventListener('mouseleave', () => {
+        traceDirZoomState[sideKey].hoverIndex = null;
+        drawTraceDirCharts(getRenderStatus() || {});
+      });
+    }
+
     function drawTraceDirCharts(status) {
       setCardVisible(leftTraceDirCard, showTraceDirCharts);
       setCardVisible(rightTraceDirCard, showTraceDirCharts);
+      setCardVisible(leftTraceDirZoomCard, showTraceDirCharts);
+      setCardVisible(rightTraceDirZoomCard, showTraceDirCharts);
       if (!showTraceDirCharts) return;
       drawTraceDirChart(leftTraceDirCanvas,
                         leftTraceDirCtx,
@@ -1903,14 +2174,34 @@
                         '#ff4d4f',
                         'Left',
                         status.cross_lower_left_corner_index,
-                        status.cross_lower_corner_pair_valid);
+                        status.cross_lower_corner_pair_valid,
+                        'left');
       drawTraceDirChart(rightTraceDirCanvas,
                         rightTraceDirCtx,
                         getTraceDirSeries(status, 'eight_right_trace_dir'),
                         '#c084fc',
                         'Right',
                         status.cross_lower_right_corner_index,
-                        status.cross_lower_corner_pair_valid);
+                        status.cross_lower_corner_pair_valid,
+                        'right');
+      drawTraceDirZoomChart(leftTraceDirZoomCanvas,
+                            leftTraceDirZoomCtx,
+                            leftTraceDirZoomMeta,
+                            getTraceDirSeries(status, 'eight_left_trace_dir'),
+                            '#ff4d4f',
+                            'Left',
+                            status.cross_lower_left_corner_index,
+                            status.cross_lower_corner_pair_valid,
+                            'left');
+      drawTraceDirZoomChart(rightTraceDirZoomCanvas,
+                            rightTraceDirZoomCtx,
+                            rightTraceDirZoomMeta,
+                            getTraceDirSeries(status, 'eight_right_trace_dir'),
+                            '#c084fc',
+                            'Right',
+                            status.cross_lower_right_corner_index,
+                            status.cross_lower_corner_pair_valid,
+                            'right');
     }
 
     function renderGrayFrameFromSource(source, w, h, sourceMode) {
@@ -2037,6 +2328,8 @@
       drawSeries(binaryCtx, status.eight_right_trace || [], '#c084fc', 2, 1);
       drawSeries(binaryCtx, status.left_boundary || [], '#38bdf8', 2, 1);
       drawSeries(binaryCtx, status.right_boundary || [], '#22c55e', 2, 1);
+      drawSeries(binaryCtx, status.left_circle_guide_line || [], '#f59e0b', 2, 1);
+      drawSeries(binaryCtx, status.right_circle_guide_line || [], '#f97316', 2, 1);
 
       const leftTouch = getTraceTouchPoint(status.eight_left_trace, status.eight_left_first_frame_touch_index, status.eight_left_first_frame_touch_point);
       const rightTouch = getTraceTouchPoint(status.eight_right_trace, status.eight_right_first_frame_touch_index, status.eight_right_first_frame_touch_point);
@@ -2044,6 +2337,8 @@
       drawPointSet(binaryCtx, rightTouch ? [rightTouch] : [], '#facc15', 3);
       drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_left_corner_point, 'L下角', status.cross_lower_corner_pair_valid);
       drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_right_corner_point, 'R下角', status.cross_lower_corner_pair_valid);
+      drawBoundaryStraightLabel(binaryCtx, isActiveFlag(status.left_boundary_straight), 'L直边', 6, 14, 'left');
+      drawBoundaryStraightLabel(binaryCtx, isActiveFlag(status.right_boundary_straight), 'R直边', binaryCanvas.width - 6, 14, 'right');
     }
 
     function drawCrossLowerCornerPoint(ctx, point, label, pairValid) {
@@ -2065,6 +2360,36 @@
       ctx.textBaseline = 'bottom';
       ctx.fillStyle = fill;
       ctx.fillText(label, Math.min(binaryCanvas.width - 28, x + 5), Math.max(10, y - 4));
+    }
+
+    function drawBoundaryStraightLabel(ctx, active, label, anchorX, anchorY, side) {
+      if (!active) return;
+      ctx.save();
+      ctx.font = '11px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+      ctx.textBaseline = 'middle';
+      const padX = 6;
+      const boxH = 16;
+      const textW = ctx.measureText(label).width;
+      const boxW = Math.ceil(textW + padX * 2);
+      const x = side === 'right' ? Math.max(0, anchorX - boxW) : Math.min(binaryCanvas.width - boxW, anchorX);
+      const y = Math.max(0, Math.min(binaryCanvas.height - boxH, anchorY - boxH / 2));
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.88)';
+      ctx.fillRect(x, y, boxW, boxH);
+      ctx.strokeStyle = '#052e16';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, boxW, boxH);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(label, x + padX, y + boxH / 2);
+      ctx.restore();
+    }
+
+    function isActiveFlag(value) {
+      if (value === true || value === 1) return true;
+      if (typeof value === 'string') {
+        const v = value.trim().toLowerCase();
+        return v === '1' || v === 'true';
+      }
+      return false;
     }
 
     function getTraceTouchPoint(points, index, explicitPoint) {
@@ -2553,6 +2878,8 @@
       showTraceDirCharts = !!toggleTraceDirCharts.checked;
       drawTraceDirCharts(getRenderStatus() || {});
     });
+    bindTraceDirZoomHandlers(leftTraceDirCanvas, 'left');
+    bindTraceDirZoomHandlers(rightTraceDirCanvas, 'right');
     toggleLocalCompute.checked = localComputeEnabled;
     toggleLocalCompute.addEventListener('change', () => {
       localComputeEnabled = !!toggleLocalCompute.checked;

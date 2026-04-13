@@ -171,26 +171,29 @@ typedef struct
     int maze_trace_method;
     // 迷宫法巡线回退停止阈值：若后续 y > 当前最小 y + 阈值，则停止巡线。
     int maze_trace_y_fallback_stop_delta;
-    // 十字下角点 dir 模板识别开关：用于八邻域原始 dir 序列，检测 {4,5} 平台 -> 短过渡 -> 2 平台。
+    // 十字下角点 dir 模板识别开关：用于八邻域原始 dir 序列，检测相邻平台跳变
+    // 模板：{4,5}/{5,6} 前平台 -> 短过渡(1..6) -> {1,2}/{2,3} 后平台。
     bool cross_lower_corner_dir_enabled;
-    // 十字下角点识别：前平台窗口长度，窗口内 dir=4/5 视为有效票。
+    // 十字下角点识别：前平台窗口长度，用于检查是否形成较长的 {4,5} 或 {5,6} 平台。
     int cross_lower_corner_pre_window;
-    // 十字下角点识别：后平台窗口长度，窗口内 dir=2 视为有效票。
+    // 十字下角点识别：后平台窗口长度，用于检查是否形成较长的 {1,2} 或 {2,3} 平台。
     int cross_lower_corner_post_window;
-    // 十字下角点识别：前平台窗口内至少需要多少个 dir=4/5。
+    // 十字下角点识别：前平台窗口内至少需要多少个点落在 {4,5} 或 {5,6} 这两组相邻平台之一。
     int cross_lower_corner_pre_min_votes;
-    // 十字下角点识别：后平台窗口内至少需要多少个 dir=2。
+    // 十字下角点识别：后平台窗口内至少需要多少个点落在 {1,2} 或 {2,3} 这两组相邻平台之一。
     int cross_lower_corner_post_min_votes;
-    // 十字下角点识别：前后平台之间允许的最大过渡长度，过渡区允许 2/3/4/5。
+    // 十字下角点识别：前后平台之间允许的短过渡最大长度；该模板假设平台长、跳变突然。
     int cross_lower_corner_transition_max_len;
-    // 十字下角点识别：过渡区允许的最大 dir=3 数量，避免把长 3 平台误判为角点。
-    int cross_lower_corner_transition_max_dir3_count;
-    // 十字下角点识别：后平台窗口内允许的最大 dir=3 数量，避免 2 平台频繁夹 3 时误判。
-    int cross_lower_corner_post_max_dir3_count;
     // 十字下角点识别：左右候选角点 y 坐标最大允许差，超出则双边稳定标志无效。
     int cross_lower_corner_pair_y_diff_max;
     // 十字补线触发的下角点最小 y 阈值，只有角点 y 严格大于该值才补线。
     int cross_lower_corner_extrapolate_min_y;
+    // 十字下角点补线向上的延伸长度（按 y 行数计算）。
+    int cross_lower_corner_extrapolate_y_span;
+    // 原图直边判断：检查边界数组前多少个点的 dir。
+    int src_boundary_straight_check_count;
+    // 原图直边判断：前 N 个点中 dir=4/5 的最小占比阈值，范围 [0,1]。
+    float src_boundary_straight_dir45_ratio_min;
     // 去畸变开关：true=开启去畸变，false=关闭去畸变直通原图。
     bool undistort_enabled;
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -244,6 +247,20 @@ typedef struct
     bool route_cross_detection_enabled;
     // 状态机圆环识别开关：true=允许进入圆环状态，false=禁用圆环识别。
     bool route_circle_detection_enabled;
+    // 圆环入口判定：对侧边界最少点数，同时角点索引需距离边界尾部至少保留该余量。
+    int route_circle_entry_min_boundary_count;
+    // 圆环入口判定：角点索引需小于“对侧边界点数 - 该余量”。
+    int route_circle_entry_corner_tail_margin;
+    // 圆环状态 1/5 进入下一阶段时，起始贴边连续行数阈值。
+    int route_circle_stage_frame_wall_rows_enter;
+    // 圆环状态 3 进入下一阶段时，对侧起始贴边连续行数阈值。
+    int route_circle_stage3_frame_wall_rows_trigger;
+    // 圆环补线：规则/原始边界中，贴边连续段最小长度阈值。
+    int circle_guide_min_frame_wall_segment_len;
+    // 圆环 state3 补线：贴边连续段结束后，锚点向后偏移的索引数。
+    int circle_guide_anchor_offset_stage3;
+    // 圆环 state5 补线：贴边连续段结束后，锚点向后偏移的索引数。
+    int circle_guide_anchor_offset_stage5;
 
     // ==================== 参数区域 2: 偏差计算 ====================
     // 包括 line_error 取点策略与索引范围约束参数。
