@@ -227,13 +227,13 @@ RouteProfileSelection select_route_profile_selection(int route_main_state, int r
     using pid_tuning::route_line_follow::kCircleEnterProfile;
     using pid_tuning::route_line_follow::kCircleExitProfile;
     using pid_tuning::route_line_follow::kCircleInsideProfile;
-    using pid_tuning::route_line_follow::kCrossProfile;
     using pid_tuning::route_line_follow::kNormalProfile;
+    using pid_tuning::route_line_follow::kStraightProfile;
 
     switch (route_main_state)
     {
-        case VISION_ROUTE_MAIN_CROSS:
-            return {kCrossProfile, "CROSS"};
+        case VISION_ROUTE_MAIN_STRAIGHT:
+            return {kStraightProfile, "STRAIGHT"};
 
         case VISION_ROUTE_MAIN_CIRCLE_LEFT:
         case VISION_ROUTE_MAIN_CIRCLE_RIGHT:
