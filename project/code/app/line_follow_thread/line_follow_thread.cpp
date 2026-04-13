@@ -191,6 +191,7 @@ const char *route_main_state_name(int route_main_state)
     switch (route_main_state)
     {
         case VISION_ROUTE_MAIN_NORMAL:       return "NORMAL";
+        case VISION_ROUTE_MAIN_STRAIGHT:     return "STRAIGHT";
         case VISION_ROUTE_MAIN_CIRCLE_LEFT:  return "CIRCLE_LEFT";
         case VISION_ROUTE_MAIN_CIRCLE_RIGHT: return "CIRCLE_RIGHT";
         case VISION_ROUTE_MAIN_CROSS:        return "CROSS";

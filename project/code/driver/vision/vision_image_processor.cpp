@@ -401,6 +401,17 @@ static int truncate_boundary_at_cross_lower_corner_inplace(maze_point_t *pts,
                                                            int corner_x,
                                                            int corner_y,
                                                            int max_pts);
+static bool find_raw_boundary_x_at_row(const maze_point_t *pts, int count, int target_y, int *x_out);
+static bool circle_entry_raw_boundary_gap_ready(const maze_point_t *left_raw_pts,
+                                                int left_raw_num,
+                                                const maze_point_t *right_raw_pts,
+                                                int right_raw_num,
+                                                int corner_y);
+static bool find_circle_stage3_target_on_regular_boundary(const maze_point_t *pts,
+                                                          int count,
+                                                          bool is_left,
+                                                          int target_offset,
+                                                          maze_point_t *target_out);
 
 /* 前进方向定义：
  *   0
@@ -1017,6 +1028,183 @@ static int count_leading_side_frame_wall_rows(const maze_point_t *pts, int count
     return rows;
 }
 
+static bool find_raw_boundary_x_at_row(const maze_point_t *pts, int count, int target_y, int *x_out)
+{
+    if (pts == nullptr || count <= 0 || x_out == nullptr)
+    {
+        return false;
+    }
+
+    const int safe_count = std::clamp(count, 0, VISION_BOUNDARY_NUM);
+    for (int i = 0; i < safe_count; ++i)
+    {
+        if (pts[i].y != target_y)
+        {
+            continue;
+        }
+
+        *x_out = pts[i].x;
+        return true;
+    }
+
+    return false;
+}
+
+static bool circle_entry_raw_boundary_gap_ready(const maze_point_t *left_raw_pts,
+                                                int left_raw_num,
+                                                const maze_point_t *right_raw_pts,
+                                                int right_raw_num,
+                                                int corner_y)
+{
+    const int row_offset = std::max(g_vision_runtime_config.route_circle_entry_corner_row_offset, 0);
+    const int rows_to_check = std::max(g_vision_runtime_config.route_circle_entry_gap_check_rows, 1);
+    const int min_gap = g_vision_runtime_config.route_circle_entry_min_raw_boundary_gap;
+    const int start_y = corner_y - row_offset;
+
+    for (int i = 0; i < rows_to_check; ++i)
+    {
+        const int target_y = start_y - i;
+        if (target_y <= 0 || target_y >= (kProcHeight - 1))
+        {
+            return false;
+        }
+
+        int left_x = 0;
+        int right_x = 0;
+        if (!find_raw_boundary_x_at_row(left_raw_pts, left_raw_num, target_y, &left_x) ||
+            !find_raw_boundary_x_at_row(right_raw_pts, right_raw_num, target_y, &right_x))
+        {
+            return false;
+        }
+
+        if ((right_x - left_x) <= min_gap)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool find_circle_stage3_target_on_regular_boundary(const maze_point_t *pts,
+                                                          int count,
+                                                          bool is_left,
+                                                          int target_offset,
+                                                          maze_point_t *target_out)
+{
+    if (pts == nullptr || count <= 0 || target_out == nullptr)
+    {
+        return false;
+    }
+
+    const int safe_count = std::clamp(count, 0, VISION_BOUNDARY_NUM);
+    const int min_run_len = std::max(g_vision_runtime_config.circle_guide_min_frame_wall_segment_len, 6);
+    bool frame_seg_found = false;
+    int frame_seg_end_index = -1;
+    int run_start = -1;
+    for (int i = 0; i < safe_count; ++i)
+    {
+        const bool on_frame = is_left ? (pts[i].x <= 1) : (pts[i].x >= (kProcWidth - 2));
+        if (on_frame)
+        {
+            if (run_start < 0)
+            {
+                run_start = i;
+            }
+            continue;
+        }
+
+        if (run_start >= 0)
+        {
+            const int run_len = i - run_start;
+            if (run_len > g_vision_runtime_config.circle_guide_min_frame_wall_segment_len)
+            {
+                frame_seg_found = true;
+                frame_seg_end_index = i - 1;
+                break;
+            }
+            run_start = -1;
+        }
+    }
+    if (!frame_seg_found && run_start >= 0)
+    {
+        const int run_len = safe_count - run_start;
+        if (run_len > g_vision_runtime_config.circle_guide_min_frame_wall_segment_len)
+        {
+            frame_seg_found = true;
+            frame_seg_end_index = safe_count - 1;
+        }
+    }
+
+    const int search_begin = frame_seg_found ? (frame_seg_end_index + 1) : 0;
+
+    for (int start = search_begin; start + min_run_len <= safe_count; ++start)
+    {
+        const bool start_on_frame = is_left ? (pts[start].x <= 1) : (pts[start].x >= (kProcWidth - 2));
+        if (start_on_frame)
+        {
+            continue;
+        }
+
+        const int end = start + min_run_len - 1;
+        const int total_dx = pts[end].x - pts[start].x;
+        if ((is_left && total_dx < 4) || (!is_left && total_dx > -4))
+        {
+            continue;
+        }
+
+        int backward_steps = 0;
+        int max_abs_residual = 0;
+        bool y_monotonic = true;
+        for (int i = start + 1; i <= end; ++i)
+        {
+            const int dx = pts[i].x - pts[i - 1].x;
+            const int dy = pts[i - 1].y - pts[i].y;
+            if (dy < 0 || dy > 2)
+            {
+                y_monotonic = false;
+                break;
+            }
+
+            if ((is_left && dx < -1) || (!is_left && dx > 1))
+            {
+                ++backward_steps;
+            }
+
+            const float t = (pts[end].y != pts[start].y)
+                                ? static_cast<float>(pts[i].y - pts[start].y) / static_cast<float>(pts[end].y - pts[start].y)
+                                : 0.0f;
+            const float predicted_x = static_cast<float>(pts[start].x) + t * static_cast<float>(pts[end].x - pts[start].x);
+            max_abs_residual = std::max(max_abs_residual,
+                                        std::abs(static_cast<int>(std::lround(predicted_x)) - pts[i].x));
+        }
+
+        if (!y_monotonic || backward_steps > 1 || max_abs_residual > 2)
+        {
+            continue;
+        }
+
+        *target_out = pts[start];
+        return true;
+    }
+
+    int fallback_index = frame_seg_found ? (frame_seg_end_index + std::max(0, target_offset)) : 0;
+    fallback_index = std::clamp(fallback_index, 0, safe_count - 1);
+    while (fallback_index < safe_count)
+    {
+        const bool on_frame = is_left ? (pts[fallback_index].x <= 1) : (pts[fallback_index].x >= (kProcWidth - 2));
+        if (!on_frame)
+        {
+            *target_out = pts[fallback_index];
+            return true;
+        }
+        ++fallback_index;
+    }
+
+    *target_out = pts[safe_count - 1];
+    return true;
+}
+
 typedef struct
 {
     bool found;
@@ -1074,6 +1262,46 @@ static side_frame_wall_segment_t find_first_side_frame_wall_segment(const maze_p
     }
 
     return result;
+}
+
+static bool find_circle_stage5_target_on_regular_boundary(const maze_point_t *pts,
+                                                          int count,
+                                                          bool is_left,
+                                                          maze_point_t *target_out)
+{
+    if (pts == nullptr || count <= 0 || target_out == nullptr)
+    {
+        return false;
+    }
+
+    const int safe_count = std::clamp(count, 0, VISION_BOUNDARY_NUM);
+    const side_frame_wall_segment_t seg = find_first_side_frame_wall_segment(pts,
+                                                                             safe_count,
+                                                                             is_left,
+                                                                             g_vision_runtime_config.circle_guide_min_frame_wall_segment_len);
+    if (seg.found && seg.end_index >= 0 && seg.end_index < safe_count)
+    {
+        *target_out = pts[seg.end_index];
+        return true;
+    }
+
+    int last_frame_index = -1;
+    for (int i = 0; i < safe_count; ++i)
+    {
+        const bool on_side_frame = is_left ? (pts[i].x <= 1) : (pts[i].x >= (kProcWidth - 2));
+        if (on_side_frame)
+        {
+            last_frame_index = i;
+        }
+    }
+
+    if (last_frame_index >= 0)
+    {
+        *target_out = pts[last_frame_index];
+        return true;
+    }
+
+    return false;
 }
 
 static int build_line_points_between(const maze_point_t &a,
@@ -4044,7 +4272,9 @@ bool vision_image_processor_process_step()
         (route_snapshot_before_trace.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_6);
     if (left_circle_stage6_active || right_circle_stage6_active)
     {
-        maze_start_row = std::clamp(std::max(maze_start_row, 70), 1, kProcHeight - 2);
+        maze_start_row = std::clamp(std::max(maze_start_row, g_vision_runtime_config.route_circle_stage6_maze_start_row),
+                                    1,
+                                    kProcHeight - 2);
     }
     if (cross_in_active)
     {
@@ -4457,6 +4687,16 @@ bool vision_image_processor_process_step()
     route_input.cross_detected_stop_row = g_cross_detected_stop_row.load();
     route_input.left_boundary_count = left_num;
     route_input.right_boundary_count = right_num;
+    route_input.left_circle_entry_raw_gap_ok = circle_entry_raw_boundary_gap_ready(left_trace_pts_raw.data(),
+                                                                                   left_trace_raw_num,
+                                                                                   right_trace_pts_raw.data(),
+                                                                                   right_trace_raw_num,
+                                                                                   route_input.left_corner_src_y);
+    route_input.right_circle_entry_raw_gap_ok = circle_entry_raw_boundary_gap_ready(left_trace_pts_raw.data(),
+                                                                                    left_trace_raw_num,
+                                                                                    right_trace_pts_raw.data(),
+                                                                                    right_trace_raw_num,
+                                                                                    route_input.right_corner_src_y);
     route_input.frame_encoder_delta = static_cast<uint32>(std::lround((std::fabs(motor_thread_left_count()) + std::fabs(motor_thread_right_count())) * 0.5f));
     vision_route_state_machine_update(&route_input);
     const vision_route_state_snapshot_t route_snapshot = vision_route_state_machine_snapshot();
@@ -4465,110 +4705,148 @@ bool vision_image_processor_process_step()
     {
         if (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_LEFT_3)
         {
-            const maze_point_t target = (right_regular_num > 0) ? right_regular_pts[0]
-                                                                : ((right_num > 0) ? right_pts[0] : maze_point_t{kProcWidth - 2, maze_start_row});
-            apply_circle_guide_line_to_side(left_trace_pts_raw.data(),
-                                            left_trace_raw_num,
-                                            right_pts.data(),
-                                            &right_num,
-                                            right_ipm_pts.data(),
-                                            &right_ipm_num,
-                                            target,
-                                            true,
-                                            g_vision_runtime_config.circle_guide_anchor_offset_stage3,
-                                            true,
-                                            g_src_right_circle_guide_x,
-                                            g_src_right_circle_guide_y,
-                                            &g_src_right_circle_guide_count);
+            const maze_point_t fixed_start = (right_regular_num > 0) ? right_regular_pts[0]
+                                                                     : ((right_num > 0) ? right_pts[0] : maze_point_t{kProcWidth - 2, maze_start_row});
+            maze_point_t target = fixed_start;
+            if (find_circle_stage3_target_on_regular_boundary(left_regular_pts.data(),
+                                                              left_regular_num,
+                                                              true,
+                                                              g_vision_runtime_config.circle_guide_target_offset_stage3,
+                                                              &target))
+            {
+                std::array<maze_point_t, VISION_BOUNDARY_NUM> guide_pts{};
+                const int guide_num = build_line_points_between(fixed_start,
+                                                                target,
+                                                                guide_pts.data(),
+                                                                static_cast<int>(guide_pts.size()));
+                if (guide_num > 0)
+                {
+                    copy_boundary_points(guide_pts.data(), guide_num, right_pts.data(), VISION_BOUNDARY_NUM);
+                    right_num = std::clamp(guide_num, 0, VISION_BOUNDARY_NUM);
+                    copy_boundary_points(guide_pts.data(), guide_num, right_ipm_pts.data(), VISION_BOUNDARY_NUM);
+                    right_ipm_num = std::clamp(guide_num, 0, VISION_BOUNDARY_NUM);
+                    int cached_count = 0;
+                    fill_single_line_arrays_from_points(guide_pts.data(),
+                                                        guide_num,
+                                                        g_src_right_circle_guide_x,
+                                                        g_src_right_circle_guide_y,
+                                                        &cached_count,
+                                                        kProcWidth,
+                                                        kProcHeight);
+                    g_src_right_circle_guide_count = static_cast<uint16>(std::clamp(cached_count, 0, VISION_BOUNDARY_NUM));
+                }
+            }
         }
         else if (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_LEFT_5)
         {
-            maze_point_t target = (right_regular_num > 0) ? right_regular_pts[0]
-                                                          : ((right_num > 0) ? right_pts[0] : maze_point_t{kProcWidth - 2, maze_start_row});
-            bool replace_right_boundary = true;
-            if (route_input.right_corner_found)
+            const maze_point_t start = route_input.right_corner_found
+                                           ? maze_point_t{route_input.right_corner_x, route_input.right_corner_y}
+                                           : ((right_regular_num > 0) ? right_regular_pts[0]
+                                                                      : ((right_num > 0) ? right_pts[0]
+                                                                                         : maze_point_t{kProcWidth - 2, maze_start_row}));
+            maze_point_t target{1, 1};
+            if (!find_circle_stage5_target_on_regular_boundary(left_regular_pts.data(),
+                                                               left_regular_num,
+                                                               true,
+                                                               &target))
             {
-                target = {route_input.right_corner_x, route_input.right_corner_y};
-                right_num = truncate_boundary_at_cross_lower_corner_inplace(right_pts.data(),
-                                                                            right_num,
-                                                                            route_input.right_corner_x,
-                                                                            route_input.right_corner_y,
-                                                                            static_cast<int>(right_pts.size()));
-                right_ipm_num = truncate_boundary_at_cross_lower_corner_inplace(right_ipm_pts.data(),
-                                                                                right_ipm_num,
-                                                                                route_input.right_corner_x,
-                                                                                route_input.right_corner_y,
-                                                                                static_cast<int>(right_ipm_pts.size()));
-                replace_right_boundary = false;
+                target = maze_point_t{1, 1};
             }
-            apply_circle_guide_line_to_side(left_trace_pts_raw.data(),
-                                            left_trace_raw_num,
-                                            right_pts.data(),
-                                            &right_num,
-                                            right_ipm_pts.data(),
-                                            &right_ipm_num,
-                                            target,
-                                            true,
-                                            g_vision_runtime_config.circle_guide_anchor_offset_stage5,
-                                            replace_right_boundary,
-                                            g_src_right_circle_guide_x,
-                                            g_src_right_circle_guide_y,
-                                            &g_src_right_circle_guide_count);
+            std::array<maze_point_t, VISION_BOUNDARY_NUM> guide_pts{};
+            const int guide_num = build_line_points_between(start,
+                                                            target,
+                                                            guide_pts.data(),
+                                                            static_cast<int>(guide_pts.size()));
+            if (guide_num > 0)
+            {
+                copy_boundary_points(guide_pts.data(), guide_num, right_pts.data(), VISION_BOUNDARY_NUM);
+                right_num = std::clamp(guide_num, 0, VISION_BOUNDARY_NUM);
+                copy_boundary_points(guide_pts.data(), guide_num, right_ipm_pts.data(), VISION_BOUNDARY_NUM);
+                right_ipm_num = std::clamp(guide_num, 0, VISION_BOUNDARY_NUM);
+                int cached_count = 0;
+                fill_single_line_arrays_from_points(guide_pts.data(),
+                                                    guide_num,
+                                                    g_src_right_circle_guide_x,
+                                                    g_src_right_circle_guide_y,
+                                                    &cached_count,
+                                                    kProcWidth,
+                                                    kProcHeight);
+                g_src_right_circle_guide_count = static_cast<uint16>(std::clamp(cached_count, 0, VISION_BOUNDARY_NUM));
+            }
         }
     }
     else if (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE_RIGHT)
     {
         if (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_3)
         {
-            const maze_point_t target = (left_regular_num > 0) ? left_regular_pts[0]
-                                                               : ((left_num > 0) ? left_pts[0] : maze_point_t{1, maze_start_row});
-            apply_circle_guide_line_to_side(right_trace_pts_raw.data(),
-                                            right_trace_raw_num,
-                                            left_pts.data(),
-                                            &left_num,
-                                            left_ipm_pts.data(),
-                                            &left_ipm_num,
-                                            target,
-                                            false,
-                                            g_vision_runtime_config.circle_guide_anchor_offset_stage3,
-                                            true,
-                                            g_src_left_circle_guide_x,
-                                            g_src_left_circle_guide_y,
-                                            &g_src_left_circle_guide_count);
+            const maze_point_t fixed_start = (left_regular_num > 0) ? left_regular_pts[0]
+                                                                    : ((left_num > 0) ? left_pts[0] : maze_point_t{1, maze_start_row});
+            maze_point_t target = fixed_start;
+            if (find_circle_stage3_target_on_regular_boundary(right_regular_pts.data(),
+                                                              right_regular_num,
+                                                              false,
+                                                              g_vision_runtime_config.circle_guide_target_offset_stage3,
+                                                              &target))
+            {
+                std::array<maze_point_t, VISION_BOUNDARY_NUM> guide_pts{};
+                const int guide_num = build_line_points_between(fixed_start,
+                                                                target,
+                                                                guide_pts.data(),
+                                                                static_cast<int>(guide_pts.size()));
+                if (guide_num > 0)
+                {
+                    copy_boundary_points(guide_pts.data(), guide_num, left_pts.data(), VISION_BOUNDARY_NUM);
+                    left_num = std::clamp(guide_num, 0, VISION_BOUNDARY_NUM);
+                    copy_boundary_points(guide_pts.data(), guide_num, left_ipm_pts.data(), VISION_BOUNDARY_NUM);
+                    left_ipm_num = std::clamp(guide_num, 0, VISION_BOUNDARY_NUM);
+                    int cached_count = 0;
+                    fill_single_line_arrays_from_points(guide_pts.data(),
+                                                        guide_num,
+                                                        g_src_left_circle_guide_x,
+                                                        g_src_left_circle_guide_y,
+                                                        &cached_count,
+                                                        kProcWidth,
+                                                        kProcHeight);
+                    g_src_left_circle_guide_count = static_cast<uint16>(std::clamp(cached_count, 0, VISION_BOUNDARY_NUM));
+                }
+            }
         }
         else if (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_5)
         {
-            maze_point_t target = (left_regular_num > 0) ? left_regular_pts[0]
-                                                         : ((left_num > 0) ? left_pts[0] : maze_point_t{1, maze_start_row});
-            bool replace_left_boundary = true;
-            if (route_input.left_corner_found)
+            const maze_point_t start = route_input.left_corner_found
+                                           ? maze_point_t{route_input.left_corner_x, route_input.left_corner_y}
+                                           : ((left_regular_num > 0) ? left_regular_pts[0]
+                                                                     : ((left_num > 0) ? left_pts[0]
+                                                                                       : maze_point_t{1, maze_start_row}));
+            maze_point_t target{kProcWidth - 2, 1};
+            if (!find_circle_stage5_target_on_regular_boundary(right_regular_pts.data(),
+                                                               right_regular_num,
+                                                               false,
+                                                               &target))
             {
-                target = {route_input.left_corner_x, route_input.left_corner_y};
-                left_num = truncate_boundary_at_cross_lower_corner_inplace(left_pts.data(),
-                                                                           left_num,
-                                                                           route_input.left_corner_x,
-                                                                           route_input.left_corner_y,
-                                                                           static_cast<int>(left_pts.size()));
-                left_ipm_num = truncate_boundary_at_cross_lower_corner_inplace(left_ipm_pts.data(),
-                                                                               left_ipm_num,
-                                                                               route_input.left_corner_x,
-                                                                               route_input.left_corner_y,
-                                                                               static_cast<int>(left_ipm_pts.size()));
-                replace_left_boundary = false;
+                target = maze_point_t{kProcWidth - 2, 1};
             }
-            apply_circle_guide_line_to_side(right_trace_pts_raw.data(),
-                                            right_trace_raw_num,
-                                            left_pts.data(),
-                                            &left_num,
-                                            left_ipm_pts.data(),
-                                            &left_ipm_num,
-                                            target,
-                                            false,
-                                            g_vision_runtime_config.circle_guide_anchor_offset_stage5,
-                                            replace_left_boundary,
-                                            g_src_left_circle_guide_x,
-                                            g_src_left_circle_guide_y,
-                                            &g_src_left_circle_guide_count);
+            std::array<maze_point_t, VISION_BOUNDARY_NUM> guide_pts{};
+            const int guide_num = build_line_points_between(start,
+                                                            target,
+                                                            guide_pts.data(),
+                                                            static_cast<int>(guide_pts.size()));
+            if (guide_num > 0)
+            {
+                copy_boundary_points(guide_pts.data(), guide_num, left_pts.data(), VISION_BOUNDARY_NUM);
+                left_num = std::clamp(guide_num, 0, VISION_BOUNDARY_NUM);
+                copy_boundary_points(guide_pts.data(), guide_num, left_ipm_pts.data(), VISION_BOUNDARY_NUM);
+                left_ipm_num = std::clamp(guide_num, 0, VISION_BOUNDARY_NUM);
+                int cached_count = 0;
+                fill_single_line_arrays_from_points(guide_pts.data(),
+                                                    guide_num,
+                                                    g_src_left_circle_guide_x,
+                                                    g_src_left_circle_guide_y,
+                                                    &cached_count,
+                                                    kProcWidth,
+                                                    kProcHeight);
+                g_src_left_circle_guide_count = static_cast<uint16>(std::clamp(cached_count, 0, VISION_BOUNDARY_NUM));
+            }
         }
     }
 

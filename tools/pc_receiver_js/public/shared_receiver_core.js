@@ -90,16 +90,17 @@
 
   function formatRouteMainState(state) {
     if (state === 0) return '正常巡线';
-    if (state === 1) return '左环岛';
-    if (state === 2) return '右环岛';
-    if (state === 3) return '交叉口';
+    if (state === 1) return '直道态';
+    if (state === 2) return '左环岛';
+    if (state === 3) return '右环岛';
+    if (state === 4) return '交叉口(保留)';
     return `未知主状态(${state})`;
   }
 
   function formatRouteSubState(state) {
     if (state === 0) return '无子状态';
-    if (state === 1) return '十字-准备进入';
-    if (state === 2) return '十字-穿越中';
+    if (state === 1) return '十字-准备进入(保留)';
+    if (state === 2) return '十字-穿越中(保留)';
     if (state === 3) return '左环岛-circle_1';
     if (state === 4) return '左环岛-circle_2';
     if (state === 5) return '左环岛-circle_3';
@@ -132,6 +133,38 @@
     return Math.hypot(ax - bx, ay - by);
   }
 
+  function toFiniteNumber(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function countPointSeries(series) {
+    if (Array.isArray(series)) return series.length;
+    return null;
+  }
+
+  function formatHit(hit) {
+    return hit ? '命中' : '未命中';
+  }
+
+  function describeRouteSubState(subState) {
+    if (subState === 3) return '入口观察阶段，等待左侧起始贴左边框累计达到进入阈值。';
+    if (subState === 4) return '已贴左边框，等待左侧起始贴边消失，准备进入第一次补右线。';
+    if (subState === 5) return '执行左环 stage3，右线由补线接管，等待右侧起始贴边连续增大。';
+    if (subState === 6) return '等待右侧角点出现，确认已经推进到出环前半段。';
+    if (subState === 7) return '执行左环 stage5，继续补右线，等待右侧重新连续贴右边框。';
+    if (subState === 8) return '收尾阶段，搜线起始行抬高，等待双侧重新都成为直边。';
+    if (subState === 9) return '入口观察阶段，等待右侧起始贴右边框累计达到进入阈值。';
+    if (subState === 10) return '已贴右边框，等待右侧起始贴边消失，准备进入第一次补左线。';
+    if (subState === 11) return '执行右环 stage3，左线由补线接管，等待左侧起始贴边连续增大。';
+    if (subState === 12) return '等待左侧角点出现，确认已经推进到出环前半段。';
+    if (subState === 13) return '执行右环 stage5，继续补左线，等待左侧重新连续贴左边框。';
+    if (subState === 14) return '收尾阶段，搜线起始行抬高，等待双侧重新都成为直边。';
+    if (subState === 1) return '十字子状态当前保留，主线未使用。';
+    if (subState === 2) return '十字子状态当前保留，主线未使用。';
+    return '普通巡线阶段。';
+  }
+
   function buildRouteStateSummary(status) {
     const mainStateRaw = Number(status && status.route_main_state);
     const subStateRaw = Number(status && status.route_sub_state);
@@ -160,8 +193,49 @@
     const cornerDistance = pointDistance(leftCornerPoint, rightCornerPoint);
     const leftHasFrameWall = toBool(status && status.src_left_trace_has_frame_wall);
     const rightHasFrameWall = toBool(status && status.src_right_trace_has_frame_wall);
-    const leftStartFrameRows = Number(status && status.left_start_frame_wall_rows);
-    const rightStartFrameRows = Number(status && status.right_start_frame_wall_rows);
+    const leftStartFrameRows = toFiniteNumber(status && status.left_start_frame_wall_rows);
+    const rightStartFrameRows = toFiniteNumber(status && status.right_start_frame_wall_rows);
+    const leftBoundaryCount = countPointSeries(status && status.left_boundary);
+    const rightBoundaryCount = countPointSeries(status && status.right_boundary);
+    const leftGuideCount = countPointSeries(status && status.left_circle_guide_line);
+    const rightGuideCount = countPointSeries(status && status.right_circle_guide_line);
+    const leftCornerIndex = toFiniteNumber(status && status.cross_lower_left_corner_index);
+    const rightCornerIndex = toFiniteNumber(status && status.cross_lower_right_corner_index);
+    const leftCornerY = leftCornerPoint && leftCornerPoint.length >= 2 ? toFiniteNumber(leftCornerPoint[1]) : null;
+    const rightCornerY = rightCornerPoint && rightCornerPoint.length >= 2 ? toFiniteNumber(rightCornerPoint[1]) : null;
+    const routeCircleDetectionEnabled = toBool(status && status.route_circle_detection_enabled);
+    const circleEntryMinBoundaryCount = toFiniteNumber(status && status.route_circle_entry_min_boundary_count);
+    const circleEntryCornerTailMargin = toFiniteNumber(status && status.route_circle_entry_corner_tail_margin);
+    const circleStageEnterRows = toFiniteNumber(status && status.route_circle_stage_frame_wall_rows_enter);
+    const circleStage3RowsTrigger = toFiniteNumber(status && status.route_circle_stage3_frame_wall_rows_trigger);
+    const circleStage6MazeStartRow = toFiniteNumber(status && status.route_circle_stage6_maze_start_row);
+    const circleGuideMinSegmentLen = toFiniteNumber(status && status.circle_guide_min_frame_wall_segment_len);
+    const circleGuideTargetOffsetStage3 = toFiniteNumber(status && status.circle_guide_target_offset_stage3);
+    const circleGuideAnchorOffsetStage5 = toFiniteNumber(status && status.circle_guide_anchor_offset_stage5);
+    const leftCircleEntryHit =
+      routeCircleDetectionEnabled &&
+      rightStraight &&
+      leftCornerFound &&
+      leftCornerY !== null &&
+      leftCornerY > 60 &&
+      leftCornerIndex !== null &&
+      rightBoundaryCount !== null &&
+      circleEntryMinBoundaryCount !== null &&
+      circleEntryCornerTailMargin !== null &&
+      rightBoundaryCount > circleEntryMinBoundaryCount &&
+      leftCornerIndex < (rightBoundaryCount - circleEntryCornerTailMargin);
+    const rightCircleEntryHit =
+      routeCircleDetectionEnabled &&
+      leftStraight &&
+      rightCornerFound &&
+      rightCornerY !== null &&
+      rightCornerY > 60 &&
+      rightCornerIndex !== null &&
+      leftBoundaryCount !== null &&
+      circleEntryMinBoundaryCount !== null &&
+      circleEntryCornerTailMargin !== null &&
+      leftBoundaryCount > circleEntryMinBoundaryCount &&
+      rightCornerIndex < (leftBoundaryCount - circleEntryCornerTailMargin);
 
     function toBool(value) {
       if (value === true || value === false) return value;
@@ -170,14 +244,29 @@
     }
 
     const clues = [];
+    clues.push(`阶段说明：${describeRouteSubState(subState)}`);
     clues.push(`原图角点：左=${leftCornerFound ? '有' : '无'}，右=${rightCornerFound ? '有' : '无'}`);
+    clues.push(`原图直边：左=${leftStraight ? '有' : '无'}，右=${rightStraight ? '有' : '无'}`);
     clues.push(`边框墙：左=${leftHasFrameWall ? '有' : '无'}，右=${rightHasFrameWall ? '有' : '无'}`);
-    if (Number.isFinite(leftStartFrameRows) || Number.isFinite(rightStartFrameRows)) {
-      clues.push(`起始贴边：左=${Number.isFinite(leftStartFrameRows) ? leftStartFrameRows : '--'}，右=${Number.isFinite(rightStartFrameRows) ? rightStartFrameRows : '--'}`);
+    if (leftStartFrameRows !== null || rightStartFrameRows !== null) {
+      clues.push(`起始贴边：左=${leftStartFrameRows !== null ? leftStartFrameRows : '--'}，右=${rightStartFrameRows !== null ? rightStartFrameRows : '--'}`);
+    }
+    if (leftBoundaryCount !== null || rightBoundaryCount !== null) {
+      clues.push(`边界点数：左=${leftBoundaryCount !== null ? leftBoundaryCount : '--'}，右=${rightBoundaryCount !== null ? rightBoundaryCount : '--'}`);
+    }
+    if (leftGuideCount !== null || rightGuideCount !== null) {
+      clues.push(`圆环辅助线：左=${leftGuideCount !== null ? leftGuideCount : '--'}，右=${rightGuideCount !== null ? rightGuideCount : '--'}`);
+    }
+    if (leftCornerIndex !== null || rightCornerIndex !== null) {
+      clues.push(`角点索引：左=${leftCornerIndex !== null ? leftCornerIndex : '--'}，右=${rightCornerIndex !== null ? rightCornerIndex : '--'}`);
+    }
+    if (leftCornerY !== null || rightCornerY !== null) {
+      clues.push(`角点y：左=${leftCornerY !== null ? leftCornerY : '--'}，右=${rightCornerY !== null ? rightCornerY : '--'}`);
     }
     if (cornerDistance !== null) {
       clues.push(`双角点距离：${cornerDistance.toFixed(1)} px`);
     }
+    clues.push(`状态机开关：圆环=${routeCircleDetectionEnabled ? '开' : '关'}`);
 
     const judgments = [];
     let nextStateLabel = '保持当前状态';
@@ -193,96 +282,108 @@
     };
 
     if (mainState === 0) {
-      if (leftCornerFound && rightCornerFound) {
-        judgments.push(cornerDistance !== null && cornerDistance < 40
-          ? '双角点都存在且距离已接近交叉阈值，当前更接近交叉口判定。'
-          : '双角点都存在，但距离还未压到交叉阈值，当前仍保持正常巡线。');
+      const straightStateHit = leftStraight && rightStraight && !leftCornerFound && !rightCornerFound;
+      if (straightStateHit) {
+        judgments.push('双侧都为直边且双侧都没有角点，下一次状态更新会进入直道态。');
+      } else if (!routeCircleDetectionEnabled) {
+        judgments.push('圆环状态机当前关闭，页面只展示输入特征，不会进入 circle 状态。');
+      } else if (leftCircleEntryHit) {
+        judgments.push('左环入口条件已完整命中，下一次状态更新会进入左环岛 circle_1。');
+      } else if (rightCircleEntryHit) {
+        judgments.push('右环入口条件已完整命中，下一次状态更新会进入右环岛 circle_1。');
       } else if (leftCornerFound && rightStraight) {
-        judgments.push('左侧出现角点、右侧仍保持直边，当前更像左环岛进入前的候选状态。');
+        judgments.push('左侧角点和右侧直边已经出现，但边界点数或角点索引余量还没完全满足左环入口阈值。');
       } else if (rightCornerFound && leftStraight) {
-        judgments.push('右侧出现角点、左侧仍保持直边，当前更像右环岛进入前的候选状态。');
+        judgments.push('右侧角点和左侧直边已经出现，但边界点数或角点索引余量还没完全满足右环入口阈值。');
       } else {
-        judgments.push('当前没有同时触发角点与直边的强切换条件，状态机继续留在正常巡线。');
+        judgments.push('当前没有满足圆环入口的组合条件，状态机继续留在正常巡线。');
       }
 
-      pushCondition('双角点交叉候选', (leftCornerFound && rightCornerFound && cornerDistance !== null && cornerDistance < 40) ? '命中' : '未命中', '双侧都检测到角点且距离 < 40');
+      pushCondition('直道态入口', formatHit(straightStateHit), '左直边=1 右直边=1 左角点=0 右角点=0');
+      pushCondition('左环入口', formatHit(!!leftCircleEntryHit), `右直边=${rightStraight ? 1 : 0} 左角点=${leftCornerFound ? 1 : 0} 左角点y=${leftCornerY !== null ? leftCornerY : '--'}>60 右点数=${rightBoundaryCount !== null ? rightBoundaryCount : '--'}>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'} 左角点索引=${leftCornerIndex !== null ? leftCornerIndex : '--'} < 右点数-${circleEntryCornerTailMargin !== null ? circleEntryCornerTailMargin : '--'}`);
+      pushCondition('右环入口', formatHit(!!rightCircleEntryHit), `左直边=${leftStraight ? 1 : 0} 右角点=${rightCornerFound ? 1 : 0} 右角点y=${rightCornerY !== null ? rightCornerY : '--'}>60 左点数=${leftBoundaryCount !== null ? leftBoundaryCount : '--'}>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'} 右角点索引=${rightCornerIndex !== null ? rightCornerIndex : '--'} < 左点数-${circleEntryCornerTailMargin !== null ? circleEntryCornerTailMargin : '--'}`);
 
-      if (leftCornerFound && rightStraight) {
+      if (straightStateHit) {
+        nextStateLabel = '直道态';
+        nextReasons.push('当前帧满足双侧直边且双侧无角点，状态机会切到直道态。');
+      } else if (leftCircleEntryHit) {
         nextStateLabel = '左环岛-circle_1';
-        nextReasons.push('右侧保持直边且左侧检测到角点时，满足左环岛入口条件。');
-      } else if (rightCornerFound && leftStraight) {
+        nextReasons.push('当前帧已经满足左环入口的全部判据，状态机会把偏好源切到右边界。');
+      } else if (rightCircleEntryHit) {
         nextStateLabel = '右环岛-circle_1';
-        nextReasons.push('左侧保持直边且右侧检测到角点时，满足右环岛入口条件。');
-      } else if (leftCornerFound && rightCornerFound && cornerDistance !== null && cornerDistance < 40) {
-        nextStateLabel = '十字-准备进入';
-        nextReasons.push('双角点距离已压到交叉阈值内。');
+        nextReasons.push('当前帧已经满足右环入口的全部判据，状态机会把偏好源切到左边界。');
       } else {
-        nextReasons.push('当前圆环或十字入口条件都未命中，保持正常巡线。');
-      }
-    } else if (mainState === 3) {
-      if (subState === 1) {
-        judgments.push('当前处于 cross_begin：等待任一侧角点原图 y 超过阈值后，下一帧切入 cross_in。');
-        nextStateLabel = '十字-穿越中';
-        nextReasons.push('任一侧角点 y 超过 45 后，从 cross_begin 切到 cross_in。');
-        pushCondition('左角点 y > 45', Number(status && status.cross_lower_left_corner_point && status.cross_lower_left_corner_point[1]) > 45 ? '命中' : '未命中', `当前 y=${Array.isArray(status && status.cross_lower_left_corner_point) ? status.cross_lower_left_corner_point[1] : '--'}`);
-        pushCondition('右角点 y > 45', Number(status && status.cross_lower_right_corner_point && status.cross_lower_right_corner_point[1]) > 45 ? '命中' : '未命中', `当前 y=${Array.isArray(status && status.cross_lower_right_corner_point) ? status.cross_lower_right_corner_point[1] : '--'}`);
-      } else if (subState === 2) {
-        judgments.push(`当前处于 cross_in：正在按保存起始行向下搜线，当前探测停止行=${crossLossCount !== null ? crossLossCount : -1}（>=80 将退出）。`);
-        nextStateLabel = (crossLossCount !== null && crossLossCount >= 80) ? '正常巡线' : '十字-穿越中';
-        nextReasons.push('cross_detected_stop_row >= 80 时退出十字。');
-        pushCondition('cross_detected_stop_row >= 80', (crossLossCount !== null && crossLossCount >= 80) ? '命中' : '未命中', `当前=${crossLossCount !== null ? crossLossCount : '--'}`);
-      } else {
-        judgments.push(`交叉口状态下，当前探测停止行为 ${crossLossCount !== null ? crossLossCount : -1}，用于判断何时退出交叉口。`);
-        nextReasons.push('等待 cross_begin / cross_in 细分判据推进。');
+        nextReasons.push('圆环入口条件未全部命中，继续保持正常巡线。');
       }
     } else if (mainState === 1) {
-      judgments.push(`左环岛状态下，优先使用 ${formatRoutePreferredSource(preferredSource)} 构造中线。`);
-      pushCondition('左起始贴边行数', Number.isFinite(leftStartFrameRows) ? leftStartFrameRows : '--', 'circle_1>=15，circle_2 需回到 0');
-      pushCondition('右起始贴边行数', Number.isFinite(rightStartFrameRows) ? rightStartFrameRows : '--', 'circle_3>20，circle_5>=15');
-      pushCondition('右侧角点', rightCornerFound ? '命中' : '未命中', 'circle_4 进入 circle_5');
-      pushCondition('双侧直边', (leftStraight && rightStraight) ? '命中' : '未命中', 'circle_6 返回正常巡线');
+      judgments.push('当前处于直道态：两侧都为直边，且两侧都没有角点。');
+      pushCondition('双侧直边且无角点', formatHit(leftStraight && rightStraight && !leftCornerFound && !rightCornerFound), '任一侧出现角点或不再同时为直边时，先退回 normal');
+      nextStateLabel = '直道态';
+      nextReasons.push('当前仍满足直道态保持条件。');
+      if (!(leftStraight && rightStraight && !leftCornerFound && !rightCornerFound)) {
+        nextStateLabel = '正常巡线';
+        nextReasons[0] = '直道态保持条件被破坏，状态机先退回 normal，再按 normal 规则判断后续状态。';
+      }
+    } else if (mainState === 4) {
+      judgments.push('该状态位当前在网页端仅保留原始显示，不再额外推断旧十字状态机逻辑。');
+      nextReasons.push('请以实际 route_main_state / route_sub_state 原始值为准。');
+      pushCondition('保留状态', subState !== null ? subState : '--', '当前页面不再扩展旧十字状态说明');
+    } else if (mainState === 2) {
+      judgments.push(`左环岛状态下，当前固定偏向 ${formatRoutePreferredSource(preferredSource)}。`);
+      if (subState === 5 || subState === 7) {
+        judgments.push(`当前处于补右线阶段，右侧辅助线点数=${rightGuideCount !== null ? rightGuideCount : 0}。`);
+      }
+      pushCondition('左起始贴边行数', leftStartFrameRows !== null ? leftStartFrameRows : '--', `circle_1 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}，circle_2 需回到 0`);
+      pushCondition('右起始贴边行数', rightStartFrameRows !== null ? rightStartFrameRows : '--', `circle_3 > ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'}，circle_5 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}`);
+      pushCondition('右侧角点', formatHit(rightCornerFound), 'circle_4 进入 circle_5');
+      pushCondition('右侧辅助线', rightGuideCount !== null ? rightGuideCount : '--', `stage3 offset=${circleGuideTargetOffsetStage3 !== null ? circleGuideTargetOffsetStage3 : '--'} stage5 offset=${circleGuideAnchorOffsetStage5 !== null ? circleGuideAnchorOffsetStage5 : '--'} 最短贴边段=${circleGuideMinSegmentLen !== null ? circleGuideMinSegmentLen : '--'}`);
+      pushCondition('双侧直边', formatHit(leftStraight && rightStraight), `circle_6 返回正常巡线，maze_start_row >= ${circleStage6MazeStartRow !== null ? circleStage6MazeStartRow : '--'}`);
       if (subState === 3) {
         nextStateLabel = '左环岛-circle_2';
-        nextReasons.push('左边界起始连续贴左边框达到 15 行后，进入 circle_2。');
+        nextReasons.push(`左边界起始连续贴左边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_2。`);
       } else if (subState === 4) {
         nextStateLabel = '左环岛-circle_3';
         nextReasons.push('左边界起始行不再贴左边框时，进入 circle_3。');
       } else if (subState === 5) {
         nextStateLabel = '左环岛-circle_4';
-        nextReasons.push('右边界起始连续贴右边框超过 20 行时，进入 circle_4。');
+        nextReasons.push(`右边界起始连续贴右边框超过 ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'} 行时，进入 circle_4。`);
       } else if (subState === 6) {
         nextStateLabel = '左环岛-circle_5';
         nextReasons.push('右边界检测到角点后，进入 circle_5。');
       } else if (subState === 7) {
         nextStateLabel = '左环岛-circle_6';
-        nextReasons.push('右边界起始连续贴右边框达到 15 行后，进入 circle_6。');
+        nextReasons.push(`右边界起始连续贴右边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_6。`);
       } else if (subState === 8) {
         nextStateLabel = '正常巡线';
         nextReasons.push('双侧重新同时识别为直边后，退出左环岛。');
       } else {
         nextReasons.push('等待左环内部子状态推进。');
       }
-    } else if (mainState === 2) {
-      judgments.push(`右环岛状态下，优先使用 ${formatRoutePreferredSource(preferredSource)} 构造中线。`);
-      pushCondition('右起始贴边行数', Number.isFinite(rightStartFrameRows) ? rightStartFrameRows : '--', 'circle_1>=15，circle_2 需回到 0');
-      pushCondition('左起始贴边行数', Number.isFinite(leftStartFrameRows) ? leftStartFrameRows : '--', 'circle_3>20，circle_5>=15');
-      pushCondition('左侧角点', leftCornerFound ? '命中' : '未命中', 'circle_4 进入 circle_5');
-      pushCondition('双侧直边', (leftStraight && rightStraight) ? '命中' : '未命中', 'circle_6 返回正常巡线');
+    } else if (mainState === 3) {
+      judgments.push(`右环岛状态下，当前固定偏向 ${formatRoutePreferredSource(preferredSource)}。`);
+      if (subState === 11 || subState === 13) {
+        judgments.push(`当前处于补左线阶段，左侧辅助线点数=${leftGuideCount !== null ? leftGuideCount : 0}。`);
+      }
+      pushCondition('右起始贴边行数', rightStartFrameRows !== null ? rightStartFrameRows : '--', `circle_1 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}，circle_2 需回到 0`);
+      pushCondition('左起始贴边行数', leftStartFrameRows !== null ? leftStartFrameRows : '--', `circle_3 > ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'}，circle_5 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}`);
+      pushCondition('左侧角点', formatHit(leftCornerFound), 'circle_4 进入 circle_5');
+      pushCondition('左侧辅助线', leftGuideCount !== null ? leftGuideCount : '--', `stage3 offset=${circleGuideTargetOffsetStage3 !== null ? circleGuideTargetOffsetStage3 : '--'} stage5 offset=${circleGuideAnchorOffsetStage5 !== null ? circleGuideAnchorOffsetStage5 : '--'} 最短贴边段=${circleGuideMinSegmentLen !== null ? circleGuideMinSegmentLen : '--'}`);
+      pushCondition('双侧直边', formatHit(leftStraight && rightStraight), `circle_6 返回正常巡线，maze_start_row >= ${circleStage6MazeStartRow !== null ? circleStage6MazeStartRow : '--'}`);
       if (subState === 9) {
         nextStateLabel = '右环岛-circle_2';
-        nextReasons.push('右边界起始连续贴右边框达到 15 行后，进入 circle_2。');
+        nextReasons.push(`右边界起始连续贴右边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_2。`);
       } else if (subState === 10) {
         nextStateLabel = '右环岛-circle_3';
         nextReasons.push('右边界起始行不再贴右边框时，进入 circle_3。');
       } else if (subState === 11) {
         nextStateLabel = '右环岛-circle_4';
-        nextReasons.push('左边界起始连续贴左边框超过 20 行时，进入 circle_4。');
+        nextReasons.push(`左边界起始连续贴左边框超过 ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'} 行时，进入 circle_4。`);
       } else if (subState === 12) {
         nextStateLabel = '右环岛-circle_5';
         nextReasons.push('左边界检测到角点后，进入 circle_5。');
       } else if (subState === 13) {
         nextStateLabel = '右环岛-circle_6';
-        nextReasons.push('左边界起始连续贴左边框达到 15 行后，进入 circle_6。');
+        nextReasons.push(`左边界起始连续贴左边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_6。`);
       } else if (subState === 14) {
         nextStateLabel = '正常巡线';
         nextReasons.push('双侧重新同时识别为直边后，退出右环岛。');
@@ -295,6 +396,10 @@
     }
 
     const counters = [
+      ['左边界点数', leftBoundaryCount],
+      ['右边界点数', rightBoundaryCount],
+      ['左辅助线点数', leftGuideCount],
+      ['右辅助线点数', rightGuideCount],
       ['交叉停止行', Number.isFinite(crossLossCount) ? crossLossCount : null],
       ['左侧丢线', Number.isFinite(leftLossCount) ? leftLossCount : null],
       ['左侧恢复', Number.isFinite(leftGainCount) ? leftGainCount : null],
@@ -595,6 +700,15 @@
     if (Number.isFinite(Number(status.route_left_gain_count))) push('route_left_gain_count', status.route_left_gain_count);
     if (Number.isFinite(Number(status.route_right_loss_count))) push('route_right_loss_count', status.route_right_loss_count);
     if (Number.isFinite(Number(status.route_right_gain_count))) push('route_right_gain_count', status.route_right_gain_count);
+    if (hasValue(status.route_circle_detection_enabled)) push('route_circle_detection_enabled', status.route_circle_detection_enabled);
+    if (Number.isFinite(Number(status.route_circle_entry_min_boundary_count))) push('route_circle_entry_min_boundary_count', status.route_circle_entry_min_boundary_count);
+    if (Number.isFinite(Number(status.route_circle_entry_corner_tail_margin))) push('route_circle_entry_corner_tail_margin', status.route_circle_entry_corner_tail_margin);
+    if (Number.isFinite(Number(status.route_circle_stage_frame_wall_rows_enter))) push('route_circle_stage_frame_wall_rows_enter', status.route_circle_stage_frame_wall_rows_enter);
+    if (Number.isFinite(Number(status.route_circle_stage3_frame_wall_rows_trigger))) push('route_circle_stage3_frame_wall_rows_trigger', status.route_circle_stage3_frame_wall_rows_trigger);
+    if (Number.isFinite(Number(status.route_circle_stage6_maze_start_row))) push('route_circle_stage6_maze_start_row', status.route_circle_stage6_maze_start_row);
+    if (Number.isFinite(Number(status.circle_guide_min_frame_wall_segment_len))) push('circle_guide_min_frame_wall_segment_len', status.circle_guide_min_frame_wall_segment_len);
+    if (Number.isFinite(Number(status.circle_guide_target_offset_stage3))) push('circle_guide_target_offset_stage3', status.circle_guide_target_offset_stage3);
+    if (Number.isFinite(Number(status.circle_guide_anchor_offset_stage5))) push('circle_guide_anchor_offset_stage5', status.circle_guide_anchor_offset_stage5);
     push('ipm_track_index', status.ipm_track_index);
     if (Array.isArray(status.ipm_track_point)) push('ipm_track_point', formatArrayInline(status.ipm_track_point));
     push('eight_left_first_frame_touch_index', status.eight_left_first_frame_touch_index);

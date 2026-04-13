@@ -223,7 +223,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    .udp_web_server_ip = "10.120.166.102",
+    .udp_web_server_ip = "172.21.79.129",
+    // .udp_web_server_ip = "10.120.166.102",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -264,7 +265,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 十字下角点补线向上的延伸长度（按 y 行数计算）。
     .cross_lower_corner_extrapolate_y_span = 15,
     // 原图直边判断：检查边界数组前 60 个点。
-    .src_boundary_straight_check_count = 60,
+    .src_boundary_straight_check_count = 90,
     // 原图直边判断：前 N 个点中 90% 以上为 dir=4/5 判定为直边。
     .src_boundary_straight_dir45_ratio_min = 0.90f,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
@@ -323,13 +324,15 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 圆环入口判定：角点索引距离边界尾部至少保留的余量。
     .route_circle_entry_corner_tail_margin = 20,
     // 圆环状态 1/5 的起始贴边连续行数阈值。
-    .route_circle_stage_frame_wall_rows_enter = 15,
+    .route_circle_stage_frame_wall_rows_enter = 30,
     // 圆环状态 3 的对侧起始贴边连续行数触发阈值。
     .route_circle_stage3_frame_wall_rows_trigger = 70,
+    // 圆环状态 6：搜线起始行至少抬高到该行。
+    .route_circle_stage6_maze_start_row = 70,
     // 圆环补线：贴边连续段最小长度阈值。
     .circle_guide_min_frame_wall_segment_len = 8,
-    // 圆环 state3 补线锚点向后偏移索引。
-    .circle_guide_anchor_offset_stage3 = 40,
+    // 圆环 state3 补线左/右目标点在规则边界上的后移索引。
+    .circle_guide_target_offset_stage3 = 5,
     // 圆环 state5 补线锚点向后偏移索引。
     .circle_guide_anchor_offset_stage5 = 0,
     // ==================== 参数区域 2: 偏差计算 ====================

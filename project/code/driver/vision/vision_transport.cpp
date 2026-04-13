@@ -951,6 +951,16 @@ static void send_tcp_status()
     append_int(true, "route_left_gain_count", vision_image_processor_route_left_gain_count());
     append_int(true, "route_right_loss_count", vision_image_processor_route_right_loss_count());
     append_int(true, "route_right_gain_count", vision_image_processor_route_right_gain_count());
+    append_bool(true, "route_cross_detection_enabled", g_vision_runtime_config.route_cross_detection_enabled);
+    append_bool(true, "route_circle_detection_enabled", g_vision_runtime_config.route_circle_detection_enabled);
+    append_int(true, "route_circle_entry_min_boundary_count", g_vision_runtime_config.route_circle_entry_min_boundary_count);
+    append_int(true, "route_circle_entry_corner_tail_margin", g_vision_runtime_config.route_circle_entry_corner_tail_margin);
+    append_int(true, "route_circle_stage_frame_wall_rows_enter", g_vision_runtime_config.route_circle_stage_frame_wall_rows_enter);
+    append_int(true, "route_circle_stage3_frame_wall_rows_trigger", g_vision_runtime_config.route_circle_stage3_frame_wall_rows_trigger);
+    append_int(true, "route_circle_stage6_maze_start_row", g_vision_runtime_config.route_circle_stage6_maze_start_row);
+    append_int(true, "circle_guide_min_frame_wall_segment_len", g_vision_runtime_config.circle_guide_min_frame_wall_segment_len);
+    append_int(true, "circle_guide_target_offset_stage3", g_vision_runtime_config.circle_guide_target_offset_stage3);
+    append_int(true, "circle_guide_anchor_offset_stage5", g_vision_runtime_config.circle_guide_anchor_offset_stage5);
     append_bool(true, "src_left_trace_has_frame_wall", src_left_trace_has_frame_wall);
     append_bool(true, "src_right_trace_has_frame_wall", src_right_trace_has_frame_wall);
     append_int(true, "left_start_frame_wall_rows", src_left_start_frame_wall_rows);

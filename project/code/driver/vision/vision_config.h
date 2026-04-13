@@ -251,14 +251,22 @@ typedef struct
     int route_circle_entry_min_boundary_count;
     // 圆环入口判定：角点索引需小于“对侧边界点数 - 该余量”。
     int route_circle_entry_corner_tail_margin;
+    // 圆环入口判定：从角点 y 往上偏移多少行后开始检查原始边界间距。
+    int route_circle_entry_corner_row_offset;
+    // 圆环入口判定：连续检查多少行原始左右边界间距。
+    int route_circle_entry_gap_check_rows;
+    // 圆环入口判定：原始左右边界在每个检查行上的最小间距阈值（px）。
+    int route_circle_entry_min_raw_boundary_gap;
     // 圆环状态 1/5 进入下一阶段时，起始贴边连续行数阈值。
     int route_circle_stage_frame_wall_rows_enter;
     // 圆环状态 3 进入下一阶段时，对侧起始贴边连续行数阈值。
     int route_circle_stage3_frame_wall_rows_trigger;
+    // 圆环状态 6：搜线起始行至少抬高到该行。
+    int route_circle_stage6_maze_start_row;
     // 圆环补线：规则/原始边界中，贴边连续段最小长度阈值。
     int circle_guide_min_frame_wall_segment_len;
-    // 圆环 state3 补线：贴边连续段结束后，锚点向后偏移的索引数。
-    int circle_guide_anchor_offset_stage3;
+    // 圆环 state3 补线：对侧规则边界目标点在贴边连续段结束后向后偏移的索引数。
+    int circle_guide_target_offset_stage3;
     // 圆环 state5 补线：贴边连续段结束后，锚点向后偏移的索引数。
     int circle_guide_anchor_offset_stage5;
 

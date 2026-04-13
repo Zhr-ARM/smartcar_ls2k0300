@@ -58,8 +58,10 @@ static bool left_circle_entry_ready(const vision_route_state_input_t *input)
 
     return input->right_straight &&
            input->left_corner_found &&
+           input->left_corner_y > 60 &&
            input->left_corner_index >= 0 &&
            input->right_boundary_count > g_vision_runtime_config.route_circle_entry_min_boundary_count &&
+           input->left_circle_entry_raw_gap_ok &&
            input->left_corner_index < (input->right_boundary_count - g_vision_runtime_config.route_circle_entry_corner_tail_margin);
 }
 
@@ -72,9 +74,24 @@ static bool right_circle_entry_ready(const vision_route_state_input_t *input)
 
     return input->left_straight &&
            input->right_corner_found &&
+           input->right_corner_y > 60 &&
            input->right_corner_index >= 0 &&
            input->left_boundary_count > g_vision_runtime_config.route_circle_entry_min_boundary_count &&
+           input->right_circle_entry_raw_gap_ok &&
            input->right_corner_index < (input->left_boundary_count - g_vision_runtime_config.route_circle_entry_corner_tail_margin);
+}
+
+static bool straight_state_ready(const vision_route_state_input_t *input)
+{
+    if (input == nullptr)
+    {
+        return false;
+    }
+
+    return input->left_straight &&
+           input->right_straight &&
+           !input->left_corner_found &&
+           !input->right_corner_found;
 }
 
 } // namespace
@@ -106,7 +123,13 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
     {
     case VISION_ROUTE_MAIN_NORMAL:
         g_preferred_source = normalize_preferred_source(input->base_preferred_source);
-        if (g_vision_runtime_config.route_circle_detection_enabled)
+        if (straight_state_ready(input))
+        {
+            enter_state(VISION_ROUTE_MAIN_STRAIGHT,
+                        VISION_ROUTE_SUB_NONE,
+                        input->base_preferred_source);
+        }
+        else if (g_vision_runtime_config.route_circle_detection_enabled)
         {
             if (left_circle_entry_ready(input))
             {
@@ -120,6 +143,15 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
                             VISION_ROUTE_SUB_CIRCLE_RIGHT_1,
                             VISION_ROUTE_PREFERRED_SOURCE_LEFT);
             }
+        }
+        break;
+    case VISION_ROUTE_MAIN_STRAIGHT:
+        g_preferred_source = normalize_preferred_source(input->base_preferred_source);
+        if (!straight_state_ready(input))
+        {
+            enter_state(VISION_ROUTE_MAIN_NORMAL,
+                        VISION_ROUTE_SUB_NONE,
+                        input->base_preferred_source);
         }
         break;
     case VISION_ROUTE_MAIN_CIRCLE_LEFT:
@@ -143,6 +175,7 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
             }
             break;
         case VISION_ROUTE_SUB_CIRCLE_LEFT_3:
+            g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_LEFT;
             if (input->right_start_frame_wall_rows > g_vision_runtime_config.route_circle_stage3_frame_wall_rows_trigger)
             {
                 enter_state(VISION_ROUTE_MAIN_CIRCLE_LEFT,
@@ -151,6 +184,7 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
             }
             break;
         case VISION_ROUTE_SUB_CIRCLE_LEFT_4:
+            g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_LEFT;
             if (input->right_corner_found)
             {
                 enter_state(VISION_ROUTE_MAIN_CIRCLE_LEFT,
@@ -159,6 +193,7 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
             }
             break;
         case VISION_ROUTE_SUB_CIRCLE_LEFT_5:
+            g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_LEFT;
             if (input->right_start_frame_wall_rows >= g_vision_runtime_config.route_circle_stage_frame_wall_rows_enter)
             {
                 enter_state(VISION_ROUTE_MAIN_CIRCLE_LEFT,
@@ -202,6 +237,7 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
             }
             break;
         case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:
+            g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_RIGHT;
             if (input->left_start_frame_wall_rows > g_vision_runtime_config.route_circle_stage3_frame_wall_rows_trigger)
             {
                 enter_state(VISION_ROUTE_MAIN_CIRCLE_RIGHT,
@@ -210,6 +246,7 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
             }
             break;
         case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:
+            g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_RIGHT;
             if (input->left_corner_found)
             {
                 enter_state(VISION_ROUTE_MAIN_CIRCLE_RIGHT,
@@ -218,6 +255,7 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
             }
             break;
         case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:
+            g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_RIGHT;
             if (input->left_start_frame_wall_rows >= g_vision_runtime_config.route_circle_stage_frame_wall_rows_enter)
             {
                 enter_state(VISION_ROUTE_MAIN_CIRCLE_RIGHT,

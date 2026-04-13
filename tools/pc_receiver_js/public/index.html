@@ -131,6 +131,34 @@
       font-weight: 700;
       line-height: 1.2;
     }
+    .route-state-card.route-state-card-replay {
+      background:
+        radial-gradient(circle at top right, rgba(248, 113, 113, 0.12), transparent 24%),
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.15), transparent 28%),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(7, 12, 22, 0.99));
+      border-color: rgba(248, 113, 113, 0.55);
+      box-shadow:
+        0 0 0 1px rgba(248, 113, 113, 0.14),
+        0 18px 40px rgba(2, 6, 23, 0.34);
+    }
+    .route-state-card.route-state-card-replay .title {
+      color: #fecaca;
+      font-size: 15px;
+    }
+    .route-state-card.route-state-card-replay .route-state-value {
+      font-size: 24px;
+    }
+    .route-state-card.route-state-card-replay .route-state-judgment {
+      border-color: rgba(248, 113, 113, 0.35);
+      background: rgba(20, 13, 22, 0.88);
+    }
+    .route-state-card.route-state-card-replay .route-state-next {
+      color: #fde68a;
+    }
+    .route-state-card.route-state-card-replay .route-state-chip {
+      background: rgba(51, 16, 29, 0.58);
+      border-color: rgba(148, 163, 184, 0.28);
+    }
     .view { position: relative; }
     canvas { width: 100%; background: #000; border-radius: 8px; image-rendering: pixelated; display: block; }
     .pixel-info {
@@ -593,6 +621,41 @@
             <div class="playback-grid" id="playbackGrid" style="margin-top:12px;"></div>
           </div>
           <div class="recording-side">
+            <div class="recording-status-panel route-state-card route-state-card-replay">
+              <div class="title">回放状态机高亮</div>
+              <div class="route-state-top">
+                <div class="route-state-stat">
+                  <div class="route-state-label">当前主状态</div>
+                  <div class="route-state-value" id="playbackRouteMainStateValue">--</div>
+                </div>
+                <div class="route-state-stat">
+                  <div class="route-state-label">当前子状态</div>
+                  <div class="route-state-value" id="playbackRouteSubStateValue">--</div>
+                </div>
+                <div class="route-state-stat">
+                  <div class="route-state-label">偏向来源</div>
+                  <div class="route-state-value" id="playbackRoutePreferredSourceValue">--</div>
+                </div>
+                <div class="route-state-stat">
+                  <div class="route-state-label">进入当前状态后编码器</div>
+                  <div class="route-state-value" id="playbackRouteEncoderValue">--</div>
+                </div>
+              </div>
+              <div class="route-state-judgment" id="playbackRouteStateJudgment">等待回放状态机数据...</div>
+              <div class="route-state-grid">
+                <div class="route-state-block">
+                  <div class="route-state-block-title">下一步状态</div>
+                  <div class="route-state-next" id="playbackRouteNextStateValue">--</div>
+                  <div class="route-state-lines" id="playbackRouteNextReason"></div>
+                </div>
+                <div class="route-state-block">
+                  <div class="route-state-block-title">触发条件与当前判定</div>
+                  <div class="route-state-lines" id="playbackRouteConditionLines"></div>
+                </div>
+              </div>
+              <div class="route-state-clues" id="playbackRouteStateClues"></div>
+              <div class="route-state-counters" id="playbackRouteStateCounters"></div>
+            </div>
             <div class="recording-status-panel">
               <div class="title">录制状态</div>
               <pre id="playbackStatus">暂无录制</pre>
@@ -638,7 +701,7 @@
       </div>
     </div>
   </div>
-  <script src="/shared_receiver_core.js"></script>
+  <script src="/shared_receiver_core.js?v=20260413-route-state-2"></script>
   <script>
     const rgbCanvas = document.getElementById('rgbCanvas');
     const rgbCtx = rgbCanvas.getContext('2d');
@@ -715,6 +778,16 @@
     const routeConditionLines = document.getElementById('routeConditionLines');
     const routeStateClues = document.getElementById('routeStateClues');
     const routeStateCounters = document.getElementById('routeStateCounters');
+    const playbackRouteMainStateValue = document.getElementById('playbackRouteMainStateValue');
+    const playbackRouteSubStateValue = document.getElementById('playbackRouteSubStateValue');
+    const playbackRoutePreferredSourceValue = document.getElementById('playbackRoutePreferredSourceValue');
+    const playbackRouteEncoderValue = document.getElementById('playbackRouteEncoderValue');
+    const playbackRouteStateJudgment = document.getElementById('playbackRouteStateJudgment');
+    const playbackRouteNextStateValue = document.getElementById('playbackRouteNextStateValue');
+    const playbackRouteNextReason = document.getElementById('playbackRouteNextReason');
+    const playbackRouteConditionLines = document.getElementById('playbackRouteConditionLines');
+    const playbackRouteStateClues = document.getElementById('playbackRouteStateClues');
+    const playbackRouteStateCounters = document.getElementById('playbackRouteStateCounters');
     const curvatureCard = document.getElementById('curvatureCard');
     const leftBoundaryAngleCosCard = document.getElementById('leftBoundaryAngleCosCard');
     const rightBoundaryAngleCosCard = document.getElementById('rightBoundaryAngleCosCard');
@@ -925,25 +998,25 @@
       });
     }
 
-    function renderRouteStatePanel(status) {
+    function renderRouteStatePanelWithRefs(status, refs) {
       const route = receiverCore.buildRouteStateSummary(status || {});
-      routeMainStateValue.textContent = route.mainStateLabel || '--';
-      routeSubStateValue.textContent = route.subStateLabel || '--';
-      routePreferredSourceValue.textContent = route.preferredSourceLabel || '--';
-      routeEncoderValue.textContent = route.encoderSinceEnter !== null ? `${route.encoderSinceEnter}` : '--';
-      routeStateJudgment.textContent = route.judgments.length > 0 ? route.judgments.join(' ') : '等待状态机数据...';
-      routeNextStateValue.textContent = route.nextStateLabel || '--';
+      refs.mainStateValue.textContent = route.mainStateLabel || '--';
+      refs.subStateValue.textContent = route.subStateLabel || '--';
+      refs.preferredSourceValue.textContent = route.preferredSourceLabel || '--';
+      refs.encoderValue.textContent = route.encoderSinceEnter !== null ? `${route.encoderSinceEnter}` : '--';
+      refs.stateJudgment.textContent = route.judgments.length > 0 ? route.judgments.join(' ') : '等待状态机数据...';
+      refs.nextStateValue.textContent = route.nextStateLabel || '--';
 
-      routeNextReason.innerHTML = '';
+      refs.nextReason.innerHTML = '';
       const nextReasons = route.nextReasons.length > 0 ? route.nextReasons : ['等待状态机数据...'];
       for (const text of nextReasons) {
         const line = document.createElement('div');
         line.className = 'route-state-line';
         line.textContent = text;
-        routeNextReason.appendChild(line);
+        refs.nextReason.appendChild(line);
       }
 
-      routeConditionLines.innerHTML = '';
+      refs.conditionLines.innerHTML = '';
       const conditionLines = route.conditionLines.length > 0
         ? route.conditionLines
         : [{ label: '判定条件', value: '--', detail: '等待状态机数据...' }];
@@ -951,26 +1024,56 @@
         const line = document.createElement('div');
         line.className = 'route-state-line';
         line.innerHTML = `<strong>${item.label}</strong>${item.value}${item.detail ? ` | ${item.detail}` : ''}`;
-        routeConditionLines.appendChild(line);
+        refs.conditionLines.appendChild(line);
       }
 
-      routeStateClues.innerHTML = '';
+      refs.stateClues.innerHTML = '';
       const clues = route.clues.length > 0 ? route.clues : ['暂无可用判定线索'];
       for (const text of clues) {
         const chip = document.createElement('div');
         chip.className = 'route-state-chip';
         chip.textContent = text;
-        routeStateClues.appendChild(chip);
+        refs.stateClues.appendChild(chip);
       }
 
-      routeStateCounters.innerHTML = '';
+      refs.stateCounters.innerHTML = '';
       const counters = route.counters.length > 0 ? route.counters : [['状态计数', null]];
       for (const [label, value] of counters) {
         const counter = document.createElement('div');
         counter.className = 'route-state-counter';
         counter.innerHTML = `<div class="route-state-counter-label">${label}</div><div class="route-state-counter-value">${value === null ? '--' : value}</div>`;
-        routeStateCounters.appendChild(counter);
+        refs.stateCounters.appendChild(counter);
       }
+    }
+
+    function renderRouteStatePanel(status) {
+      renderRouteStatePanelWithRefs(status, {
+        mainStateValue: routeMainStateValue,
+        subStateValue: routeSubStateValue,
+        preferredSourceValue: routePreferredSourceValue,
+        encoderValue: routeEncoderValue,
+        stateJudgment: routeStateJudgment,
+        nextStateValue: routeNextStateValue,
+        nextReason: routeNextReason,
+        conditionLines: routeConditionLines,
+        stateClues: routeStateClues,
+        stateCounters: routeStateCounters
+      });
+    }
+
+    function renderPlaybackRouteStatePanel(status) {
+      renderRouteStatePanelWithRefs(status, {
+        mainStateValue: playbackRouteMainStateValue,
+        subStateValue: playbackRouteSubStateValue,
+        preferredSourceValue: playbackRoutePreferredSourceValue,
+        encoderValue: playbackRouteEncoderValue,
+        stateJudgment: playbackRouteStateJudgment,
+        nextStateValue: playbackRouteNextStateValue,
+        nextReason: playbackRouteNextReason,
+        conditionLines: playbackRouteConditionLines,
+        stateClues: playbackRouteStateClues,
+        stateCounters: playbackRouteStateCounters
+      });
     }
 
     function renderStatusPanels(status) {
@@ -1390,12 +1493,14 @@
         playbackTimeLabel.textContent = `${fmtPlaybackTime(video.currentTime || 0)} / ${fmtPlaybackTime(duration)}`;
         playbackToggleBtn.textContent = video.paused ? '播放' : '暂停';
         playbackStatus.textContent = formatStatusForPanel(synced || {});
+        renderPlaybackRouteStatePanel(synced || {});
         setParamPanelText(formatStatusForPanel(synced || {}));
         return;
       }
       playbackTimeLabel.textContent = '00:00.00 / 00:00.00';
       playbackToggleBtn.textContent = '播放';
       paramPanelMeta.textContent = '还没有可播放的录制内容';
+      renderPlaybackRouteStatePanel({});
       setParamPanelText('waiting...');
     }
 

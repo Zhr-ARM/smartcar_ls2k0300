@@ -6,6 +6,7 @@
 typedef enum
 {
     VISION_ROUTE_MAIN_NORMAL = 0,
+    VISION_ROUTE_MAIN_STRAIGHT,
     VISION_ROUTE_MAIN_CIRCLE_LEFT,
     VISION_ROUTE_MAIN_CIRCLE_RIGHT,
     VISION_ROUTE_MAIN_CROSS
@@ -59,6 +60,8 @@ typedef struct
     int cross_detected_stop_row;
     int left_boundary_count;
     int right_boundary_count;
+    bool left_circle_entry_raw_gap_ok;
+    bool right_circle_entry_raw_gap_ok;
     uint32 frame_encoder_delta;
 } vision_route_state_input_t;
 
