@@ -16,16 +16,18 @@ typedef enum
     VISION_ROUTE_SUB_NONE = 0,
     VISION_ROUTE_SUB_CROSS_BEGIN,
     VISION_ROUTE_SUB_CROSS_IN,
-    VISION_ROUTE_SUB_CIRCLE_LEFT_BEGIN,
-    VISION_ROUTE_SUB_CIRCLE_LEFT_IN,
-    VISION_ROUTE_SUB_CIRCLE_LEFT_RUNNING,
-    VISION_ROUTE_SUB_CIRCLE_LEFT_OUT,
-    VISION_ROUTE_SUB_CIRCLE_LEFT_END,
-    VISION_ROUTE_SUB_CIRCLE_RIGHT_BEGIN,
-    VISION_ROUTE_SUB_CIRCLE_RIGHT_IN,
-    VISION_ROUTE_SUB_CIRCLE_RIGHT_RUNNING,
-    VISION_ROUTE_SUB_CIRCLE_RIGHT_OUT,
-    VISION_ROUTE_SUB_CIRCLE_RIGHT_END
+    VISION_ROUTE_SUB_CIRCLE_LEFT_1,
+    VISION_ROUTE_SUB_CIRCLE_LEFT_2,
+    VISION_ROUTE_SUB_CIRCLE_LEFT_3,
+    VISION_ROUTE_SUB_CIRCLE_LEFT_4,
+    VISION_ROUTE_SUB_CIRCLE_LEFT_5,
+    VISION_ROUTE_SUB_CIRCLE_LEFT_6,
+    VISION_ROUTE_SUB_CIRCLE_RIGHT_1,
+    VISION_ROUTE_SUB_CIRCLE_RIGHT_2,
+    VISION_ROUTE_SUB_CIRCLE_RIGHT_3,
+    VISION_ROUTE_SUB_CIRCLE_RIGHT_4,
+    VISION_ROUTE_SUB_CIRCLE_RIGHT_5,
+    VISION_ROUTE_SUB_CIRCLE_RIGHT_6
 } vision_route_sub_state_enum;
 
 typedef enum
@@ -50,11 +52,10 @@ typedef struct
     int right_corner_index;
     bool left_straight;
     bool right_straight;
-    bool left_circle_entry_feature;
-    bool right_circle_entry_feature;
-    bool circle_exit_clear_feature;
     bool left_has_frame_wall;
     bool right_has_frame_wall;
+    int left_start_frame_wall_rows;
+    int right_start_frame_wall_rows;
     int cross_detected_stop_row;
     int left_boundary_count;
     int right_boundary_count;
