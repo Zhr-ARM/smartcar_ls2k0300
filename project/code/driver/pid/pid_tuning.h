@@ -163,30 +163,30 @@ inline constexpr Profile make_normal_profile()
 {
     Profile profile{};
 
-    profile.base_speed = 300.0f; // NORMAL 档基础速度：非直道加速阶段默认按 300 count/5ms 行驶。
+    profile.base_speed = 320.0f; // NORMAL 档基础速度：非直道加速阶段默认按 300 count/5ms 行驶。
     profile.straight_full_speed_error_threshold_px = 0.0f; // NORMAL 档直道满速阈值：整条路径均值误差小于 1px 才允许直通满速。
 
-    profile.position_dynamic_kp_quad_a = 1.5; // NORMAL 档位置环动态Kp一次项：误差越大，Kp 按线性速度增长。
+    profile.position_dynamic_kp_quad_a = 1.8; // NORMAL 档位置环动态Kp一次项：误差越大，Kp 按线性速度增长。
     profile.position_dynamic_kp_base = 1.0f; // NORMAL 档位置环动态Kp基础值：零误差附近从 1300 起步，避免“名义基础值”被下限吃掉。
     profile.position_dynamic_kp_min = 0.0f; // NORMAL 档位置环动态Kp下限：当前与基础值保持一致，表示零误差起点就是最小 Kp。
     profile.position_dynamic_kp_max = 30.0f; // NORMAL 档位置环动态Kp上限：防止比例项过强。
     profile.position_ki = 0.0f; // NORMAL 档位置环积分项：当前关闭，避免积分拖尾。
     profile.position_kd = 0.0f; // NORMAL 档位置环微分项：抑制转向过冲和来回摆动。
     profile.position_max_integral = 0.0f; // NORMAL 档位置环积分限幅：0 表示当前不启用额外积分限幅。
-    profile.position_max_output = 400.0f; // NORMAL 档位置环输出限幅：位置支路允许的最大差速。
-    profile.steering_max_output = 400.0f; // NORMAL 档总转向限幅：位置环与角速度环叠加后的总差速上限。
+    profile.position_max_output = 190.0f; // NORMAL 档位置环输出限幅：位置支路允许的最大差速。
+    profile.steering_max_output = 190.0f; // NORMAL 档总转向限幅：位置环与角速度环叠加后的总差速上限。
 
     profile.yaw_rate_ref_from_error_gain_dps = 0.0f; // NORMAL 档误差前馈增益：当前固定夹角模式，不参与目标横摆角速度生成，建议保持 0。
     profile.yaw_rate_ref_from_curvature_gain_dps = 0.0f; // NORMAL 档曲率前馈增益：当前固定夹角模式，不参与目标横摆角速度生成，建议保持 0。
     profile.yaw_rate_ref_from_track_point_gain_dps = 4.0f; // NORMAL 档跟踪点夹角前馈增益：目标点偏角映射到目标横摆角速度的比例。
     profile.yaw_rate_ref_limit_dps = 220.0f; // NORMAL 档目标横摆角速度限幅：防止视觉异常时姿态目标过大。
-    profile.yaw_rate_kp = 1.5f; // NORMAL 档角速度环比例项：把弯道基础支撑补回来，避免入弯后车头跟不上。
+    profile.yaw_rate_kp = 2.0f; // NORMAL 档角速度环比例项：把弯道基础支撑补回来，避免入弯后车头跟不上。
     profile.yaw_rate_dynamic_kp_quad_a = 0.0f; // NORMAL 档角速度环动态Kp一次项：弯里误差增大时线性抬 Kp。
     profile.yaw_rate_dynamic_kp_min = 0.0f; // NORMAL 档角速度环动态Kp下限：与基础 Kp 对齐，保证一进角速度环就有足够支撑。
     profile.yaw_rate_dynamic_kp_max = 10.0f; // NORMAL 档角速度环动态Kp上限：给中大弯留更强纠偏空间，但仍比固定大 Kp 更可控。
     profile.yaw_rate_kp_enable_error_threshold_px = 0.0f; // NORMAL 档角速度环Kp启用阈值：更早介入，避免等偏差放大后才开始补转向。
     profile.yaw_rate_ki = 0.0f; // NORMAL 档角速度环积分项：当前关闭，避免姿态积分拖尾。
-    profile.yaw_rate_kd = 0.00f; // NORMAL 档角速度环微分项：略回一点，帮助压住补强后可能带来的过冲。
+    profile.yaw_rate_kd = 0.022f; // NORMAL 档角速度环微分项：略回一点，帮助压住补强后可能带来的过冲。
     profile.yaw_rate_max_integral = 0.0f; // NORMAL 档角速度环积分限幅：0 表示当前不启用额外积分限幅。
     profile.yaw_rate_max_output = 160.0f; // NORMAL 档角速度环输出限幅：角速度支路允许的最大差速。
 
@@ -234,10 +234,10 @@ inline constexpr Profile make_circle_enter_profile()
 {
     Profile profile = kNormalProfile;
 
-    // profile.base_speed = 250.0f; // 环岛入口档基础速度：入口默认按 225 count/5ms 行驶。
+     profile.base_speed = 250.0f; // 环岛入口档基础速度：入口默认按 225 count/5ms 行驶。
     // profile.straight_full_speed_error_threshold_px = 0.0f; // 环岛入口档直道满速阈值：禁用入口阶段满速直通。
 
-    // profile.position_dynamic_kp_quad_a = 40.0f; // 环岛入口档位置环动态Kp一次项：大误差时更积极地拉回中线。
+    // profile.position_dynamic_kp_quad_a = 2.0f; // 环岛入口档位置环动态Kp一次项：大误差时更积极地拉回中线。
     // profile.position_dynamic_kp_base = 1500.0f; // 环岛入口档位置环动态Kp基础值：零误差附近就保持较强贴线，和实际生效起点一致。
     // profile.position_dynamic_kp_min = 1500.0f; // 环岛入口档位置环动态Kp下限：当前与基础值一致，避免基础值被下限覆盖。
     // profile.position_dynamic_kp_max = 6650.0f; // 环岛入口档位置环动态Kp上限：允许更强的极限纠偏。
@@ -273,7 +273,7 @@ inline constexpr Profile make_circle_inside_profile()
 {
     Profile profile = kNormalProfile;
 
-    // profile.base_speed = 250.0f; // 环岛内部档基础速度：内部默认按 200 count/5ms 控速。
+     profile.base_speed = 250.0f; // 环岛内部档基础速度：内部默认按 200 count/5ms 控速。
     // profile.straight_full_speed_error_threshold_px = 0.0f; // 环岛内部档直道满速阈值：禁用内部阶段满速直通。
 
     // profile.position_dynamic_kp_quad_a = 45.0f; // 环岛内部档位置环动态Kp一次项：大误差时更果断地拉回单边中线。
