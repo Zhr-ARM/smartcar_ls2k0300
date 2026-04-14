@@ -29,6 +29,8 @@ bool vision_thread_client_sender_enabled();
 
 void vision_thread_set_infer_enabled(bool enabled);
 bool vision_thread_infer_enabled();
+void vision_thread_set_ncnn_enabled(bool enabled);
+bool vision_thread_ncnn_enabled();
 
 // 采图模式：检测到红色矩形后，保存推理 ROI 的 PNG 彩图。
 void vision_thread_set_roi_capture_mode(bool enabled);

@@ -9,6 +9,9 @@
 #include <string>
 #include <vector>
 
+static constexpr int VISION_NCNN_MAX_CLASSES = 32;
+static constexpr int VISION_NCNN_LABEL_MAX_LEN = 32;
+
 class LQ_NCNN
 {
 public:
@@ -26,6 +29,13 @@ public:
     // 返回：Top1 标签字符串。
     // 是否调用：是，由 infer worker 在 ROI 上调用。
     std::string Infer(const cv::Mat &bgr_image);
+    bool InferWithProbs(const cv::Mat &bgr_image,
+                       int *top_class_id,
+                       float *top_score,
+                       std::string *top_label,
+                       std::vector<std::string> *labels,
+                       std::vector<float> *probs,
+                       uint32 *infer_us);
 
     // 作用：设置模型 param/bin 路径。
     // 如何修改：切换模型文件时改这里。
@@ -84,6 +94,15 @@ typedef struct
     int ncnn_roi_y;        // ncnn ROI 左上角 y。
     int ncnn_roi_w;        // ncnn ROI 宽。
     int ncnn_roi_h;        // ncnn ROI 高。
+    bool ncnn_enabled;     // 当前是否启用 ncnn 推理。
+    bool ncnn_infer_valid; // 当前帧是否有有效 ncnn 结果。
+    uint32 ncnn_infer_us;  // ncnn 推理耗时（us）。
+    int ncnn_top_class_id; // Top1 类别 id。
+    float ncnn_top_score;  // Top1 概率。
+    char ncnn_top_label[VISION_NCNN_LABEL_MAX_LEN]; // Top1 类别标签。
+    int ncnn_class_count;  // 当前返回的类别数。
+    char ncnn_labels[VISION_NCNN_MAX_CLASSES][VISION_NCNN_LABEL_MAX_LEN]; // 各类别标签。
+    float ncnn_probs[VISION_NCNN_MAX_CLASSES]; // 各类别概率。
 } vision_infer_async_result_t;
 
 // 作用：初始化异步推理模块并启动 worker 线程。
@@ -100,6 +119,8 @@ void vision_infer_async_cleanup();
 // 如何修改：false 时仅巡线不推理。
 void vision_infer_async_set_enabled(bool enabled);
 bool vision_infer_async_enabled();
+void vision_infer_async_set_ncnn_enabled(bool enabled);
+bool vision_infer_async_ncnn_enabled();
 
 // 作用：ROI 抓图开关（检测到目标时按节流保存样本图）。
 void vision_infer_async_set_roi_capture_mode(bool enabled);

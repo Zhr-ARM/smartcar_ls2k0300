@@ -3,6 +3,7 @@
 #include "motor_thread.h"
 #include "line_follow_thread.h"
 #include "driver/vision/vision_config.h"
+#include "driver/vision/vision_infer_async.h"
 #include "driver/vision/vision_image_processor.h"
 
 #include "zf_driver_tcp_client.h"
@@ -52,6 +53,8 @@ constexpr int kGrayJpegQuality = 100;
 constexpr int kRgbJpegQuality = 80;
 constexpr int kIpmCanvasWidth = VISION_IPM_WIDTH;
 constexpr int kIpmCanvasHeight = VISION_IPM_HEIGHT;
+constexpr int kRoi64Size = 64;
+constexpr int kRoiJpegQuality = 90;
 
 #pragma pack(push, 1)
 struct udp_chunk_header_t
@@ -518,6 +521,78 @@ static bool build_rgb_image(std::vector<uint8> *image_out, int *width, int *heig
     return true;
 }
 
+static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *height, uint8 *mode_out)
+{
+    if (image_out == nullptr || width == nullptr || height == nullptr || mode_out == nullptr)
+    {
+        return false;
+    }
+
+    bool roi_valid = false;
+    int roi_x = 0;
+    int roi_y = 0;
+    int roi_w = 0;
+    int roi_h = 0;
+    vision_image_processor_get_ncnn_roi(&roi_valid, &roi_x, &roi_y, &roi_w, &roi_h);
+    if (!roi_valid || roi_w <= 0 || roi_h <= 0)
+    {
+        return false;
+    }
+
+    const cv::Rect roi_rect(roi_x, roi_y, roi_w, roi_h);
+    const vision_web_image_format_enum format =
+        sanitize_web_image_format(g_vision_runtime_config.udp_web_rgb_image_format);
+    std::vector<int> enc_params;
+    if (format == VISION_WEB_IMAGE_FORMAT_JPEG)
+    {
+        enc_params = {cv::IMWRITE_JPEG_QUALITY, kRoiJpegQuality};
+    }
+
+    const uint8 *bgr = vision_image_processor_bgr_downsampled_image();
+    if (bgr != nullptr)
+    {
+        cv::Mat full(VISION_DOWNSAMPLED_HEIGHT, VISION_DOWNSAMPLED_WIDTH, CV_8UC3, const_cast<uint8 *>(bgr));
+        cv::Rect safe = roi_rect & cv::Rect(0, 0, full.cols, full.rows);
+        if (safe.width <= 0 || safe.height <= 0)
+        {
+            return false;
+        }
+        cv::Mat roi = full(safe);
+        cv::Mat roi64;
+        cv::resize(roi, roi64, cv::Size(kRoi64Size, kRoi64Size), 0.0, 0.0, cv::INTER_LINEAR);
+        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi64, *image_out, enc_params))
+        {
+            return false;
+        }
+    }
+    else
+    {
+        const uint8 *gray = vision_image_processor_gray_downsampled_image();
+        if (gray == nullptr)
+        {
+            return false;
+        }
+        cv::Mat full(VISION_DOWNSAMPLED_HEIGHT, VISION_DOWNSAMPLED_WIDTH, CV_8UC1, const_cast<uint8 *>(gray));
+        cv::Rect safe = roi_rect & cv::Rect(0, 0, full.cols, full.rows);
+        if (safe.width <= 0 || safe.height <= 0)
+        {
+            return false;
+        }
+        cv::Mat roi = full(safe);
+        cv::Mat roi64;
+        cv::resize(roi, roi64, cv::Size(kRoi64Size, kRoi64Size), 0.0, 0.0, cv::INTER_LINEAR);
+        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi64, *image_out, enc_params))
+        {
+            return false;
+        }
+    }
+
+    *width = kRoi64Size;
+    *height = kRoi64Size;
+    *mode_out = 3;
+    return true;
+}
+
 // 作用：发送 UDP 分片帧。
 static void send_udp_frame(const std::vector<uint8> &image_bytes,
                            int width,
@@ -594,6 +669,9 @@ static void send_tcp_status()
     int roi_w = 0;
     int roi_h = 0;
     vision_image_processor_get_ncnn_roi(&roi_valid, &roi_x, &roi_y, &roi_w, &roi_h);
+    vision_infer_async_result_t infer_result{};
+    const bool has_infer_result = vision_infer_async_fetch_latest(&infer_result);
+    const bool infer_enabled = vision_infer_async_enabled();
 
     uint16 *x1 = nullptr;
     uint16 *x3 = nullptr;
@@ -858,6 +936,54 @@ static void send_tcp_status()
         line += "]";
     };
 
+    auto append_string = [&append_key, &line](bool enabled, const char *name, const std::string &value) {
+        if (!enabled)
+        {
+            return;
+        }
+        append_key(name);
+        line += "\"";
+        for (char ch : value)
+        {
+            if (ch == '\\' || ch == '"')
+            {
+                line += "\\";
+            }
+            line += ch;
+        }
+        line += "\"";
+    };
+
+    auto append_prob_pairs = [&append_key, &line](bool enabled, const char *name, const vision_infer_async_result_t &result) {
+        if (!enabled)
+        {
+            return;
+        }
+        append_key(name);
+        line += "[";
+        for (int i = 0; i < result.ncnn_class_count; ++i)
+        {
+            if (i > 0)
+            {
+                line += ",";
+            }
+            line += "[\"";
+            const char *label = result.ncnn_labels[i];
+            for (int j = 0; label[j] != '\0'; ++j)
+            {
+                if (label[j] == '\\' || label[j] == '"')
+                {
+                    line += "\\";
+                }
+                line += label[j];
+            }
+            line += "\",";
+            line += std::to_string(result.ncnn_probs[i]);
+            line += "]";
+        }
+        line += "]";
+    };
+
     append_int(true, "web_data_profile", data_profile);
     append_int(true, "web_full_debug", send_full_debug ? 1 : 0);
     append_int(true, "udp_web_max_fps", g_vision_runtime_config.udp_web_max_fps);
@@ -885,6 +1011,22 @@ static void send_tcp_status()
         append_float(true, "left_filtered_count", motor_thread_left_filtered_count());
         append_float(true, "right_filtered_count", motor_thread_right_filtered_count());
         append_int(true, "otsu_threshold", otsu_threshold);
+        append_bool(true, "red_found", red_found);
+        append_int_array(true, "red", {red_x, red_y, red_w, red_h, red_cx, red_cy});
+        append_bool(true, "roi_valid", roi_valid);
+        append_int_array(true, "roi", {roi_x, roi_y, roi_w, roi_h});
+        append_bool(true, "infer_enabled", infer_enabled);
+        append_bool(true, "ncnn_enabled", has_infer_result ? infer_result.ncnn_enabled : vision_infer_async_ncnn_enabled());
+        append_bool(true, "ncnn_has_result", has_infer_result);
+        append_bool(true, "ncnn_infer_valid", has_infer_result && infer_result.ncnn_infer_valid);
+        append_int(true, "ncnn_infer_us", has_infer_result ? infer_result.ncnn_infer_us : 0);
+        append_int(true, "ncnn_top_class_id", has_infer_result ? infer_result.ncnn_top_class_id : -1);
+        append_float(true, "ncnn_top_score", has_infer_result ? infer_result.ncnn_top_score : 0.0f);
+        append_string(true, "ncnn_top_label",
+                      (has_infer_result && infer_result.ncnn_infer_valid) ? infer_result.ncnn_top_label : "");
+        append_prob_pairs(true, "ncnn_probs", infer_result);
+        append_bool(true, "udp_web_send_roi64", roi_valid);
+        append_int_array(true, "roi64_size", {kRoi64Size, kRoi64Size});
         append_int_array(true, "gray_size",
                          {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
         line += "}";
@@ -937,6 +1079,18 @@ static void send_tcp_status()
     append_bool(g_vision_runtime_config.udp_web_tcp_send_roi_valid, "roi_valid", roi_valid);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_roi_rect, "roi",
                      {roi_x, roi_y, roi_w, roi_h});
+    append_bool(true, "infer_enabled", infer_enabled);
+    append_bool(true, "ncnn_enabled", has_infer_result ? infer_result.ncnn_enabled : vision_infer_async_ncnn_enabled());
+    append_bool(true, "ncnn_has_result", has_infer_result);
+    append_bool(true, "ncnn_infer_valid", has_infer_result && infer_result.ncnn_infer_valid);
+    append_int(true, "ncnn_infer_us", has_infer_result ? infer_result.ncnn_infer_us : 0);
+    append_int(true, "ncnn_top_class_id", has_infer_result ? infer_result.ncnn_top_class_id : -1);
+    append_float(true, "ncnn_top_score", has_infer_result ? infer_result.ncnn_top_score : 0.0f);
+    append_string(true, "ncnn_top_label",
+                  (has_infer_result && infer_result.ncnn_infer_valid) ? infer_result.ncnn_top_label : "");
+    append_prob_pairs(true, "ncnn_probs", infer_result);
+    append_bool(true, "udp_web_send_roi64", roi_valid);
+    append_int_array(true, "roi64_size", {kRoi64Size, kRoi64Size});
     append_bool(g_vision_runtime_config.udp_web_tcp_send_ipm_track_valid, "ipm_track_valid", ipm_track_valid);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_method, "ipm_track_method",
                static_cast<int>(vision_image_processor_ipm_line_error_method()));
@@ -1278,6 +1432,19 @@ void vision_transport_send_step()
             if (build_rgb_image(&rgb_image, &width, &height, &mode))
             {
                 send_udp_frame(rgb_image, width, height, mode, format);
+            }
+        }
+        if (g_udp_enabled.load())
+        {
+            std::vector<uint8> roi64_image;
+            int width = 0;
+            int height = 0;
+            uint8 mode = 0;
+            const vision_web_image_format_enum format =
+                sanitize_web_image_format(g_vision_runtime_config.udp_web_rgb_image_format);
+            if (build_roi64_image(&roi64_image, &width, &height, &mode))
+            {
+                send_udp_frame(roi64_image, width, height, mode, format);
             }
         }
         send_tcp_status();

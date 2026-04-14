@@ -25,7 +25,8 @@ const WEB_IMAGE_FORMAT_BMP = 2;
 const latestByMode = {
   0: { image: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 0, format: WEB_IMAGE_FORMAT_JPEG },
   1: { image: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 1, format: WEB_IMAGE_FORMAT_JPEG },
-  2: { image: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 2, format: WEB_IMAGE_FORMAT_JPEG }
+  2: { image: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 2, format: WEB_IMAGE_FORMAT_JPEG },
+  3: { image: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 3, format: WEB_IMAGE_FORMAT_JPEG }
 };
 let latestStatus = { message: 'waiting' };
 
@@ -51,6 +52,7 @@ function modeName(mode) {
   if (mode === 0) return 'binary';
   if (mode === 1) return 'gray';
   if (mode === 2) return 'rgb';
+  if (mode === 3) return 'roi64';
   return `mode_${mode}`;
 }
 
@@ -322,8 +324,8 @@ function buildTransportTelemetry(status) {
 
   const rxBytesPerSec = recentBytes.reduce((sum, item) => sum + item.bytes, 0);
   const rxFramesPerSec = recentFrames.length;
-  const rxFramesByMode = { gray: 0, binary: 0, rgb: 0 };
-  const frameBytesByMode = { gray: 0, binary: 0, rgb: 0 };
+  const rxFramesByMode = { gray: 0, binary: 0, rgb: 0, roi64: 0 };
+  const frameBytesByMode = { gray: 0, binary: 0, rgb: 0, roi64: 0 };
   for (const item of recentFrames) {
     const key = modeName(item.mode);
     if (key in rxFramesByMode) {
@@ -332,7 +334,7 @@ function buildTransportTelemetry(status) {
     }
   }
 
-  const avgWireBytesByMode = { gray: null, binary: null, rgb: null };
+  const avgWireBytesByMode = { gray: null, binary: null, rgb: null, roi64: null };
   for (const key of Object.keys(avgWireBytesByMode)) {
     if (rxFramesByMode[key] > 0) {
       avgWireBytesByMode[key] = Math.round(frameBytesByMode[key] / rxFramesByMode[key]);
@@ -515,7 +517,8 @@ function startHttpServer() {
       sendJson(res, 200, {
         gray: latestByMode[1],
         binary: latestByMode[0],
-        rgb: latestByMode[2]
+        rgb: latestByMode[2],
+        roi64: latestByMode[3]
       });
       return;
     }
@@ -532,6 +535,11 @@ function startHttpServer() {
 
     if (pathname === '/api/frame_rgb.jpg') {
       writeImage(res, latestByMode[2], 'rgb frame not ready');
+      return;
+    }
+
+    if (pathname === '/api/frame_roi64.jpg') {
+      writeImage(res, latestByMode[3], 'roi64 frame not ready');
       return;
     }
 

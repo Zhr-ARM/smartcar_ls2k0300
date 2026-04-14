@@ -33,6 +33,8 @@ typedef struct
     uint32 send_max_fps;
     // 推理总开关：false 时关闭红色识别与 ncnn 推理链路。
     bool infer_enabled;
+    // ncnn 子开关：false 时保留红框检测，但不做 ncnn 分类。
+    bool ncnn_enabled;
     // 客户端发送开关：控制逐飞助手发送链路是否启用。
     bool client_sender_enabled;
     // 车载屏显示开关：true 时启动 screen_display_thread。

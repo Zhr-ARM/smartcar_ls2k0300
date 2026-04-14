@@ -11,6 +11,7 @@
 #include <condition_variable>
 #include <cstdio>
 #include <cerrno>
+#include <cstring>
 #include <cmath>
 #include <limits>
 #include <mutex>
@@ -21,7 +22,7 @@
 
 namespace
 {
-// 固定分辨率参数：当前工程采图/处理固定为 160x120，full 为 UVC 原始尺寸。
+// 固定分辨率参数：当前工程推理 ROI 直接基于 160x120 处理图裁剪。
 static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
 static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
 static constexpr int kFullWidth = UVC_WIDTH;
@@ -30,12 +31,6 @@ static constexpr int kFullHeight = UVC_HEIGHT;
 static constexpr int kRefProcWidth = 160;
 static constexpr int kRefProcHeight = 120;
 static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
-static constexpr int kRefFullWidth = 320;
-static constexpr int kRefFullHeight = 240;
-
-// 推理 ROI 参数（基于处理分辨率标定值）。
-static constexpr int kInferRoiSizeProcRef = 40;      // ROI 边长参考值。
-static constexpr int kInferBottomOffsetFullRef = 10; // ROI 相对红框底部偏移。
 
 // 红框搜索区域参数（以 x=80 竖线附近搜索）。
 static constexpr int kRedSearchExpandXRef = 28;
@@ -73,11 +68,20 @@ struct infer_worker_result_t
     int red_area = 0;
     uint32 red_detect_us = 0;
     cv::Rect ncnn_roi_proc;
+    bool ncnn_enabled = false;
+    bool ncnn_infer_valid = false;
+    uint32 ncnn_infer_us = 0;
+    int ncnn_top_class_id = -1;
+    float ncnn_top_score = 0.0f;
+    std::string ncnn_top_label;
+    std::vector<std::string> ncnn_labels;
+    std::vector<float> ncnn_probs;
 };
 
 // 推理运行态（原 vision_ncnn 逻辑并入）。
 static LQ_NCNN *g_ncnn = nullptr;
 static std::atomic<bool> g_infer_enabled(false);
+static std::atomic<bool> g_ncnn_enabled(false);
 
 // ROI 抓图状态。
 static std::atomic<bool> g_roi_capture_mode_enabled(false);
@@ -125,84 +129,24 @@ static inline int scale_by_area(int ref_area_px)
     return std::max(1, static_cast<int>((scaled + kRefProcPixels / 2) / kRefProcPixels));
 }
 
-static inline int scale_full_height(int ref_px)
+static cv::Rect build_ncnn_proc_roi_from_red_rect(int red_x_proc,
+                                                  int red_y_proc,
+                                                  int red_w_proc,
+                                                  int red_h_proc)
 {
-    if (ref_px <= 0)
-    {
-        return 0;
-    }
-    return std::max(1, (ref_px * kFullHeight + kRefFullHeight / 2) / kRefFullHeight);
-}
+    // 对齐 vision_specific：
+    // 1. 以红框上边中点作为 ROI 中心；
+    // 2. ROI 为正方形；
+    // 3. 边长 = 红框宽 * 3 / 2。
+    const int side_proc = std::max(1, (std::max(1, red_w_proc) * 3) / 2);
+    const int center_x_proc = red_x_proc + red_w_proc / 2;
+    const int center_y_proc = red_y_proc;
 
-static inline int map_proc_to_full_x(int x_proc)
-{
-    if (kProcWidth <= 1)
-    {
-        return 0;
-    }
-    return std::clamp((x_proc * (kFullWidth - 1)) / (kProcWidth - 1), 0, kFullWidth - 1);
-}
-
-static inline int map_proc_to_full_y(int y_proc)
-{
-    if (kProcHeight <= 1)
-    {
-        return 0;
-    }
-    return std::clamp((y_proc * (kFullHeight - 1)) / (kProcHeight - 1), 0, kFullHeight - 1);
-}
-
-static inline int map_full_to_proc_x(int x_full)
-{
-    if (kFullWidth <= 1)
-    {
-        return 0;
-    }
-    return std::clamp((x_full * (kProcWidth - 1)) / (kFullWidth - 1), 0, kProcWidth - 1);
-}
-
-static inline int map_full_to_proc_y(int y_full)
-{
-    if (kFullHeight <= 1)
-    {
-        return 0;
-    }
-    return std::clamp((y_full * (kProcHeight - 1)) / (kFullHeight - 1), 0, kProcHeight - 1);
-}
-
-static cv::Rect build_ncnn_full_roi_from_red_rect_proc(int cx_proc, int red_y_proc, int red_h_proc)
-{
-    const int roi_w_proc = std::min(scale_by_width(kInferRoiSizeProcRef), kProcWidth);
-    const int roi_h_proc = std::min(scale_by_height(kInferRoiSizeProcRef), kProcHeight);
-    const int roi_w = std::max(1, std::min((roi_w_proc * kFullWidth + kProcWidth / 2) / kProcWidth, kFullWidth));
-    const int roi_h = std::max(1, std::min((roi_h_proc * kFullHeight + kProcHeight / 2) / kProcHeight, kFullHeight));
-    const int cx_full = map_proc_to_full_x(cx_proc);
-    const int red_top_full = map_proc_to_full_y(red_y_proc);
-    const int red_h_full = std::max(1, (red_h_proc * kFullHeight + kProcHeight / 2) / kProcHeight);
-    const int red_bottom_full = red_top_full + std::max(0, red_h_full - 1);
-    const int roi_bottom = std::min(kFullHeight - 1, red_bottom_full + scale_full_height(kInferBottomOffsetFullRef));
-
-    int roi_x = cx_full - roi_w / 2;
-    int roi_y = roi_bottom - roi_h + 1;
-    roi_x = std::clamp(roi_x, 0, std::max(0, kFullWidth - roi_w));
-    roi_y = std::clamp(roi_y, 0, std::max(0, kFullHeight - roi_h));
-    return cv::Rect(roi_x, roi_y, roi_w, roi_h);
-}
-
-static cv::Rect map_full_roi_to_proc(const cv::Rect &full_roi)
-{
-    cv::Rect safe = full_roi & cv::Rect(0, 0, kFullWidth, kFullHeight);
-    if (safe.width <= 0 || safe.height <= 0)
-    {
-        return cv::Rect(0, 0, 0, 0);
-    }
-    const int x0 = map_full_to_proc_x(safe.x);
-    const int y0 = map_full_to_proc_y(safe.y);
-    const int x1 = map_full_to_proc_x(safe.x + safe.width - 1);
-    const int y1 = map_full_to_proc_y(safe.y + safe.height - 1);
-    const int w = std::max(1, x1 - x0 + 1);
-    const int h = std::max(1, y1 - y0 + 1);
-    return cv::Rect(x0, y0, w, h);
+    int roi_x_proc = center_x_proc - side_proc / 2;
+    int roi_y_proc = center_y_proc - side_proc / 2;
+    roi_x_proc = std::clamp(roi_x_proc, 0, std::max(0, kProcWidth - side_proc));
+    roi_y_proc = std::clamp(roi_y_proc, 0, std::max(0, kProcHeight - side_proc));
+    return cv::Rect(roi_x_proc, roi_y_proc, side_proc, side_proc) & cv::Rect(0, 0, kProcWidth, kProcHeight);
 }
 
 static int64_t steady_now_ms()
@@ -415,15 +359,24 @@ static bool detect_red_rectangle_bbox(const cv::Mat &bgr, const cv::Rect &search
     return true;
 }
 
-// 作用：执行一帧 ncnn 推理（内部调用 LQ_NCNN::Infer）。
-static void ncnn_step(const uint8 *bgr_data, int width, int height)
+// 作用：执行一帧 ncnn 推理（输出 top1 与各类别概率）。
+static bool ncnn_step(const uint8 *bgr_data,
+                      int width,
+                      int height,
+                      int *top_class_id,
+                      float *top_score,
+                      std::string *top_label,
+                      std::vector<std::string> *labels,
+                      std::vector<float> *probs,
+                      uint32 *infer_us)
 {
-    if (!g_infer_enabled.load() || g_ncnn == nullptr || bgr_data == nullptr || width <= 0 || height <= 0)
+    if (!g_ncnn_enabled.load() || g_ncnn == nullptr || bgr_data == nullptr || width <= 0 || height <= 0)
     {
-        return;
+        return false;
     }
+
     cv::Mat bgr(height, width, CV_8UC3, const_cast<uint8 *>(bgr_data));
-    g_ncnn->Infer(bgr);
+    return g_ncnn->InferWithProbs(bgr, top_class_id, top_score, top_label, labels, probs, infer_us);
 }
 
 // 作用：清空异步任务与结果共享状态。
@@ -456,6 +409,7 @@ static void run_infer_worker()
         }
 
         infer_worker_result_t result{};
+        result.ncnn_enabled = g_ncnn_enabled.load();
         auto detect_start = std::chrono::steady_clock::now();
         cv::Rect red_bbox;
         int red_area = 0;
@@ -477,17 +431,27 @@ static void run_infer_worker()
             result.red_cy = red_bbox.y + red_bbox.height / 2;
             result.red_area = red_area;
 
-            const cv::Rect ncnn_full_roi = build_ncnn_full_roi_from_red_rect_proc(result.red_cx, result.red_y, result.red_h);
-            result.ncnn_roi_proc = map_full_roi_to_proc(ncnn_full_roi);
+            result.ncnn_roi_proc = build_ncnn_proc_roi_from_red_rect(result.red_x,
+                                                                     result.red_y,
+                                                                     result.red_w,
+                                                                     result.red_h);
 
-            try_save_infer_roi_png(job.full_bgr, ncnn_full_roi);
-            if (g_infer_enabled.load())
+            try_save_infer_roi_png(job.proc_bgr, result.ncnn_roi_proc);
+            if (g_ncnn_enabled.load())
             {
-                cv::Rect safe_full_roi = ncnn_full_roi & cv::Rect(0, 0, kFullWidth, kFullHeight);
-                if (safe_full_roi.width > 0 && safe_full_roi.height > 0)
+                cv::Rect safe_roi = result.ncnn_roi_proc & cv::Rect(0, 0, kProcWidth, kProcHeight);
+                if (safe_roi.width > 0 && safe_roi.height > 0)
                 {
-                    cv::Mat roi_bgr = job.full_bgr(safe_full_roi).clone();
-                    ncnn_step(reinterpret_cast<const uint8 *>(roi_bgr.data), roi_bgr.cols, roi_bgr.rows);
+                    cv::Mat roi_bgr = job.proc_bgr(safe_roi).clone();
+                    result.ncnn_infer_valid = ncnn_step(reinterpret_cast<const uint8 *>(roi_bgr.data),
+                                                        roi_bgr.cols,
+                                                        roi_bgr.rows,
+                                                        &result.ncnn_top_class_id,
+                                                        &result.ncnn_top_score,
+                                                        &result.ncnn_top_label,
+                                                        &result.ncnn_labels,
+                                                        &result.ncnn_probs,
+                                                        &result.ncnn_infer_us);
                 }
             }
         }
@@ -537,6 +501,27 @@ bool LQ_NCNN::Init()
 
 std::string LQ_NCNN::Infer(const cv::Mat &bgr_image)
 {
+    int top_class_id = -1;
+    float top_score = 0.0f;
+    uint32 infer_us = 0;
+    std::string top_label;
+    std::vector<std::string> labels;
+    std::vector<float> probs;
+    if (!InferWithProbs(bgr_image, &top_class_id, &top_score, &top_label, &labels, &probs, &infer_us))
+    {
+        throw std::runtime_error("InferWithProbs failed");
+    }
+    return top_label;
+}
+
+bool LQ_NCNN::InferWithProbs(const cv::Mat &bgr_image,
+                             int *top_class_id,
+                             float *top_score,
+                             std::string *top_label,
+                             std::vector<std::string> *labels,
+                             std::vector<float> *probs,
+                             uint32 *infer_us)
+{
     if (!m_initialized)
     {
         throw std::runtime_error("NCNN not initialized");
@@ -545,6 +530,8 @@ std::string LQ_NCNN::Infer(const cv::Mat &bgr_image)
     {
         throw std::invalid_argument("Input image is empty");
     }
+
+    const auto t0 = std::chrono::steady_clock::now();
 
     cv::Mat resized;
     cv::resize(bgr_image, resized, cv::Size(m_input_width, m_input_height));
@@ -572,12 +559,76 @@ std::string LQ_NCNN::Infer(const cv::Mat &bgr_image)
         throw std::runtime_error("ex.extract failed");
     }
 
-    int class_id = Argmax(logits);
-    if (class_id >= 0 && class_id < static_cast<int>(m_labels.size()))
+    const int class_id = Argmax(logits);
+    float max_logit = -std::numeric_limits<float>::infinity();
+    for (int i = 0; i < logits.w; ++i)
     {
-        return m_labels[class_id];
+        max_logit = std::max(max_logit, logits[i]);
     }
-    return std::to_string(class_id);
+
+    std::vector<float> local_probs(logits.w, 0.0f);
+    float sum = 0.0f;
+    for (int i = 0; i < logits.w; ++i)
+    {
+        const float v = std::exp(logits[i] - max_logit);
+        local_probs[i] = v;
+        sum += v;
+    }
+    if (sum > 0.0f)
+    {
+        for (float &v : local_probs)
+        {
+            v /= sum;
+        }
+    }
+
+    std::vector<std::string> local_labels;
+    local_labels.reserve(logits.w);
+    for (int i = 0; i < logits.w; ++i)
+    {
+        if (i >= 0 && i < static_cast<int>(m_labels.size()))
+        {
+            local_labels.push_back(m_labels[i]);
+        }
+        else
+        {
+            local_labels.push_back(std::to_string(i));
+        }
+    }
+
+    if (top_class_id)
+    {
+        *top_class_id = class_id;
+    }
+    if (top_score)
+    {
+        *top_score = (class_id >= 0 && class_id < static_cast<int>(local_probs.size())) ? local_probs[class_id] : 0.0f;
+    }
+    if (top_label)
+    {
+        if (class_id >= 0 && class_id < static_cast<int>(local_labels.size()))
+        {
+            *top_label = local_labels[class_id];
+        }
+        else
+        {
+            *top_label = std::to_string(class_id);
+        }
+    }
+    if (labels)
+    {
+        *labels = local_labels;
+    }
+    if (probs)
+    {
+        *probs = local_probs;
+    }
+    if (infer_us)
+    {
+        *infer_us = static_cast<uint32>(
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count());
+    }
+    return true;
 }
 
 void LQ_NCNN::SetModelPath(const std::string &param_path, const std::string &bin_path)
@@ -636,8 +687,7 @@ bool vision_infer_init_default_model(LQ_NCNN &ncnn)
     const int input_width = 64;
     const int input_height = 64;
     const std::vector<std::string> labels = {
-        "gun", "explosive", "knife", "baton", "axe", "aid", "flashlight",
-        "walkie", "bulletproof", "tele", "helmet", "fire", "amb", "arm", "motor"};
+        "supplies", "vehicles", "weapons"};
     float mean_vals[3] = {123.675f, 116.28f, 103.53f};
     float norm_vals[3] = {0.01712475f, 0.017507f, 0.01742919f};
 
@@ -660,6 +710,7 @@ bool vision_infer_async_init(LQ_NCNN *ncnn, bool enabled)
     // 模块初始化：绑定 ncnn 运行态并启动 worker。
     g_ncnn = ncnn;
     g_infer_enabled.store(enabled);
+    g_ncnn_enabled.store(enabled);
 
     g_roi_capture_saved_count.store(0);
     g_roi_capture_last_save_ms.store(steady_now_ms() - kCaptureMinIntervalMs);
@@ -714,6 +765,16 @@ bool vision_infer_async_enabled()
     return g_infer_enabled.load();
 }
 
+void vision_infer_async_set_ncnn_enabled(bool enabled)
+{
+    g_ncnn_enabled.store(enabled);
+}
+
+bool vision_infer_async_ncnn_enabled()
+{
+    return g_ncnn_enabled.load();
+}
+
 void vision_infer_async_set_roi_capture_mode(bool enabled)
 {
     const bool prev = g_roi_capture_mode_enabled.exchange(enabled);
@@ -746,7 +807,7 @@ void vision_infer_async_submit_frame(const uint8 *bgr_proc_data,
                                      int full_width,
                                      int full_height)
 {
-    if (!g_infer_enabled.load() || bgr_proc_data == nullptr || bgr_full_data == nullptr)
+    if (!g_infer_enabled.load() || bgr_proc_data == nullptr)
     {
         return;
     }
@@ -757,11 +818,18 @@ void vision_infer_async_submit_frame(const uint8 *bgr_proc_data,
     }
 
     cv::Mat proc_frame(kProcHeight, kProcWidth, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
-    cv::Mat full_frame(kFullHeight, kFullWidth, CV_8UC3, const_cast<uint8 *>(bgr_full_data));
     {
         std::lock_guard<std::mutex> lock(g_infer_mutex);
         g_infer_job.proc_bgr = proc_frame.clone();
-        g_infer_job.full_bgr = full_frame.clone();
+        if (bgr_full_data != nullptr)
+        {
+            cv::Mat full_frame(kFullHeight, kFullWidth, CV_8UC3, const_cast<uint8 *>(bgr_full_data));
+            g_infer_job.full_bgr = full_frame.clone();
+        }
+        else
+        {
+            g_infer_job.full_bgr.release();
+        }
         g_infer_job_ready = true;
     }
     g_infer_cv.notify_one();
@@ -798,5 +866,26 @@ bool vision_infer_async_fetch_latest(vision_infer_async_result_t *out)
     out->ncnn_roi_y = result.ncnn_roi_proc.y;
     out->ncnn_roi_w = result.ncnn_roi_proc.width;
     out->ncnn_roi_h = result.ncnn_roi_proc.height;
+    out->ncnn_enabled = result.ncnn_enabled;
+    out->ncnn_infer_valid = result.ncnn_infer_valid;
+    out->ncnn_infer_us = result.ncnn_infer_us;
+    out->ncnn_top_class_id = result.ncnn_top_class_id;
+    out->ncnn_top_score = result.ncnn_top_score;
+    std::memset(out->ncnn_top_label, 0, sizeof(out->ncnn_top_label));
+    std::snprintf(out->ncnn_top_label, sizeof(out->ncnn_top_label), "%s", result.ncnn_top_label.c_str());
+    out->ncnn_class_count = std::min(static_cast<int>(result.ncnn_probs.size()), VISION_NCNN_MAX_CLASSES);
+    for (int i = 0; i < VISION_NCNN_MAX_CLASSES; ++i)
+    {
+        out->ncnn_probs[i] = 0.0f;
+        std::memset(out->ncnn_labels[i], 0, sizeof(out->ncnn_labels[i]));
+    }
+    for (int i = 0; i < out->ncnn_class_count; ++i)
+    {
+        out->ncnn_probs[i] = result.ncnn_probs[i];
+        const std::string &label = (i < static_cast<int>(result.ncnn_labels.size()))
+                                       ? result.ncnn_labels[i]
+                                       : std::to_string(i);
+        std::snprintf(out->ncnn_labels[i], sizeof(out->ncnn_labels[i]), "%s", label.c_str());
+    }
     return true;
 }

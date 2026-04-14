@@ -49,6 +49,8 @@ bool vision_pipeline_is_send_enabled();
 // 是否调用：是，main.cpp -> vision_thread -> pipeline 调用。
 void vision_pipeline_set_infer_enabled(bool enabled);
 bool vision_pipeline_infer_enabled();
+void vision_pipeline_set_ncnn_enabled(bool enabled);
+bool vision_pipeline_ncnn_enabled();
 
 // 作用：ROI 抓图模式开关（检测到目标后保存 PNG）。
 // 意义：采集推理样本，便于离线排查。

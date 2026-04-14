@@ -69,6 +69,11 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
     {
         cv::Mat proc_frame(kProcHeight, kProcWidth, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
         cv::rectangle(proc_frame,
+                      cv::Rect(result->red_x, result->red_y, result->red_w, result->red_h),
+                      cv::Scalar(0, 0, 255),
+                      1,
+                      cv::LINE_8);
+        cv::rectangle(proc_frame,
                       cv::Rect(result->ncnn_roi_x, result->ncnn_roi_y, result->ncnn_roi_w, result->ncnn_roi_h),
                       cv::Scalar(0, 255, 0),
                       1,
@@ -77,6 +82,11 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
     if (gray_data != nullptr)
     {
         cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, const_cast<uint8 *>(gray_data));
+        cv::rectangle(gray,
+                      cv::Rect(result->red_x, result->red_y, result->red_w, result->red_h),
+                      cv::Scalar(200),
+                      1,
+                      cv::LINE_8);
         cv::rectangle(gray,
                       cv::Rect(result->ncnn_roi_x, result->ncnn_roi_y, result->ncnn_roi_w, result->ncnn_roi_h),
                       cv::Scalar(255),
@@ -123,8 +133,8 @@ bool vision_pipeline_process_step()
 
     const uint8 *bgr_proc_data = vision_image_processor_bgr_image();
     const uint8 *bgr_full_data = vision_image_processor_bgr_full_image();
-    // 2) 推理关闭或图像无效时，清空推理相关状态但不影响巡线主链。
-    if (!vision_infer_async_enabled() || bgr_proc_data == nullptr || bgr_full_data == nullptr)
+    // 2) 推理关闭或处理图无效时，清空推理相关状态但不影响巡线主链。
+    if (!vision_infer_async_enabled() || bgr_proc_data == nullptr)
     {
         clear_infer_result_in_image_processor();
         return true;
@@ -212,6 +222,16 @@ void vision_pipeline_set_infer_enabled(bool enabled)
 bool vision_pipeline_infer_enabled()
 {
     return vision_infer_async_enabled();
+}
+
+void vision_pipeline_set_ncnn_enabled(bool enabled)
+{
+    vision_infer_async_set_ncnn_enabled(enabled);
+}
+
+bool vision_pipeline_ncnn_enabled()
+{
+    return vision_infer_async_ncnn_enabled();
 }
 
 void vision_pipeline_set_roi_capture_mode(bool enabled)

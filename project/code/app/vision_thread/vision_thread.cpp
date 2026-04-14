@@ -221,6 +221,16 @@ bool vision_thread_infer_enabled()
     return vision_pipeline_infer_enabled();
 }
 
+void vision_thread_set_ncnn_enabled(bool enabled)
+{
+    vision_pipeline_set_ncnn_enabled(enabled);
+}
+
+bool vision_thread_ncnn_enabled()
+{
+    return vision_pipeline_ncnn_enabled();
+}
+
 void vision_thread_set_roi_capture_mode(bool enabled)
 {
     vision_pipeline_set_roi_capture_mode(enabled);

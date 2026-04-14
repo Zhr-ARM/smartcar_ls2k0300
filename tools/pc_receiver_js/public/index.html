@@ -161,6 +161,76 @@
     }
     .view { position: relative; }
     canvas { width: 100%; background: #000; border-radius: 8px; image-rendering: pixelated; display: block; }
+    .infer-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+      gap: 12px;
+    }
+    .infer-side {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+    .infer-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .infer-meta-item {
+      background: #0b1220;
+      border: 1px solid #273449;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .infer-meta-label {
+      color: #94a3b8;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+    .infer-meta-value {
+      color: #f8fafc;
+      font-size: 14px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .prob-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .prob-item {
+      background: #0b1220;
+      border: 1px solid #273449;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .prob-item-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: #e2e8f0;
+      font-size: 13px;
+    }
+    .prob-bar {
+      margin-top: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(51, 65, 85, 0.9);
+      overflow: hidden;
+    }
+    .prob-bar > span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #f97316, #22c55e);
+    }
+    .infer-hint {
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-top: 8px;
+    }
     .pixel-info {
       position: absolute;
       left: 8px;
@@ -368,6 +438,7 @@
     }
     @media (max-width: 900px){
       .grid { grid-template-columns: 1fr; }
+      .infer-grid { grid-template-columns: 1fr; }
       .transport-panel {
         position: static;
         width: auto;
@@ -487,6 +558,30 @@
         <div class="view">
           <canvas id="grayCanvas" width="160" height="120"></canvas>
           <div class="pixel-info" id="grayPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
+      </div>
+      <div class="card" id="inferCard" style="grid-column: 1 / -1;">
+        <div class="title">红框识别 + ROI + ncnn 推理</div>
+        <div class="infer-grid">
+          <div>
+            <div class="view">
+              <canvas id="inferCanvas" width="160" height="120"></canvas>
+            </div>
+            <div class="infer-meta-grid" id="inferMetaGrid"></div>
+          </div>
+          <div class="infer-side">
+            <div>
+              <div class="title" style="margin-bottom:8px;">ROI 64x64</div>
+              <div class="view">
+                <canvas id="roi64Canvas" width="64" height="64"></canvas>
+              </div>
+              <div class="infer-hint" id="roi64Hint">还没有可显示的 ROI64 图像。</div>
+            </div>
+            <div>
+              <div class="title" style="margin-bottom:8px;">分类概率</div>
+              <div class="prob-list" id="inferProbList"></div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="card" id="binaryCard">
@@ -707,6 +802,10 @@
     const rgbCtx = rgbCanvas.getContext('2d');
     const grayCanvas = document.getElementById('grayCanvas');
     const grayCtx = grayCanvas.getContext('2d');
+    const inferCanvas = document.getElementById('inferCanvas');
+    const inferCtx = inferCanvas.getContext('2d');
+    const roi64Canvas = document.getElementById('roi64Canvas');
+    const roi64Ctx = roi64Canvas.getContext('2d');
     const binaryCanvas = document.getElementById('binaryCanvas');
     const binaryCtx = binaryCanvas.getContext('2d');
     const ipmCanvas = document.getElementById('ipmCanvas');
@@ -732,6 +831,9 @@
     const binaryPixelInfo = document.getElementById('binaryPixelInfo');
     const ipmPixelInfo = document.getElementById('ipmPixelInfo');
     const ipmRawPixelInfo = document.getElementById('ipmRawPixelInfo');
+    const inferMetaGrid = document.getElementById('inferMetaGrid');
+    const inferProbList = document.getElementById('inferProbList');
+    const roi64Hint = document.getElementById('roi64Hint');
     const statusEl = document.getElementById('status');
     const metaEl = document.getElementById('meta');
     const transportRateValueEl = document.getElementById('transportRateValue');
@@ -823,6 +925,7 @@
     const ipmCenterlineSourceLabel = document.getElementById('ipmCenterlineSourceLabel');
     const rgbImg = new Image();
     const grayImg = new Image();
+    const roi64Img = new Image();
     const rawGrayCanvas = document.createElement('canvas');
     const rawGrayCtx = rawGrayCanvas.getContext('2d');
     const receiverCore = window.SharedReceiverCore;
@@ -850,6 +953,7 @@
     let localWorkerBusy = false;
     let grayFrameReady = false;
     let rgbFrameReady = false;
+    let roi64FrameReady = false;
     let grayFetchSeq = 0;
     let grayFetchInFlight = false;
     let activeGraySource = 'none';
@@ -866,6 +970,17 @@
 
     function hasPointArray(value) {
       return Array.isArray(value) && value.length > 0;
+    }
+
+    function isBool01(value) {
+      return value === true || value === 1 || value === '1';
+    }
+
+    function fmtInferValue(value, digits = 3) {
+      if (typeof value === 'number' && Number.isFinite(value)) return value.toFixed(digits);
+      if (value === undefined || value === null || value === '') return 'N/A';
+      if (Array.isArray(value)) return fmtArrayInline(value);
+      return String(value);
     }
 
     function setDebugPageActive(active) {
@@ -1183,6 +1298,14 @@
       pushArray(detectRows, 'red', status.red);
       push(detectRows, 'roi_valid', status.roi_valid);
       pushArray(detectRows, 'roi', status.roi);
+      push(detectRows, 'infer_enabled', status.infer_enabled);
+      push(detectRows, 'ncnn_enabled', status.ncnn_enabled);
+      push(detectRows, 'ncnn_infer_valid', status.ncnn_infer_valid);
+      push(detectRows, 'ncnn_infer_us', status.ncnn_infer_us);
+      push(detectRows, 'ncnn_top_class_id', status.ncnn_top_class_id);
+      push(detectRows, 'ncnn_top_score', status.ncnn_top_score);
+      push(detectRows, 'ncnn_top_label', status.ncnn_top_label);
+      pushArray(detectRows, 'ncnn_probs', status.ncnn_probs);
       addSection('检测结果', detectRows);
 
       const trackRows = [];
@@ -2361,6 +2484,7 @@
         drawSeries(grayCtx, meanCenterline, '#facc15', 2, 1);
       }
       drawDecisionPoint(grayCtx, renderStatus.src_weighted_decision_point);
+      renderInferFrame(renderStatus);
       renderBinaryFromGray();
       requestLocalCompute();
     }
@@ -2391,6 +2515,116 @@
       if (rgbCanvas.width !== w) rgbCanvas.width = w;
       if (rgbCanvas.height !== h) rgbCanvas.height = h;
       rgbCtx.drawImage(rgbImg, 0, 0, w, h);
+      renderInferFrame(getRenderStatus() || {});
+    }
+
+    function renderInferMeta(status) {
+      const rows = [
+        ['源图', rgbFrameReady ? 'RGB' : (grayFrameReady ? 'GRAY' : 'NONE')],
+        ['red_found', isBool01(status.red_found) ? '1' : '0'],
+        ['red', Array.isArray(status.red) ? fmtArrayInline(status.red) : 'N/A'],
+        ['roi_valid', isBool01(status.roi_valid) ? '1' : '0'],
+        ['roi', Array.isArray(status.roi) ? fmtArrayInline(status.roi) : 'N/A'],
+        ['infer_enabled', isBool01(status.infer_enabled) ? '1' : '0'],
+        ['ncnn_enabled', isBool01(status.ncnn_enabled) ? '1' : '0'],
+        ['ncnn_infer_us', fmtInferValue(status.ncnn_infer_us, 0)],
+        ['top_label', fmtInferValue(status.ncnn_top_label, 0)],
+        ['top_score', typeof status.ncnn_top_score === 'number' ? `${(status.ncnn_top_score * 100).toFixed(2)}%` : 'N/A']
+      ];
+      inferMetaGrid.innerHTML = rows.map(([label, value]) =>
+        `<div class="infer-meta-item"><div class="infer-meta-label">${label}</div><div class="infer-meta-value">${value}</div></div>`).join('');
+    }
+
+    function renderInferProbList(status) {
+      const probs = Array.isArray(status.ncnn_probs) ? status.ncnn_probs : [];
+      if (probs.length < 1) {
+        inferProbList.innerHTML = '<div class="infer-hint">还没有推理概率输出。</div>';
+        return;
+      }
+      inferProbList.innerHTML = '';
+      for (const item of probs) {
+        if (!Array.isArray(item) || item.length < 2) continue;
+        const label = String(item[0]);
+        const prob = Number(item[1] || 0);
+        const safeWidth = Math.max(0, Math.min(100, prob * 100));
+        const wrap = document.createElement('div');
+        wrap.className = 'prob-item';
+        wrap.innerHTML =
+          `<div class="prob-item-top"><span>${label}</span><span>${(prob * 100).toFixed(2)}%</span></div>`
+          + `<div class="prob-bar"><span style="width:${safeWidth}%"></span></div>`;
+        inferProbList.appendChild(wrap);
+      }
+    }
+
+    function renderRoi64Frame(status) {
+      roi64Ctx.clearRect(0, 0, roi64Canvas.width, roi64Canvas.height);
+      if (roi64FrameReady && roi64Img.complete && roi64Img.naturalWidth > 0) {
+        roi64Ctx.imageSmoothingEnabled = false;
+        roi64Ctx.drawImage(roi64Img, 0, 0, roi64Canvas.width, roi64Canvas.height);
+        roi64Hint.textContent = '当前送入 ncnn 的 ROI 已缩放到 64x64。';
+        return;
+      }
+      roi64Ctx.fillStyle = '#000000';
+      roi64Ctx.fillRect(0, 0, roi64Canvas.width, roi64Canvas.height);
+      roi64Hint.textContent = isBool01(status && status.roi_valid)
+        ? 'ROI 已有效，但 ROI64 图像还未收到。'
+        : '还没有可显示的 ROI64 图像。';
+    }
+
+    function renderInferFrame(status) {
+      const w = (rgbFrameReady && rgbImg.naturalWidth > 0)
+        ? (rgbImg.naturalWidth || 160)
+        : (grayCanvas.width || 160);
+      const h = (rgbFrameReady && rgbImg.naturalHeight > 0)
+        ? (rgbImg.naturalHeight || 120)
+        : (grayCanvas.height || 120);
+      if (inferCanvas.width !== w) inferCanvas.width = w;
+      if (inferCanvas.height !== h) inferCanvas.height = h;
+
+      inferCtx.clearRect(0, 0, w, h);
+      if (rgbFrameReady && rgbImg.complete && rgbImg.naturalWidth > 0) {
+        inferCtx.drawImage(rgbImg, 0, 0, w, h);
+      } else if (grayCanvas.width > 0 && grayCanvas.height > 0) {
+        inferCtx.drawImage(grayCanvas, 0, 0, w, h);
+      } else {
+        inferCtx.fillStyle = '#000000';
+        inferCtx.fillRect(0, 0, w, h);
+      }
+
+      if (Array.isArray(status.red) && status.red.length >= 4 && isBool01(status.red_found)) {
+        inferCtx.strokeStyle = '#ff4d4f';
+        inferCtx.lineWidth = 1.5;
+        inferCtx.strokeRect(Number(status.red[0]), Number(status.red[1]), Number(status.red[2]), Number(status.red[3]));
+      }
+      if (Array.isArray(status.roi) && status.roi.length >= 4 && isBool01(status.roi_valid)) {
+        inferCtx.strokeStyle = '#22c55e';
+        inferCtx.lineWidth = 1.5;
+        inferCtx.strokeRect(Number(status.roi[0]), Number(status.roi[1]), Number(status.roi[2]), Number(status.roi[3]));
+      }
+
+      const topLabel = typeof status.ncnn_top_label === 'string' ? status.ncnn_top_label.trim() : '';
+      const topScore = Number(status.ncnn_top_score || 0);
+      const overlayLines = [];
+      if (isBool01(status.red_found)) overlayLines.push('Red: found');
+      if (isBool01(status.roi_valid)) overlayLines.push('ROI: valid');
+      if (isBool01(status.ncnn_infer_valid) && topLabel) {
+        overlayLines.push(`Top1: ${topLabel} (${(topScore * 100).toFixed(1)}%)`);
+      }
+      if (overlayLines.length > 0) {
+        inferCtx.font = '10px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+        const boxW = 124;
+        const boxH = 12 + overlayLines.length * 13;
+        inferCtx.fillStyle = 'rgba(2, 6, 23, 0.72)';
+        inferCtx.fillRect(4, 4, boxW, boxH);
+        inferCtx.fillStyle = '#f8fafc';
+        overlayLines.forEach((line, idx) => {
+          inferCtx.fillText(line, 8, 16 + idx * 13);
+        });
+      }
+
+      renderInferMeta(status);
+      renderInferProbList(status);
+      renderRoi64Frame(status);
     }
 
     function renderBinaryFromGray() {
@@ -2639,6 +2873,14 @@
       grayFrameReady = false;
       if (rgbFrameReady) renderGrayFrame();
     };
+    roi64Img.onload = () => {
+      roi64FrameReady = true;
+      renderRoi64Frame(getRenderStatus() || {});
+    };
+    roi64Img.onerror = () => {
+      roi64FrameReady = false;
+      renderRoi64Frame(getRenderStatus() || {});
+    };
 
     async function fetchGrayFrameDirect() {
       const seq = ++grayFetchSeq;
@@ -2844,6 +3086,7 @@
         updateTransportPanel(j);
         modeNote.textContent = buildModeExplanation(j);
         renderStatusPanels(renderStatus);
+        renderInferFrame(renderStatus || {});
         if (isFull || shouldUseLocalCompute()) {
           drawIpmBoundaries(renderStatus);
           drawCurvatureChart(renderStatus);
@@ -2867,10 +3110,15 @@
     }
 
     function pullFrames() {
-      if (!fullDebugModeActive && !shouldUseLocalCompute()) return;
       rgbImg.src = receiverCore.frameUrlForMode('rgb');
       if (!grayFetchInFlight) {
         fetchGrayFrameDirect();
+      }
+      if (isBool01(latestStatus && latestStatus.udp_web_send_roi64)) {
+        roi64Img.src = receiverCore.frameUrlForMode('roi64');
+      } else if (roi64FrameReady) {
+        roi64FrameReady = false;
+        renderRoi64Frame(getRenderStatus() || {});
       }
     }
 

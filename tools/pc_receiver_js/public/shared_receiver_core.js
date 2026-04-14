@@ -5,6 +5,7 @@
   function imageEndpointByMode(mode) {
     if (mode === 'rgb') return '/api/frame_rgb.jpg';
     if (mode === 'binary') return '/api/frame_binary.jpg';
+    if (mode === 'roi64') return '/api/frame_roi64.jpg';
     return '/api/frame_gray.jpg';
   }
 

@@ -51,7 +51,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 图传发送上限帧率，0 表示不限速。
     .send_max_fps = 60,
     // 推理总开关：false 时关闭红色识别与 ncnn 推理。
-    .infer_enabled = false,
+    .infer_enabled = true,
+    // ncnn 子开关：false 时只保留红框检测，不做 ncnn 分类。
+    .ncnn_enabled = true,
     // 逐飞客户端发送开关。
     .client_sender_enabled = false,
     // 车载屏显示开关。
@@ -223,8 +225,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    //.udp_web_server_ip = "172.21.79.129",
-    .udp_web_server_ip = "10.120.166.102",
+    .udp_web_server_ip = "172.21.79.129",
+    // .udp_web_server_ip = "10.120.166.102",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
