@@ -85,7 +85,8 @@ struct ControlErrorState
 {
     float filtered_error_px;
     float abs_filtered_error_px;
-    float control_error;
+    float control_error_norm;
+    float control_error_px;
 };
 
 float apply_iir_filter(float previous_value, float current_value, float alpha)
@@ -103,14 +104,14 @@ float apply_iir_filter(float previous_value, float current_value, float alpha)
  *
  * 数学形式：
  *   gain = clamp(base_gain + quad_a * e^2, min_gain, max_gain)
- * 其中 e 为 normalized_error。
+ * 其中 e 为参与当前控制器增益调度的实际误差量。
  *
  * 参数说明：
  * @param base_gain        基础增益（e=0 时的起始值）。
  * @param quad_a           二次项系数，决定“误差增大时增益提升”的速度。
  * @param min_gain         输出增益下限，防止增益过小导致响应迟钝。
  * @param max_gain         输出增益上限，防止增益过大引发振荡或过冲。
- * @param normalized_error 归一化误差（通常已按量纲统一并限幅）。
+ * @param error_value      参与增益调度的误差值；位置环这里用像素误差，角速度环这里用 dps 误差。
  *
  * 关键点：
  * - 使用 e^2 后，正负误差得到相同增益幅度，保证左右转向调节“对称”；
@@ -121,31 +122,36 @@ float compute_quadratic_gain(float base_gain,
                              float quad_a,
                              float min_gain,
                              float max_gain,
-                             float normalized_error)
+                             float error_value)
 {
     // 误差平方项：只关心误差大小，不区分正负方向。
-    const float error_sq = normalized_error * normalized_error;
+    const float error_sq = error_value * error_value;
 
     // 二次增益律 + 限幅保护。
     return std::clamp(base_gain + quad_a * error_sq, min_gain, max_gain);
 }
-//转换滤波后的归一化误差为控制误差，包含死区和低增益区逻辑。
+// 把滤波后的归一化误差同时转换成：
+// 1) 位置环主控制继续使用的归一化 control_error_norm；
+// 2) 动态 Kp 调度使用的像素 control_error_px。
 ControlErrorState compute_control_error_state(float filtered_error)
 {
     const float filtered_error_px = filtered_error * VISION_HALF_WIDTH;
     const float abs_filtered_error_px = std::fabs(filtered_error_px);
-    float control_error = filtered_error;
+    float control_error_norm = filtered_error;
+    float control_error_px = filtered_error_px;
 
     if (abs_filtered_error_px < pid_tuning::line_follow::kErrorDeadzonePx)
     {
-        control_error = 0.0f;
+        control_error_norm = 0.0f;
+        control_error_px = 0.0f;
     }
     else if (abs_filtered_error_px < pid_tuning::line_follow::kErrorLowGainLimitPx)
     {
-        control_error *= pid_tuning::line_follow::kErrorLowGain;
+        control_error_norm *= pid_tuning::line_follow::kErrorLowGain;
+        control_error_px *= pid_tuning::line_follow::kErrorLowGain;
     }
 
-    return {filtered_error_px, abs_filtered_error_px, control_error};
+    return {filtered_error_px, abs_filtered_error_px, control_error_norm, control_error_px};
 }
 
 void reset_line_follow_runtime_state()
@@ -673,11 +679,12 @@ void line_follow_loop()
         const ControlErrorState error_state = compute_control_error_state(g_filtered_error);
 
         // 动态 Kp：误差越大，比例增益越强。
+        // 这里不再对动态 Kp 的输入额外归一化，直接用经过死区/低增益处理后的像素误差。
         const float dynamic_kp = compute_quadratic_gain(route_profile.position_dynamic_kp_base,
                                                         route_profile.position_dynamic_kp_quad_a,
                                                         route_profile.position_dynamic_kp_min,
                                                         route_profile.position_dynamic_kp_max,
-                                                        error_state.control_error);
+                                                        error_state.control_error_px);
 
         // 第二条支路：角速度环 PID。
         // 当前固定采用“跟踪点夹角 -> 目标横摆角速度”的路线：
@@ -697,7 +704,7 @@ void line_follow_loop()
                                                                  route_profile.yaw_rate_dynamic_kp_quad_a,
                                                                  route_profile.yaw_rate_dynamic_kp_min,
                                                                  route_profile.yaw_rate_dynamic_kp_max,
-                                                                 yaw_rate_error_norm);
+                                                                 yaw_rate_error_dps);
         const bool enable_yaw_rate_kp =
             (route_profile.yaw_rate_kp_enable_error_threshold_px <= 0.0f) ||
             (error_state.abs_filtered_error_px >= route_profile.yaw_rate_kp_enable_error_threshold_px);
@@ -708,7 +715,7 @@ void line_follow_loop()
         // 第一条支路：位置环 PID，只负责“把车拉回中线”。
         // 它盯的是横向误差 e，输出一份差速量。
         g_position_output_state = update_pid_output_state_if_needed(vision_updated,
-                                                                    error_state.control_error,
+                                                                    error_state.control_error_norm,
                                                                     vision_frame_dt_seconds,
                                                                     g_last_position_pid_time,
                                                                     g_has_last_position_pid_time,
@@ -811,7 +818,8 @@ void line_follow_loop()
             g_pid_debug_status.filtered_error_norm = g_filtered_error;
             g_pid_debug_status.filtered_error_px = error_state.filtered_error_px;
             g_pid_debug_status.abs_filtered_error_px = error_state.abs_filtered_error_px;
-            g_pid_debug_status.control_error_norm = error_state.control_error;
+            g_pid_debug_status.control_error_norm = error_state.control_error_norm;
+            g_pid_debug_status.control_error_px = error_state.control_error_px;
             g_pid_debug_status.track_point_valid = track_point_valid;
             g_pid_debug_status.track_point_x = track_point_x;
             g_pid_debug_status.track_point_y = track_point_y;

@@ -1004,6 +1004,7 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_filtered_error_px", line_follow_pid_debug.filtered_error_px);
         append_float(enabled, "pid_common_abs_filtered_error_px", line_follow_pid_debug.abs_filtered_error_px);
         append_float(enabled, "pid_common_control_error_norm", line_follow_pid_debug.control_error_norm);
+        append_float(enabled, "pid_common_control_error_px", line_follow_pid_debug.control_error_px);
         append_bool(enabled, "pid_common_track_point_valid", line_follow_pid_debug.track_point_valid);
         append_int_array(enabled && line_follow_pid_debug.track_point_valid,
                          "pid_common_track_point",

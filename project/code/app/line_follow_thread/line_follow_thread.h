@@ -19,6 +19,7 @@ struct LineFollowPidDebugStatus
     float filtered_error_px;
     float abs_filtered_error_px;
     float control_error_norm;
+    float control_error_px;
     bool track_point_valid;
     int track_point_x;
     int track_point_y;

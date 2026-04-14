@@ -110,7 +110,7 @@ struct Profile
     float base_speed;                              // 该状态下的绝对基础速度（单位同电机目标 count/5ms）
     float straight_full_speed_error_threshold_px;  // 均值路径误差低于该阈值时，允许直接给该状态满速；<=0 表示禁用
 
-    float position_dynamic_kp_quad_a;              // 动态Kp二次项系数
+    float position_dynamic_kp_quad_a;              // 动态Kp二次项系数（基于位置环像素误差平方）
     float position_dynamic_kp_base;                // 动态Kp基准值：零误差附近从它起算，建议满足 min <= base <= max
     float position_dynamic_kp_min;                 // 动态Kp下限：如果不希望 base 被夹掉，需保证它不大于 base
     float position_dynamic_kp_max;                 // 动态Kp上限
@@ -125,7 +125,7 @@ struct Profile
     float yaw_rate_ref_from_track_point_gain_dps;  // 跟踪点夹角前馈到目标横摆角速度的增益
     float yaw_rate_ref_limit_dps;                  // 目标横摆角速度限幅
     float yaw_rate_kp;                             // 角速度环比例项（动态Kp基准值）
-    float yaw_rate_dynamic_kp_quad_a;              // 角速度环动态Kp二次项系数（基于归一化角速度误差平方）
+    float yaw_rate_dynamic_kp_quad_a;              // 角速度环动态Kp二次项系数（基于角速度误差 dps 平方）
     float yaw_rate_dynamic_kp_min;                 // 角速度环动态Kp下限
     float yaw_rate_dynamic_kp_max;                 // 角速度环动态Kp上限
     float yaw_rate_kp_enable_error_threshold_px;   // 横向误差绝对值超过该阈值时，才启用角速度环Kp；<=0 表示始终启用
