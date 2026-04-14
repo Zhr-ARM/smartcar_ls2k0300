@@ -93,7 +93,7 @@ float apply_iir_filter(float previous_value, float current_value, float alpha)
 }
 
 /**
- * @brief 按“误差平方”动态调整增益，并做上下限保护。
+ * @brief 按“误差绝对值的一次函数”动态调整增益，并做上下限保护。
  *
  * 设计目的：
  * - 小误差时保持较温和的基础增益，抑制抖动与来回修正；
@@ -101,32 +101,32 @@ float apply_iir_filter(float previous_value, float current_value, float alpha)
  * - 始终把结果限制在可控范围内，避免参数突增导致控制过激。
  *
  * 数学形式：
- *   gain = clamp(base_gain + quad_a * e^2, min_gain, max_gain)
+ *   gain = clamp(base_gain + a * |e|, min_gain, max_gain)
  * 其中 e 为参与当前控制器增益调度的实际误差量。
  *
  * 参数说明：
  * @param base_gain        基础增益（e=0 时的起始值）。
- * @param quad_a           二次项系数，决定“误差增大时增益提升”的速度。
+ * @param linear_a         一次项系数，决定“误差增大时增益提升”的速度。
  * @param min_gain         输出增益下限，防止增益过小导致响应迟钝。
  * @param max_gain         输出增益上限，防止增益过大引发振荡或过冲。
  * @param error_value      参与增益调度的误差值；位置环这里用像素误差，角速度环这里用 dps 误差。
  *
  * 关键点：
- * - 使用 e^2 后，正负误差得到相同增益幅度，保证左右转向调节“对称”；
- * - 增益随 |e| 非线性上升，比固定增益更兼顾稳定性与大偏差纠偏能力；
+ * - 使用 |e| 后，正负误差得到相同增益幅度，保证左右转向调节“对称”；
+ * - 增益随 |e| 线性上升，调参更直观；
  * - clamp 是最后一道保护，确保结果始终落在调参可接受区间。
  */
-float compute_quadratic_gain(float base_gain,
-                             float quad_a,
-                             float min_gain,
-                             float max_gain,
-                             float error_value)
+float compute_linear_abs_gain(float base_gain,
+                              float linear_a,
+                              float min_gain,
+                              float max_gain,
+                              float error_value)
 {
-    // 误差平方项：只关心误差大小，不区分正负方向。
-    const float error_sq = error_value * error_value;
+    // 误差绝对值项：只关心误差大小，不区分正负方向。
+    const float abs_error = std::fabs(error_value);
 
-    // 二次增益律 + 限幅保护。
-    return std::clamp(base_gain + quad_a * error_sq, min_gain, max_gain);
+    // 一次增益律 + 限幅保护。
+    return std::clamp(base_gain + linear_a * abs_error, min_gain, max_gain);
 }
 // 把滤波后的像素误差转换成真正参与位置环控制的像素 control_error_px，
 // 同时保留便于调试的绝对误差量。
@@ -667,11 +667,11 @@ void line_follow_loop()
 
         // 动态 Kp：误差越大，比例增益越强。
         // 这里不再对动态 Kp 的输入额外归一化，直接用经过死区/低增益处理后的像素误差。
-        const float dynamic_kp = compute_quadratic_gain(route_profile.position_dynamic_kp_base,
-                                                        route_profile.position_dynamic_kp_quad_a,
-                                                        route_profile.position_dynamic_kp_min,
-                                                        route_profile.position_dynamic_kp_max,
-                                                        error_state.control_error_px);
+        const float dynamic_kp = compute_linear_abs_gain(route_profile.position_dynamic_kp_base,
+                                                         route_profile.position_dynamic_kp_quad_a,
+                                                         route_profile.position_dynamic_kp_min,
+                                                         route_profile.position_dynamic_kp_max,
+                                                         error_state.control_error_px);
 
         // 第二条支路：角速度环 PID。
         // 当前固定采用“跟踪点夹角 -> 目标横摆角速度”的路线：
@@ -685,11 +685,11 @@ void line_follow_loop()
             route_profile.yaw_rate_ref_limit_dps);
         //角速度的差
         const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 目标角速度与实际角速度之差
-        const float dynamic_yaw_rate_kp = compute_quadratic_gain(route_profile.yaw_rate_kp,
-                                                                 route_profile.yaw_rate_dynamic_kp_quad_a,
-                                                                 route_profile.yaw_rate_dynamic_kp_min,
-                                                                 route_profile.yaw_rate_dynamic_kp_max,
-                                                                 yaw_rate_error_dps);
+        const float dynamic_yaw_rate_kp = compute_linear_abs_gain(route_profile.yaw_rate_kp,
+                                                                  route_profile.yaw_rate_dynamic_kp_quad_a,
+                                                                  route_profile.yaw_rate_dynamic_kp_min,
+                                                                  route_profile.yaw_rate_dynamic_kp_max,
+                                                                  yaw_rate_error_dps);
         const bool enable_yaw_rate_kp =
             (route_profile.yaw_rate_kp_enable_error_threshold_px <= 0.0f) ||
             (error_state.abs_filtered_error_px >= route_profile.yaw_rate_kp_enable_error_threshold_px);
