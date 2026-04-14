@@ -5,11 +5,137 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Vision JS Receiver</title>
   <style>
-    body { margin: 0; font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif; background: #0f172a; color: #e2e8f0; }
-    .wrap { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .card { background: #111827; border: 1px solid #334155; border-radius: 10px; padding: 12px; }
-    .title { margin-bottom: 10px; color: #cbd5e1; font-size: 14px; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.10), transparent 24%),
+        radial-gradient(circle at top right, rgba(16, 185, 129, 0.08), transparent 24%),
+        linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
+      color: #e2e8f0;
+    }
+    .wrap {
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: 18px 18px 28px;
+    }
+    .page-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
+      gap: 16px;
+      align-items: stretch;
+      margin-bottom: 16px;
+    }
+    .hero-card {
+      background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 30%),
+        linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(11, 18, 32, 0.98));
+      border: 1px solid rgba(71, 85, 105, 0.9);
+      border-radius: 16px;
+      padding: 18px 20px;
+      min-height: 178px;
+    }
+    .hero-title {
+      margin: 0;
+      color: #f8fafc;
+      font-size: 30px;
+      line-height: 1.1;
+      letter-spacing: 0.01em;
+    }
+    .hero-subtitle {
+      margin-top: 8px;
+      color: #93c5fd;
+      font-size: 14px;
+      line-height: 1.55;
+      max-width: 72ch;
+    }
+    .header-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .meta-pill {
+      padding: 8px 12px;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(51, 65, 85, 0.92);
+      color: #cbd5e1;
+      font-size: 12px;
+      line-height: 1.4;
+      max-width: 100%;
+      word-break: break-word;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .card {
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.24);
+      min-width: 0;
+    }
+    .title {
+      margin-bottom: 10px;
+      color: #cbd5e1;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .control-card {
+      margin-bottom: 16px;
+      padding: 14px 16px;
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 0;
+    }
+    .control-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+      gap: 14px;
+      align-items: start;
+    }
+    .option-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .option-panel label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(51, 65, 85, 0.85);
+    }
+    .control-notes {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .control-note {
+      color: #93c5fd;
+      font-size: 12px;
+      line-height: 1.45;
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: rgba(8, 15, 31, 0.92);
+      border: 1px solid rgba(37, 99, 235, 0.3);
+    }
     .route-state-card {
       grid-column: 1 / -1;
       background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(9, 14, 24, 0.98));
@@ -254,19 +380,18 @@
       background: rgba(30, 64, 175, 0.16);
       color: #dbeafe;
     }
-    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 16px; }
     .transport-panel {
-      position: fixed;
+      position: sticky;
       top: 16px;
-      right: 16px;
-      z-index: 30;
-      width: min(360px, calc(100vw - 32px));
+      z-index: 10;
+      width: 100%;
       background: rgba(11, 18, 32, 0.94);
       border: 1px solid rgba(71, 85, 105, 0.9);
-      border-radius: 12px;
-      box-shadow: 0 14px 40px rgba(2, 6, 23, 0.42);
+      border-radius: 16px;
+      box-shadow: 0 14px 40px rgba(2, 6, 23, 0.32);
       backdrop-filter: blur(8px);
-      padding: 12px 14px;
+      padding: 14px 16px;
+      min-height: 178px;
     }
     .transport-panel .title {
       margin-bottom: 8px;
@@ -433,17 +558,74 @@
       word-break: break-word;
     }
     pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; color: #93c5fd; max-height: 280px; overflow: auto; }
+    #inferCard { grid-column: span 7; order: 1; }
+    #routeStateCard { grid-column: span 5; order: 2; }
+    #grayCard { grid-column: span 4; order: 3; }
+    #binaryCard { grid-column: span 4; order: 4; }
+    #rgbCard { grid-column: span 4; order: 5; }
+    #ipmCard, #ipmRawCard, #curvatureCard { grid-column: span 4; }
+    #ipmCard { order: 6; }
+    #ipmRawCard { order: 7; }
+    #curvatureCard { order: 8; }
+    #leftBoundaryAngleCosCard, #rightBoundaryAngleCosCard, #leftTraceDirCard, #rightTraceDirCard { grid-column: span 6; }
+    #leftBoundaryAngleCosCard { order: 9; }
+    #rightBoundaryAngleCosCard { order: 10; }
+    #leftTraceDirCard { order: 11; }
+    #rightTraceDirCard { order: 12; }
+    #leftTraceDirZoomCard, #rightTraceDirZoomCard { grid-column: span 6; }
+    #leftTraceDirZoomCard { order: 13; }
+    #rightTraceDirZoomCard { order: 14; }
+    #statusCard { grid-column: span 12; order: 20; }
+    #statusCard pre { max-height: 520px; }
+    @media (max-width: 1400px) {
+      .page-header {
+        grid-template-columns: 1fr;
+      }
+      .control-grid {
+        grid-template-columns: 1fr;
+      }
+      #inferCard,
+      #routeStateCard,
+      #ipmCard,
+      #ipmRawCard,
+      #curvatureCard,
+      #leftBoundaryAngleCosCard,
+      #rightBoundaryAngleCosCard,
+      #leftTraceDirCard,
+      #rightTraceDirCard,
+      #leftTraceDirZoomCard,
+      #rightTraceDirZoomCard {
+        grid-column: span 12;
+      }
+      #rgbCard, #grayCard, #binaryCard {
+        grid-column: span 6;
+      }
+      #statusCard {
+        grid-column: span 12;
+      }
+    }
     @media (max-width: 1100px) {
       .recording-layout { grid-template-columns: 1fr; }
     }
     @media (max-width: 900px){
       .grid { grid-template-columns: 1fr; }
       .infer-grid { grid-template-columns: 1fr; }
-      .transport-panel {
-        position: static;
-        width: auto;
-        margin: 0 0 12px;
-      }
+      .transport-panel { position: static; min-height: 0; }
+      #inferCard,
+      #routeStateCard,
+      #rgbCard,
+      #grayCard,
+      #binaryCard,
+      #statusCard,
+      #ipmCard,
+      #ipmRawCard,
+      #curvatureCard,
+      #leftBoundaryAngleCosCard,
+      #rightBoundaryAngleCosCard,
+      #leftTraceDirCard,
+      #rightTraceDirCard,
+      #leftTraceDirZoomCard,
+      #rightTraceDirZoomCard { grid-column: auto; }
       .route-state-top,
       .route-state-counters {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -453,115 +635,105 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="transport-panel" id="transportPanel">
-      <div class="title">图传概览</div>
-      <div class="transport-grid">
-        <div class="transport-stat">
-          <div class="transport-label">当前传输速度</div>
-          <div class="transport-value" id="transportRateValue">-- Mbps</div>
-          <div class="transport-subvalue" id="transportRateSub">-- KiB/s</div>
+    <div class="page-header">
+      <div class="hero-card">
+        <h1 class="hero-title">智能车视觉接收端</h1>
+        <div class="hero-subtitle">
+          把主板图像、推理结果、状态机和关键曲线集中到同一页里。首屏优先看红框识别、ROI、二值与巡线状态，深度数组和调试明细放在下面连续展开。
         </div>
-        <div class="transport-stat">
-          <div class="transport-label">当前图像帧率</div>
-          <div class="transport-value" id="transportFpsValue">-- fps</div>
-          <div class="transport-subvalue" id="transportFpsSub">gray -- / rgb -- / binary --</div>
-        </div>
-        <div class="transport-stat">
-          <div class="transport-label">当前图传配置</div>
-          <div class="transport-value" id="transportModeValue">--</div>
-          <div class="transport-subvalue" id="transportModeSub">max fps --</div>
-        </div>
-        <div class="transport-stat">
-          <div class="transport-label">本地复算同步</div>
-          <div class="transport-value" id="transportSyncValue">--</div>
-          <div class="transport-subvalue" id="transportSyncSub">等待同步信息...</div>
-        </div>
-        <div class="transport-stat">
-          <div class="transport-label">主板 CPU 占用</div>
-          <div class="transport-value" id="transportCpuValue">-- %</div>
-          <div class="transport-subvalue" id="transportCpuSub">主板端每秒采样</div>
-        </div>
-        <div class="transport-stat">
-          <div class="transport-label">主板内存占用</div>
-          <div class="transport-value" id="transportMemValue">-- %</div>
-          <div class="transport-subvalue" id="transportMemSub">主板端每秒采样</div>
+        <div class="header-meta">
+          <div class="meta-pill" id="meta">connecting...</div>
+          <div class="meta-pill" id="modeNote">当前模式说明加载中...</div>
+          <div class="meta-pill" id="recordingMeta">录制未开始</div>
         </div>
       </div>
-      <div class="transport-note" id="transportNote">等待图传数据...</div>
+      <div class="transport-panel" id="transportPanel">
+        <div class="title">图传概览</div>
+        <div class="transport-grid">
+          <div class="transport-stat">
+            <div class="transport-label">当前传输速度</div>
+            <div class="transport-value" id="transportRateValue">-- Mbps</div>
+            <div class="transport-subvalue" id="transportRateSub">-- KiB/s</div>
+          </div>
+          <div class="transport-stat">
+            <div class="transport-label">当前图像帧率</div>
+            <div class="transport-value" id="transportFpsValue">-- fps</div>
+            <div class="transport-subvalue" id="transportFpsSub">gray -- / rgb -- / binary --</div>
+          </div>
+          <div class="transport-stat">
+            <div class="transport-label">当前图传配置</div>
+            <div class="transport-value" id="transportModeValue">--</div>
+            <div class="transport-subvalue" id="transportModeSub">max fps --</div>
+          </div>
+          <div class="transport-stat">
+            <div class="transport-label">本地复算同步</div>
+            <div class="transport-value" id="transportSyncValue">--</div>
+            <div class="transport-subvalue" id="transportSyncSub">等待同步信息...</div>
+          </div>
+          <div class="transport-stat">
+            <div class="transport-label">主板 CPU 占用</div>
+            <div class="transport-value" id="transportCpuValue">-- %</div>
+            <div class="transport-subvalue" id="transportCpuSub">主板端每秒采样</div>
+          </div>
+          <div class="transport-stat">
+            <div class="transport-label">主板内存占用</div>
+            <div class="transport-value" id="transportMemValue">-- %</div>
+            <div class="transport-subvalue" id="transportMemSub">主板端每秒采样</div>
+          </div>
+        </div>
+        <div class="transport-note" id="transportNote">等待图传数据...</div>
+      </div>
     </div>
-    <h2>智能车视觉接收端（Node.js）</h2>
-    <div class="meta" id="meta">connecting...</div>
-    <div class="mode-note" id="modeNote">当前模式说明加载中...</div>
-    <div class="toolbar">
-      <button class="btn btn-primary" id="startRecordBtn">开始录制</button>
-      <button class="btn btn-danger" id="stopRecordBtn" disabled>停止录制</button>
-      <button class="btn" id="playRecordBtn" disabled>打开回放界面</button>
-      <button class="btn" id="saveRecordBtn" disabled>保存录制</button>
-      <button class="btn" id="openSavedModalBtn">已保存回放</button>
-      <span class="meta" id="recordingMeta">录制未开始</span>
-    </div>
-    <div class="meta">
-      <label style="margin-right: 16px;">
-        <input type="checkbox" id="toggleGrayBoundaries" checked />
-        灰度图显示左右边界
-      </label>
-      <label style="margin-right: 16px;">
-        <input type="checkbox" id="toggleMeanCenterline" />
-        灰度图显示左右均值中线
-      </label>
-      <label>
-        <input type="checkbox" id="toggleIpmAnchorDot" checked />
-        透视图显示锚点圆 (x=140,y=140,r=1)
-      </label>
-      <label style="margin-left: 16px;">
-        <input type="checkbox" id="toggleBoundaryPointMode" checked />
-        边界/中线按采样点显示（关闭=连线）
-      </label>
-      <label style="margin-left: 16px;">
-        <input type="checkbox" id="toggleCenterlineCurvatureChart" checked />
-        显示中线曲率图
-      </label>
-      <label style="margin-left: 16px;">
-        <input type="checkbox" id="toggleBoundaryAngleCosCharts" checked />
-        显示边界角点cos图
-      </label>
-      <label style="margin-left: 16px;">
-        <input type="checkbox" id="toggleTraceDirCharts" checked />
-        显示八邻域dir图
-      </label>
-      <label style="margin-left: 16px;">
-        <input type="checkbox" id="toggleLocalCompute" />
-        启用本地复算补数
-      </label>
-      <label style="margin-left: 16px;">
-        曲率Y最小
-        <input id="curvatureYMinInput" type="number" step="0.01" value="-0.3" style="width: 72px; margin-left: 4px;" />
-      </label>
-      <label>
-        曲率Y最大
-        <input id="curvatureYMaxInput" type="number" step="0.01" value="0.3" style="width: 72px; margin-left: 4px;" />
-      </label>
-      <span id="ipmCenterlineSourceLabel" style="margin-left: 16px;">
-        透视中线来源：自动
-      </span>
+    <div class="card control-card">
+      <div class="control-grid">
+        <div>
+          <div class="title">录制与回放</div>
+          <div class="toolbar">
+            <button class="btn btn-primary" id="startRecordBtn">开始录制</button>
+            <button class="btn btn-danger" id="stopRecordBtn" disabled>停止录制</button>
+            <button class="btn" id="playRecordBtn" disabled>打开回放界面</button>
+            <button class="btn" id="saveRecordBtn" disabled>保存录制</button>
+            <button class="btn" id="openSavedModalBtn">已保存回放</button>
+          </div>
+          <div class="control-notes">
+            <div class="control-note">原始状态全文保留在“状态数据”卡片里，首屏优先展示关键结果。</div>
+            <div class="control-note" id="ipmCenterlineSourceLabel">透视中线来源：自动</div>
+          </div>
+        </div>
+        <div>
+          <div class="title">显示开关</div>
+          <div class="option-panel">
+            <label><input type="checkbox" id="toggleGrayBoundaries" checked /> 灰度图显示左右边界</label>
+            <label><input type="checkbox" id="toggleMeanCenterline" /> 灰度图显示左右均值中线</label>
+            <label><input type="checkbox" id="toggleIpmAnchorDot" checked /> 透视图显示锚点圆</label>
+            <label><input type="checkbox" id="toggleBoundaryPointMode" checked /> 边界/中线按采样点显示</label>
+            <label><input type="checkbox" id="toggleCenterlineCurvatureChart" checked /> 显示中线曲率图</label>
+            <label><input type="checkbox" id="toggleBoundaryAngleCosCharts" checked /> 显示边界角点 cos 图</label>
+            <label><input type="checkbox" id="toggleTraceDirCharts" checked /> 显示八邻域 dir 图</label>
+            <label><input type="checkbox" id="toggleLocalCompute" /> 启用本地复算补数</label>
+            <label>曲率Y最小 <input id="curvatureYMinInput" type="number" step="0.01" value="-0.3" style="width: 72px;" /></label>
+            <label>曲率Y最大 <input id="curvatureYMaxInput" type="number" step="0.01" value="0.3" style="width: 72px;" /></label>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="grid">
       <div class="card" id="rgbCard">
-        <div class="title">彩图</div>
+        <div class="title">原始彩图</div>
         <div class="view">
           <canvas id="rgbCanvas" width="160" height="120"></canvas>
           <div class="pixel-info" id="rgbPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
         </div>
       </div>
       <div class="card" id="grayCard">
-        <div class="title">灰度图 + 迷宫左右边线（红/绿）</div>
+        <div class="title">灰度图与左右边界</div>
         <div class="view">
           <canvas id="grayCanvas" width="160" height="120"></canvas>
           <div class="pixel-info" id="grayPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
         </div>
       </div>
-      <div class="card" id="inferCard" style="grid-column: 1 / -1;">
-        <div class="title">红框识别 + ROI + ncnn 推理</div>
+      <div class="card" id="inferCard">
+        <div class="title">识别主视图</div>
         <div class="infer-grid">
           <div>
             <div class="view">
@@ -585,7 +757,7 @@
         </div>
       </div>
       <div class="card" id="binaryCard">
-        <div class="title" id="binaryTitle">二值图（网页端实时二值化）</div>
+        <div class="title" id="binaryTitle">二值图</div>
         <div class="view">
           <canvas id="binaryCanvas" width="160" height="120"></canvas>
           <div class="pixel-info" id="binaryPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
@@ -606,7 +778,7 @@
         </div>
       </div>
       <div class="card" id="statusCard">
-        <div class="title">状态数据</div>
+        <div class="title">原始状态全文</div>
         <pre id="status">loading...</pre>
       </div>
       <div class="card route-state-card" id="routeStateCard">
@@ -2521,15 +2693,12 @@
     function renderInferMeta(status) {
       const rows = [
         ['源图', rgbFrameReady ? 'RGB' : (grayFrameReady ? 'GRAY' : 'NONE')],
-        ['red_found', isBool01(status.red_found) ? '1' : '0'],
-        ['red', Array.isArray(status.red) ? fmtArrayInline(status.red) : 'N/A'],
-        ['roi_valid', isBool01(status.roi_valid) ? '1' : '0'],
-        ['roi', Array.isArray(status.roi) ? fmtArrayInline(status.roi) : 'N/A'],
-        ['infer_enabled', isBool01(status.infer_enabled) ? '1' : '0'],
-        ['ncnn_enabled', isBool01(status.ncnn_enabled) ? '1' : '0'],
+        ['红框框选', isBool01(status.red_found) && Array.isArray(status.red) ? fmtArrayInline(status.red) : '未检测到'],
+        ['ROI 框选', isBool01(status.roi_valid) && Array.isArray(status.roi) ? fmtArrayInline(status.roi) : '无'],
         ['ncnn_infer_us', fmtInferValue(status.ncnn_infer_us, 0)],
         ['top_label', fmtInferValue(status.ncnn_top_label, 0)],
-        ['top_score', typeof status.ncnn_top_score === 'number' ? `${(status.ncnn_top_score * 100).toFixed(2)}%` : 'N/A']
+        ['top_score', typeof status.ncnn_top_score === 'number' ? `${(status.ncnn_top_score * 100).toFixed(2)}%` : 'N/A'],
+        ['推理状态', isBool01(status.ncnn_infer_valid) ? '有效' : (isBool01(status.infer_enabled) ? '等待结果' : '已关闭')]
       ];
       inferMetaGrid.innerHTML = rows.map(([label, value]) =>
         `<div class="infer-meta-item"><div class="infer-meta-label">${label}</div><div class="infer-meta-value">${value}</div></div>`).join('');
