@@ -380,6 +380,47 @@ bool motor_thread_set_pid_params(const MotorPidParams &params)
     return count_pid.set_pid_params(pid_params);
 }
 
+bool motor_thread_get_pid_debug_status(MotorPidDebugStatus &status)
+{
+    MotorSpeedPidDebugInfo info{};
+    count_pid.get_debug_info(info);
+
+    status.params.left_kp = info.left_kp;
+    status.params.left_ki = info.left_ki;
+    status.params.left_kd = info.left_kd;
+    status.params.right_kp = info.right_kp;
+    status.params.right_ki = info.right_ki;
+    status.params.right_kd = info.right_kd;
+    status.integral_limit = info.integral_limit;
+    status.max_output_step = info.max_output_step;
+    status.correction_limit = info.correction_limit;
+    status.duty_limit = info.duty_limit;
+    status.left_feedforward_gain = info.left_feedforward_gain;
+    status.right_feedforward_gain = info.right_feedforward_gain;
+    status.left_feedforward_bias = info.left_feedforward_bias;
+    status.right_feedforward_bias = info.right_feedforward_bias;
+    status.feedforward_bias_threshold = info.feedforward_bias_threshold;
+    status.decel_error_threshold = info.decel_error_threshold;
+    status.decel_duty_gain = info.decel_duty_gain;
+    status.decel_duty_limit = info.decel_duty_limit;
+    status.left_pid_target = info.left_pid_target;
+    status.right_pid_target = info.right_pid_target;
+    status.left_pid_error = info.left_pid_error;
+    status.right_pid_error = info.right_pid_error;
+    status.left_pid_output = info.left_pid_output;
+    status.right_pid_output = info.right_pid_output;
+    status.left_pid_output_min = info.left_pid_output_min;
+    status.right_pid_output_min = info.right_pid_output_min;
+    status.left_pid_output_max = info.left_pid_output_max;
+    status.right_pid_output_max = info.right_pid_output_max;
+    status.left_pid_integral_limit = info.left_pid_integral_limit;
+    status.right_pid_integral_limit = info.right_pid_integral_limit;
+    status.left_pid_max_output_step = info.left_pid_max_output_step;
+    status.right_pid_max_output_step = info.right_pid_max_output_step;
+    status.runtime = motor_thread_uart_status();
+    return true;
+}
+
 void motor_thread_cleanup()
 {
     if (!g_motor_running.load())

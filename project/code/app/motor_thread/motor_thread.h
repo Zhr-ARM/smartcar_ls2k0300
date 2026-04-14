@@ -43,6 +43,38 @@ struct MotorUartStatus
     int right_dir_level;      // 右轮方向 GPIO 电平
 };
 
+struct MotorPidDebugStatus
+{
+    MotorPidParams params;
+    float integral_limit;
+    float max_output_step;
+    float correction_limit;
+    float duty_limit;
+    float left_feedforward_gain;
+    float right_feedforward_gain;
+    float left_feedforward_bias;
+    float right_feedforward_bias;
+    float feedforward_bias_threshold;
+    float decel_error_threshold;
+    float decel_duty_gain;
+    float decel_duty_limit;
+    float left_pid_target;
+    float right_pid_target;
+    float left_pid_error;
+    float right_pid_error;
+    float left_pid_output;
+    float right_pid_output;
+    float left_pid_output_min;
+    float right_pid_output_min;
+    float left_pid_output_max;
+    float right_pid_output_max;
+    float left_pid_integral_limit;
+    float right_pid_integral_limit;
+    float left_pid_max_output_step;
+    float right_pid_max_output_step;
+    MotorUartStatus runtime;
+};
+
 /**
  * @brief 初始化电机控制线程
  * @return 成功返回 true，失败返回 false
@@ -139,6 +171,7 @@ bool motor_thread_get_pid_params(MotorPidParams &params);
  * @return 参数合法并更新成功返回 true，失败返回 false
  */
 bool motor_thread_set_pid_params(const MotorPidParams &params);
+bool motor_thread_get_pid_debug_status(MotorPidDebugStatus &status);
 
 /**
  * @brief 清理电机控制线程

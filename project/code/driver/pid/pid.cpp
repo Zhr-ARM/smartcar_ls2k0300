@@ -166,6 +166,26 @@ float PidController::kd() const
     return kd_;
 }
 
+float PidController::output_min() const
+{
+    return output_min_;
+}
+
+float PidController::output_max() const
+{
+    return output_max_;
+}
+
+float PidController::integral_limit() const
+{
+    return integral_limit_;
+}
+
+float PidController::max_output_step() const
+{
+    return max_output_step_;
+}
+
 /**
  * @brief 获取当前输出值
  * @return 当前输出结果
@@ -477,6 +497,46 @@ void MotorSpeedPidController::get_pid_params(DualPidParams &params) const
     params.right_kp = pid_.right_pid().kp();
     params.right_ki = pid_.right_pid().ki();
     params.right_kd = pid_.right_pid().kd();
+}
+
+void MotorSpeedPidController::get_debug_info(MotorSpeedPidDebugInfo &info) const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    info.left_kp = config_.pid_params.left_kp;
+    info.left_ki = config_.pid_params.left_ki;
+    info.left_kd = config_.pid_params.left_kd;
+    info.right_kp = config_.pid_params.right_kp;
+    info.right_ki = config_.pid_params.right_ki;
+    info.right_kd = config_.pid_params.right_kd;
+    info.integral_limit = config_.integral_limit;
+    info.max_output_step = config_.max_output_step;
+    info.correction_limit = config_.correction_limit;
+    info.duty_limit = config_.duty_limit;
+    info.left_feedforward_gain = config_.left_feedforward_gain;
+    info.right_feedforward_gain = config_.right_feedforward_gain;
+    info.left_feedforward_bias = config_.left_feedforward_bias;
+    info.right_feedforward_bias = config_.right_feedforward_bias;
+    info.feedforward_bias_threshold = config_.feedforward_bias_threshold;
+    info.decel_error_threshold = config_.decel_error_threshold;
+    info.decel_duty_gain = config_.decel_duty_gain;
+    info.decel_duty_limit = config_.decel_duty_limit;
+
+    const PidController &left = pid_.left_pid();
+    const PidController &right = pid_.right_pid();
+    info.left_pid_target = left.get_target();
+    info.right_pid_target = right.get_target();
+    info.left_pid_error = left.get_error();
+    info.right_pid_error = right.get_error();
+    info.left_pid_output = left.get_output();
+    info.right_pid_output = right.get_output();
+    info.left_pid_output_min = left.output_min();
+    info.right_pid_output_min = right.output_min();
+    info.left_pid_output_max = left.output_max();
+    info.right_pid_output_max = right.output_max();
+    info.left_pid_integral_limit = left.integral_limit();
+    info.right_pid_integral_limit = right.integral_limit();
+    info.left_pid_max_output_step = left.max_output_step();
+    info.right_pid_max_output_step = right.max_output_step();
 }
 
 /**
@@ -846,6 +906,36 @@ void PositionalPidController::set_integral_limit(float max_integral)
 void PositionalPidController::set_output_limit(float max_out)
 {
     max_output_ = fabsf(max_out);
+}
+
+float PositionalPidController::kp() const
+{
+    return kp_;
+}
+
+float PositionalPidController::ki() const
+{
+    return ki_;
+}
+
+float PositionalPidController::kd() const
+{
+    return kd_;
+}
+
+float PositionalPidController::integral() const
+{
+    return integral_;
+}
+
+float PositionalPidController::max_integral() const
+{
+    return max_integral_;
+}
+
+float PositionalPidController::max_output() const
+{
+    return max_output_;
 }
 
 /**

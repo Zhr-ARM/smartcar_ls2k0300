@@ -225,8 +225,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    // .udp_web_server_ip = "172.21.79.129",
-    .udp_web_server_ip = "10.120.166.102",
+    .udp_web_server_ip = "172.21.79.129",
+    // .udp_web_server_ip = "10.120.166.129",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -265,7 +265,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 十字补线触发的下角点最小 y 阈值。
     .cross_lower_corner_extrapolate_min_y = 35,
     // 十字下角点补线向上的延伸长度（按 y 行数计算）。
-    .cross_lower_corner_extrapolate_y_span = 15,
+    .cross_lower_corner_extrapolate_y_span = 30,
     // 原图直边判断：检查边界数组前 60 个点。
     .src_boundary_straight_check_count = 90,
     // 原图直边判断：前 N 个点中 90% 以上为 dir=4/5 判定为直边。
@@ -348,9 +348,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // line_error 加权点数量。
     .ipm_line_error_weighted_point_count = 3,
     // line_error 加权索引点（0-based）。
-    .ipm_line_error_point_indices = {3, 7, 11},
+    .ipm_line_error_point_indices = {4, 8, 12},
     // line_error 各索引点对应权重。
-    .ipm_line_error_weights = {0.48f, 0.25f, 0.25f},
+    .ipm_line_error_weights = {0.45f, 0.3f, 0.25f},
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
     .ipm_line_error_speed_k = 0.02f,
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b。

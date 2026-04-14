@@ -92,6 +92,10 @@ public:
      * @return 当前微分系数
      */
     float kd() const;
+    float output_min() const;
+    float output_max() const;
+    float integral_limit() const;
+    float max_output_step() const;
 
     /**
      * @brief 获取当前输出值
@@ -252,6 +256,42 @@ struct MotorSpeedControlState
     float right_duty;
 };
 
+struct MotorSpeedPidDebugInfo
+{
+    float left_kp;
+    float left_ki;
+    float left_kd;
+    float right_kp;
+    float right_ki;
+    float right_kd;
+    float integral_limit;
+    float max_output_step;
+    float correction_limit;
+    float duty_limit;
+    float left_feedforward_gain;
+    float right_feedforward_gain;
+    float left_feedforward_bias;
+    float right_feedforward_bias;
+    float feedforward_bias_threshold;
+    float decel_error_threshold;
+    float decel_duty_gain;
+    float decel_duty_limit;
+    float left_pid_target;
+    float right_pid_target;
+    float left_pid_error;
+    float right_pid_error;
+    float left_pid_output;
+    float right_pid_output;
+    float left_pid_output_min;
+    float right_pid_output_min;
+    float left_pid_output_max;
+    float right_pid_output_max;
+    float left_pid_integral_limit;
+    float right_pid_integral_limit;
+    float left_pid_max_output_step;
+    float right_pid_max_output_step;
+};
+
 /**
  * @brief 双轮电机速度环控制器
  * 作用：封装反馈滤波、前馈补偿与双通道增量式 PID 修正
@@ -284,6 +324,7 @@ public:
      * @param params 用于接收参数的输出对象
      */
     void get_pid_params(DualPidParams &params) const;
+    void get_debug_info(MotorSpeedPidDebugInfo &info) const;
 
     /**
      * @brief 更新 PID 参数
@@ -423,6 +464,12 @@ public:
      * @param max_out 输出限幅绝对值
      */
     void set_output_limit(float max_out);
+    float kp() const;
+    float ki() const;
+    float kd() const;
+    float integral() const;
+    float max_integral() const;
+    float max_output() const;
 
     /**
      * @brief 获取当前输出值

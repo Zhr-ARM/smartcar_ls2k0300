@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <mutex>
 #include <pthread.h>
 #include <sys/syscall.h>
 #include <thread>
@@ -19,7 +20,7 @@
 namespace
 {
 // 控制周期：1ms(1000Hz)。巡线环频率高于电机速度环(5ms)的整数倍，能持续给出平滑转向目标。
-constexpr int32 LINE_FOLLOW_PERIOD_MS = 1;
+constexpr int32 LINE_FOLLOW_PERIOD_MS = 20;
 // 调度优先级：巡线线程作为中高优先级实时任务执行。
 constexpr int32 LINE_FOLLOW_THREAD_PRIORITY = 8;
 constexpr float LINE_FOLLOW_LOOP_DT_SECONDS = LINE_FOLLOW_PERIOD_MS / 1000.0f;
@@ -71,6 +72,8 @@ std::chrono::steady_clock::time_point g_last_yaw_rate_pid_time;
 bool g_has_last_logged_route_state = false;
 int g_last_logged_route_main_state = VISION_ROUTE_MAIN_NORMAL;
 int g_last_logged_route_sub_state = VISION_ROUTE_SUB_NONE;
+std::mutex g_pid_debug_mutex;
+LineFollowPidDebugStatus g_pid_debug_status{};
 
 struct RouteProfileSelection
 {
@@ -167,6 +170,8 @@ void reset_line_follow_runtime_state()
     g_has_last_logged_route_state = false;
     g_last_logged_route_main_state = VISION_ROUTE_MAIN_NORMAL;
     g_last_logged_route_sub_state = VISION_ROUTE_SUB_NONE;
+    std::lock_guard<std::mutex> lock(g_pid_debug_mutex);
+    g_pid_debug_status = {};
 }
 
 const char *sched_policy_name(int32 policy)
@@ -778,6 +783,81 @@ void line_follow_loop()
         // 这样你在调试时能同时看到：看到了多大误差、实际打了多少差速、左右轮目标是多少。
         g_turn_output.store(applied_steering_output);
 
+        bool track_point_valid = false;
+        int track_point_x = 0;
+        int track_point_y = 0;
+        vision_image_processor_get_ipm_line_error_track_point(&track_point_valid, &track_point_x, &track_point_y);
+        const float current_track_point_angle_deg =
+            compute_signed_track_point_angle_deg(track_point_valid, track_point_x, track_point_y);
+        const float raw_error_px = g_line_error_px.load();
+        const float normalized_error = std::clamp(
+            raw_error_px / VISION_HALF_WIDTH,
+            -pid_tuning::line_follow::kNormalizedErrorLimit,
+            pid_tuning::line_follow::kNormalizedErrorLimit);
+        const float measured_yaw_rate_dps = imu_thread_gyro_z_dps() * pid_tuning::imu::kGyroYawRateSign;
+
+        {
+            std::lock_guard<std::mutex> lock(g_pid_debug_mutex);
+            g_pid_debug_status.vision_updated = vision_updated;
+            g_pid_debug_status.imu_updated = imu_updated;
+            g_pid_debug_status.route_main_state = route_main_state;
+            g_pid_debug_status.route_sub_state = route_sub_state;
+            g_pid_debug_status.normal_speed_reference = current_normal_speed_reference;
+            g_pid_debug_status.profile_base_speed = profile_base_speed;
+            g_pid_debug_status.desired_base_speed = desired_base_speed;
+            g_pid_debug_status.applied_base_speed = applied_base_speed;
+            g_pid_debug_status.raw_error_px = raw_error_px;
+            g_pid_debug_status.normalized_error = normalized_error;
+            g_pid_debug_status.filtered_error_norm = g_filtered_error;
+            g_pid_debug_status.filtered_error_px = error_state.filtered_error_px;
+            g_pid_debug_status.abs_filtered_error_px = error_state.abs_filtered_error_px;
+            g_pid_debug_status.control_error_norm = error_state.control_error;
+            g_pid_debug_status.track_point_valid = track_point_valid;
+            g_pid_debug_status.track_point_x = track_point_x;
+            g_pid_debug_status.track_point_y = track_point_y;
+            g_pid_debug_status.current_track_point_angle_deg = current_track_point_angle_deg;
+            g_pid_debug_status.filtered_track_point_angle_deg = g_filtered_track_point_angle_deg;
+            g_pid_debug_status.measured_yaw_rate_dps = measured_yaw_rate_dps;
+            g_pid_debug_status.yaw_rate_ref_dps = yaw_rate_ref_dps;
+            g_pid_debug_status.yaw_rate_error_dps = yaw_rate_error_dps;
+            g_pid_debug_status.yaw_rate_error_norm = yaw_rate_error_norm;
+            g_pid_debug_status.dynamic_position_kp = dynamic_kp;
+            g_pid_debug_status.dynamic_yaw_rate_kp = dynamic_yaw_rate_kp;
+            g_pid_debug_status.applied_yaw_rate_kp = applied_yaw_rate_kp;
+            g_pid_debug_status.position_pid_kp = position_pid1.kp();
+            g_pid_debug_status.position_pid_ki = position_pid1.ki();
+            g_pid_debug_status.position_pid_kd = position_pid1.kd();
+            g_pid_debug_status.position_pid_target = position_pid1.get_target();
+            g_pid_debug_status.position_pid_error = position_pid1.get_error();
+            g_pid_debug_status.position_pid_integral = position_pid1.integral();
+            g_pid_debug_status.position_pid_output = position_pid1.get_output();
+            g_pid_debug_status.position_pid_max_integral = position_pid1.max_integral();
+            g_pid_debug_status.position_pid_max_output = position_pid1.max_output();
+            g_pid_debug_status.yaw_pid_kp = position_pid2.kp();
+            g_pid_debug_status.yaw_pid_ki = position_pid2.ki();
+            g_pid_debug_status.yaw_pid_kd = position_pid2.kd();
+            g_pid_debug_status.yaw_pid_target = position_pid2.get_target();
+            g_pid_debug_status.yaw_pid_error = position_pid2.get_error();
+            g_pid_debug_status.yaw_pid_integral = position_pid2.integral();
+            g_pid_debug_status.yaw_pid_output = position_pid2.get_output();
+            g_pid_debug_status.yaw_pid_max_integral = position_pid2.max_integral();
+            g_pid_debug_status.yaw_pid_max_output = position_pid2.max_output();
+            g_pid_debug_status.route_yaw_rate_ref_gain = route_profile.yaw_rate_ref_from_track_point_gain_dps;
+            g_pid_debug_status.route_yaw_rate_ref_limit = route_profile.yaw_rate_ref_limit_dps;
+            g_pid_debug_status.route_steering_max_output = route_profile.steering_max_output;
+            g_pid_debug_status.route_yaw_rate_kp_enable_error_threshold_px =
+                route_profile.yaw_rate_kp_enable_error_threshold_px;
+            g_pid_debug_status.mean_abs_path_error = mean_abs_path_error;
+            g_pid_debug_status.force_full_speed = force_full_speed;
+            g_pid_debug_status.raw_steering_output = raw_steering_output;
+            g_pid_debug_status.clamped_steering_output = steering_output;
+            g_pid_debug_status.applied_steering_output = applied_steering_output;
+            g_pid_debug_status.left_target_count = left_target;
+            g_pid_debug_status.right_target_count = right_target;
+            g_pid_debug_status.vision_dt_ms = vision_frame_dt_seconds * 1000.0f;
+            g_pid_debug_status.imu_dt_ms = imu_sample_dt_seconds * 1000.0f;
+        }
+
         system_delay_ms(LINE_FOLLOW_PERIOD_MS);
     }
 }
@@ -884,4 +964,11 @@ float line_follow_thread_applied_base_speed()
         return g_applied_base_speed_state;
     }
     return line_follow_thread_normal_speed_reference();
+}
+
+bool line_follow_thread_get_pid_debug_status(LineFollowPidDebugStatus &status)
+{
+    std::lock_guard<std::mutex> lock(g_pid_debug_mutex);
+    status = g_pid_debug_status;
+    return true;
 }

@@ -141,7 +141,8 @@ function writeRecordingFiles(folderName, payload) {
     duration_ms: payload.duration_ms,
     frame_count: payload.frame_count,
     video_labels: (payload.video_labels && typeof payload.video_labels === 'object') ? payload.video_labels : {},
-    statuses: Array.isArray(payload.statuses) ? payload.statuses : []
+    statuses: Array.isArray(payload.statuses) ? payload.statuses : [],
+    session_meta: (payload.session_meta && typeof payload.session_meta === 'object') ? payload.session_meta : {}
   };
   fs.writeFileSync(path.join(folderPath, 'status.json'), JSON.stringify(statusPayload, null, 2), 'utf8');
 
@@ -167,6 +168,7 @@ function writeRecordingFiles(folderName, payload) {
     duration_ms: payload.duration_ms,
     frame_count: payload.frame_count,
     video_labels: statusPayload.video_labels,
+    session_meta: statusPayload.session_meta,
     videos: videoMeta
   };
   fs.writeFileSync(path.join(folderPath, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
@@ -470,8 +472,16 @@ function startHttpServer() {
       serveFile(res, path.join(PUBLIC_DIR, 'index.html'), 'text/html; charset=utf-8');
       return;
     }
+    if (pathname === '/playback.html') {
+      serveFile(res, path.join(PUBLIC_DIR, 'playback.html'), 'text/html; charset=utf-8');
+      return;
+    }
     if (pathname === '/local_compute.html') {
       serveFile(res, path.join(PUBLIC_DIR, 'local_compute.html'), 'text/html; charset=utf-8');
+      return;
+    }
+    if (pathname === '/playback_app.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'playback_app.js'), 'application/javascript; charset=utf-8');
       return;
     }
     if (pathname === '/local_compute_app.js') {

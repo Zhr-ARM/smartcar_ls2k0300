@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vision Playback</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-soft: #0c1728;
+      --panel: rgba(10, 18, 33, 0.96);
+      --panel-2: rgba(15, 23, 42, 0.94);
+      --line: rgba(71, 85, 105, 0.82);
+      --line-soft: rgba(51, 65, 85, 0.72);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #7dd3fc;
+      --accent-2: #86efac;
+      --warn: #fbbf24;
+      --danger: #fca5a5;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 24%),
+        radial-gradient(circle at top right, rgba(134, 239, 172, 0.08), transparent 24%),
+        linear-gradient(180deg, #07111f 0%, #050c16 100%);
+      color: var(--text);
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    }
+    body {
+      overflow-y: auto;
+    }
+    .wrap {
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: 18px 18px 28px;
+    }
+    .page-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
+      gap: 16px;
+      align-items: stretch;
+      margin-bottom: 16px;
+    }
+    .hero-card {
+      background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 30%),
+        linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(11, 18, 32, 0.98));
+      border: 1px solid rgba(71, 85, 105, 0.9);
+      border-radius: 16px;
+      padding: 18px 20px;
+      min-height: 148px;
+    }
+    .status-card {
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 16px 18px;
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.24);
+    }
+    .header-block {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+    }
+    .status-card-title {
+      margin: 0;
+      color: #f8fafc;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+    .status-card-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .page-title {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.05;
+      color: #f8fafc;
+    }
+    .page-subtitle {
+      margin-top: 8px;
+      max-width: 78ch;
+      color: #93c5fd;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+    .meta-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .pill {
+      padding: 8px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(51, 65, 85, 0.92);
+      background: rgba(8, 15, 31, 0.92);
+      color: #cbd5e1;
+      font-size: 12px;
+      line-height: 1.4;
+      max-width: 100%;
+      word-break: break-word;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    .floating-controls {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 50;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 12px;
+      max-width: min(680px, calc(100vw - 24px));
+      border-radius: 18px;
+      background: rgba(7, 13, 24, 0.92);
+      border: 1px solid rgba(71, 85, 105, 0.9);
+      box-shadow: 0 20px 48px rgba(2, 6, 23, 0.46);
+      backdrop-filter: blur(16px);
+    }
+    .floating-controls .btn {
+      min-width: 88px;
+    }
+    .floating-controls .btn.speed-btn {
+      min-width: 104px;
+    }
+    .floating-controls-label {
+      flex: 1 0 100%;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+      padding: 0 2px 2px;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(71, 85, 105, 0.92);
+      background: rgba(15, 23, 42, 0.94);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    }
+    .btn:hover {
+      background: rgba(30, 41, 59, 0.96);
+      border-color: rgba(125, 211, 252, 0.56);
+    }
+    .btn:active {
+      transform: translateY(1px);
+    }
+    .btn-primary {
+      background: linear-gradient(180deg, rgba(14, 116, 144, 0.95), rgba(8, 47, 73, 0.96));
+      border-color: rgba(103, 232, 249, 0.45);
+      color: #f0fdfa;
+    }
+    .btn-primary:hover {
+      background: linear-gradient(180deg, rgba(8, 145, 178, 0.96), rgba(14, 116, 144, 0.96));
+    }
+    .control-card {
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 14px 16px;
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.24);
+      margin-bottom: 16px;
+    }
+    .control-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+      gap: 14px;
+      align-items: start;
+    }
+    .timebar {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(8, 15, 31, 0.92);
+      border: 1px solid rgba(51, 65, 85, 0.92);
+    }
+    .time-label {
+      font-size: 22px;
+      letter-spacing: 0.04em;
+      color: #dbeafe;
+      font-variant-numeric: tabular-nums;
+    }
+    .time-sub {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .main-pane {
+      grid-column: span 8;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .side-pane {
+      grid-column: span 4;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: sticky;
+      top: 18px;
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .videos-pane {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .video-card,
+    .panel {
+      background: linear-gradient(180deg, rgba(10, 18, 33, 0.96), rgba(7, 13, 24, 0.98));
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 18px 42px rgba(2, 6, 23, 0.32);
+      min-width: 0;
+    }
+    .video-card {
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+    .video-card:hover {
+      border-color: rgba(125, 211, 252, 0.58);
+    }
+    .video-card.active {
+      border-color: rgba(125, 211, 252, 0.9);
+      box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.26), 0 18px 42px rgba(2, 6, 23, 0.34);
+    }
+    .video-card h3 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      color: #f8fafc;
+    }
+    .video-card video {
+      width: 100%;
+      display: block;
+      background: #000;
+      border-radius: 10px;
+      aspect-ratio: 4 / 3;
+    }
+    .video-note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .panel {
+      padding: 14px;
+    }
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      color: #f8fafc;
+    }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .overview-item {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid var(--line-soft);
+    }
+    .overview-item strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .overview-item span {
+      font-size: 14px;
+      line-height: 1.45;
+      color: var(--text);
+      word-break: break-word;
+    }
+    .side-pane {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .route-top {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .route-stat,
+    .route-block,
+    .pid-column {
+      background: rgba(12, 20, 36, 0.92);
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      padding: 12px;
+      min-width: 0;
+    }
+    .route-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+    .route-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #f8fafc;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+    .route-judgment {
+      margin-top: 10px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(8, 15, 31, 0.96);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      line-height: 1.55;
+      color: #dbeafe;
+    }
+    .route-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .route-block-title {
+      margin-bottom: 8px;
+      color: #cbd5e1;
+      font-size: 13px;
+    }
+    .route-next {
+      font-size: 18px;
+      color: #f8fafc;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .route-lines,
+    .route-clues,
+    .route-counters {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .route-line,
+    .route-chip,
+    .route-counter {
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(51, 65, 85, 0.74);
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--text);
+      word-break: break-word;
+    }
+    .route-line strong {
+      display: inline-block;
+      margin-right: 6px;
+      color: #93c5fd;
+      font-weight: 700;
+    }
+    .route-counter strong {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .pid-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+    }
+    .pid-column-title {
+      font-size: 15px;
+      color: #f8fafc;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .pid-list {
+      display: grid;
+      gap: 8px;
+    }
+    .pid-item {
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.84);
+      border: 1px solid rgba(51, 65, 85, 0.72);
+    }
+    .pid-item strong {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      letter-spacing: 0.03em;
+    }
+    .pid-item span {
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--text);
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .pid-empty,
+    .empty-state {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .raw-status {
+      margin: 0;
+      max-height: 260px;
+      overflow: auto;
+      padding: 14px;
+      border-radius: 12px;
+      background: rgba(4, 10, 18, 0.96);
+      border: 1px solid rgba(30, 41, 59, 0.92);
+      color: #cbd5e1;
+      line-height: 1.55;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .status-text {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .hidden {
+      display: none !important;
+    }
+    @media (max-width: 1480px) {
+      .page-header,
+      .control-grid,
+      .grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .side-pane {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+      .main-pane,
+      .side-pane {
+        grid-column: auto;
+      }
+      .video-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+    @media (max-width: 980px) {
+      .pid-panel,
+      .overview-grid,
+      .route-top,
+      .route-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .page-title {
+        font-size: 24px;
+      }
+      .time-label {
+        font-size: 20px;
+      }
+      .video-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .wrap {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+      .floating-controls {
+        right: 12px;
+        bottom: 12px;
+        left: 12px;
+        max-width: none;
+      }
+      .floating-controls .btn {
+        min-width: 0;
+        flex: 1 1 calc(50% - 10px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="page-header">
+      <div class="hero-card">
+        <div class="header-block">
+          <h1 class="page-title">录制回放</h1>
+          <div class="page-subtitle">这一页只负责播放录制内容，不再挤在主调试页的弹层里。视频区、状态机、PID 和完整状态分开摆放，方便在一个视口里观察。</div>
+          <div class="meta-pills" id="metaPills"></div>
+        </div>
+      </div>
+      <div class="status-card">
+        <div class="header-block">
+          <h2 class="status-card-title">回放控制</h2>
+          <div class="status-card-subtitle">常用播放按钮已经改到右下角浮动控制条里，滚动页面时也能随时暂停、回到开头或跳转时间。</div>
+        </div>
+      </div>
+    </header>
+    <section class="control-card">
+      <div class="control-grid">
+        <div class="timebar">
+          <div>
+            <div class="time-label" id="playbackTimeLabel">00:00.00 / 00:00.00</div>
+            <div class="time-sub" id="timeSubLabel">等待回放内容...</div>
+          </div>
+          <div class="status-text" id="sourceLabel">来源：--</div>
+        </div>
+        <section class="panel">
+          <h2>回放摘要</h2>
+          <div class="overview-grid" id="overviewGrid"></div>
+        </section>
+      </div>
+    </section>
+    <main class="grid">
+      <section class="main-pane">
+        <div class="videos-pane">
+          <div class="panel">
+            <h2>回放视频</h2>
+            <div class="status-text" id="videoPanelNote">点击任意一个视频卡片，可把它切换为主同步时间轴。</div>
+          </div>
+          <div class="video-grid" id="playbackGrid"></div>
+        </div>
+      </section>
+      <aside class="side-pane">
+
+        <section class="panel">
+          <h2>状态机高亮</h2>
+          <div class="route-top">
+            <div class="route-stat">
+              <div class="route-label">主状态</div>
+              <div class="route-value" id="routeMainStateValue">--</div>
+            </div>
+            <div class="route-stat">
+              <div class="route-label">子状态</div>
+              <div class="route-value" id="routeSubStateValue">--</div>
+            </div>
+            <div class="route-stat">
+              <div class="route-label">优先边界</div>
+              <div class="route-value" id="routePreferredSourceValue">--</div>
+            </div>
+            <div class="route-stat">
+              <div class="route-label">进入后编码器</div>
+              <div class="route-value" id="routeEncoderValue">--</div>
+            </div>
+          </div>
+          <div class="route-judgment" id="routeStateJudgment">等待状态机数据...</div>
+          <div class="route-grid">
+            <div class="route-block">
+              <div class="route-block-title">下一阶段与原因</div>
+              <div class="route-next" id="routeNextStateValue">--</div>
+              <div class="route-lines" id="routeNextReason"></div>
+            </div>
+            <div class="route-block">
+              <div class="route-block-title">关键判定条件</div>
+              <div class="route-lines" id="routeConditionLines"></div>
+            </div>
+          </div>
+          <div class="route-grid">
+            <div class="route-block">
+              <div class="route-block-title">判定线索</div>
+              <div class="route-clues" id="routeStateClues"></div>
+            </div>
+            <div class="route-block">
+              <div class="route-block-title">状态计数</div>
+              <div class="route-counters" id="routeStateCounters"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>PID 专用状态栏</h2>
+          <div class="pid-panel">
+            <div class="pid-column">
+              <div class="pid-column-title">共同部分</div>
+              <div class="pid-list" id="pidCommonList"></div>
+            </div>
+            <div class="pid-column">
+              <div class="pid-column-title">左侧 PID 与执行链</div>
+              <div class="pid-list" id="pidLeftList"></div>
+            </div>
+            <div class="pid-column">
+              <div class="pid-column-title">右侧 PID 与执行链</div>
+              <div class="pid-list" id="pidRightList"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>完整状态快照</h2>
+          <pre class="raw-status" id="rawStatus">waiting...</pre>
+        </section>
+      </aside>
+    </main>
+  </div>
+  <div class="floating-controls">
+    <div class="floating-controls-label">回放浮动控制条</div>
+    <button class="btn btn-primary" id="playbackToggleBtn">播放</button>
+    <button class="btn" id="playbackRestartBtn">回到开头</button>
+    <button class="btn" id="playbackBackwardBtn">后退1s</button>
+    <button class="btn" id="playbackForwardBtn">快进1s</button>
+    <button class="btn speed-btn" id="playbackSpeedBtn">倍速 1.00x</button>
+    <button class="btn" id="refreshBtn">重新加载</button>
+  </div>
+
+  <script src="/shared_receiver_core.js"></script>
+  <script src="/playback_app.js"></script>
+</body>
+</html>
