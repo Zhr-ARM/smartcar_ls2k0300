@@ -14,11 +14,8 @@ struct LineFollowPidDebugStatus
     float desired_base_speed;
     float applied_base_speed;
     float raw_error_px;
-    float normalized_error;
-    float filtered_error_norm;
     float filtered_error_px;
     float abs_filtered_error_px;
-    float control_error_norm;
     float control_error_px;
     bool track_point_valid;
     int track_point_x;
@@ -28,7 +25,6 @@ struct LineFollowPidDebugStatus
     float measured_yaw_rate_dps;
     float yaw_rate_ref_dps;
     float yaw_rate_error_dps;
-    float yaw_rate_error_norm;
     float dynamic_position_kp;
     float dynamic_yaw_rate_kp;
     float applied_yaw_rate_kp;

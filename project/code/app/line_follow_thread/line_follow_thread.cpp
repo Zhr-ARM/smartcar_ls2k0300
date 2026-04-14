@@ -29,7 +29,6 @@ constexpr float VISION_NOMINAL_DT_SECONDS = 1.0f / 60.0f;
 constexpr float IMU_MAX_DT_SECONDS = 0.050f;
 constexpr float VISION_MAX_DT_SECONDS = 0.200f;
 constexpr float PID_MAX_DT_SECONDS = 0.200f;
-constexpr float VISION_HALF_WIDTH = static_cast<float>(VISION_DOWNSAMPLED_WIDTH) * 0.5f;
 constexpr float RAD_TO_DEG = 180.0f / 3.1415926f;
 
 using RouteProfile = pid_tuning::route_line_follow::Profile;
@@ -85,7 +84,6 @@ struct ControlErrorState
 {
     float filtered_error_px;
     float abs_filtered_error_px;
-    float control_error_norm;
     float control_error_px;
 };
 
@@ -130,28 +128,23 @@ float compute_quadratic_gain(float base_gain,
     // 二次增益律 + 限幅保护。
     return std::clamp(base_gain + quad_a * error_sq, min_gain, max_gain);
 }
-// 把滤波后的归一化误差同时转换成：
-// 1) 位置环主控制继续使用的归一化 control_error_norm；
-// 2) 动态 Kp 调度使用的像素 control_error_px。
-ControlErrorState compute_control_error_state(float filtered_error)
+// 把滤波后的像素误差转换成真正参与位置环控制的像素 control_error_px，
+// 同时保留便于调试的绝对误差量。
+ControlErrorState compute_control_error_state(float filtered_error_px)
 {
-    const float filtered_error_px = filtered_error * VISION_HALF_WIDTH;
     const float abs_filtered_error_px = std::fabs(filtered_error_px);
-    float control_error_norm = filtered_error;
     float control_error_px = filtered_error_px;
 
     if (abs_filtered_error_px < pid_tuning::line_follow::kErrorDeadzonePx)
     {
-        control_error_norm = 0.0f;
         control_error_px = 0.0f;
     }
     else if (abs_filtered_error_px < pid_tuning::line_follow::kErrorLowGainLimitPx)
     {
-        control_error_norm *= pid_tuning::line_follow::kErrorLowGain;
         control_error_px *= pid_tuning::line_follow::kErrorLowGain;
     }
 
-    return {filtered_error_px, abs_filtered_error_px, control_error_norm, control_error_px};
+    return {filtered_error_px, abs_filtered_error_px, control_error_px};
 }
 
 void reset_line_follow_runtime_state()
@@ -575,20 +568,14 @@ bool update_filtered_vision_inputs_if_new_frame(float *frame_dt_seconds_out)
     const float raw_error_px = -selected_offset_error;
     g_line_error_px.store(raw_error_px);
 
-    // 以半幅宽度归一化到近似[-1,1]范围，并对异常值做保护限幅。
-    // 这样 PID 参数可以脱离具体分辨率，后续改摄像头宽度时更容易复用。
-    const float normalized_error = std::clamp(
-        raw_error_px / VISION_HALF_WIDTH,
-        -pid_tuning::line_follow::kNormalizedErrorLimit,
-        pid_tuning::line_follow::kNormalizedErrorLimit);
-
     // 一阶 IIR 滤波只在“新视觉帧到来”时推进一次，避免在 1ms 循环里对旧帧重复滤波。
+    // 这里直接在像素误差量纲下滤波，不再经过归一化。
     const float error_filter_tau_seconds =
         alpha_to_time_constant_seconds(pid_tuning::line_follow::kErrorFilterAlpha, VISION_NOMINAL_DT_SECONDS);
     const float error_filter_alpha =
         compute_iir_alpha_from_dt(frame_dt_seconds, error_filter_tau_seconds);
     g_filtered_error = apply_iir_filter(g_filtered_error,
-                                        normalized_error,
+                                        raw_error_px,
                                         error_filter_alpha);
 
     bool track_point_valid = false;
@@ -675,7 +662,7 @@ void line_follow_loop()
         }
 
         // 后面的 deadzone / 小误差降增益继续使用像素尺度判断，
-        // 是为了让阈值更直观，便于你结合画面观察实际偏差量。
+        // 位置环当前也直接在像素量纲下工作。
         const ControlErrorState error_state = compute_control_error_state(g_filtered_error);
 
         // 动态 Kp：误差越大，比例增益越强。
@@ -698,8 +685,6 @@ void line_follow_loop()
             route_profile.yaw_rate_ref_limit_dps);
         //角速度的差
         const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 目标角速度与实际角速度之差
-        const float yaw_rate_error_norm =
-            yaw_rate_error_dps / std::max(route_profile.yaw_rate_ref_limit_dps, 1.0f);
         const float dynamic_yaw_rate_kp = compute_quadratic_gain(route_profile.yaw_rate_kp,
                                                                  route_profile.yaw_rate_dynamic_kp_quad_a,
                                                                  route_profile.yaw_rate_dynamic_kp_min,
@@ -715,7 +700,7 @@ void line_follow_loop()
         // 第一条支路：位置环 PID，只负责“把车拉回中线”。
         // 它盯的是横向误差 e，输出一份差速量。
         g_position_output_state = update_pid_output_state_if_needed(vision_updated,
-                                                                    error_state.control_error_norm,
+                                                                    error_state.control_error_px,
                                                                     vision_frame_dt_seconds,
                                                                     g_last_position_pid_time,
                                                                     g_has_last_position_pid_time,
@@ -797,10 +782,6 @@ void line_follow_loop()
         const float current_track_point_angle_deg =
             compute_signed_track_point_angle_deg(track_point_valid, track_point_x, track_point_y);
         const float raw_error_px = g_line_error_px.load();
-        const float normalized_error = std::clamp(
-            raw_error_px / VISION_HALF_WIDTH,
-            -pid_tuning::line_follow::kNormalizedErrorLimit,
-            pid_tuning::line_follow::kNormalizedErrorLimit);
         const float measured_yaw_rate_dps = imu_thread_gyro_z_dps() * pid_tuning::imu::kGyroYawRateSign;
 
         {
@@ -814,11 +795,8 @@ void line_follow_loop()
             g_pid_debug_status.desired_base_speed = desired_base_speed;
             g_pid_debug_status.applied_base_speed = applied_base_speed;
             g_pid_debug_status.raw_error_px = raw_error_px;
-            g_pid_debug_status.normalized_error = normalized_error;
-            g_pid_debug_status.filtered_error_norm = g_filtered_error;
             g_pid_debug_status.filtered_error_px = error_state.filtered_error_px;
             g_pid_debug_status.abs_filtered_error_px = error_state.abs_filtered_error_px;
-            g_pid_debug_status.control_error_norm = error_state.control_error_norm;
             g_pid_debug_status.control_error_px = error_state.control_error_px;
             g_pid_debug_status.track_point_valid = track_point_valid;
             g_pid_debug_status.track_point_x = track_point_x;
@@ -828,7 +806,6 @@ void line_follow_loop()
             g_pid_debug_status.measured_yaw_rate_dps = measured_yaw_rate_dps;
             g_pid_debug_status.yaw_rate_ref_dps = yaw_rate_ref_dps;
             g_pid_debug_status.yaw_rate_error_dps = yaw_rate_error_dps;
-            g_pid_debug_status.yaw_rate_error_norm = yaw_rate_error_norm;
             g_pid_debug_status.dynamic_position_kp = dynamic_kp;
             g_pid_debug_status.dynamic_yaw_rate_kp = dynamic_yaw_rate_kp;
             g_pid_debug_status.applied_yaw_rate_kp = applied_yaw_rate_kp;

@@ -999,11 +999,8 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_desired_base_speed", line_follow_pid_debug.desired_base_speed);
         append_float(enabled, "pid_common_applied_base_speed", line_follow_pid_debug.applied_base_speed);
         append_float(enabled, "pid_common_raw_error_px", line_follow_pid_debug.raw_error_px);
-        append_float(enabled, "pid_common_normalized_error", line_follow_pid_debug.normalized_error);
-        append_float(enabled, "pid_common_filtered_error_norm", line_follow_pid_debug.filtered_error_norm);
         append_float(enabled, "pid_common_filtered_error_px", line_follow_pid_debug.filtered_error_px);
         append_float(enabled, "pid_common_abs_filtered_error_px", line_follow_pid_debug.abs_filtered_error_px);
-        append_float(enabled, "pid_common_control_error_norm", line_follow_pid_debug.control_error_norm);
         append_float(enabled, "pid_common_control_error_px", line_follow_pid_debug.control_error_px);
         append_bool(enabled, "pid_common_track_point_valid", line_follow_pid_debug.track_point_valid);
         append_int_array(enabled && line_follow_pid_debug.track_point_valid,
@@ -1014,7 +1011,6 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_measured_yaw_rate_dps", line_follow_pid_debug.measured_yaw_rate_dps);
         append_float(enabled, "pid_common_yaw_rate_ref_dps", line_follow_pid_debug.yaw_rate_ref_dps);
         append_float(enabled, "pid_common_yaw_rate_error_dps", line_follow_pid_debug.yaw_rate_error_dps);
-        append_float(enabled, "pid_common_yaw_rate_error_norm", line_follow_pid_debug.yaw_rate_error_norm);
         append_float(enabled, "pid_common_dynamic_position_kp", line_follow_pid_debug.dynamic_position_kp);
         append_float(enabled, "pid_common_dynamic_yaw_rate_kp", line_follow_pid_debug.dynamic_yaw_rate_kp);
         append_float(enabled, "pid_common_applied_yaw_rate_kp", line_follow_pid_debug.applied_yaw_rate_kp);

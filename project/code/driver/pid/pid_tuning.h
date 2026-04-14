@@ -89,8 +89,6 @@ inline constexpr float kTargetCountMin = -1550.0f;
 // 左右轮目标最大值：限制巡线线程下发给速度环的目标上限。
 inline constexpr float kTargetCountMax = 1550.0f;
 
-// 归一化误差保护限幅：防止视觉异常值把控制链一下子打爆。
-inline constexpr float kNormalizedErrorLimit = 1.2f;
 // 误差死区：采样线附近的小抖动直接忽略，减少左右抽动。
 inline constexpr float kErrorDeadzonePx = 0.6f;
 // 小误差降增益区间：误差小于这个值时，先温和修正。
@@ -168,15 +166,15 @@ inline constexpr Profile make_normal_profile()
     profile.base_speed = 250.0f; // NORMAL 档基础速度：非直道加速阶段默认按 300 count/5ms 行驶。
     profile.straight_full_speed_error_threshold_px = 0.0f; // NORMAL 档直道满速阈值：整条路径均值误差小于 1px 才允许直通满速。
 
-    profile.position_dynamic_kp_quad_a = 1.0f; // NORMAL 档位置环动态Kp二次项：误差越大，Kp 增长越快。
-    profile.position_dynamic_kp_base = 900.0f; // NORMAL 档位置环动态Kp基础值：零误差附近从 1300 起步，避免“名义基础值”被下限吃掉。
-    profile.position_dynamic_kp_min = 900.0f; // NORMAL 档位置环动态Kp下限：当前与基础值保持一致，表示零误差起点就是最小 Kp。
-    profile.position_dynamic_kp_max = 1800.0f; // NORMAL 档位置环动态Kp上限：防止比例项过强。
+    profile.position_dynamic_kp_quad_a = 0.1f; // NORMAL 档位置环动态Kp二次项：误差越大，Kp 增长越快。
+    profile.position_dynamic_kp_base = 1.0f; // NORMAL 档位置环动态Kp基础值：零误差附近从 1300 起步，避免“名义基础值”被下限吃掉。
+    profile.position_dynamic_kp_min = 0.0f; // NORMAL 档位置环动态Kp下限：当前与基础值保持一致，表示零误差起点就是最小 Kp。
+    profile.position_dynamic_kp_max = 30.0f; // NORMAL 档位置环动态Kp上限：防止比例项过强。
     profile.position_ki = 0.0f; // NORMAL 档位置环积分项：当前关闭，避免积分拖尾。
-    profile.position_kd = 8.0f; // NORMAL 档位置环微分项：抑制转向过冲和来回摆动。
+    profile.position_kd = 0.0f; // NORMAL 档位置环微分项：抑制转向过冲和来回摆动。
     profile.position_max_integral = 0.0f; // NORMAL 档位置环积分限幅：0 表示当前不启用额外积分限幅。
-    profile.position_max_output = 750.0f; // NORMAL 档位置环输出限幅：位置支路允许的最大差速。
-    profile.steering_max_output = 750.0f; // NORMAL 档总转向限幅：位置环与角速度环叠加后的总差速上限。
+    profile.position_max_output = 650.0f; // NORMAL 档位置环输出限幅：位置支路允许的最大差速。
+    profile.steering_max_output = 650.0f; // NORMAL 档总转向限幅：位置环与角速度环叠加后的总差速上限。
 
     profile.yaw_rate_ref_from_error_gain_dps = 0.0f; // NORMAL 档误差前馈增益：当前固定夹角模式，不参与目标横摆角速度生成，建议保持 0。
     profile.yaw_rate_ref_from_curvature_gain_dps = 0.0f; // NORMAL 档曲率前馈增益：当前固定夹角模式，不参与目标横摆角速度生成，建议保持 0。
