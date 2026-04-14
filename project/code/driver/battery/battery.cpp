@@ -5,7 +5,7 @@ namespace
 // 当前车上蜂鸣器为高电平有效：高电平点亮蜂鸣器，低电平关闭蜂鸣器。
 constexpr const char *kBatteryBeepDevicePath = "/dev/zf_driver_gpio_beep";
 // 低压后打印电压、停控制线程并进入蜂鸣报警，直到用户主动退出程序。
-constexpr bool kBatteryProtectionEnabled = false;
+constexpr bool kBatteryProtectionEnabled = true;
 constexpr bool kBatteryAlarmEnabled = kBatteryProtectionEnabled;
 constexpr float kBatteryLowVoltageThresholdV = 11.3f;
 constexpr float kBatteryVoltageFilterAlpha = 0.35f;
@@ -14,7 +14,7 @@ constexpr int kBatteryCheckPeriodMs =1000;
 constexpr int kBatteryStatusPrintPeriodMs = 2000;
 
 float g_filtered_battery_voltage_v = 0.0f;
-bool g_battery_filter_initialized = false;
+bool g_battery_filter_initialized = true;
 int g_low_voltage_confirm_count = 0;
 bool g_low_voltage_latched = false;
 
