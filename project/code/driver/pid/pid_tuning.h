@@ -305,7 +305,7 @@ inline constexpr Profile make_circle_enter_profile()
 {
     Profile profile = kNormalProfile;
 
-    //profile.base_speed = 250.0f; // 环岛入口档基础速度：入口默认按 225 count/5ms 行驶。
+    // profile.base_speed = 260.0f; // 环岛入口档基础速度：入口默认按 225 count/5ms 行驶。
     // profile.straight_full_speed_error_threshold_px = 0.0f; // 环岛入口档直道满速阈值：禁用入口阶段满速直通。
 
     // profile.position_dynamic_kp_quad_a = 2.0f; // 环岛入口档位置环动态Kp一次项：大误差时更积极地拉回中线。
@@ -344,7 +344,7 @@ inline constexpr Profile make_circle_inside_profile()
 {
     Profile profile = kNormalProfile;
 
-    //profile.base_speed = 250.0f; // 环岛内部档基础速度：内部默认按 200 count/5ms 控速。
+    // profile.base_speed = 260.0f; // 环岛内部档基础速度：内部默认按 200 count/5ms 控速。
     // profile.straight_full_speed_error_threshold_px = 0.0f; // 环岛内部档直道满速阈值：禁用内部阶段满速直通。
 
     // profile.position_dynamic_kp_quad_a = 45.0f; // 环岛内部档位置环动态Kp一次项：大误差时更果断地拉回单边中线。

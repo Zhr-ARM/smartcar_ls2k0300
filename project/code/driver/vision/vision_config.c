@@ -337,7 +337,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 所选偏移中线曲率计算步长（索引步长）。
     .ipm_centerline_curvature_step = 3,
     // 斑马线检测开关。
-    .zebra_cross_detection_enabled = true,
+    .zebra_cross_detection_enabled = false,
     // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。
     .keep_last_centerline_on_double_loss = true,
     // 状态机十字识别开关。
@@ -359,9 +359,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 圆环状态 3 的对侧起始贴边连续行数触发阈值。
     .route_circle_stage3_frame_wall_rows_trigger = 70,
     // 圆环状态 6：搜线起始行至少抬高到该行。
-    .route_circle_stage6_maze_start_row = 60,
+    .route_circle_stage6_maze_start_row = 50,
     // 圆环状态中线偏移：仅在 circle4/5 生效；左圆环相对左边界偏移，右圆环走镜像偏移。
-    .route_circle_center_target_offset_from_left_px = 23.0f,
+    .route_circle_center_target_offset_from_left_px = 14.0f,
     // 圆环补线：贴边连续段最小长度阈值。
     .circle_guide_min_frame_wall_segment_len = 8,
     // 圆环 state3 补线左/右目标点在规则边界上的后移索引。
