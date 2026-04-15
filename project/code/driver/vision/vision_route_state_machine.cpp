@@ -13,6 +13,8 @@ static int g_left_loss_count = 0;
 static int g_left_gain_count = 0;
 static int g_right_loss_count = 0;
 static int g_right_gain_count = 0;
+static int g_straight_ready_consecutive_count = 0;
+static constexpr int kStraightEnterConsecutiveFrames = 5;
 
 static int normalize_preferred_source(int preferred_source)
 {
@@ -37,6 +39,7 @@ static void clear_runtime_counters()
     g_left_gain_count = 0;
     g_right_loss_count = 0;
     g_right_gain_count = 0;
+    g_straight_ready_consecutive_count = 0;
 }
 
 static void enter_state(vision_route_main_state_enum main_state,
@@ -125,23 +128,31 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
         g_preferred_source = normalize_preferred_source(input->base_preferred_source);
         if (straight_state_ready(input))
         {
-            enter_state(VISION_ROUTE_MAIN_STRAIGHT,
-                        VISION_ROUTE_SUB_NONE,
-                        input->base_preferred_source);
-        }
-        else if (g_vision_runtime_config.route_circle_detection_enabled)
-        {
-            if (left_circle_entry_ready(input))
+            g_straight_ready_consecutive_count += 1;
+            if (g_straight_ready_consecutive_count >= kStraightEnterConsecutiveFrames)
             {
-                enter_state(VISION_ROUTE_MAIN_CIRCLE_LEFT,
-                            VISION_ROUTE_SUB_CIRCLE_LEFT_1,
-                            VISION_ROUTE_PREFERRED_SOURCE_RIGHT);
+                enter_state(VISION_ROUTE_MAIN_STRAIGHT,
+                            VISION_ROUTE_SUB_NONE,
+                            input->base_preferred_source);
             }
-            else if (right_circle_entry_ready(input))
+        }
+        else
+        {
+            g_straight_ready_consecutive_count = 0;
+            if (g_vision_runtime_config.route_circle_detection_enabled)
             {
-                enter_state(VISION_ROUTE_MAIN_CIRCLE_RIGHT,
-                            VISION_ROUTE_SUB_CIRCLE_RIGHT_1,
-                            VISION_ROUTE_PREFERRED_SOURCE_LEFT);
+                if (left_circle_entry_ready(input))
+                {
+                    enter_state(VISION_ROUTE_MAIN_CIRCLE_LEFT,
+                                VISION_ROUTE_SUB_CIRCLE_LEFT_1,
+                                VISION_ROUTE_PREFERRED_SOURCE_RIGHT);
+                }
+                else if (right_circle_entry_ready(input))
+                {
+                    enter_state(VISION_ROUTE_MAIN_CIRCLE_RIGHT,
+                                VISION_ROUTE_SUB_CIRCLE_RIGHT_1,
+                                VISION_ROUTE_PREFERRED_SOURCE_LEFT);
+                }
             }
         }
         break;
