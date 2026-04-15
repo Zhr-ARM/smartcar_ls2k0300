@@ -51,9 +51,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 图传发送上限帧率，0 表示不限速。
     .send_max_fps = 60,
     // 推理总开关：false 时关闭红色识别与 ncnn 推理。
-    .infer_enabled = false,
+    .infer_enabled = true,
     // ncnn 子开关：false 时只保留红框检测，不做 ncnn 分类。
-    .ncnn_enabled = false,
+    .ncnn_enabled = true,
     // 逐飞客户端发送开关。
     .client_sender_enabled = false,
     // 车载屏显示开关。
