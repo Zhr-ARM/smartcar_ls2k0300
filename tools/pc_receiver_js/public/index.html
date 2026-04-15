@@ -230,6 +230,89 @@
       line-height: 1.55;
       min-height: 52px;
     }
+    .straight-focus-panel {
+      margin-top: 12px;
+      border-radius: 14px;
+      padding: 14px;
+      border: 1px solid rgba(71, 85, 105, 0.92);
+      background: linear-gradient(135deg, rgba(8, 15, 31, 0.96), rgba(15, 23, 42, 0.92));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+    .straight-focus-panel.ready {
+      border-color: rgba(34, 197, 94, 0.72);
+      background:
+        radial-gradient(circle at top right, rgba(34, 197, 94, 0.18), transparent 26%),
+        linear-gradient(135deg, rgba(6, 20, 17, 0.98), rgba(10, 27, 21, 0.94));
+    }
+    .straight-focus-panel.not-ready {
+      border-color: rgba(239, 68, 68, 0.72);
+      background:
+        radial-gradient(circle at top right, rgba(239, 68, 68, 0.16), transparent 26%),
+        linear-gradient(135deg, rgba(25, 11, 16, 0.98), rgba(37, 15, 19, 0.94));
+    }
+    .straight-focus-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .straight-focus-title {
+      color: #f8fafc;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+    .straight-focus-badge {
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: rgba(15, 23, 42, 0.8);
+      color: #e2e8f0;
+    }
+    .straight-focus-panel.ready .straight-focus-badge {
+      background: rgba(20, 83, 45, 0.88);
+      color: #dcfce7;
+      border-color: rgba(74, 222, 128, 0.34);
+    }
+    .straight-focus-panel.not-ready .straight-focus-badge {
+      background: rgba(127, 29, 29, 0.88);
+      color: #fee2e2;
+      border-color: rgba(248, 113, 113, 0.34);
+    }
+    .straight-focus-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .straight-focus-stat {
+      background: rgba(15, 23, 42, 0.84);
+      border: 1px solid rgba(71, 85, 105, 0.78);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .straight-focus-label {
+      color: #94a3b8;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .straight-focus-value {
+      color: #f8fafc;
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.05;
+    }
+    .straight-focus-detail {
+      margin-top: 10px;
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.55;
+    }
     .route-state-block {
       background: rgba(8, 15, 31, 0.92);
       border: 1px solid rgba(51, 65, 85, 0.92);
@@ -938,6 +1021,31 @@
             <div class="route-state-value" id="routeEncoderValue">--</div>
           </div>
         </div>
+        <div class="straight-focus-panel" id="straightFocusPanel">
+          <div class="straight-focus-head">
+            <div class="straight-focus-title">直道判定高亮</div>
+            <div class="straight-focus-badge" id="straightFocusBadge">等待数据</div>
+          </div>
+          <div class="straight-focus-grid">
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">中线点数</div>
+              <div class="straight-focus-value" id="straightFocusCenterlineCount">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">最后索引</div>
+              <div class="straight-focus-value" id="straightFocusLastIndex">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">误差和</div>
+              <div class="straight-focus-value" id="straightFocusErrorSum">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">误差阈值</div>
+              <div class="straight-focus-value" id="straightFocusErrorMax">--</div>
+            </div>
+          </div>
+          <div class="straight-focus-detail" id="straightFocusDetail">等待直道判定数据...</div>
+        </div>
         <div class="route-state-judgment" id="routeStateJudgment">waiting...</div>
         <div class="route-state-grid">
           <div class="route-state-block">
@@ -1042,8 +1150,33 @@
                 </div>
                 <div class="route-state-stat">
                   <div class="route-state-label">进入当前状态后编码器</div>
-                  <div class="route-state-value" id="playbackRouteEncoderValue">--</div>
+            <div class="route-state-value" id="playbackRouteEncoderValue">--</div>
                 </div>
+              </div>
+              <div class="straight-focus-panel" id="playbackStraightFocusPanel">
+                <div class="straight-focus-head">
+                  <div class="straight-focus-title">直道判定高亮</div>
+                  <div class="straight-focus-badge" id="playbackStraightFocusBadge">等待数据</div>
+                </div>
+                <div class="straight-focus-grid">
+                  <div class="straight-focus-stat">
+                    <div class="straight-focus-label">中线点数</div>
+                    <div class="straight-focus-value" id="playbackStraightFocusCenterlineCount">--</div>
+                  </div>
+                  <div class="straight-focus-stat">
+                    <div class="straight-focus-label">最后索引</div>
+                    <div class="straight-focus-value" id="playbackStraightFocusLastIndex">--</div>
+                  </div>
+                  <div class="straight-focus-stat">
+                    <div class="straight-focus-label">误差和</div>
+                    <div class="straight-focus-value" id="playbackStraightFocusErrorSum">--</div>
+                  </div>
+                  <div class="straight-focus-stat">
+                    <div class="straight-focus-label">误差阈值</div>
+                    <div class="straight-focus-value" id="playbackStraightFocusErrorMax">--</div>
+                  </div>
+                </div>
+                <div class="straight-focus-detail" id="playbackStraightFocusDetail">等待直道判定数据...</div>
               </div>
               <div class="route-state-judgment" id="playbackRouteStateJudgment">等待回放状态机数据...</div>
               <div class="route-state-grid">
@@ -1203,6 +1336,13 @@
     const routeSubStateValue = document.getElementById('routeSubStateValue');
     const routePreferredSourceValue = document.getElementById('routePreferredSourceValue');
     const routeEncoderValue = document.getElementById('routeEncoderValue');
+    const straightFocusPanel = document.getElementById('straightFocusPanel');
+    const straightFocusBadge = document.getElementById('straightFocusBadge');
+    const straightFocusCenterlineCount = document.getElementById('straightFocusCenterlineCount');
+    const straightFocusLastIndex = document.getElementById('straightFocusLastIndex');
+    const straightFocusErrorSum = document.getElementById('straightFocusErrorSum');
+    const straightFocusErrorMax = document.getElementById('straightFocusErrorMax');
+    const straightFocusDetail = document.getElementById('straightFocusDetail');
     const routeStateJudgment = document.getElementById('routeStateJudgment');
     const routeNextStateValue = document.getElementById('routeNextStateValue');
     const routeNextReason = document.getElementById('routeNextReason');
@@ -1213,6 +1353,13 @@
     const playbackRouteSubStateValue = document.getElementById('playbackRouteSubStateValue');
     const playbackRoutePreferredSourceValue = document.getElementById('playbackRoutePreferredSourceValue');
     const playbackRouteEncoderValue = document.getElementById('playbackRouteEncoderValue');
+    const playbackStraightFocusPanel = document.getElementById('playbackStraightFocusPanel');
+    const playbackStraightFocusBadge = document.getElementById('playbackStraightFocusBadge');
+    const playbackStraightFocusCenterlineCount = document.getElementById('playbackStraightFocusCenterlineCount');
+    const playbackStraightFocusLastIndex = document.getElementById('playbackStraightFocusLastIndex');
+    const playbackStraightFocusErrorSum = document.getElementById('playbackStraightFocusErrorSum');
+    const playbackStraightFocusErrorMax = document.getElementById('playbackStraightFocusErrorMax');
+    const playbackStraightFocusDetail = document.getElementById('playbackStraightFocusDetail');
     const playbackRouteStateJudgment = document.getElementById('playbackRouteStateJudgment');
     const playbackRouteNextStateValue = document.getElementById('playbackRouteNextStateValue');
     const playbackRouteNextReason = document.getElementById('playbackRouteNextReason');
@@ -1456,8 +1603,55 @@
       });
     }
 
+    function renderStraightFocusPanel(status, refs) {
+      if (!refs || !refs.panel) return;
+      const centerlineCount = Number(status && status.straight_selected_centerline_count);
+      const lastIndex = Number(status && status.straight_required_last_index);
+      const errorSum = Number(status && status.straight_abs_error_sum);
+      const errorMax = Number(status && status.straight_abs_error_sum_max);
+      const readyNow = !!(status && status.straight_state_ready_now);
+      const hasData = Number.isFinite(centerlineCount) || Number.isFinite(lastIndex) || Number.isFinite(errorSum);
+
+      refs.panel.classList.remove('ready', 'not-ready');
+      refs.panel.classList.add(readyNow ? 'ready' : 'not-ready');
+      refs.badge.textContent = !hasData ? '等待数据' : (readyNow ? '满足直道条件' : '未满足直道条件');
+      refs.centerlineCount.textContent = Number.isFinite(centerlineCount) ? String(centerlineCount) : '--';
+      refs.lastIndex.textContent = Number.isFinite(lastIndex) ? String(lastIndex) : '--';
+      refs.errorSum.textContent = Number.isFinite(errorSum) ? errorSum.toFixed(1) : '--';
+      refs.errorMax.textContent = Number.isFinite(errorMax) ? errorMax.toFixed(1) : '--';
+
+      if (!hasData) {
+        refs.detail.textContent = '等待直道判定数据...';
+        return;
+      }
+
+      const reasons = [];
+      if (!Number.isFinite(lastIndex) || lastIndex < 0) {
+        reasons.push('当前还没有有效的“最后索引”');
+      } else if (!Number.isFinite(centerlineCount) || centerlineCount <= lastIndex) {
+        reasons.push(`中线点数不足：${Number.isFinite(centerlineCount) ? centerlineCount : '--'} <= ${lastIndex}`);
+      } else {
+        reasons.push(`点数条件满足：${centerlineCount} > ${lastIndex}`);
+      }
+
+      if (!Number.isFinite(errorSum) || !Number.isFinite(errorMax)) {
+        reasons.push('误差和或阈值数据无效');
+      } else if (errorSum >= errorMax) {
+        reasons.push(`误差和超阈值：${errorSum.toFixed(1)} >= ${errorMax.toFixed(1)}`);
+      } else {
+        reasons.push(`误差和条件满足：${errorSum.toFixed(1)} < ${errorMax.toFixed(1)}`);
+      }
+
+      const enterFrames = Number(status && status.straight_enter_consecutive_frames);
+      if (Number.isFinite(enterFrames)) {
+        reasons.push(`进入 straight 还需要连续满足 ${enterFrames} 帧`);
+      }
+      refs.detail.textContent = reasons.join('；');
+    }
+
     function renderRouteStatePanelWithRefs(status, refs) {
       const route = receiverCore.buildRouteStateSummary(status || {});
+      renderStraightFocusPanel(status, refs.straightFocus);
       refs.mainStateValue.textContent = route.mainStateLabel || '--';
       refs.subStateValue.textContent = route.subStateLabel || '--';
       refs.preferredSourceValue.textContent = route.preferredSourceLabel || '--';
@@ -1510,6 +1704,15 @@
         subStateValue: routeSubStateValue,
         preferredSourceValue: routePreferredSourceValue,
         encoderValue: routeEncoderValue,
+        straightFocus: {
+          panel: straightFocusPanel,
+          badge: straightFocusBadge,
+          centerlineCount: straightFocusCenterlineCount,
+          lastIndex: straightFocusLastIndex,
+          errorSum: straightFocusErrorSum,
+          errorMax: straightFocusErrorMax,
+          detail: straightFocusDetail
+        },
         stateJudgment: routeStateJudgment,
         nextStateValue: routeNextStateValue,
         nextReason: routeNextReason,
@@ -1525,6 +1728,15 @@
         subStateValue: playbackRouteSubStateValue,
         preferredSourceValue: playbackRoutePreferredSourceValue,
         encoderValue: playbackRouteEncoderValue,
+        straightFocus: {
+          panel: playbackStraightFocusPanel,
+          badge: playbackStraightFocusBadge,
+          centerlineCount: playbackStraightFocusCenterlineCount,
+          lastIndex: playbackStraightFocusLastIndex,
+          errorSum: playbackStraightFocusErrorSum,
+          errorMax: playbackStraightFocusErrorMax,
+          detail: playbackStraightFocusDetail
+        },
         stateJudgment: playbackRouteStateJudgment,
         nextStateValue: playbackRouteNextStateValue,
         nextReason: playbackRouteNextReason,

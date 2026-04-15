@@ -80,6 +80,7 @@ bool vision_infer_init_default_model(LQ_NCNN &ncnn);
 
 typedef struct
 {
+    uint32 result_seq;     // 异步结果序号；每产生一帧新结果递增。
     bool found;            // 是否找到红色矩形。
     int red_x;             // 红框左上角 x（处理分辨率坐标）。
     int red_y;             // 红框左上角 y。

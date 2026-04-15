@@ -1,6 +1,8 @@
 #include "driver/vision/vision_route_state_machine.h"
 #include "driver/vision/vision_config.h"
 
+#include <algorithm>
+
 namespace
 {
 
@@ -14,7 +16,6 @@ static int g_left_gain_count = 0;
 static int g_right_loss_count = 0;
 static int g_right_gain_count = 0;
 static int g_straight_ready_consecutive_count = 0;
-static constexpr int kStraightEnterConsecutiveFrames = 5;
 
 static int normalize_preferred_source(int preferred_source)
 {
@@ -91,10 +92,9 @@ static bool straight_state_ready(const vision_route_state_input_t *input)
         return false;
     }
 
-    return input->left_straight &&
-           input->right_straight &&
-           !input->left_corner_found &&
-           !input->right_corner_found;
+    return input->straight_required_last_index >= 0 &&
+           input->selected_centerline_count > input->straight_required_last_index &&
+           input->straight_abs_error_sum < g_vision_runtime_config.route_straight_abs_error_sum_max;
 }
 
 } // namespace
@@ -129,7 +129,8 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
         if (straight_state_ready(input))
         {
             g_straight_ready_consecutive_count += 1;
-            if (g_straight_ready_consecutive_count >= kStraightEnterConsecutiveFrames)
+            if (g_straight_ready_consecutive_count >=
+                std::max(1, g_vision_runtime_config.route_straight_enter_consecutive_frames))
             {
                 enter_state(VISION_ROUTE_MAIN_STRAIGHT,
                             VISION_ROUTE_SUB_NONE,

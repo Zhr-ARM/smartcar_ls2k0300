@@ -1214,6 +1214,19 @@ static void send_tcp_status()
                static_cast<int>(vision_image_processor_ipm_line_error_method()));
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_source, "ipm_centerline_source",
                static_cast<int>(vision_image_processor_ipm_line_error_source()));
+    const int straight_selected_centerline_count = vision_image_processor_ipm_selected_centerline_count();
+    const int straight_required_last_index = vision_image_processor_ipm_straight_required_last_index();
+    const float straight_abs_error_sum = vision_image_processor_ipm_straight_abs_error_sum();
+    const bool straight_state_ready_now =
+        (straight_required_last_index >= 0) &&
+        (straight_selected_centerline_count > straight_required_last_index) &&
+        (straight_abs_error_sum < g_vision_runtime_config.route_straight_abs_error_sum_max);
+    append_bool(true, "straight_state_ready_now", straight_state_ready_now);
+    append_int(true, "straight_selected_centerline_count", straight_selected_centerline_count);
+    append_int(true, "straight_required_last_index", straight_required_last_index);
+    append_float(true, "straight_abs_error_sum", straight_abs_error_sum);
+    append_float(true, "straight_abs_error_sum_max", g_vision_runtime_config.route_straight_abs_error_sum_max);
+    append_int(true, "straight_enter_consecutive_frames", g_vision_runtime_config.route_straight_enter_consecutive_frames);
     append_int(true, "route_main_state", vision_image_processor_route_main_state());
     append_int(true, "route_sub_state", vision_image_processor_route_sub_state());
     append_int(true, "route_preferred_source", vision_image_processor_route_preferred_source());

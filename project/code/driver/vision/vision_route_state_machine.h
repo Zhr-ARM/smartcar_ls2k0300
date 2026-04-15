@@ -60,6 +60,9 @@ typedef struct
     int cross_detected_stop_row;
     int left_boundary_count;
     int right_boundary_count;
+    int selected_centerline_count;
+    int straight_required_last_index;
+    float straight_abs_error_sum;
     bool left_circle_entry_raw_gap_ok;
     bool right_circle_entry_raw_gap_ok;
     uint32 frame_encoder_delta;

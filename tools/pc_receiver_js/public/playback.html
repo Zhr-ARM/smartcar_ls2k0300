@@ -357,6 +357,89 @@
       line-height: 1.55;
       color: #dbeafe;
     }
+    .straight-focus-panel {
+      margin-top: 10px;
+      border-radius: 14px;
+      padding: 14px;
+      border: 1px solid rgba(71, 85, 105, 0.92);
+      background: linear-gradient(135deg, rgba(8, 15, 31, 0.96), rgba(15, 23, 42, 0.92));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+    .straight-focus-panel.ready {
+      border-color: rgba(34, 197, 94, 0.72);
+      background:
+        radial-gradient(circle at top right, rgba(34, 197, 94, 0.18), transparent 26%),
+        linear-gradient(135deg, rgba(6, 20, 17, 0.98), rgba(10, 27, 21, 0.94));
+    }
+    .straight-focus-panel.not-ready {
+      border-color: rgba(239, 68, 68, 0.72);
+      background:
+        radial-gradient(circle at top right, rgba(239, 68, 68, 0.16), transparent 26%),
+        linear-gradient(135deg, rgba(25, 11, 16, 0.98), rgba(37, 15, 19, 0.94));
+    }
+    .straight-focus-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .straight-focus-title {
+      color: #f8fafc;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+    .straight-focus-badge {
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: rgba(15, 23, 42, 0.8);
+      color: #e2e8f0;
+    }
+    .straight-focus-panel.ready .straight-focus-badge {
+      background: rgba(20, 83, 45, 0.88);
+      color: #dcfce7;
+      border-color: rgba(74, 222, 128, 0.34);
+    }
+    .straight-focus-panel.not-ready .straight-focus-badge {
+      background: rgba(127, 29, 29, 0.88);
+      color: #fee2e2;
+      border-color: rgba(248, 113, 113, 0.34);
+    }
+    .straight-focus-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .straight-focus-stat {
+      background: rgba(15, 23, 42, 0.84);
+      border: 1px solid rgba(71, 85, 105, 0.78);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .straight-focus-label {
+      color: #94a3b8;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .straight-focus-value {
+      color: #f8fafc;
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.05;
+    }
+    .straight-focus-detail {
+      margin-top: 10px;
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.55;
+    }
     .route-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -585,6 +668,31 @@
               <div class="route-label">进入后编码器</div>
               <div class="route-value" id="routeEncoderValue">--</div>
             </div>
+          </div>
+          <div class="straight-focus-panel" id="straightFocusPanel">
+            <div class="straight-focus-head">
+              <div class="straight-focus-title">直道判定高亮</div>
+              <div class="straight-focus-badge" id="straightFocusBadge">等待数据</div>
+            </div>
+            <div class="straight-focus-grid">
+              <div class="straight-focus-stat">
+                <div class="straight-focus-label">中线点数</div>
+                <div class="straight-focus-value" id="straightFocusCenterlineCount">--</div>
+              </div>
+              <div class="straight-focus-stat">
+                <div class="straight-focus-label">最后索引</div>
+                <div class="straight-focus-value" id="straightFocusLastIndex">--</div>
+              </div>
+              <div class="straight-focus-stat">
+                <div class="straight-focus-label">误差和</div>
+                <div class="straight-focus-value" id="straightFocusErrorSum">--</div>
+              </div>
+              <div class="straight-focus-stat">
+                <div class="straight-focus-label">误差阈值</div>
+                <div class="straight-focus-value" id="straightFocusErrorMax">--</div>
+              </div>
+            </div>
+            <div class="straight-focus-detail" id="straightFocusDetail">等待直道判定数据...</div>
           </div>
           <div class="route-judgment" id="routeStateJudgment">等待状态机数据...</div>
           <div class="route-grid">

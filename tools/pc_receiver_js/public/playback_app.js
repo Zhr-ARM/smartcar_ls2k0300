@@ -19,6 +19,13 @@
   const routeSubStateValue = document.getElementById('routeSubStateValue');
   const routePreferredSourceValue = document.getElementById('routePreferredSourceValue');
   const routeEncoderValue = document.getElementById('routeEncoderValue');
+  const straightFocusPanel = document.getElementById('straightFocusPanel');
+  const straightFocusBadge = document.getElementById('straightFocusBadge');
+  const straightFocusCenterlineCount = document.getElementById('straightFocusCenterlineCount');
+  const straightFocusLastIndex = document.getElementById('straightFocusLastIndex');
+  const straightFocusErrorSum = document.getElementById('straightFocusErrorSum');
+  const straightFocusErrorMax = document.getElementById('straightFocusErrorMax');
+  const straightFocusDetail = document.getElementById('straightFocusDetail');
   const routeStateJudgment = document.getElementById('routeStateJudgment');
   const routeNextStateValue = document.getElementById('routeNextStateValue');
   const routeNextReason = document.getElementById('routeNextReason');
@@ -64,6 +71,52 @@
     return String(value);
   }
 
+  function renderStraightFocus(status) {
+    if (!straightFocusPanel) return;
+    const centerlineCount = Number(status && status.straight_selected_centerline_count);
+    const lastIndex = Number(status && status.straight_required_last_index);
+    const errorSum = Number(status && status.straight_abs_error_sum);
+    const errorMax = Number(status && status.straight_abs_error_sum_max);
+    const readyNow = !!(status && status.straight_state_ready_now);
+    const hasData = Number.isFinite(centerlineCount) || Number.isFinite(lastIndex) || Number.isFinite(errorSum);
+
+    straightFocusPanel.classList.remove('ready', 'not-ready');
+    straightFocusPanel.classList.add(readyNow ? 'ready' : 'not-ready');
+    straightFocusBadge.textContent = !hasData ? '等待数据' : (readyNow ? '满足直道条件' : '未满足直道条件');
+    straightFocusCenterlineCount.textContent = Number.isFinite(centerlineCount) ? String(centerlineCount) : '--';
+    straightFocusLastIndex.textContent = Number.isFinite(lastIndex) ? String(lastIndex) : '--';
+    straightFocusErrorSum.textContent = Number.isFinite(errorSum) ? errorSum.toFixed(1) : '--';
+    straightFocusErrorMax.textContent = Number.isFinite(errorMax) ? errorMax.toFixed(1) : '--';
+
+    if (!hasData) {
+      straightFocusDetail.textContent = '等待直道判定数据...';
+      return;
+    }
+
+    const reasons = [];
+    if (!Number.isFinite(lastIndex) || lastIndex < 0) {
+      reasons.push('当前还没有有效的“最后索引”');
+    } else if (!Number.isFinite(centerlineCount) || centerlineCount <= lastIndex) {
+      reasons.push(`中线点数不足：${Number.isFinite(centerlineCount) ? centerlineCount : '--'} <= ${lastIndex}`);
+    } else {
+      reasons.push(`点数条件满足：${centerlineCount} > ${lastIndex}`);
+    }
+
+    if (!Number.isFinite(errorSum) || !Number.isFinite(errorMax)) {
+      reasons.push('误差和或阈值数据无效');
+    } else if (errorSum >= errorMax) {
+      reasons.push(`误差和超阈值：${errorSum.toFixed(1)} >= ${errorMax.toFixed(1)}`);
+    } else {
+      reasons.push(`误差和条件满足：${errorSum.toFixed(1)} < ${errorMax.toFixed(1)}`);
+    }
+
+    const enterFrames = Number(status && status.straight_enter_consecutive_frames);
+    if (Number.isFinite(enterFrames)) {
+      reasons.push(`进入 straight 还需要连续满足 ${enterFrames} 帧`);
+    }
+    straightFocusDetail.textContent = reasons.join('；');
+  }
+
   function renderMetaPills(recording) {
     const pills = [];
     if (recording && recording.folder) pills.push(`目录: ${recording.folder}`);
@@ -82,6 +135,7 @@
 
   function renderRouteStatePanel(status) {
     const route = receiverCore.buildRouteStateSummary(status || {});
+    renderStraightFocus(status);
     routeMainStateValue.textContent = route.mainStateLabel || '--';
     routeSubStateValue.textContent = route.subStateLabel || '--';
     routePreferredSourceValue.textContent = route.preferredSourceLabel || '--';
@@ -227,6 +281,7 @@
       ['巡线输出', hasValue(status.pid_common_applied_steering_output) ? fmtPidValue(status.pid_common_applied_steering_output) : 'N/A'],
       ['基础速度', hasValue(status.pid_common_applied_base_speed) ? fmtPidValue(status.pid_common_applied_base_speed) : 'N/A'],
       ['状态机', [status.route_main_state, status.route_sub_state].filter(hasValue).join(' / ') || 'N/A'],
+      ['直道判定', hasValue(status.straight_state_ready_now) ? (status.straight_state_ready_now ? '满足' : '未满足') : 'N/A'],
       ['红框/ROI', `red=${hasValue(status.red_found) ? status.red_found : 'N/A'} roi=${hasValue(status.roi_valid) ? status.roi_valid : 'N/A'}`],
       ['推理', hasValue(status.ncnn_top_label) ? `${status.ncnn_top_label}${hasValue(status.ncnn_top_score) ? ` (${fmtPidValue((Number(status.ncnn_top_score) || 0) * 100)}%)` : ''}` : 'N/A'],
       ['推理耗时', hasValue(status.ncnn_infer_us) ? `${status.ncnn_infer_us} us` : 'N/A'],

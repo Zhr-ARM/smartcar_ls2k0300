@@ -213,6 +213,12 @@
     const circleGuideMinSegmentLen = toFiniteNumber(status && status.circle_guide_min_frame_wall_segment_len);
     const circleGuideTargetOffsetStage3 = toFiniteNumber(status && status.circle_guide_target_offset_stage3);
     const circleGuideAnchorOffsetStage5 = toFiniteNumber(status && status.circle_guide_anchor_offset_stage5);
+    const straightSelectedCenterlineCount = toFiniteNumber(status && status.straight_selected_centerline_count);
+    const straightRequiredLastIndex = toFiniteNumber(status && status.straight_required_last_index);
+    const straightAbsErrorSum = toFiniteNumber(status && status.straight_abs_error_sum);
+    const straightAbsErrorSumMax = toFiniteNumber(status && status.straight_abs_error_sum_max);
+    const straightEnterConsecutiveFrames = toFiniteNumber(status && status.straight_enter_consecutive_frames);
+    const straightReadyNow = toBool(status && status.straight_state_ready_now);
     const leftCircleEntryHit =
       routeCircleDetectionEnabled &&
       rightStraight &&
@@ -268,6 +274,12 @@
       clues.push(`双角点距离：${cornerDistance.toFixed(1)} px`);
     }
     clues.push(`状态机开关：圆环=${routeCircleDetectionEnabled ? '开' : '关'}`);
+    if (straightSelectedCenterlineCount !== null || straightRequiredLastIndex !== null) {
+      clues.push(`直道判定：中线点数=${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'}，最后索引=${straightRequiredLastIndex !== null ? straightRequiredLastIndex : '--'}`);
+    }
+    if (straightAbsErrorSum !== null || straightAbsErrorSumMax !== null) {
+      clues.push(`直道误差和：${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'} / ${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}`);
+    }
 
     const judgments = [];
     let nextStateLabel = '保持当前状态';
@@ -283,9 +295,17 @@
     };
 
     if (mainState === 0) {
-      const straightStateHit = leftStraight && rightStraight && !leftCornerFound && !rightCornerFound;
+      const straightPointCountOk =
+        straightRequiredLastIndex !== null &&
+        straightSelectedCenterlineCount !== null &&
+        straightSelectedCenterlineCount > straightRequiredLastIndex;
+      const straightErrorSumOk =
+        straightAbsErrorSum !== null &&
+        straightAbsErrorSumMax !== null &&
+        straightAbsErrorSum < straightAbsErrorSumMax;
+      const straightStateHit = straightReadyNow;
       if (straightStateHit) {
-        judgments.push('双侧都为直边且双侧都没有角点，下一次状态更新会进入直道态。');
+        judgments.push('当前已经满足直道判定：中线点数充足，且前段误差绝对值总和低于阈值。');
       } else if (!routeCircleDetectionEnabled) {
         judgments.push('圆环状态机当前关闭，页面只展示输入特征，不会进入 circle 状态。');
       } else if (leftCircleEntryHit) {
@@ -300,13 +320,15 @@
         judgments.push('当前没有满足圆环入口的组合条件，状态机继续留在正常巡线。');
       }
 
-      pushCondition('直道态入口', formatHit(straightStateHit), '左直边=1 右直边=1 左角点=0 右角点=0');
+      pushCondition('直道态入口', formatHit(straightStateHit), `中线点数=${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} > 最后索引=${straightRequiredLastIndex !== null ? straightRequiredLastIndex : '--'}；误差和=${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'} < 阈值=${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}；连续帧=${straightEnterConsecutiveFrames !== null ? straightEnterConsecutiveFrames : '--'}`);
+      pushCondition('直道点数条件', formatHit(!!straightPointCountOk), `${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} > ${straightRequiredLastIndex !== null ? straightRequiredLastIndex : '--'}`);
+      pushCondition('直道误差和条件', formatHit(!!straightErrorSumOk), `${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'} < ${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}`);
       pushCondition('左环入口', formatHit(!!leftCircleEntryHit), `右直边=${rightStraight ? 1 : 0} 左角点=${leftCornerFound ? 1 : 0} 左角点y=${leftCornerY !== null ? leftCornerY : '--'}>60 右点数=${rightBoundaryCount !== null ? rightBoundaryCount : '--'}>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'} 左角点索引=${leftCornerIndex !== null ? leftCornerIndex : '--'} < 右点数-${circleEntryCornerTailMargin !== null ? circleEntryCornerTailMargin : '--'}`);
       pushCondition('右环入口', formatHit(!!rightCircleEntryHit), `左直边=${leftStraight ? 1 : 0} 右角点=${rightCornerFound ? 1 : 0} 右角点y=${rightCornerY !== null ? rightCornerY : '--'}>60 左点数=${leftBoundaryCount !== null ? leftBoundaryCount : '--'}>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'} 右角点索引=${rightCornerIndex !== null ? rightCornerIndex : '--'} < 左点数-${circleEntryCornerTailMargin !== null ? circleEntryCornerTailMargin : '--'}`);
 
       if (straightStateHit) {
         nextStateLabel = '直道态';
-        nextReasons.push('当前帧满足双侧直边且双侧无角点，状态机会切到直道态。');
+        nextReasons.push('当前帧满足直道点数和误差和条件，状态机会切到直道态。');
       } else if (leftCircleEntryHit) {
         nextStateLabel = '左环岛-circle_1';
         nextReasons.push('当前帧已经满足左环入口的全部判据，状态机会把偏好源切到右边界。');
@@ -317,11 +339,21 @@
         nextReasons.push('圆环入口条件未全部命中，继续保持正常巡线。');
       }
     } else if (mainState === 1) {
-      judgments.push('当前处于直道态：两侧都为直边，且两侧都没有角点。');
-      pushCondition('双侧直边且无角点', formatHit(leftStraight && rightStraight && !leftCornerFound && !rightCornerFound), '任一侧出现角点或不再同时为直边时，先退回 normal');
+      const straightPointCountOk =
+        straightRequiredLastIndex !== null &&
+        straightSelectedCenterlineCount !== null &&
+        straightSelectedCenterlineCount > straightRequiredLastIndex;
+      const straightErrorSumOk =
+        straightAbsErrorSum !== null &&
+        straightAbsErrorSumMax !== null &&
+        straightAbsErrorSum < straightAbsErrorSumMax;
+      const straightKeepHit = straightReadyNow;
+      judgments.push('当前处于直道态：只要中线点数条件和误差和条件任一失效，就会退回 normal。');
+      pushCondition('直道点数条件', formatHit(!!straightPointCountOk), `${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} > ${straightRequiredLastIndex !== null ? straightRequiredLastIndex : '--'}`);
+      pushCondition('直道误差和条件', formatHit(!!straightErrorSumOk), `${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'} < ${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}`);
       nextStateLabel = '直道态';
       nextReasons.push('当前仍满足直道态保持条件。');
-      if (!(leftStraight && rightStraight && !leftCornerFound && !rightCornerFound)) {
+      if (!straightKeepHit) {
         nextStateLabel = '正常巡线';
         nextReasons[0] = '直道态保持条件被破坏，状态机先退回 normal，再按 normal 规则判断后续状态。';
       }

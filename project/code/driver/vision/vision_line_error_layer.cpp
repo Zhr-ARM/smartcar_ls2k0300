@@ -51,6 +51,9 @@ int g_ipm_line_error_track_y = 0;
 std::array<float, VISION_DOWNSAMPLED_HEIGHT * 2> g_selected_centerline_curvature = {};
 int g_selected_centerline_curvature_count = 0;
 float g_mean_abs_offset = 0.0f;
+int g_selected_centerline_count = 0;
+int g_required_last_index_for_straight = -1;
+float g_abs_error_sum_to_required_index = 0.0f;
 
 static void compute_selected_centerline_curvature(const uint16 *xs, const uint16 *ys, int count)
 {
@@ -147,6 +150,9 @@ void vision_line_error_layer_reset()
     g_selected_centerline_curvature.fill(0.0f);
     g_selected_centerline_curvature_count = 0;
     g_mean_abs_offset = 0.0f;
+    g_selected_centerline_count = 0;
+    g_required_last_index_for_straight = -1;
+    g_abs_error_sum_to_required_index = 0.0f;
 }
 
 int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ipm_center_x,
@@ -167,6 +173,9 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     g_src_weighted_decision_point_valid = false;
     g_src_weighted_decision_point_x = 0;
     g_src_weighted_decision_point_y = 0;
+    g_selected_centerline_count = 0;
+    g_required_last_index_for_straight = -1;
+    g_abs_error_sum_to_required_index = 0.0f;
 
     const int center_count = std::clamp(ipm_center_count, 0, static_cast<int>(g_selected_centerline_curvature.size()));
     if (center_count <= 0)
@@ -179,11 +188,15 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     const uint16 *src_xs = src_center_x;
     const uint16 *src_ys = src_center_y;
     const int src_count = std::max(0, src_center_count);
+    g_selected_centerline_count = count;
     if (xs == nullptr || ys == nullptr || count <= 0)
     {
         g_selected_centerline_curvature.fill(0.0f);
         g_selected_centerline_curvature_count = 0;
         g_mean_abs_offset = 0.0f;
+        g_selected_centerline_count = 0;
+        g_required_last_index_for_straight = -1;
+        g_abs_error_sum_to_required_index = 0.0f;
         return 0;
     }
 
@@ -205,6 +218,7 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     if (method == VISION_IPM_LINE_ERROR_FIXED_INDEX)
     {
         const int idx = std::clamp(g_ipm_line_error_fixed_index.load(), 0, count - 1);
+        g_required_last_index_for_straight = std::max(0, g_ipm_line_error_fixed_index.load());
         g_ipm_line_error_track_index = idx;
         x = static_cast<float>(xs[idx]);
         y = static_cast<float>(ys[idx]);
@@ -222,6 +236,7 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         const int idx = std::clamp(static_cast<int>(std::lround(idx_by_speed)),
                                    range_min,
                                    std::min(range_max, count - 1));
+        g_required_last_index_for_straight = idx;
         g_ipm_line_error_track_index = idx;
         x = static_cast<float>(xs[idx]);
         y = static_cast<float>(ys[idx]);
@@ -237,6 +252,13 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
             weights = g_ipm_line_error_weights;
             point_count = g_ipm_line_error_weighted_point_count;
         }
+
+        int last_required_index = -1;
+        for (size_t i = 0; i < point_count; ++i)
+        {
+            last_required_index = std::max(last_required_index, point_indices[i]);
+        }
+        g_required_last_index_for_straight = last_required_index;
 
         int decision_index = -1;
         for (size_t i = 0; i < point_count; ++i)
@@ -280,6 +302,7 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         }
         if (point_count == 0)
         {
+            g_abs_error_sum_to_required_index = 0.0f;
             return 0;
         }
         if (std::fabs(valid_weight) <= 1e-6f)
@@ -316,6 +339,17 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
                 y += static_cast<float>(ys[idx]) * effective_weight;
             }
             g_ipm_line_error_track_index = std::clamp(static_cast<int>(std::lround(weighted_index)), 0, count - 1);
+        }
+    }
+
+    g_abs_error_sum_to_required_index = 0.0f;
+    if (g_required_last_index_for_straight >= 0)
+    {
+        const int sum_last_index = std::min(g_required_last_index_for_straight, count - 1);
+        for (int i = 0; i <= sum_last_index; ++i)
+        {
+            g_abs_error_sum_to_required_index +=
+                static_cast<float>(std::fabs(static_cast<double>(xs[i]) - static_cast<double>(ipm_center_x_ref)));
         }
     }
 
@@ -461,6 +495,21 @@ void vision_line_error_layer_get_selected_centerline_curvature(const float **cur
 float vision_line_error_layer_mean_abs_offset()
 {
     return g_mean_abs_offset;
+}
+
+int vision_line_error_layer_selected_centerline_count()
+{
+    return g_selected_centerline_count;
+}
+
+int vision_line_error_layer_required_last_index_for_straight()
+{
+    return g_required_last_index_for_straight;
+}
+
+float vision_line_error_layer_abs_error_sum_to_required_index()
+{
+    return g_abs_error_sum_to_required_index;
 }
 
 int vision_line_error_layer_weighted_first_point_error()

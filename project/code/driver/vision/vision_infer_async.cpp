@@ -1,5 +1,6 @@
 #include "driver/vision/vision_infer_async.h"
 
+#include "driver/vision/vision_config.h"
 #include "driver/vision/vision_image_processor.h"
 
 #include <opencv2/imgproc.hpp>
@@ -99,6 +100,7 @@ static bool g_infer_job_ready = false;
 static infer_job_t g_infer_job;
 static infer_worker_result_t g_latest_infer_result;
 static bool g_latest_infer_result_valid = false;
+static uint32 g_latest_infer_result_seq = 0;
 
 // 作用：参考分辨率参数缩放到当前处理分辨率。
 static inline int scale_by_width(int ref_px)
@@ -388,6 +390,7 @@ static void reset_infer_shared_state()
     g_infer_job_ready = false;
     g_latest_infer_result = infer_worker_result_t{};
     g_latest_infer_result_valid = false;
+    g_latest_infer_result_seq = 0;
 }
 
 // 作用：异步推理工作线程主循环。
@@ -459,6 +462,7 @@ static void run_infer_worker()
         {
             std::lock_guard<std::mutex> lock(g_infer_mutex);
             g_latest_infer_result = result;
+            ++g_latest_infer_result_seq;
             g_latest_infer_result_valid = true;
         }
     }
@@ -684,10 +688,20 @@ bool vision_infer_init_default_model(LQ_NCNN &ncnn)
     // 默认模型配置：集中在此，替换模型时优先修改这里。
     const std::string model_param = "tiny_classifier_fp32.ncnn.param";
     const std::string model_bin = "tiny_classifier_fp32.ncnn.bin";
-    const int input_width = 64;
-    const int input_height = 64;
-    const std::vector<std::string> labels = {
-        "supplies", "vehicles", "weapons"};
+    const int input_width = g_vision_runtime_config.ncnn_input_width;
+    const int input_height = g_vision_runtime_config.ncnn_input_height;
+    std::vector<std::string> labels;
+    labels.reserve(g_vision_runtime_config.ncnn_label_count);
+    for (size_t i = 0; i < g_vision_runtime_config.ncnn_label_count &&
+                       i < VISION_NCNN_CONFIG_MAX_LABELS; ++i)
+    {
+        const char *label = g_vision_runtime_config.ncnn_labels[i];
+        if (label == nullptr || label[0] == '\0')
+        {
+            break;
+        }
+        labels.emplace_back(label);
+    }
     float mean_vals[3] = {123.675f, 116.28f, 103.53f};
     float norm_vals[3] = {0.01712475f, 0.017507f, 0.01742919f};
 
@@ -843,6 +857,7 @@ bool vision_infer_async_fetch_latest(vision_infer_async_result_t *out)
     }
 
     infer_worker_result_t result{};
+    uint32 result_seq = 0;
     {
         std::lock_guard<std::mutex> lock(g_infer_mutex);
         if (!g_latest_infer_result_valid)
@@ -850,8 +865,10 @@ bool vision_infer_async_fetch_latest(vision_infer_async_result_t *out)
             return false;
         }
         result = g_latest_infer_result;
+        result_seq = g_latest_infer_result_seq;
     }
 
+    out->result_seq = result_seq;
     out->found = result.found;
     out->red_x = result.red_x;
     out->red_y = result.red_y;

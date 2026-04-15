@@ -272,7 +272,8 @@ static std::atomic<bool> g_ipm_boundary_truncate_at_first_corner_enabled(
 static std::atomic<int> g_ipm_boundary_straight_min_points(g_vision_runtime_config.ipm_boundary_straight_min_points);
 static std::atomic<int> g_ipm_boundary_straight_check_count(g_vision_runtime_config.ipm_boundary_straight_check_count);
 static std::atomic<float> g_ipm_boundary_straight_min_cos(g_vision_runtime_config.ipm_boundary_straight_min_cos);
-static std::atomic<float> g_ipm_boundary_shift_distance_px(g_vision_runtime_config.ipm_boundary_shift_distance_px);
+static std::atomic<float> g_ipm_track_width_px(g_vision_runtime_config.ipm_track_width_px);
+static std::atomic<float> g_ipm_center_target_offset_from_left_px(g_vision_runtime_config.ipm_center_target_offset_from_left_px);
 // 逆透视处理中线独立配置。
 static std::atomic<bool> g_ipm_centerline_postprocess_enabled(g_vision_runtime_config.ipm_centerline_postprocess_enabled);
 static std::atomic<bool> g_ipm_centerline_triangle_filter_enabled(g_vision_runtime_config.ipm_centerline_triangle_filter_enabled);
@@ -2982,7 +2983,12 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
     const bool selected_is_right = select_shift_source_from_preference_and_counts(route_snapshot.preferred_source,
                                                                                    cross_left_proc_num,
                                                                                    cross_right_proc_num);
-    const float shift_dist_px = g_ipm_boundary_shift_distance_px.load();
+    const float track_width_px = std::max(0.0f, g_ipm_track_width_px.load());
+    const float target_offset_from_left_px = std::clamp(g_ipm_center_target_offset_from_left_px.load(),
+                                                        0.0f,
+                                                        track_width_px);
+    const float shift_dist_from_left_px = target_offset_from_left_px;
+    const float shift_dist_from_right_px = std::max(0.0f, track_width_px - target_offset_from_left_px);
     std::array<maze_point_t, VISION_BOUNDARY_NUM> center_selected{};
     int center_selected_num = 0;
     if (selected_is_right)
@@ -2995,7 +3001,7 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                     &center_selected_num,
                                     kIpmOutputWidth,
                                     kIpmOutputHeight,
-                                    shift_dist_px,
+                                    shift_dist_from_right_px,
                                     false);
     }
     else
@@ -3008,7 +3014,7 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                     &center_selected_num,
                                     kIpmOutputWidth,
                                     kIpmOutputHeight,
-                                    shift_dist_px,
+                                    shift_dist_from_left_px,
                                     true);
     }
 
@@ -4687,6 +4693,9 @@ bool vision_image_processor_process_step()
     route_input.cross_detected_stop_row = g_cross_detected_stop_row.load();
     route_input.left_boundary_count = left_num;
     route_input.right_boundary_count = right_num;
+    route_input.selected_centerline_count = vision_line_error_layer_selected_centerline_count();
+    route_input.straight_required_last_index = vision_line_error_layer_required_last_index_for_straight();
+    route_input.straight_abs_error_sum = vision_line_error_layer_abs_error_sum_to_required_index();
     route_input.left_circle_entry_raw_gap_ok = circle_entry_raw_boundary_gap_ready(left_trace_pts_raw.data(),
                                                                                    left_trace_raw_num,
                                                                                    right_trace_pts_raw.data(),
@@ -5059,14 +5068,24 @@ float vision_image_processor_ipm_boundary_straight_min_cos()
     return g_ipm_boundary_straight_min_cos.load();
 }
 
-void vision_image_processor_set_ipm_boundary_shift_distance_px(float dist_px)
+void vision_image_processor_set_ipm_track_width_px(float width_px)
 {
-    g_ipm_boundary_shift_distance_px.store(std::max(0.0f, dist_px));
+    g_ipm_track_width_px.store(std::max(0.0f, width_px));
 }
 
-float vision_image_processor_ipm_boundary_shift_distance_px()
+float vision_image_processor_ipm_track_width_px()
 {
-    return g_ipm_boundary_shift_distance_px.load();
+    return g_ipm_track_width_px.load();
+}
+
+void vision_image_processor_set_ipm_center_target_offset_from_left_px(float offset_px)
+{
+    g_ipm_center_target_offset_from_left_px.store(std::max(0.0f, offset_px));
+}
+
+float vision_image_processor_ipm_center_target_offset_from_left_px()
+{
+    return g_ipm_center_target_offset_from_left_px.load();
 }
 
 void vision_image_processor_set_ipm_centerline_postprocess_enabled(bool enabled)
@@ -5231,6 +5250,21 @@ void vision_image_processor_get_ipm_selected_centerline_curvature(const float **
     // 当前返回 line_error 实际选中的那条 IPM 中线曲率序列，
     // 供控制层用来生成“来自视觉的目标横摆角速度”。
     vision_line_error_layer_get_selected_centerline_curvature(curvature, count);
+}
+
+int vision_image_processor_ipm_selected_centerline_count()
+{
+    return vision_line_error_layer_selected_centerline_count();
+}
+
+int vision_image_processor_ipm_straight_required_last_index()
+{
+    return vision_line_error_layer_required_last_index_for_straight();
+}
+
+float vision_image_processor_ipm_straight_abs_error_sum()
+{
+    return vision_line_error_layer_abs_error_sum_to_required_index();
 }
 
 void vision_image_processor_get_ipm_left_boundary_angle_cos(const float **angle_cos, int *count)

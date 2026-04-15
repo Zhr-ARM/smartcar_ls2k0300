@@ -105,10 +105,15 @@ int vision_image_processor_ipm_boundary_straight_check_count();
 void vision_image_processor_set_ipm_boundary_straight_min_cos(float min_cos);
 float vision_image_processor_ipm_boundary_straight_min_cos();
 
-// 逆透视处理链边界“法向平移距离”参数（单位：像素，默认15）。
-// 约定：左边界向右平移、右边界向左平移。
-void vision_image_processor_set_ipm_boundary_shift_distance_px(float dist_px);
-float vision_image_processor_ipm_boundary_shift_distance_px();
+// 逆透视后赛道宽度像素（单位：px）。
+void vision_image_processor_set_ipm_track_width_px(float width_px);
+float vision_image_processor_ipm_track_width_px();
+// 目标中线距离左边界的偏移像素（单位：px）。
+// 约定：
+// - 左边界生成中线时，向右平移该值；
+// - 右边界生成中线时，向左平移 (赛道宽度 - 该值)。
+void vision_image_processor_set_ipm_center_target_offset_from_left_px(float offset_px);
+float vision_image_processor_ipm_center_target_offset_from_left_px();
 
 // 逆透视处理中线后处理总开关（去重/平滑/重采样）。
 void vision_image_processor_set_ipm_centerline_postprocess_enabled(bool enabled);
@@ -150,6 +155,9 @@ void vision_image_processor_get_ipm_line_error_track_point(bool *valid, int *x, 
 void vision_image_processor_set_ipm_centerline_curvature_step(int step);
 int vision_image_processor_ipm_centerline_curvature_step();
 void vision_image_processor_get_ipm_selected_centerline_curvature(const float **curvature, int *count);
+int vision_image_processor_ipm_selected_centerline_count();
+int vision_image_processor_ipm_straight_required_last_index();
+float vision_image_processor_ipm_straight_abs_error_sum();
 void vision_image_processor_get_ipm_left_boundary_angle_cos(const float **angle_cos, int *count);
 void vision_image_processor_get_ipm_right_boundary_angle_cos(const float **angle_cos, int *count);
 float vision_image_processor_ipm_mean_abs_offset_error();

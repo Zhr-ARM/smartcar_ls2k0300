@@ -8,6 +8,9 @@
 // line_error 加权点数量上限。
 // 作用：限定配置数组容量，避免运行时传入过多采样点。
 #define VISION_LINE_ERROR_MAX_WEIGHTED_POINTS 16
+// ncnn 配置标签数量上限。
+// 作用：限定默认模型标签表容量，避免运行时动态分配。
+#define VISION_NCNN_CONFIG_MAX_LABELS 16
 
 typedef enum
 {
@@ -35,6 +38,14 @@ typedef struct
     bool infer_enabled;
     // ncnn 子开关：false 时保留红框检测，但不做 ncnn 分类。
     bool ncnn_enabled;
+    // ncnn 默认模型输入宽度。
+    int ncnn_input_width;
+    // ncnn 默认模型输入高度。
+    int ncnn_input_height;
+    // ncnn 默认模型标签数量。
+    size_t ncnn_label_count;
+    // ncnn 默认模型标签表，索引顺序必须与模型输出类别顺序一致。
+    const char *ncnn_labels[VISION_NCNN_CONFIG_MAX_LABELS];
     // 客户端发送开关：控制逐飞助手发送链路是否启用。
     bool client_sender_enabled;
     // 车载屏显示开关：true 时启动 screen_display_thread。
@@ -229,8 +240,22 @@ typedef struct
     float ipm_boundary_straight_min_cos;
 
     // ---------- 边界双处理流水线：中线生成 ----------
-    // 逆透视处理链边界法向平移距离（px），用于生成平移中线。
-    float ipm_boundary_shift_distance_px;
+    // 逆透视后赛道宽度像素（px）。
+    float ipm_track_width_px;
+    // 目标中线距离左边界的偏移像素（px）。
+    // 例如：
+    // - 取赛道宽度一半表示居中；
+    // - 更小表示更靠左；
+    // - 更大表示更靠右。
+    float ipm_center_target_offset_from_left_px;
+    // 武器类别命中后使用的左偏目标偏移（距离左边界 px）。
+    float ipm_center_target_offset_weapons_from_left_px;
+    // 物资类别命中后使用的右偏目标偏移（距离左边界 px）。
+    float ipm_center_target_offset_supplies_from_left_px;
+    // 从“正常无框”进入目标引导前，需要累计多少个有效推理结果。
+    int infer_offset_vote_result_count;
+    // 已进入目标引导后，连续多少帧无红框时恢复默认偏移。
+    int infer_offset_restore_no_red_count;
     // 逆透视处理中线独立后处理总开关（去重/平滑/重采样）。
     bool ipm_centerline_postprocess_enabled;
     // 逆透视处理中线三角滤波开关。
@@ -271,6 +296,10 @@ typedef struct
     int circle_guide_target_offset_stage3;
     // 圆环 state5 补线：贴边连续段结束后，锚点向后偏移的索引数。
     int circle_guide_anchor_offset_stage5;
+    // 进入 straight 状态所需的连续满足帧数。
+    int route_straight_enter_consecutive_frames;
+    // straight 判定：从 0 到“当前误差计算最后索引”范围内的绝对误差和上限。
+    float route_straight_abs_error_sum_max;
 
     // ==================== 参数区域 2: 偏差计算 ====================
     // 包括 line_error 取点策略与索引范围约束参数。

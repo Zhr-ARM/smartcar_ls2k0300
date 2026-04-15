@@ -1,9 +1,12 @@
 #include "driver/vision/vision_pipeline.h"
 
+#include "driver/vision/vision_config.h"
 #include "driver/vision/vision_image_processor.h"
 #include "driver/vision/vision_infer_async.h"
 #include "driver/vision/vision_transport.h"
 
+#include <algorithm>
+#include <array>
 #include <opencv2/opencv.hpp>
 
 namespace
@@ -13,6 +16,140 @@ static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
 static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
 static constexpr int kFullWidth = UVC_WIDTH;
 static constexpr int kFullHeight = UVC_HEIGHT;
+
+static bool g_center_target_offset_override_active = false;
+static int g_center_target_offset_no_red_count = 0;
+static uint32 g_last_processed_infer_result_seq = 0;
+static float g_center_target_offset_restore_px = g_vision_runtime_config.ipm_center_target_offset_from_left_px;
+static int g_infer_offset_vote_valid_result_count = 0;
+static std::array<float, VISION_NCNN_MAX_CLASSES> g_infer_offset_prob_sums = {};
+
+static void reset_infer_offset_vote_state()
+{
+    g_infer_offset_vote_valid_result_count = 0;
+    g_infer_offset_prob_sums.fill(0.0f);
+}
+
+// 作用：为“识别类别 -> 目标偏移”预留映射接口。
+// 当前策略：
+// - weapons  -> 左偏配置；
+// - supplies -> 右偏配置；
+// - vehicles -> 赛道宽度一半（居中）。
+static float resolve_center_target_offset_for_class_id(int class_id)
+{
+    if (class_id == 2)
+    {
+        return g_vision_runtime_config.ipm_center_target_offset_weapons_from_left_px;
+    }
+    if (class_id == 0)
+    {
+        return g_vision_runtime_config.ipm_center_target_offset_supplies_from_left_px;
+    }
+    return std::max(0.0f, g_vision_runtime_config.ipm_track_width_px * 0.5f);
+}
+
+static int select_best_class_id_from_prob_sums()
+{
+    float best_sum = -1.0f;
+    int best_class_id = -1;
+    const int class_count = std::clamp(VISION_NCNN_MAX_CLASSES, 0, VISION_NCNN_MAX_CLASSES);
+    for (int i = 0; i < class_count; ++i)
+    {
+        if (g_infer_offset_prob_sums[i] > best_sum)
+        {
+            best_sum = g_infer_offset_prob_sums[i];
+            best_class_id = i;
+        }
+    }
+    return best_class_id;
+}
+
+static void restore_center_target_offset_if_needed()
+{
+    if (!g_center_target_offset_override_active)
+    {
+        return;
+    }
+    vision_image_processor_set_ipm_center_target_offset_from_left_px(g_center_target_offset_restore_px);
+    g_center_target_offset_override_active = false;
+    g_center_target_offset_no_red_count = 0;
+    reset_infer_offset_vote_state();
+}
+
+static void reset_dynamic_center_target_offset_state(bool restore_default)
+{
+    if (restore_default)
+    {
+        restore_center_target_offset_if_needed();
+    }
+    g_last_processed_infer_result_seq = 0;
+    g_center_target_offset_no_red_count = 0;
+    reset_infer_offset_vote_state();
+    if (!g_center_target_offset_override_active)
+    {
+        g_center_target_offset_restore_px = vision_image_processor_ipm_center_target_offset_from_left_px();
+    }
+}
+
+static void update_dynamic_center_target_offset_from_infer_result(const vision_infer_async_result_t &result)
+{
+    if (result.result_seq == 0 || result.result_seq == g_last_processed_infer_result_seq)
+    {
+        return;
+    }
+    g_last_processed_infer_result_seq = result.result_seq;
+
+    if (result.found && result.ncnn_infer_valid)
+    {
+        g_center_target_offset_no_red_count = 0;
+        if (g_center_target_offset_override_active)
+        {
+            return;
+        }
+
+        if (g_infer_offset_vote_valid_result_count == 0)
+        {
+            g_center_target_offset_restore_px = vision_image_processor_ipm_center_target_offset_from_left_px();
+        }
+
+        const int class_count = std::clamp(result.ncnn_class_count, 0, VISION_NCNN_MAX_CLASSES);
+        for (int i = 0; i < class_count; ++i)
+        {
+            g_infer_offset_prob_sums[i] += std::max(0.0f, result.ncnn_probs[i]);
+        }
+        ++g_infer_offset_vote_valid_result_count;
+
+        const int vote_result_count = std::max(1, g_vision_runtime_config.infer_offset_vote_result_count);
+        if (g_infer_offset_vote_valid_result_count < vote_result_count)
+        {
+            return;
+        }
+
+        const int best_class_id = select_best_class_id_from_prob_sums();
+        vision_image_processor_set_ipm_center_target_offset_from_left_px(
+            resolve_center_target_offset_for_class_id(best_class_id));
+        g_center_target_offset_override_active = true;
+        reset_infer_offset_vote_state();
+        return;
+    }
+
+    if (result.found)
+    {
+        g_center_target_offset_no_red_count = 0;
+        return;
+    }
+
+    if (!g_center_target_offset_override_active)
+    {
+        return;
+    }
+
+    ++g_center_target_offset_no_red_count;
+    if (g_center_target_offset_no_red_count >= std::max(1, g_vision_runtime_config.infer_offset_restore_no_red_count))
+    {
+        restore_center_target_offset_if_needed();
+    }
+}
 
 // 作用：清空 image_processor 内缓存的推理结果。
 // 调用关系：推理关闭、无结果、cleanup 时调用。
@@ -113,12 +250,14 @@ bool vision_pipeline_init(const char *camera_path, LQ_NCNN *ncnn, bool ncnn_enab
 
     vision_transport_init();
     clear_infer_result_in_image_processor();
+    reset_dynamic_center_target_offset_state(false);
     return true;
 }
 
 void vision_pipeline_cleanup()
 {
     vision_infer_async_cleanup();
+    reset_dynamic_center_target_offset_state(true);
     clear_infer_result_in_image_processor();
     vision_image_processor_cleanup();
 }
@@ -136,6 +275,7 @@ bool vision_pipeline_process_step()
     // 2) 推理关闭或处理图无效时，清空推理相关状态但不影响巡线主链。
     if (!vision_infer_async_enabled() || bgr_proc_data == nullptr)
     {
+        reset_dynamic_center_target_offset_state(true);
         clear_infer_result_in_image_processor();
         return true;
     }
@@ -156,6 +296,7 @@ bool vision_pipeline_process_step()
         return true;
     }
 
+    update_dynamic_center_target_offset_from_infer_result(latest);
     apply_infer_result_to_image(&latest);
     return true;
 }
@@ -215,6 +356,7 @@ void vision_pipeline_set_infer_enabled(bool enabled)
     vision_infer_async_set_enabled(enabled);
     if (!enabled)
     {
+        reset_dynamic_center_target_offset_state(true);
         clear_infer_result_in_image_processor();
     }
 }

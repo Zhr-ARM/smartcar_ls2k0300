@@ -51,9 +51,19 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 图传发送上限帧率，0 表示不限速。
     .send_max_fps = 60,
     // 推理总开关：false 时关闭红色识别与 ncnn 推理。
-    .infer_enabled = true,
+    .infer_enabled = false,
     // ncnn 子开关：false 时只保留红框检测，不做 ncnn 分类。
-    .ncnn_enabled = true,
+    .ncnn_enabled = false,
+    // ncnn 默认模型输入尺寸。
+    .ncnn_input_width = 64,
+    .ncnn_input_height = 64,
+    // ncnn 标签顺序必须与模型输出类别索引严格一致。
+    .ncnn_label_count = 3,
+    .ncnn_labels = {
+        "supplies",
+        "vehicles",
+        "weapons",
+    },
     // 逐飞客户端发送开关。
     .client_sender_enabled = false,
     // 车载屏显示开关。
@@ -225,8 +235,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    //.udp_web_server_ip = "172.21.79.129",
-    .udp_web_server_ip = "10.120.166.102",
+    .udp_web_server_ip = "172.21.79.129",
+    // .udp_web_server_ip = "10.120.166.102",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -301,8 +311,19 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 直边检测起始窗口内 cos 最小阈值。
     .ipm_boundary_straight_min_cos = 0.95f,
     // ---------- 边界双处理流水线：中线生成 ----------
-    // 边界法向平移距离，单位 px，用于生成平移中线。
-    .ipm_boundary_shift_distance_px = 14.0f,
+    // 逆透视后期望赛道宽度，单位 px。
+    .ipm_track_width_px = 28.0f,
+    // 目标中线距离左边界的偏移，单位 px。
+    // 当前 14 表示落在 28px 赛道宽度的正中间。
+    .ipm_center_target_offset_from_left_px = 14.0f,
+    // 武器类别：靠左走。
+    .ipm_center_target_offset_weapons_from_left_px = 4.0f,
+    // 物资类别：靠右走。
+    .ipm_center_target_offset_supplies_from_left_px = 24.0f,
+    // 从正常巡线切入目标引导前，先累计 5 个有效推理结果再决策类别。
+    .infer_offset_vote_result_count = 5,
+    // 连续 5 帧无红框后，退出目标引导并恢复默认偏移。
+    .infer_offset_restore_no_red_count = 5,
     // 中线独立后处理总开关。
     .ipm_centerline_postprocess_enabled = true,
     // 中线三角滤波开关。
@@ -330,13 +351,17 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 圆环状态 3 的对侧起始贴边连续行数触发阈值。
     .route_circle_stage3_frame_wall_rows_trigger = 70,
     // 圆环状态 6：搜线起始行至少抬高到该行。
-    .route_circle_stage6_maze_start_row = 70,
+    .route_circle_stage6_maze_start_row = 60,
     // 圆环补线：贴边连续段最小长度阈值。
     .circle_guide_min_frame_wall_segment_len = 8,
     // 圆环 state3 补线左/右目标点在规则边界上的后移索引。
     .circle_guide_target_offset_stage3 = 5,
     // 圆环 state5 补线锚点向后偏移索引。
     .circle_guide_anchor_offset_stage5 = 0,
+    // 进入 straight 状态所需连续帧数。
+    .route_straight_enter_consecutive_frames = 3,
+    // straight 判定：从 0 到最后误差索引的绝对误差和必须小于该值。
+    .route_straight_abs_error_sum_max = 50.0f,
     // ==================== 参数区域 2: 偏差计算 ====================
     // 说明：line_error 取点参数集中在这里。
     // line_error 平移中线偏好源：0=偏好左，1=偏好右，2=无偏好(自动按边界点数)。

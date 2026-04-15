@@ -44,6 +44,9 @@ void vision_line_error_layer_set_curvature_enabled(bool enabled);
 bool vision_line_error_layer_curvature_enabled();
 void vision_line_error_layer_get_selected_centerline_curvature(const float **curvature, int *count);
 float vision_line_error_layer_mean_abs_offset();
+int vision_line_error_layer_selected_centerline_count();
+int vision_line_error_layer_required_last_index_for_straight();
+float vision_line_error_layer_abs_error_sum_to_required_index();
 
 int vision_line_error_layer_weighted_first_point_error();
 void vision_line_error_layer_get_ipm_weighted_decision_point(bool *valid, int *x, int *y);

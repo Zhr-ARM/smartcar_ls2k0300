@@ -152,6 +152,9 @@ int main(int, char**)
     // 利用这 2s 视觉预热窗口同步完成 IMU 静止零偏标定：
     // 1) 不额外增加总启动时间；
     // 2) 标定结束后再启动 IMU 后台采集线程，后续按 5ms 周期持续更新并发布 gyro_z。
+    brushless_driver.set_left_duty(0);
+    brushless_driver.set_right_duty(0);
+
     if (!imu_thread_calibrate_and_start(pid_tuning::imu::kStartupCalibrateDurationMs))
     {
         cleanup();
@@ -170,6 +173,7 @@ int main(int, char**)
     }
     brushless_driver.set_left_duty(0);
     brushless_driver.set_right_duty(0);
+
     if (g_vision_runtime_config.screen_display_enabled && !screen_display_thread_init())
     {
         cleanup();
@@ -195,7 +199,8 @@ int main(int, char**)
     vision_image_processor_set_ipm_boundary_straight_min_points(g_vision_runtime_config.ipm_boundary_straight_min_points); // 直边检测最小点数
     vision_image_processor_set_ipm_boundary_straight_check_count(g_vision_runtime_config.ipm_boundary_straight_check_count); // 直边检测起始检查窗口
     vision_image_processor_set_ipm_boundary_straight_min_cos(g_vision_runtime_config.ipm_boundary_straight_min_cos); // 直边检测最小cos
-    vision_image_processor_set_ipm_boundary_shift_distance_px(g_vision_runtime_config.ipm_boundary_shift_distance_px); // IPM边界法向平移距离
+    vision_image_processor_set_ipm_track_width_px(g_vision_runtime_config.ipm_track_width_px); // IPM赛道宽度像素
+    vision_image_processor_set_ipm_center_target_offset_from_left_px(g_vision_runtime_config.ipm_center_target_offset_from_left_px); // 目标中线左偏移
     vision_image_processor_set_ipm_centerline_postprocess_enabled(g_vision_runtime_config.ipm_centerline_postprocess_enabled); // 中线后处理总开关
     vision_image_processor_set_ipm_centerline_triangle_filter_enabled(g_vision_runtime_config.ipm_centerline_triangle_filter_enabled); // 中线三角滤波
     vision_image_processor_set_ipm_centerline_resample_enabled(g_vision_runtime_config.ipm_centerline_resample_enabled); // 中线等距采样
@@ -215,7 +220,7 @@ int main(int, char**)
     vision_image_processor_set_ipm_line_error_index_range(g_vision_runtime_config.ipm_line_error_index_min,
                                                           g_vision_runtime_config.ipm_line_error_index_max); // line_error 随速度索引区间
 
-    printf("[VISION CFG] mode=%d max_fps=%u infer=%d ncnn=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_angle_step=%d ipm_straight_min_pts=%d ipm_straight_check=%d ipm_straight_min_cos=%.2f ipm_shift=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
+    printf("[VISION CFG] mode=%d max_fps=%u infer=%d ncnn=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_angle_step=%d ipm_straight_min_pts=%d ipm_straight_check=%d ipm_straight_min_cos=%.2f ipm_track_w=%.2f ipm_target_left=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
            static_cast<int>(vision_thread_get_send_mode()),
            static_cast<unsigned int>(vision_thread_get_send_max_fps()),
            vision_thread_infer_enabled() ? 1 : 0,
@@ -232,7 +237,8 @@ int main(int, char**)
            vision_image_processor_ipm_boundary_straight_min_points(),
            vision_image_processor_ipm_boundary_straight_check_count(),
            static_cast<double>(vision_image_processor_ipm_boundary_straight_min_cos()),
-           static_cast<double>(vision_image_processor_ipm_boundary_shift_distance_px()),
+           static_cast<double>(vision_image_processor_ipm_track_width_px()),
+           static_cast<double>(vision_image_processor_ipm_center_target_offset_from_left_px()),
            vision_image_processor_ipm_centerline_postprocess_enabled() ? 1 : 0,
            vision_image_processor_ipm_centerline_triangle_filter_enabled() ? 1 : 0,
            vision_image_processor_ipm_centerline_resample_enabled() ? 1 : 0,
