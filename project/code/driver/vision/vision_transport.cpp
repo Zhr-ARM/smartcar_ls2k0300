@@ -1208,6 +1208,7 @@ static void send_tcp_status()
         append_float(true, "right_current_count", motor_thread_right_count());
         append_float(true, "left_filtered_count", motor_thread_left_filtered_count());
         append_float(true, "right_filtered_count", motor_thread_right_filtered_count());
+        append_int(true, "zebra_cross_count", vision_image_processor_zebra_cross_count());
         append_int(true, "otsu_threshold", otsu_threshold);
         append_bool(true, "red_found", red_found);
         append_int_array(true, "red", {red_x, red_y, red_w, red_h, red_cx, red_cy});
@@ -1236,6 +1237,7 @@ static void send_tcp_status()
 
     append_int(g_vision_runtime_config.udp_web_tcp_send_ts_ms, "ts_ms", ts_ms);
     append_int(g_vision_runtime_config.udp_web_tcp_send_line_error, "line_error", line_error);
+    append_int(true, "zebra_cross_count", vision_image_processor_zebra_cross_count());
     append_float(g_vision_runtime_config.udp_web_tcp_send_cpu_usage_percent,
                  "cpu_usage_percent",
                  g_system_usage_cache.cpu_usage_percent);

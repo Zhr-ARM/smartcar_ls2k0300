@@ -2039,6 +2039,7 @@
       const basicRows = [];
       push(basicRows, 'ts_ms', status.ts_ms);
       push(basicRows, 'line_error', status.line_error);
+      push(basicRows, 'zebra_cross_count', status.zebra_cross_count);
       push(basicRows, 'base_speed', status.base_speed);
       push(basicRows, 'adjusted_base_speed', status.adjusted_base_speed);
       push(basicRows, 'left_target_count', status.left_target_count);
@@ -2432,6 +2433,7 @@
       }
       if (status && hasValue(status.ts_ms)) lines.push(`ts_ms: ${status.ts_ms}`);
       if (status && hasValue(status.line_error)) lines.push(`line_error: ${fmtPidValue(status.line_error)}`);
+      if (status && hasValue(status.zebra_cross_count)) lines.push(`zebra_cross_count: ${fmtPidValue(status.zebra_cross_count)}`);
       if (status && hasValue(status.pid_common_applied_base_speed)) {
         lines.push(`applied_base_speed: ${fmtPidValue(status.pid_common_applied_base_speed)}`);
       }

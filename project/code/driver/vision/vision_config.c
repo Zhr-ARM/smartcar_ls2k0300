@@ -277,9 +277,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 十字下角点补线向上的延伸长度（按 y 行数计算）。
     .cross_lower_corner_extrapolate_y_span = 30,
     // 原图直边判断：检查边界数组前 60 个点。
-    .src_boundary_straight_check_count = 90,
+    .src_boundary_straight_check_count = 80,
     // 原图直边判断：前 N 个点中 90% 以上为 dir=4/5 判定为直边。
-    .src_boundary_straight_dir45_ratio_min = 0.90f,
+    .src_boundary_straight_dir45_ratio_min = 0.95f,
     // 去畸变开关：true=启用标定参数矫正，false=原图直通。
     .undistort_enabled = false,
     // ---------- 边界双处理流水线：共同预处理 ----------
@@ -336,6 +336,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .ipm_centerline_curvature_enabled = true,
     // 所选偏移中线曲率计算步长（索引步长）。
     .ipm_centerline_curvature_step = 3,
+    // 斑马线检测开关。
+    .zebra_cross_detection_enabled = true,
     // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。
     .keep_last_centerline_on_double_loss = true,
     // 状态机十字识别开关。
@@ -358,6 +360,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .route_circle_stage3_frame_wall_rows_trigger = 70,
     // 圆环状态 6：搜线起始行至少抬高到该行。
     .route_circle_stage6_maze_start_row = 60,
+    // 圆环状态中线偏移：仅在 circle4/5 生效；左圆环相对左边界偏移，右圆环走镜像偏移。
+    .route_circle_center_target_offset_from_left_px = 23.0f,
     // 圆环补线：贴边连续段最小长度阈值。
     .circle_guide_min_frame_wall_segment_len = 8,
     // 圆环 state3 补线左/右目标点在规则边界上的后移索引。
@@ -367,7 +371,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 进入 straight 状态所需连续帧数。
     .route_straight_enter_consecutive_frames = 2,
     // straight 判定：从 0 到最后误差索引的绝对误差和必须小于该值。
-    .route_straight_abs_error_sum_max = 60.0f,
+    .route_straight_abs_error_sum_max = 80.0f,
     // cross_1：沿角点同 x 向上找白->黑转变，最多 75 行。
     .cross_aux_vertical_scan_max_rows = 75,
     // cross_1：辅助边界八邻域最多保存 80 个点。

@@ -262,6 +262,30 @@ static uint16 g_last_maze_left_points = 0;
 static uint16 g_last_maze_right_points = 0;
 static bool g_last_maze_left_ok = false;
 static bool g_last_maze_right_ok = false;
+static std::atomic<int> g_zebra_cross_count(0);
+
+static int count_gray_row_threshold_jumps(const uint8 *gray, int width, int height, int y, int step, int abs_diff_threshold)
+{
+    if (gray == nullptr || width <= 0 || height <= 0 || step <= 0)
+    {
+        return 0;
+    }
+    const int row = std::clamp(y, 0, height - 1);
+    const int row_offset = row * width;
+    int prev_x = 0;
+    int jump_count = 0;
+    for (int x = step; x < width; x += step)
+    {
+        const int prev_val = static_cast<int>(gray[row_offset + prev_x]);
+        const int cur_val = static_cast<int>(gray[row_offset + x]);
+        if (std::abs(cur_val - prev_val) > abs_diff_threshold)
+        {
+            jump_count += 1;
+        }
+        prev_x = x;
+    }
+    return jump_count;
+}
 // 成功处理完一帧视觉结果后递增，供控制层做“新样本驱动”的滤波推进。
 static std::atomic<uint32> g_processed_frame_seq(0);
 // 记录“最近一次成功识别”的左右起点 x，用于下一帧起点搜索偏移。
@@ -3213,9 +3237,30 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                                                    cross_left_proc_num,
                                                                                    cross_right_proc_num);
     const float track_width_px = std::max(0.0f, g_ipm_track_width_px.load());
-    const float target_offset_from_left_px = std::clamp(g_ipm_center_target_offset_from_left_px.load(),
-                                                        0.0f,
-                                                        track_width_px);
+    float target_offset_from_left_px = std::clamp(g_ipm_center_target_offset_from_left_px.load(),
+                                                  0.0f,
+                                                  track_width_px);
+    const bool left_circle_offset_active =
+        (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE_LEFT) &&
+        (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_LEFT_4 ||
+         route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_LEFT_5);
+    const bool right_circle_offset_active =
+        (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE_RIGHT) &&
+        (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_4 ||
+         route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_5);
+    if (left_circle_offset_active)
+    {
+        target_offset_from_left_px = std::clamp(g_vision_runtime_config.route_circle_center_target_offset_from_left_px,
+                                                0.0f,
+                                                track_width_px);
+    }
+    else if (right_circle_offset_active)
+    {
+        const float left_circle_offset = std::clamp(g_vision_runtime_config.route_circle_center_target_offset_from_left_px,
+                                                    0.0f,
+                                                    track_width_px);
+        target_offset_from_left_px = std::max(0.0f, track_width_px - left_circle_offset);
+    }
     const float shift_dist_from_left_px = target_offset_from_left_px;
     const float shift_dist_from_right_px = std::max(0.0f, track_width_px - target_offset_from_left_px);
     std::array<maze_point_t, VISION_BOUNDARY_NUM> center_selected{};
@@ -4646,6 +4691,7 @@ bool vision_image_processor_init(const char *camera_path)
     g_last_otsu_threshold = 127;
     g_last_maze_left_start_x = -1;
     g_last_maze_right_start_x = -1;
+    g_zebra_cross_count.store(0);
     g_processed_frame_seq.store(0U);
     return true;
 }
@@ -4709,6 +4755,22 @@ bool vision_image_processor_process_step()
     }
     cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
+
+    // 斑马线检测：在灰度图 y=40 行按步长 3 采样，统计相邻采样点灰度跳变次数。
+    // 若跳变次数 > 7，则认为命中一次斑马线，累计计数 +1。
+    if (g_vision_runtime_config.zebra_cross_detection_enabled)
+    {
+        const int jump_count = count_gray_row_threshold_jumps(g_image_gray,
+                                                              kProcWidth,
+                                                              kProcHeight,
+                                                              80,
+                                                              3,
+                                                              50);
+        if (jump_count > 7)
+        {
+            g_zebra_cross_count.fetch_add(1);
+        }
+    }
 
     // RGB565（当前处理分辨率）
     for (int y = 0; y < kProcHeight; ++y)
@@ -6542,6 +6604,11 @@ int vision_image_processor_route_right_loss_count()
 int vision_image_processor_route_right_gain_count()
 {
     return static_cast<int>(vision_route_state_machine_snapshot().right_gain_count);
+}
+
+int vision_image_processor_zebra_cross_count()
+{
+    return g_zebra_cross_count.load();
 }
 
 void vision_image_processor_get_ipm_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num)

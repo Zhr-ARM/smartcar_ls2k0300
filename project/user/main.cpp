@@ -269,12 +269,24 @@ int main(int, char**)
     imu_thread_print_info();
     line_follow_thread_print_info();
 
+    bool zebra_cross_stop_triggered = false;
     while(!g_should_exit)
     {   
         if (battery_low_voltage_protection_update())
         {
             handle_low_battery_protection();
             break;
+        }
+
+        if (!zebra_cross_stop_triggered &&
+            g_vision_runtime_config.zebra_cross_detection_enabled &&
+            vision_image_processor_zebra_cross_count() >= 1)
+        {
+            zebra_cross_stop_triggered = true;
+            printf("[ZEBRA] zebra_cross_count=%d -> stopping all motors and brushless output\r\n",
+                   vision_image_processor_zebra_cross_count());
+            stop_all_motion_immediately();
+            motor_thread_cleanup();
         }
 
         system_delay_ms(battery_low_voltage_protection_check_period_ms());

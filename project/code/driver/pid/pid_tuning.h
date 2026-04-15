@@ -211,7 +211,7 @@ inline constexpr Profile make_straight_profile()
 {
     Profile profile = kNormalProfile;
 
-    profile.base_speed = 450.0f; // NORMAL 档基础速度：非直道加速阶段默认按 300 count/5ms 行驶。
+    profile.base_speed = 400.0f; // NORMAL 档基础速度：非直道加速阶段默认按 300 count/5ms 行驶。
     profile.straight_full_speed_error_threshold_px = 0.0f; // NORMAL 档直道满速阈值：整条路径均值误差小于 1px 才允许直通满速。
 
     profile.position_dynamic_kp_quad_a = 0.0; // NORMAL 档位置环动态Kp一次项：误差越大，Kp 按线性速度增长。
@@ -244,7 +244,7 @@ inline constexpr Profile make_straight_profile()
     profile.yaw_rate_ref_slowdown_full_dps = 0.0f; // NORMAL 档预瞄目标横摆角速度降速满量程点：关闭后保持 0。
     profile.turn_min_speed_scale = 0.30f; // NORMAL 档最低保速比例：再大误差也至少保留 7% 基础速度。
     profile.turn_slowdown_max_drop_ratio_per_cycle = 0.95f; // NORMAL 档单周期最大降速比例：限制一拍内速度下降过快。
-    profile.turn_slowdown_max_rise_ratio_per_cycle = 0.05f; // NORMAL 档单周期最大升速比例：限制一拍内速度回升过快。
+    profile.turn_slowdown_max_rise_ratio_per_cycle = 0.5f; // NORMAL 档单周期最大升速比例：限制一拍内速度回升过快。
 
     return profile;
 }

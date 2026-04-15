@@ -268,6 +268,8 @@ typedef struct
     bool ipm_centerline_curvature_enabled;
     // 所选偏移中线曲率计算步长（索引步长，默认3）。
     int ipm_centerline_curvature_step;
+    // 斑马线检测总开关：true=执行计数，false=关闭斑马线检测。
+    bool zebra_cross_detection_enabled;
     // 双边都丢线时是否保持上一帧平移中线数组。
     bool keep_last_centerline_on_double_loss;
     // 状态机十字识别开关：true=允许进入十字状态，false=禁用十字识别。
@@ -298,6 +300,9 @@ typedef struct
     int route_circle_stage3_frame_wall_rows_trigger;
     // 圆环状态 6：搜线起始行至少抬高到该行。
     int route_circle_stage6_maze_start_row;
+    // 圆环状态中线目标偏移（仅在 circle4/5 生效，左圆环）：相对左边界的偏移像素。
+    // 右圆环在 circle4/5 自动使用镜像偏移：track_width - 该值。
+    float route_circle_center_target_offset_from_left_px;
     // 圆环补线：规则/原始边界中，贴边连续段最小长度阈值。
     int circle_guide_min_frame_wall_segment_len;
     // 圆环 state3 补线：对侧规则边界目标点在贴边连续段结束后向后偏移的索引数。

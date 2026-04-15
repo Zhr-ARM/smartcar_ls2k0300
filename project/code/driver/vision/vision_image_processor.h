@@ -299,6 +299,7 @@ int vision_image_processor_route_left_loss_count();
 int vision_image_processor_route_left_gain_count();
 int vision_image_processor_route_right_loss_count();
 int vision_image_processor_route_right_gain_count();
+int vision_image_processor_zebra_cross_count();
 // 逆透视处理链“平移中线”结果：
 // - from_left : 左边界向右法向平移得到；
 // - from_right: 右边界向左法向平移得到。

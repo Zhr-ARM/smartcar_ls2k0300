@@ -176,6 +176,7 @@
     const leftGainCountRaw = Number(status && status.route_left_gain_count);
     const rightLossCountRaw = Number(status && status.route_right_loss_count);
     const rightGainCountRaw = Number(status && status.route_right_gain_count);
+    const zebraCrossCountRaw = Number(status && status.zebra_cross_count);
     const mainState = Number.isFinite(mainStateRaw) ? mainStateRaw : null;
     const subState = Number.isFinite(subStateRaw) ? subStateRaw : null;
     const preferredSource = Number.isFinite(preferredSourceRaw) ? preferredSourceRaw : null;
@@ -185,6 +186,7 @@
     const leftGainCount = Number.isFinite(leftGainCountRaw) ? leftGainCountRaw : null;
     const rightLossCount = Number.isFinite(rightLossCountRaw) ? rightLossCountRaw : null;
     const rightGainCount = Number.isFinite(rightGainCountRaw) ? rightGainCountRaw : null;
+    const zebraCrossCount = Number.isFinite(zebraCrossCountRaw) ? zebraCrossCountRaw : null;
     const leftCornerFound = !!(status && status.cross_lower_left_corner_found);
     const rightCornerFound = !!(status && status.cross_lower_right_corner_found);
     const leftStraight = toBool(status && status.left_boundary_straight);
@@ -474,7 +476,8 @@
       ['左侧丢线', Number.isFinite(leftLossCount) ? leftLossCount : null],
       ['左侧恢复', Number.isFinite(leftGainCount) ? leftGainCount : null],
       ['右侧丢线', Number.isFinite(rightLossCount) ? rightLossCount : null],
-      ['右侧恢复', Number.isFinite(rightGainCount) ? rightGainCount : null]
+      ['右侧恢复', Number.isFinite(rightGainCount) ? rightGainCount : null],
+      ['斑马线计数', Number.isFinite(zebraCrossCount) ? zebraCrossCount : null]
     ].filter(([, value]) => value !== null);
 
     return {
@@ -770,6 +773,7 @@
     if (Number.isFinite(Number(status.route_left_gain_count))) push('route_left_gain_count', status.route_left_gain_count);
     if (Number.isFinite(Number(status.route_right_loss_count))) push('route_right_loss_count', status.route_right_loss_count);
     if (Number.isFinite(Number(status.route_right_gain_count))) push('route_right_gain_count', status.route_right_gain_count);
+    if (Number.isFinite(Number(status.zebra_cross_count))) push('zebra_cross_count', status.zebra_cross_count);
     if (hasValue(status.route_circle_detection_enabled)) push('route_circle_detection_enabled', status.route_circle_detection_enabled);
     if (Number.isFinite(Number(status.route_circle_entry_min_boundary_count))) push('route_circle_entry_min_boundary_count', status.route_circle_entry_min_boundary_count);
     if (Number.isFinite(Number(status.route_circle_entry_corner_tail_margin))) push('route_circle_entry_corner_tail_margin', status.route_circle_entry_corner_tail_margin);
