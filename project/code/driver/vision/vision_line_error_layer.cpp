@@ -278,26 +278,45 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
                 valid_weight += weights[i];
             }
         }
-        if (point_count == 0 || std::fabs(valid_weight) <= 1e-6f)
+        if (point_count == 0)
         {
             return 0;
         }
-
-        const float weight_scale = total_weight / valid_weight;
-        float weighted_index = 0.0f;
-        for (size_t i = 0; i < point_count; ++i)
+        if (std::fabs(valid_weight) <= 1e-6f)
         {
-            const int idx = point_indices[i];
-            if (idx < 0 || idx >= count)
+            const int fallback_idx = count - 1;
+            x = static_cast<float>(xs[fallback_idx]);
+            y = static_cast<float>(ys[fallback_idx]);
+            g_ipm_line_error_track_index = fallback_idx;
+            g_ipm_line_error_weighted_first_point_error.store(static_cast<int>(xs[fallback_idx]) - ipm_center_x_ref);
+            g_ipm_weighted_decision_point_valid = true;
+            g_ipm_weighted_decision_point_x = static_cast<int>(xs[fallback_idx]);
+            g_ipm_weighted_decision_point_y = static_cast<int>(ys[fallback_idx]);
+            if (src_xs != nullptr && src_ys != nullptr && fallback_idx < src_count)
             {
-                continue;
+                g_src_weighted_decision_point_valid = true;
+                g_src_weighted_decision_point_x = static_cast<int>(src_xs[fallback_idx]);
+                g_src_weighted_decision_point_y = static_cast<int>(src_ys[fallback_idx]);
             }
-            const float effective_weight = weights[i] * weight_scale;
-            weighted_index += static_cast<float>(idx) * effective_weight;
-            x += static_cast<float>(xs[idx]) * effective_weight;
-            y += static_cast<float>(ys[idx]) * effective_weight;
         }
-        g_ipm_line_error_track_index = std::clamp(static_cast<int>(std::lround(weighted_index)), 0, count - 1);
+        else
+        {
+            const float weight_scale = total_weight / valid_weight;
+            float weighted_index = 0.0f;
+            for (size_t i = 0; i < point_count; ++i)
+            {
+                const int idx = point_indices[i];
+                if (idx < 0 || idx >= count)
+                {
+                    continue;
+                }
+                const float effective_weight = weights[i] * weight_scale;
+                weighted_index += static_cast<float>(idx) * effective_weight;
+                x += static_cast<float>(xs[idx]) * effective_weight;
+                y += static_cast<float>(ys[idx]) * effective_weight;
+            }
+            g_ipm_line_error_track_index = std::clamp(static_cast<int>(std::lround(weighted_index)), 0, count - 1);
+        }
     }
 
     g_ipm_line_error_track_valid = true;

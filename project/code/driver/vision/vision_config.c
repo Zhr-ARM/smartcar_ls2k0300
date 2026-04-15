@@ -61,7 +61,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端 UDP 视频发送配置 ====================
     // UDP 网页图传总开关。
-    .udp_web_enabled = true,
+    .udp_web_enabled = false,
     // UDP 网页图传发送上限帧率，0 表示不限速。
     .udp_web_max_fps = 30,
     // 是否向网页端发送灰度图。
@@ -90,7 +90,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端 TCP 状态发送总开关 ====================
     // TCP 状态上报开关。
-    .udp_web_tcp_enabled = true,
+    .udp_web_tcp_enabled = false,
 
     // ==================== TCP 基础状态字段（通用） ====================
     // 发送主板当前时间戳（ms）。
@@ -348,9 +348,9 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // line_error 加权点数量。
     .ipm_line_error_weighted_point_count = 3,
     // line_error 加权索引点（0-based）。
-    .ipm_line_error_point_indices = {4, 8, 12},
+    .ipm_line_error_point_indices = {8, 12, 16},
     // line_error 各索引点对应权重。
-    .ipm_line_error_weights = {0.4f, 0.35f, 0.25f},
+    .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
     .ipm_line_error_speed_k = 0.02f,
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b。
