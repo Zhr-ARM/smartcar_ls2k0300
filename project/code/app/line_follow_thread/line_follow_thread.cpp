@@ -208,8 +208,8 @@ const char *route_sub_state_name(int route_sub_state)
     switch (route_sub_state)
     {
         case VISION_ROUTE_SUB_NONE:                 return "NONE";
-        case VISION_ROUTE_SUB_CROSS_BEGIN:          return "CROSS_BEGIN";
-        case VISION_ROUTE_SUB_CROSS_IN:             return "CROSS_IN";
+        case VISION_ROUTE_SUB_CROSS_1:              return "CROSS_1";
+        case VISION_ROUTE_SUB_CROSS_2:              return "CROSS_2";
         case VISION_ROUTE_SUB_CIRCLE_LEFT_1:        return "CIRCLE_LEFT_1";
         case VISION_ROUTE_SUB_CIRCLE_LEFT_2:        return "CIRCLE_LEFT_2";
         case VISION_ROUTE_SUB_CIRCLE_LEFT_3:        return "CIRCLE_LEFT_3";
@@ -231,6 +231,7 @@ RouteProfileSelection select_route_profile_selection(int route_main_state, int r
     using pid_tuning::route_line_follow::kCircleEnterProfile;
     using pid_tuning::route_line_follow::kCircleExitProfile;
     using pid_tuning::route_line_follow::kCircleInsideProfile;
+    using pid_tuning::route_line_follow::kCrossProfile;
     using pid_tuning::route_line_follow::kNormalProfile;
     using pid_tuning::route_line_follow::kStraightProfile;
 
@@ -238,6 +239,9 @@ RouteProfileSelection select_route_profile_selection(int route_main_state, int r
     {
         case VISION_ROUTE_MAIN_STRAIGHT:
             return {kStraightProfile, "STRAIGHT"};
+
+        case VISION_ROUTE_MAIN_CROSS:
+            return {kCrossProfile, "CROSS"};
 
         case VISION_ROUTE_MAIN_CIRCLE_LEFT:
         case VISION_ROUTE_MAIN_CIRCLE_RIGHT:

@@ -339,7 +339,13 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。
     .keep_last_centerline_on_double_loss = true,
     // 状态机十字识别开关。
-    .route_cross_detection_enabled = false,
+    .route_cross_detection_enabled = true,
+    // 双侧角点后沿边框连续行数都至少达到 5，才允许 normal/straight 进入 cross。
+    .route_cross_entry_corner_post_frame_wall_rows_min = 5,
+    // cross_1 -> cross_2：起始巡线行一旦碰到边框边界就认为进入 cross_2 条件成立。
+    .route_cross_stage2_enter_start_frame_wall_rows_min = 1,
+    // cross_2 -> normal：左右起始边界 x 差小于 150 视为驶出十字。
+    .route_cross_exit_start_gap_x_max = 155,
     // 状态机圆环识别开关。
     .route_circle_detection_enabled = true,
     // 圆环入口判定：对侧边界最少点数。
@@ -359,9 +365,21 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 圆环 state5 补线锚点向后偏移索引。
     .circle_guide_anchor_offset_stage5 = 0,
     // 进入 straight 状态所需连续帧数。
-    .route_straight_enter_consecutive_frames = 3,
+    .route_straight_enter_consecutive_frames = 2,
     // straight 判定：从 0 到最后误差索引的绝对误差和必须小于该值。
     .route_straight_abs_error_sum_max = 50.0f,
+    // cross_1：沿角点同 x 向上找白->黑转变，最多 75 行。
+    .cross_aux_vertical_scan_max_rows = 75,
+    // cross_1：辅助边界八邻域最多保存 80 个点。
+    .cross_aux_trace_max_points = 50,
+    // cross_1：辅助边界最多向上延伸 30 行。
+    .cross_aux_trace_upward_rows_max = 30,
+    // cross_2：4->6 跳变前平台要求 3 个连续 dir=4。
+    .cross_upper_dir4_pre_run_len = 3,
+    // cross_2：允许最多 3 个过渡点，值可以落在 4/5/6。
+    .cross_upper_transition_max_len = 3,
+    // cross_2：4->6 跳变后平台要求 3 个连续 dir=6。
+    .cross_upper_dir6_post_run_len = 3,
     // ==================== 参数区域 2: 偏差计算 ====================
     // 说明：line_error 取点参数集中在这里。
     // line_error 平移中线偏好源：0=偏好左，1=偏好右，2=无偏好(自动按边界点数)。

@@ -15,8 +15,8 @@ typedef enum
 typedef enum
 {
     VISION_ROUTE_SUB_NONE = 0,
-    VISION_ROUTE_SUB_CROSS_BEGIN,
-    VISION_ROUTE_SUB_CROSS_IN,
+    VISION_ROUTE_SUB_CROSS_1,
+    VISION_ROUTE_SUB_CROSS_2,
     VISION_ROUTE_SUB_CIRCLE_LEFT_1,
     VISION_ROUTE_SUB_CIRCLE_LEFT_2,
     VISION_ROUTE_SUB_CIRCLE_LEFT_3,
@@ -51,13 +51,15 @@ typedef struct
     int right_corner_y;
     int right_corner_src_y;
     int right_corner_index;
+    int left_corner_post_frame_wall_rows;
+    int right_corner_post_frame_wall_rows;
     bool left_straight;
     bool right_straight;
     bool left_has_frame_wall;
     bool right_has_frame_wall;
     int left_start_frame_wall_rows;
     int right_start_frame_wall_rows;
-    int cross_detected_stop_row;
+    int start_boundary_gap_x;
     int left_boundary_count;
     int right_boundary_count;
     int selected_centerline_count;

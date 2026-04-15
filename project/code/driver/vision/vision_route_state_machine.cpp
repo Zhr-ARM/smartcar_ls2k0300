@@ -97,6 +97,48 @@ static bool straight_state_ready(const vision_route_state_input_t *input)
            input->straight_abs_error_sum < g_vision_runtime_config.route_straight_abs_error_sum_max;
 }
 
+static bool cross_entry_ready(const vision_route_state_input_t *input)
+{
+    if (input == nullptr || !g_vision_runtime_config.route_cross_detection_enabled)
+    {
+        return false;
+    }
+
+    const int min_frame_wall_rows =
+        std::max(1, g_vision_runtime_config.route_cross_entry_corner_post_frame_wall_rows_min);
+    return input->left_corner_found &&
+           input->right_corner_found &&
+           input->left_corner_index >= 0 &&
+           input->right_corner_index >= 0 &&
+           input->left_corner_post_frame_wall_rows >= min_frame_wall_rows &&
+           input->right_corner_post_frame_wall_rows >= min_frame_wall_rows;
+}
+
+static bool cross_stage2_ready(const vision_route_state_input_t *input)
+{
+    if (input == nullptr)
+    {
+        return false;
+    }
+
+    const int start_frame_wall_rows_min =
+        std::max(1, g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min);
+    return input->left_start_frame_wall_rows >= start_frame_wall_rows_min &&
+           input->right_start_frame_wall_rows >= start_frame_wall_rows_min;
+}
+
+static bool cross_exit_ready(const vision_route_state_input_t *input)
+{
+    if (input == nullptr)
+    {
+        return false;
+    }
+
+    const int start_gap_x_max = std::max(1, g_vision_runtime_config.route_cross_exit_start_gap_x_max);
+    return input->start_boundary_gap_x > 0 &&
+           input->start_boundary_gap_x < start_gap_x_max;
+}
+
 } // namespace
 
 void vision_route_state_machine_reset()
@@ -121,12 +163,23 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
     {
         enter_state(VISION_ROUTE_MAIN_NORMAL, VISION_ROUTE_SUB_NONE, input->base_preferred_source);
     }
+    if (!g_vision_runtime_config.route_cross_detection_enabled &&
+        g_main_state == VISION_ROUTE_MAIN_CROSS)
+    {
+        enter_state(VISION_ROUTE_MAIN_NORMAL, VISION_ROUTE_SUB_NONE, input->base_preferred_source);
+    }
 
     switch (g_main_state)
     {
     case VISION_ROUTE_MAIN_NORMAL:
         g_preferred_source = normalize_preferred_source(input->base_preferred_source);
-        if (straight_state_ready(input))
+        if (cross_entry_ready(input))
+        {
+            enter_state(VISION_ROUTE_MAIN_CROSS,
+                        VISION_ROUTE_SUB_CROSS_1,
+                        input->base_preferred_source);
+        }
+        else if (straight_state_ready(input))
         {
             g_straight_ready_consecutive_count += 1;
             if (g_straight_ready_consecutive_count >=
@@ -159,7 +212,13 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
         break;
     case VISION_ROUTE_MAIN_STRAIGHT:
         g_preferred_source = normalize_preferred_source(input->base_preferred_source);
-        if (!straight_state_ready(input))
+        if (cross_entry_ready(input))
+        {
+            enter_state(VISION_ROUTE_MAIN_CROSS,
+                        VISION_ROUTE_SUB_CROSS_1,
+                        input->base_preferred_source);
+        }
+        else if (!straight_state_ready(input))
         {
             enter_state(VISION_ROUTE_MAIN_NORMAL,
                         VISION_ROUTE_SUB_NONE,
@@ -291,6 +350,32 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
         }
         break;
     case VISION_ROUTE_MAIN_CROSS:
+        g_preferred_source = normalize_preferred_source(input->base_preferred_source);
+        switch (g_sub_state)
+        {
+        case VISION_ROUTE_SUB_CROSS_1:
+            if (cross_stage2_ready(input))
+            {
+                enter_state(VISION_ROUTE_MAIN_CROSS,
+                            VISION_ROUTE_SUB_CROSS_2,
+                            input->base_preferred_source);
+            }
+            break;
+        case VISION_ROUTE_SUB_CROSS_2:
+            if (cross_exit_ready(input))
+            {
+                enter_state(VISION_ROUTE_MAIN_NORMAL,
+                            VISION_ROUTE_SUB_NONE,
+                            input->base_preferred_source);
+            }
+            break;
+        default:
+            enter_state(VISION_ROUTE_MAIN_CROSS,
+                        VISION_ROUTE_SUB_CROSS_1,
+                        input->base_preferred_source);
+            break;
+        }
+        break;
     default:
         g_preferred_source = normalize_preferred_source(input->base_preferred_source);
         break;

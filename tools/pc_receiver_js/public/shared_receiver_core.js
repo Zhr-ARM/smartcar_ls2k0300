@@ -94,14 +94,14 @@
     if (state === 1) return '直道态';
     if (state === 2) return '左环岛';
     if (state === 3) return '右环岛';
-    if (state === 4) return '交叉口(保留)';
+    if (state === 4) return '十字态';
     return `未知主状态(${state})`;
   }
 
   function formatRouteSubState(state) {
     if (state === 0) return '无子状态';
-    if (state === 1) return '十字-准备进入(保留)';
-    if (state === 2) return '十字-穿越中(保留)';
+    if (state === 1) return '十字-cross_1';
+    if (state === 2) return '十字-cross_2';
     if (state === 3) return '左环岛-circle_1';
     if (state === 4) return '左环岛-circle_2';
     if (state === 5) return '左环岛-circle_3';
@@ -161,8 +161,8 @@
     if (subState === 12) return '等待左侧角点出现，确认已经推进到出环前半段。';
     if (subState === 13) return '执行右环 stage5，继续补左线，等待左侧重新连续贴左边框。';
     if (subState === 14) return '收尾阶段，搜线起始行抬高，等待双侧重新都成为直边。';
-    if (subState === 1) return '十字子状态当前保留，主线未使用。';
-    if (subState === 2) return '十字子状态当前保留，主线未使用。';
+    if (subState === 1) return '十字第一阶段：沿下角点竖直上探，尝试接管左右辅助边界。';
+    if (subState === 2) return '十字第二阶段：在原始 dir 中寻找上角点，并把上角点后的规则边界送入后续流程。';
     return '普通巡线阶段。';
   }
 
@@ -213,6 +213,20 @@
     const circleGuideMinSegmentLen = toFiniteNumber(status && status.circle_guide_min_frame_wall_segment_len);
     const circleGuideTargetOffsetStage3 = toFiniteNumber(status && status.circle_guide_target_offset_stage3);
     const circleGuideAnchorOffsetStage5 = toFiniteNumber(status && status.circle_guide_anchor_offset_stage5);
+    const routeCrossDetectionEnabled = toBool(status && status.route_cross_detection_enabled);
+    const crossEntryReadyNow = toBool(status && status.cross_state_entry_ready_now);
+    const crossStage2ReadyNow = toBool(status && status.cross_state_stage2_ready_now);
+    const crossExitReadyNow = toBool(status && status.cross_state_exit_ready_now);
+    const crossLeftPostFrameRows = toFiniteNumber(status && status.cross_left_corner_post_frame_wall_rows);
+    const crossRightPostFrameRows = toFiniteNumber(status && status.cross_right_corner_post_frame_wall_rows);
+    const crossStartGapX = toFiniteNumber(status && status.cross_start_boundary_gap_x);
+    const crossEntryPostFrameRowsMin = toFiniteNumber(status && status.route_cross_entry_corner_post_frame_wall_rows_min);
+    const crossStage2StartFrameRowsMin = toFiniteNumber(status && status.route_cross_stage2_enter_start_frame_wall_rows_min);
+    const crossExitStartGapXMax = toFiniteNumber(status && status.route_cross_exit_start_gap_x_max);
+    const crossLeftAuxFound = toBool(status && status.cross_left_aux_found);
+    const crossRightAuxFound = toBool(status && status.cross_right_aux_found);
+    const crossLeftUpperFound = toBool(status && status.cross_left_upper_corner_found);
+    const crossRightUpperFound = toBool(status && status.cross_right_upper_corner_found);
     const straightSelectedCenterlineCount = toFiniteNumber(status && status.straight_selected_centerline_count);
     const straightRequiredLastIndex = toFiniteNumber(status && status.straight_required_last_index);
     const straightAbsErrorSum = toFiniteNumber(status && status.straight_abs_error_sum);
@@ -273,7 +287,13 @@
     if (cornerDistance !== null) {
       clues.push(`双角点距离：${cornerDistance.toFixed(1)} px`);
     }
-    clues.push(`状态机开关：圆环=${routeCircleDetectionEnabled ? '开' : '关'}`);
+    clues.push(`状态机开关：十字=${routeCrossDetectionEnabled ? '开' : '关'}，圆环=${routeCircleDetectionEnabled ? '开' : '关'}`);
+    if (crossLeftPostFrameRows !== null || crossRightPostFrameRows !== null) {
+      clues.push(`十字角点后贴边：左=${crossLeftPostFrameRows !== null ? crossLeftPostFrameRows : '--'}，右=${crossRightPostFrameRows !== null ? crossRightPostFrameRows : '--'}`);
+    }
+    if (crossStartGapX !== null) {
+      clues.push(`十字出口起始 gap：${crossStartGapX}`);
+    }
     if (straightSelectedCenterlineCount !== null || straightRequiredLastIndex !== null) {
       clues.push(`直道判定：中线点数=${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'}，最后索引=${straightRequiredLastIndex !== null ? straightRequiredLastIndex : '--'}`);
     }
@@ -304,7 +324,9 @@
         straightAbsErrorSumMax !== null &&
         straightAbsErrorSum < straightAbsErrorSumMax;
       const straightStateHit = straightReadyNow;
-      if (straightStateHit) {
+      if (crossEntryReadyNow) {
+        judgments.push('当前已经满足十字入口条件：双侧下角点都存在，且角点后的边框边界连续行数达标。');
+      } else if (straightStateHit) {
         judgments.push('当前已经满足直道判定：中线点数充足，且前段误差绝对值总和低于阈值。');
       } else if (!routeCircleDetectionEnabled) {
         judgments.push('圆环状态机当前关闭，页面只展示输入特征，不会进入 circle 状态。');
@@ -320,13 +342,17 @@
         judgments.push('当前没有满足圆环入口的组合条件，状态机继续留在正常巡线。');
       }
 
+      pushCondition('十字入口', formatHit(crossEntryReadyNow), `双角点=${leftCornerFound && rightCornerFound ? 1 : 0}；角点后贴边 左=${crossLeftPostFrameRows !== null ? crossLeftPostFrameRows : '--'} 右=${crossRightPostFrameRows !== null ? crossRightPostFrameRows : '--'}；阈值=${crossEntryPostFrameRowsMin !== null ? crossEntryPostFrameRowsMin : '--'}`);
       pushCondition('直道态入口', formatHit(straightStateHit), `中线点数=${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} > 最后索引=${straightRequiredLastIndex !== null ? straightRequiredLastIndex : '--'}；误差和=${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'} < 阈值=${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}；连续帧=${straightEnterConsecutiveFrames !== null ? straightEnterConsecutiveFrames : '--'}`);
       pushCondition('直道点数条件', formatHit(!!straightPointCountOk), `${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} > ${straightRequiredLastIndex !== null ? straightRequiredLastIndex : '--'}`);
       pushCondition('直道误差和条件', formatHit(!!straightErrorSumOk), `${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'} < ${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}`);
       pushCondition('左环入口', formatHit(!!leftCircleEntryHit), `右直边=${rightStraight ? 1 : 0} 左角点=${leftCornerFound ? 1 : 0} 左角点y=${leftCornerY !== null ? leftCornerY : '--'}>60 右点数=${rightBoundaryCount !== null ? rightBoundaryCount : '--'}>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'} 左角点索引=${leftCornerIndex !== null ? leftCornerIndex : '--'} < 右点数-${circleEntryCornerTailMargin !== null ? circleEntryCornerTailMargin : '--'}`);
       pushCondition('右环入口', formatHit(!!rightCircleEntryHit), `左直边=${leftStraight ? 1 : 0} 右角点=${rightCornerFound ? 1 : 0} 右角点y=${rightCornerY !== null ? rightCornerY : '--'}>60 左点数=${leftBoundaryCount !== null ? leftBoundaryCount : '--'}>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'} 右角点索引=${rightCornerIndex !== null ? rightCornerIndex : '--'} < 左点数-${circleEntryCornerTailMargin !== null ? circleEntryCornerTailMargin : '--'}`);
 
-      if (straightStateHit) {
+      if (crossEntryReadyNow) {
+        nextStateLabel = '十字-cross_1';
+        nextReasons.push('十字入口条件优先于圆环，当前帧会先切入 cross_1。');
+      } else if (straightStateHit) {
         nextStateLabel = '直道态';
         nextReasons.push('当前帧满足直道点数和误差和条件，状态机会切到直道态。');
       } else if (leftCircleEntryHit) {
@@ -358,9 +384,20 @@
         nextReasons[0] = '直道态保持条件被破坏，状态机先退回 normal，再按 normal 规则判断后续状态。';
       }
     } else if (mainState === 4) {
-      judgments.push('该状态位当前在网页端仅保留原始显示，不再额外推断旧十字状态机逻辑。');
-      nextReasons.push('请以实际 route_main_state / route_sub_state 原始值为准。');
-      pushCondition('保留状态', subState !== null ? subState : '--', '当前页面不再扩展旧十字状态说明');
+      judgments.push('当前处于十字主状态，十字逻辑会优先于圆环逻辑继续推进。');
+      pushCondition('cross_1 -> cross_2', formatHit(crossStage2ReadyNow), `双角点同时丢失 或 起始贴边 左=${leftStartFrameRows !== null ? leftStartFrameRows : '--'} 右=${rightStartFrameRows !== null ? rightStartFrameRows : '--'} >= ${crossStage2StartFrameRowsMin !== null ? crossStage2StartFrameRowsMin : '--'}`);
+      pushCondition('cross_2 -> normal', formatHit(crossExitReadyNow), `起始贴边清零 且 start_gap=${crossStartGapX !== null ? crossStartGapX : '--'} < ${crossExitStartGapXMax !== null ? crossExitStartGapXMax : '--'}`);
+      pushCondition('辅助边界', `L=${crossLeftAuxFound ? '有' : '无'} R=${crossRightAuxFound ? '有' : '无'}`, 'cross_1 竖直上探后接八邻域辅助线');
+      pushCondition('上角点', `L=${crossLeftUpperFound ? '有' : '无'} R=${crossRightUpperFound ? '有' : '无'}`, 'cross_2 在原始 dir 中寻找 4->6 跳变后再找 dir=5');
+      if (subState === 1) {
+        nextStateLabel = crossStage2ReadyNow ? '十字-cross_2' : '十字-cross_1';
+        nextReasons.push(crossStage2ReadyNow ? '当前满足十字第二阶段切换条件，下一次状态更新会进入 cross_2。' : '继续在 cross_1 中尝试利用下角点上探接管辅助边界。');
+      } else if (subState === 2) {
+        nextStateLabel = crossExitReadyNow ? '正常巡线' : '十字-cross_2';
+        nextReasons.push(crossExitReadyNow ? '十字出口条件成立，状态机会回到 normal。' : '继续保持 cross_2，并等待出口 gap 收敛。');
+      } else {
+        nextReasons.push('等待十字子状态稳定。');
+      }
     } else if (mainState === 2) {
       judgments.push(`左环岛状态下，当前固定偏向 ${formatRoutePreferredSource(preferredSource)}。`);
       if (subState === 5 || subState === 7) {

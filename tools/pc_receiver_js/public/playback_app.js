@@ -26,6 +26,13 @@
   const straightFocusErrorSum = document.getElementById('straightFocusErrorSum');
   const straightFocusErrorMax = document.getElementById('straightFocusErrorMax');
   const straightFocusDetail = document.getElementById('straightFocusDetail');
+  const crossFocusPanel = document.getElementById('crossFocusPanel');
+  const crossFocusBadge = document.getElementById('crossFocusBadge');
+  const crossFocusLeftRows = document.getElementById('crossFocusLeftRows');
+  const crossFocusRightRows = document.getElementById('crossFocusRightRows');
+  const crossFocusGap = document.getElementById('crossFocusGap');
+  const crossFocusAux = document.getElementById('crossFocusAux');
+  const crossFocusDetail = document.getElementById('crossFocusDetail');
   const routeStateJudgment = document.getElementById('routeStateJudgment');
   const routeNextStateValue = document.getElementById('routeNextStateValue');
   const routeNextReason = document.getElementById('routeNextReason');
@@ -117,6 +124,54 @@
     straightFocusDetail.textContent = reasons.join('；');
   }
 
+  function renderCrossFocus(status) {
+    if (!crossFocusPanel) return;
+    const leftRows = Number(status && status.cross_left_corner_post_frame_wall_rows);
+    const rightRows = Number(status && status.cross_right_corner_post_frame_wall_rows);
+    const gap = Number(status && status.cross_start_boundary_gap_x);
+    const entryReady = !!(status && status.cross_state_entry_ready_now);
+    const stage2Ready = !!(status && status.cross_state_stage2_ready_now);
+    const exitReady = !!(status && status.cross_state_exit_ready_now);
+    const mainState = Number(status && status.route_main_state);
+    const subState = Number(status && status.route_sub_state);
+    const leftAux = !!(status && status.cross_left_aux_found);
+    const rightAux = !!(status && status.cross_right_aux_found);
+    const leftUpper = !!(status && status.cross_left_upper_corner_found);
+    const rightUpper = !!(status && status.cross_right_upper_corner_found);
+    const leftAuxTraceCount = Number(status && status.cross_left_aux_trace_count);
+    const rightAuxTraceCount = Number(status && status.cross_right_aux_trace_count);
+    const leftAuxRegularCount = Number(status && status.cross_left_aux_regular_count);
+    const rightAuxRegularCount = Number(status && status.cross_right_aux_regular_count);
+    const leftAuxDir5Count = Number(status && status.cross_left_aux_dir5_count);
+    const rightAuxDir5Count = Number(status && status.cross_right_aux_dir5_count);
+    const hasData = Number.isFinite(leftRows) || Number.isFinite(rightRows) || Number.isFinite(gap);
+
+    crossFocusPanel.classList.remove('ready', 'not-ready');
+    crossFocusPanel.classList.add((entryReady || stage2Ready || exitReady || mainState === 4) ? 'ready' : 'not-ready');
+    crossFocusBadge.textContent = !hasData
+      ? '等待数据'
+      : (mainState === 4 ? (subState === 2 ? '十字-cross_2 运行中' : '十字-cross_1 运行中') : (entryReady ? '满足十字入口' : '未满足十字入口'));
+    crossFocusLeftRows.textContent = Number.isFinite(leftRows) ? String(leftRows) : '--';
+    crossFocusRightRows.textContent = Number.isFinite(rightRows) ? String(rightRows) : '--';
+    crossFocusGap.textContent = Number.isFinite(gap) ? String(gap) : '--';
+    crossFocusAux.textContent = `L${leftAux ? '1' : '0'} R${rightAux ? '1' : '0'}`;
+
+    if (!hasData) {
+      crossFocusDetail.textContent = '等待十字判定数据...';
+      return;
+    }
+
+    const details = [];
+    details.push(`入口=${entryReady ? '命中' : '未命中'}`);
+    details.push(`cross_1->2=${stage2Ready ? '命中' : '未命中'}`);
+    details.push(`cross_2->normal=${exitReady ? '命中' : '未命中'}`);
+    details.push(`辅助线 L=${leftAux ? '有' : '无'} R=${rightAux ? '有' : '无'}`);
+    details.push(`辅线点数 L=${Number.isFinite(leftAuxTraceCount) ? leftAuxTraceCount : '--'}/${Number.isFinite(leftAuxRegularCount) ? leftAuxRegularCount : '--'} R=${Number.isFinite(rightAuxTraceCount) ? rightAuxTraceCount : '--'}/${Number.isFinite(rightAuxRegularCount) ? rightAuxRegularCount : '--'}`);
+    details.push(`辅线 dir5 L=${Number.isFinite(leftAuxDir5Count) ? leftAuxDir5Count : '--'} R=${Number.isFinite(rightAuxDir5Count) ? rightAuxDir5Count : '--'}`);
+    details.push(`上角点 L=${leftUpper ? '有' : '无'} R=${rightUpper ? '有' : '无'}`);
+    crossFocusDetail.textContent = details.join('；');
+  }
+
   function renderMetaPills(recording) {
     const pills = [];
     if (recording && recording.folder) pills.push(`目录: ${recording.folder}`);
@@ -136,6 +191,7 @@
   function renderRouteStatePanel(status) {
     const route = receiverCore.buildRouteStateSummary(status || {});
     renderStraightFocus(status);
+    renderCrossFocus(status);
     routeMainStateValue.textContent = route.mainStateLabel || '--';
     routeSubStateValue.textContent = route.subStateLabel || '--';
     routePreferredSourceValue.textContent = route.preferredSourceLabel || '--';
@@ -282,6 +338,7 @@
       ['基础速度', hasValue(status.pid_common_applied_base_speed) ? fmtPidValue(status.pid_common_applied_base_speed) : 'N/A'],
       ['状态机', [status.route_main_state, status.route_sub_state].filter(hasValue).join(' / ') || 'N/A'],
       ['直道判定', hasValue(status.straight_state_ready_now) ? (status.straight_state_ready_now ? '满足' : '未满足') : 'N/A'],
+      ['十字入口判定', hasValue(status.cross_state_entry_ready_now) ? (status.cross_state_entry_ready_now ? '满足' : '未满足') : 'N/A'],
       ['红框/ROI', `red=${hasValue(status.red_found) ? status.red_found : 'N/A'} roi=${hasValue(status.roi_valid) ? status.roi_valid : 'N/A'}`],
       ['推理', hasValue(status.ncnn_top_label) ? `${status.ncnn_top_label}${hasValue(status.ncnn_top_score) ? ` (${fmtPidValue((Number(status.ncnn_top_score) || 0) * 100)}%)` : ''}` : 'N/A'],
       ['推理耗时', hasValue(status.ncnn_infer_us) ? `${status.ncnn_infer_us} us` : 'N/A'],

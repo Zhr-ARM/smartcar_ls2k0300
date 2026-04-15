@@ -241,6 +241,28 @@ void vision_image_processor_get_cross_lower_corner_state(bool *left_found,
                                                          int *right_x,
                                                          int *right_y,
                                                          bool *pair_valid);
+void vision_image_processor_get_cross_aux_line_state(bool is_left,
+                                                     bool *found,
+                                                     int *transition_x,
+                                                     int *transition_y,
+                                                     uint16 **trace_x,
+                                                     uint16 **trace_y,
+                                                     uint8 **trace_dir,
+                                                     uint16 *trace_num,
+                                                     uint16 **regular_x,
+                                                     uint16 **regular_y,
+                                                     uint16 *regular_num);
+void vision_image_processor_get_cross_upper_corner_state(bool *left_found,
+                                                         int *left_index,
+                                                         int *left_x,
+                                                         int *left_y,
+                                                         bool *right_found,
+                                                         int *right_index,
+                                                         int *right_x,
+                                                         int *right_y);
+void vision_image_processor_get_cross_route_debug_state(int *left_corner_post_frame_wall_rows,
+                                                        int *right_corner_post_frame_wall_rows,
+                                                        int *start_boundary_gap_x);
 void vision_image_processor_get_src_trace_frame_wall_state(bool *left_has_frame_wall,
                                                            bool *right_has_frame_wall);
 void vision_image_processor_get_src_start_frame_wall_rows(int *left_rows, int *right_rows);

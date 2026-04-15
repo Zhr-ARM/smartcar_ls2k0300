@@ -1046,6 +1046,31 @@
           </div>
           <div class="straight-focus-detail" id="straightFocusDetail">等待直道判定数据...</div>
         </div>
+        <div class="straight-focus-panel" id="crossFocusPanel">
+          <div class="straight-focus-head">
+            <div class="straight-focus-title">十字判定高亮</div>
+            <div class="straight-focus-badge" id="crossFocusBadge">等待数据</div>
+          </div>
+          <div class="straight-focus-grid">
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">左角点后贴边</div>
+              <div class="straight-focus-value" id="crossFocusLeftRows">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">右角点后贴边</div>
+              <div class="straight-focus-value" id="crossFocusRightRows">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">起始 Gap</div>
+              <div class="straight-focus-value" id="crossFocusGap">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">辅助线命中</div>
+              <div class="straight-focus-value" id="crossFocusAux">--</div>
+            </div>
+          </div>
+          <div class="straight-focus-detail" id="crossFocusDetail">等待十字判定数据...</div>
+        </div>
         <div class="route-state-judgment" id="routeStateJudgment">waiting...</div>
         <div class="route-state-grid">
           <div class="route-state-block">
@@ -1177,6 +1202,31 @@
                   </div>
                 </div>
                 <div class="straight-focus-detail" id="playbackStraightFocusDetail">等待直道判定数据...</div>
+              </div>
+              <div class="straight-focus-panel" id="playbackCrossFocusPanel">
+                <div class="straight-focus-head">
+                  <div class="straight-focus-title">十字判定高亮</div>
+                  <div class="straight-focus-badge" id="playbackCrossFocusBadge">等待数据</div>
+                </div>
+                <div class="straight-focus-grid">
+                  <div class="straight-focus-stat">
+                    <div class="straight-focus-label">左角点后贴边</div>
+                    <div class="straight-focus-value" id="playbackCrossFocusLeftRows">--</div>
+                  </div>
+                  <div class="straight-focus-stat">
+                    <div class="straight-focus-label">右角点后贴边</div>
+                    <div class="straight-focus-value" id="playbackCrossFocusRightRows">--</div>
+                  </div>
+                  <div class="straight-focus-stat">
+                    <div class="straight-focus-label">起始 Gap</div>
+                    <div class="straight-focus-value" id="playbackCrossFocusGap">--</div>
+                  </div>
+                  <div class="straight-focus-stat">
+                    <div class="straight-focus-label">辅助线命中</div>
+                    <div class="straight-focus-value" id="playbackCrossFocusAux">--</div>
+                  </div>
+                </div>
+                <div class="straight-focus-detail" id="playbackCrossFocusDetail">等待十字判定数据...</div>
               </div>
               <div class="route-state-judgment" id="playbackRouteStateJudgment">等待回放状态机数据...</div>
               <div class="route-state-grid">
@@ -1343,6 +1393,13 @@
     const straightFocusErrorSum = document.getElementById('straightFocusErrorSum');
     const straightFocusErrorMax = document.getElementById('straightFocusErrorMax');
     const straightFocusDetail = document.getElementById('straightFocusDetail');
+    const crossFocusPanel = document.getElementById('crossFocusPanel');
+    const crossFocusBadge = document.getElementById('crossFocusBadge');
+    const crossFocusLeftRows = document.getElementById('crossFocusLeftRows');
+    const crossFocusRightRows = document.getElementById('crossFocusRightRows');
+    const crossFocusGap = document.getElementById('crossFocusGap');
+    const crossFocusAux = document.getElementById('crossFocusAux');
+    const crossFocusDetail = document.getElementById('crossFocusDetail');
     const routeStateJudgment = document.getElementById('routeStateJudgment');
     const routeNextStateValue = document.getElementById('routeNextStateValue');
     const routeNextReason = document.getElementById('routeNextReason');
@@ -1360,6 +1417,13 @@
     const playbackStraightFocusErrorSum = document.getElementById('playbackStraightFocusErrorSum');
     const playbackStraightFocusErrorMax = document.getElementById('playbackStraightFocusErrorMax');
     const playbackStraightFocusDetail = document.getElementById('playbackStraightFocusDetail');
+    const playbackCrossFocusPanel = document.getElementById('playbackCrossFocusPanel');
+    const playbackCrossFocusBadge = document.getElementById('playbackCrossFocusBadge');
+    const playbackCrossFocusLeftRows = document.getElementById('playbackCrossFocusLeftRows');
+    const playbackCrossFocusRightRows = document.getElementById('playbackCrossFocusRightRows');
+    const playbackCrossFocusGap = document.getElementById('playbackCrossFocusGap');
+    const playbackCrossFocusAux = document.getElementById('playbackCrossFocusAux');
+    const playbackCrossFocusDetail = document.getElementById('playbackCrossFocusDetail');
     const playbackRouteStateJudgment = document.getElementById('playbackRouteStateJudgment');
     const playbackRouteNextStateValue = document.getElementById('playbackRouteNextStateValue');
     const playbackRouteNextReason = document.getElementById('playbackRouteNextReason');
@@ -1649,9 +1713,60 @@
       refs.detail.textContent = reasons.join('；');
     }
 
+    function renderCrossFocusPanel(status, refs) {
+      if (!refs || !refs.panel) return;
+      const leftRows = Number(status && status.cross_left_corner_post_frame_wall_rows);
+      const rightRows = Number(status && status.cross_right_corner_post_frame_wall_rows);
+      const gap = Number(status && status.cross_start_boundary_gap_x);
+      const entryReady = !!(status && status.cross_state_entry_ready_now);
+      const stage2Ready = !!(status && status.cross_state_stage2_ready_now);
+      const exitReady = !!(status && status.cross_state_exit_ready_now);
+      const mainState = Number(status && status.route_main_state);
+      const subState = Number(status && status.route_sub_state);
+      const leftAux = !!(status && status.cross_left_aux_found);
+      const rightAux = !!(status && status.cross_right_aux_found);
+      const leftUpper = !!(status && status.cross_left_upper_corner_found);
+      const rightUpper = !!(status && status.cross_right_upper_corner_found);
+      const leftAuxTraceCount = Number(status && status.cross_left_aux_trace_count);
+      const rightAuxTraceCount = Number(status && status.cross_right_aux_trace_count);
+      const leftAuxRegularCount = Number(status && status.cross_left_aux_regular_count);
+      const rightAuxRegularCount = Number(status && status.cross_right_aux_regular_count);
+      const leftAuxDir5Count = Number(status && status.cross_left_aux_dir5_count);
+      const rightAuxDir5Count = Number(status && status.cross_right_aux_dir5_count);
+      const hasData = Number.isFinite(leftRows) || Number.isFinite(rightRows) || Number.isFinite(gap);
+
+      refs.panel.classList.remove('ready', 'not-ready');
+      refs.panel.classList.add((entryReady || stage2Ready || exitReady || mainState === 4) ? 'ready' : 'not-ready');
+      refs.badge.textContent = !hasData
+        ? '等待数据'
+        : (mainState === 4
+            ? (subState === 2 ? '十字-cross_2 运行中' : '十字-cross_1 运行中')
+            : (entryReady ? '满足十字入口' : '未满足十字入口'));
+      refs.leftRows.textContent = Number.isFinite(leftRows) ? String(leftRows) : '--';
+      refs.rightRows.textContent = Number.isFinite(rightRows) ? String(rightRows) : '--';
+      refs.gap.textContent = Number.isFinite(gap) ? String(gap) : '--';
+      refs.aux.textContent = `L${leftAux ? '1' : '0'} R${rightAux ? '1' : '0'}`;
+
+      if (!hasData) {
+        refs.detail.textContent = '等待十字判定数据...';
+        return;
+      }
+
+      const details = [];
+      details.push(`入口=${entryReady ? '命中' : '未命中'}`);
+      details.push(`cross_1->2=${stage2Ready ? '命中' : '未命中'}`);
+      details.push(`cross_2->normal=${exitReady ? '命中' : '未命中'}`);
+      details.push(`辅助线 L=${leftAux ? '有' : '无'} R=${rightAux ? '有' : '无'}`);
+      details.push(`辅线点数 L=${Number.isFinite(leftAuxTraceCount) ? leftAuxTraceCount : '--'}/${Number.isFinite(leftAuxRegularCount) ? leftAuxRegularCount : '--'} R=${Number.isFinite(rightAuxTraceCount) ? rightAuxTraceCount : '--'}/${Number.isFinite(rightAuxRegularCount) ? rightAuxRegularCount : '--'}`);
+      details.push(`辅线 dir5 L=${Number.isFinite(leftAuxDir5Count) ? leftAuxDir5Count : '--'} R=${Number.isFinite(rightAuxDir5Count) ? rightAuxDir5Count : '--'}`);
+      details.push(`上角点 L=${leftUpper ? '有' : '无'} R=${rightUpper ? '有' : '无'}`);
+      refs.detail.textContent = details.join('；');
+    }
+
     function renderRouteStatePanelWithRefs(status, refs) {
       const route = receiverCore.buildRouteStateSummary(status || {});
       renderStraightFocusPanel(status, refs.straightFocus);
+      renderCrossFocusPanel(status, refs.crossFocus);
       refs.mainStateValue.textContent = route.mainStateLabel || '--';
       refs.subStateValue.textContent = route.subStateLabel || '--';
       refs.preferredSourceValue.textContent = route.preferredSourceLabel || '--';
@@ -1713,6 +1828,15 @@
           errorMax: straightFocusErrorMax,
           detail: straightFocusDetail
         },
+        crossFocus: {
+          panel: crossFocusPanel,
+          badge: crossFocusBadge,
+          leftRows: crossFocusLeftRows,
+          rightRows: crossFocusRightRows,
+          gap: crossFocusGap,
+          aux: crossFocusAux,
+          detail: crossFocusDetail
+        },
         stateJudgment: routeStateJudgment,
         nextStateValue: routeNextStateValue,
         nextReason: routeNextReason,
@@ -1736,6 +1860,15 @@
           errorSum: playbackStraightFocusErrorSum,
           errorMax: playbackStraightFocusErrorMax,
           detail: playbackStraightFocusDetail
+        },
+        crossFocus: {
+          panel: playbackCrossFocusPanel,
+          badge: playbackCrossFocusBadge,
+          leftRows: playbackCrossFocusLeftRows,
+          rightRows: playbackCrossFocusRightRows,
+          gap: playbackCrossFocusGap,
+          aux: playbackCrossFocusAux,
+          detail: playbackCrossFocusDetail
         },
         stateJudgment: playbackRouteStateJudgment,
         nextStateValue: playbackRouteNextStateValue,
@@ -2005,6 +2138,19 @@
       push(cornerRows, 'cross_lower_right_corner_index', status.cross_lower_right_corner_index);
       pushArray(cornerRows, 'cross_lower_left_corner_point', status.cross_lower_left_corner_point);
       pushArray(cornerRows, 'cross_lower_right_corner_point', status.cross_lower_right_corner_point);
+      push(cornerRows, 'cross_left_corner_post_frame_wall_rows', status.cross_left_corner_post_frame_wall_rows);
+      push(cornerRows, 'cross_right_corner_post_frame_wall_rows', status.cross_right_corner_post_frame_wall_rows);
+      push(cornerRows, 'cross_start_boundary_gap_x', status.cross_start_boundary_gap_x);
+      push(cornerRows, 'cross_left_aux_found', status.cross_left_aux_found);
+      push(cornerRows, 'cross_right_aux_found', status.cross_right_aux_found);
+      pushArray(cornerRows, 'cross_left_aux_transition_point', status.cross_left_aux_transition_point);
+      pushArray(cornerRows, 'cross_right_aux_transition_point', status.cross_right_aux_transition_point);
+      push(cornerRows, 'cross_left_upper_corner_found', status.cross_left_upper_corner_found);
+      push(cornerRows, 'cross_right_upper_corner_found', status.cross_right_upper_corner_found);
+      push(cornerRows, 'cross_left_upper_corner_index', status.cross_left_upper_corner_index);
+      push(cornerRows, 'cross_right_upper_corner_index', status.cross_right_upper_corner_index);
+      pushArray(cornerRows, 'cross_left_upper_corner_point', status.cross_left_upper_corner_point);
+      pushArray(cornerRows, 'cross_right_upper_corner_point', status.cross_right_upper_corner_point);
       push(cornerRows, 'left_start_frame_wall_rows', status.left_start_frame_wall_rows);
       push(cornerRows, 'right_start_frame_wall_rows', status.right_start_frame_wall_rows);
       push(cornerRows, 'cross_lower_corner_pre_window', status.cross_lower_corner_pre_window);
@@ -2013,6 +2159,15 @@
       push(cornerRows, 'cross_lower_corner_post_min_votes', status.cross_lower_corner_post_min_votes);
       push(cornerRows, 'cross_lower_corner_transition_max_len', status.cross_lower_corner_transition_max_len);
       push(cornerRows, 'cross_lower_corner_pair_y_diff_max', status.cross_lower_corner_pair_y_diff_max);
+      push(cornerRows, 'route_cross_entry_corner_post_frame_wall_rows_min', status.route_cross_entry_corner_post_frame_wall_rows_min);
+      push(cornerRows, 'route_cross_stage2_enter_start_frame_wall_rows_min', status.route_cross_stage2_enter_start_frame_wall_rows_min);
+      push(cornerRows, 'route_cross_exit_start_gap_x_max', status.route_cross_exit_start_gap_x_max);
+      push(cornerRows, 'cross_aux_vertical_scan_max_rows', status.cross_aux_vertical_scan_max_rows);
+      push(cornerRows, 'cross_aux_trace_max_points', status.cross_aux_trace_max_points);
+      push(cornerRows, 'cross_aux_trace_upward_rows_max', status.cross_aux_trace_upward_rows_max);
+      push(cornerRows, 'cross_upper_dir4_pre_run_len', status.cross_upper_dir4_pre_run_len);
+      push(cornerRows, 'cross_upper_transition_max_len', status.cross_upper_transition_max_len);
+      push(cornerRows, 'cross_upper_dir6_post_run_len', status.cross_upper_dir6_post_run_len);
       addSection('角点与直边', cornerRows);
 
       const arrayRows = [];
@@ -2024,6 +2179,12 @@
       pushCount(arrayRows, 'eight_right_trace_dir', status.eight_right_trace_dir);
       pushCount(arrayRows, 'left_boundary_corner', status.left_boundary_corner);
       pushCount(arrayRows, 'right_boundary_corner', status.right_boundary_corner);
+      pushCount(arrayRows, 'cross_left_aux_trace', status.cross_left_aux_trace);
+      pushCount(arrayRows, 'cross_right_aux_trace', status.cross_right_aux_trace);
+      pushCount(arrayRows, 'cross_left_aux_trace_dir', status.cross_left_aux_trace_dir);
+      pushCount(arrayRows, 'cross_right_aux_trace_dir', status.cross_right_aux_trace_dir);
+      pushCount(arrayRows, 'cross_left_aux_regular', status.cross_left_aux_regular);
+      pushCount(arrayRows, 'cross_right_aux_regular', status.cross_right_aux_regular);
       pushCount(arrayRows, 'ipm_left_boundary', status.ipm_left_boundary);
       pushCount(arrayRows, 'ipm_right_boundary', status.ipm_right_boundary);
       pushCount(arrayRows, 'ipm_left_boundary_corner', status.ipm_left_boundary_corner);
@@ -3453,12 +3614,20 @@
     }
 
     function drawBinaryTraceOverlay(status) {
+      const routeSubState = Number(status && status.route_sub_state);
+      const showCrossAux = routeSubState === 1;
       drawSeries(binaryCtx, status.eight_left_trace || [], '#ff4d4f', 2, 1);
       drawSeries(binaryCtx, status.eight_right_trace || [], '#c084fc', 2, 1);
       drawSeries(binaryCtx, status.left_boundary || [], '#38bdf8', 2, 1);
       drawSeries(binaryCtx, status.right_boundary || [], '#22c55e', 2, 1);
       drawSeries(binaryCtx, status.left_circle_guide_line || [], '#f59e0b', 2, 1);
       drawSeries(binaryCtx, status.right_circle_guide_line || [], '#f97316', 2, 1);
+      if (showCrossAux) {
+        drawSeries(binaryCtx, status.cross_left_aux_trace || [], '#e11d48', 2, 1);
+        drawSeries(binaryCtx, status.cross_right_aux_trace || [], '#14b8a6', 2, 1);
+        drawSeries(binaryCtx, status.cross_left_aux_regular || [], '#fb7185', 2, 1);
+        drawSeries(binaryCtx, status.cross_right_aux_regular || [], '#2dd4bf', 2, 1);
+      }
 
       const leftTouch = getTraceTouchPoint(status.eight_left_trace, status.eight_left_first_frame_touch_index, status.eight_left_first_frame_touch_point);
       const rightTouch = getTraceTouchPoint(status.eight_right_trace, status.eight_right_first_frame_touch_index, status.eight_right_first_frame_touch_point);
@@ -3466,6 +3635,12 @@
       drawPointSet(binaryCtx, rightTouch ? [rightTouch] : [], '#facc15', 3);
       drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_left_corner_point, 'L下角', status.cross_lower_corner_pair_valid);
       drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_right_corner_point, 'R下角', status.cross_lower_corner_pair_valid);
+      if (showCrossAux) {
+        drawCrossLowerCornerPoint(binaryCtx, status.cross_left_aux_transition_point, 'L辅起', status.cross_left_aux_found);
+        drawCrossLowerCornerPoint(binaryCtx, status.cross_right_aux_transition_point, 'R辅起', status.cross_right_aux_found);
+      }
+      drawCrossLowerCornerPoint(binaryCtx, status.cross_left_upper_corner_point, 'L上角', status.cross_left_upper_corner_found);
+      drawCrossLowerCornerPoint(binaryCtx, status.cross_right_upper_corner_point, 'R上角', status.cross_right_upper_corner_found);
       drawBoundaryStraightLabel(binaryCtx, isActiveFlag(status.left_boundary_straight), 'L直边', 6, 14, 'left');
       drawBoundaryStraightLabel(binaryCtx, isActiveFlag(status.right_boundary_straight), 'R直边', binaryCanvas.width - 6, 14, 'right');
     }
@@ -3537,34 +3712,46 @@
     }
 
     function binaryTraceHoverText(status, x, y) {
-      const left = Array.isArray(status.eight_left_trace) ? status.eight_left_trace : [];
-      const right = Array.isArray(status.eight_right_trace) ? status.eight_right_trace : [];
-      const leftHit = findNearestBoundaryPoint(left, x, y, 2.5);
-      const rightHit = findNearestBoundaryPoint(right, x, y, 2.5);
-      let hit = null;
-      let sideLabel = '';
-      let dirs = [];
-      if (leftHit && rightHit) {
-        if (leftHit.distSq <= rightHit.distSq) {
-          hit = leftHit;
-          sideLabel = 'L';
-          dirs = Array.isArray(status.eight_left_trace_dir) ? status.eight_left_trace_dir : [];
-        } else {
-          hit = rightHit;
-          sideLabel = 'R';
-          dirs = Array.isArray(status.eight_right_trace_dir) ? status.eight_right_trace_dir : [];
-        }
-      } else if (leftHit) {
-        hit = leftHit;
-        sideLabel = 'L';
-        dirs = Array.isArray(status.eight_left_trace_dir) ? status.eight_left_trace_dir : [];
-      } else if (rightHit) {
-        hit = rightHit;
-        sideLabel = 'R';
-        dirs = Array.isArray(status.eight_right_trace_dir) ? status.eight_right_trace_dir : [];
+      const routeSubState = Number(status && status.route_sub_state);
+      const showCrossAux = routeSubState === 1;
+      const candidates = [
+        {
+          label: '原始巡线:L',
+          points: Array.isArray(status.eight_left_trace) ? status.eight_left_trace : [],
+          dirs: Array.isArray(status.eight_left_trace_dir) ? status.eight_left_trace_dir : []
+        },
+        {
+          label: '原始巡线:R',
+          points: Array.isArray(status.eight_right_trace) ? status.eight_right_trace : [],
+          dirs: Array.isArray(status.eight_right_trace_dir) ? status.eight_right_trace_dir : []
+        },
+      ];
+      if (showCrossAux) {
+        candidates.push(
+          {
+            label: '辅助线:L',
+            points: Array.isArray(status.cross_left_aux_trace) ? status.cross_left_aux_trace : [],
+            dirs: Array.isArray(status.cross_left_aux_trace_dir) ? status.cross_left_aux_trace_dir : []
+          },
+          {
+            label: '辅助线:R',
+            points: Array.isArray(status.cross_right_aux_trace) ? status.cross_right_aux_trace : [],
+            dirs: Array.isArray(status.cross_right_aux_trace_dir) ? status.cross_right_aux_trace_dir : []
+          }
+        );
       }
-      if (!hit) return '';
-      return ` | 原始巡线:${sideLabel} idx:${hit.index} dir:${formatTraceDir(dirs[hit.index])}`;
+
+      let best = null;
+      for (const item of candidates) {
+        const hit = findNearestBoundaryPoint(item.points, x, y, 2.5);
+        if (!hit) continue;
+        if (!best || hit.distSq < best.hit.distSq) {
+          best = { hit, item };
+        }
+      }
+
+      if (!best) return '';
+      return ` | ${best.item.label} idx:${best.hit.index} dir:${formatTraceDir(best.item.dirs[best.hit.index])}`;
     }
 
     function pixelTextFromCanvas(activeCanvas, activeCtx, x, y) {

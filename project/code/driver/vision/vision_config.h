@@ -272,6 +272,14 @@ typedef struct
     bool keep_last_centerline_on_double_loss;
     // 状态机十字识别开关：true=允许进入十字状态，false=禁用十字识别。
     bool route_cross_detection_enabled;
+    // normal / straight 进入 cross 的条件：
+    // 双侧角点后沿边框连续行数都必须 >= 该值。
+    int route_cross_entry_corner_post_frame_wall_rows_min;
+    // cross_1 -> cross_2 的“起始行已经贴边”阈值。
+    // 当前设计里 1 表示起始行一旦用到边框边界就触发。
+    int route_cross_stage2_enter_start_frame_wall_rows_min;
+    // cross_2 -> normal 的起始左右边界 x 差最大阈值（px）。
+    int route_cross_exit_start_gap_x_max;
     // 状态机圆环识别开关：true=允许进入圆环状态，false=禁用圆环识别。
     bool route_circle_detection_enabled;
     // 圆环入口判定：对侧边界最少点数，同时角点索引需距离边界尾部至少保留该余量。
@@ -300,6 +308,18 @@ typedef struct
     int route_straight_enter_consecutive_frames;
     // straight 判定：从 0 到“当前误差计算最后索引”范围内的绝对误差和上限。
     float route_straight_abs_error_sum_max;
+    // cross_1：从下角点沿同一 x 向上找“白->黑”转变时，最多向上扫描多少行。
+    int cross_aux_vertical_scan_max_rows;
+    // cross_1：辅助边界八邻域巡线最大点数。
+    int cross_aux_trace_max_points;
+    // cross_1：辅助边界最多向上延伸多少行。
+    int cross_aux_trace_upward_rows_max;
+    // cross_2：4->6 跳变中，前平台连续 dir=4 的最少点数。
+    int cross_upper_dir4_pre_run_len;
+    // cross_2：4->6 跳变中，允许的过渡区最大长度。
+    int cross_upper_transition_max_len;
+    // cross_2：4->6 跳变中，后平台连续 dir=6 的最少点数。
+    int cross_upper_dir6_post_run_len;
 
     // ==================== 参数区域 2: 偏差计算 ====================
     // 包括 line_error 取点策略与索引范围约束参数。
