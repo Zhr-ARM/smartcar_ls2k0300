@@ -211,7 +211,7 @@ inline constexpr Profile make_straight_profile()
 {
     Profile profile = kNormalProfile;
 
-    profile.base_speed = 500.0f; // NORMAL 档基础速度：非直道加速阶段默认按 300 count/5ms 行驶。
+    profile.base_speed = 450.0f; // NORMAL 档基础速度：非直道加速阶段默认按 300 count/5ms 行驶。
     profile.straight_full_speed_error_threshold_px = 0.0f; // NORMAL 档直道满速阈值：整条路径均值误差小于 1px 才允许直通满速。
 
     profile.position_dynamic_kp_quad_a = 0.0; // NORMAL 档位置环动态Kp一次项：误差越大，Kp 按线性速度增长。
@@ -258,7 +258,7 @@ static_assert(is_preview_slowdown_range_valid(kStraightProfile), "kStraightProfi
 inline constexpr Profile make_cross_profile()
 {
     Profile profile = kNormalProfile;
-    profile.base_speed = 350.0f; // NORMAL 档基础速度：非直道加速阶段默认按 300 count/5ms 行驶。
+    profile.base_speed = 320.0f; // NORMAL 档基础速度：非直道加速阶段默认按 300 count/5ms 行驶。
     profile.straight_full_speed_error_threshold_px = 0.0f; // NORMAL 档直道满速阈值：整条路径均值误差小于 1px 才允许直通满速。
 
     profile.position_dynamic_kp_quad_a = 4.4f; // NORMAL 档位置环动态Kp一次项：误差越大，Kp 按线性速度增长。

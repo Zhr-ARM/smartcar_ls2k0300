@@ -179,6 +179,22 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
                         VISION_ROUTE_SUB_CROSS_1,
                         input->base_preferred_source);
         }
+        else if (g_vision_runtime_config.route_circle_detection_enabled &&
+                 left_circle_entry_ready(input))
+        {
+            g_straight_ready_consecutive_count = 0;
+            enter_state(VISION_ROUTE_MAIN_CIRCLE_LEFT,
+                        VISION_ROUTE_SUB_CIRCLE_LEFT_1,
+                        VISION_ROUTE_PREFERRED_SOURCE_RIGHT);
+        }
+        else if (g_vision_runtime_config.route_circle_detection_enabled &&
+                 right_circle_entry_ready(input))
+        {
+            g_straight_ready_consecutive_count = 0;
+            enter_state(VISION_ROUTE_MAIN_CIRCLE_RIGHT,
+                        VISION_ROUTE_SUB_CIRCLE_RIGHT_1,
+                        VISION_ROUTE_PREFERRED_SOURCE_LEFT);
+        }
         else if (straight_state_ready(input))
         {
             g_straight_ready_consecutive_count += 1;
@@ -193,21 +209,6 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
         else
         {
             g_straight_ready_consecutive_count = 0;
-            if (g_vision_runtime_config.route_circle_detection_enabled)
-            {
-                if (left_circle_entry_ready(input))
-                {
-                    enter_state(VISION_ROUTE_MAIN_CIRCLE_LEFT,
-                                VISION_ROUTE_SUB_CIRCLE_LEFT_1,
-                                VISION_ROUTE_PREFERRED_SOURCE_RIGHT);
-                }
-                else if (right_circle_entry_ready(input))
-                {
-                    enter_state(VISION_ROUTE_MAIN_CIRCLE_RIGHT,
-                                VISION_ROUTE_SUB_CIRCLE_RIGHT_1,
-                                VISION_ROUTE_PREFERRED_SOURCE_LEFT);
-                }
-            }
         }
         break;
     case VISION_ROUTE_MAIN_STRAIGHT:
@@ -217,6 +218,20 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
             enter_state(VISION_ROUTE_MAIN_CROSS,
                         VISION_ROUTE_SUB_CROSS_1,
                         input->base_preferred_source);
+        }
+        else if (g_vision_runtime_config.route_circle_detection_enabled &&
+                 left_circle_entry_ready(input))
+        {
+            enter_state(VISION_ROUTE_MAIN_CIRCLE_LEFT,
+                        VISION_ROUTE_SUB_CIRCLE_LEFT_1,
+                        VISION_ROUTE_PREFERRED_SOURCE_RIGHT);
+        }
+        else if (g_vision_runtime_config.route_circle_detection_enabled &&
+                 right_circle_entry_ready(input))
+        {
+            enter_state(VISION_ROUTE_MAIN_CIRCLE_RIGHT,
+                        VISION_ROUTE_SUB_CIRCLE_RIGHT_1,
+                        VISION_ROUTE_PREFERRED_SOURCE_LEFT);
         }
         else if (!straight_state_ready(input))
         {
