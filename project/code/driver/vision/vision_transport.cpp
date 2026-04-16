@@ -29,8 +29,6 @@ namespace
 // ---------- client sender ----------
 static constexpr uint32 kClientDefaultMaxFps = 30;
 static constexpr uint32 kClientMaxFpsUpper = 240;
-// RGB565 临时缓存：仅在 VISION_SEND_RGB565 模式使用。
-static std::vector<uint8> g_image_rgb565_frame(VISION_DOWNSAMPLED_WIDTH * VISION_DOWNSAMPLED_HEIGHT * 2);
 // 客户端发送模式与开关。
 static std::atomic<int> g_send_mode(VISION_SEND_BINARY);
 static std::atomic<bool> g_send_enabled(true);
@@ -283,44 +281,7 @@ static vision_send_mode_enum vision_sender_sanitize_mode(vision_send_mode_enum m
     {
         return VISION_SEND_BINARY;
     }
-    if (mode == VISION_SEND_RGB565)
-    {
-        return VISION_SEND_RGB565;
-    }
     return VISION_SEND_GRAY;
-}
-
-// 作用：BGR 转 RGB565（大端）用于助手发送。
-static void convert_bgr_to_rgb565_be(const uint8 *bgr_data, uint8 *rgb565_data, int width, int height)
-{
-    if (bgr_data == nullptr || rgb565_data == nullptr || width <= 0 || height <= 0)
-    {
-        return;
-    }
-    const int pixel_num = width * height;
-    for (int i = 0; i < pixel_num; ++i)
-    {
-        uint8 b = bgr_data[i * 3 + 0];
-        uint8 g = bgr_data[i * 3 + 1];
-        uint8 r = bgr_data[i * 3 + 2];
-        uint16 v = static_cast<uint16>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
-        rgb565_data[i * 2 + 0] = static_cast<uint8>(v >> 8);
-        rgb565_data[i * 2 + 1] = static_cast<uint8>(v & 0xFF);
-    }
-}
-
-// 作用：更新 RGB565 缓冲。
-static void update_rgb565_from_bgr_source(const uint8 *bgr_data)
-{
-    if (bgr_data == nullptr)
-    {
-        std::memset(g_image_rgb565_frame.data(), 0, g_image_rgb565_frame.size());
-        return;
-    }
-    convert_bgr_to_rgb565_be(bgr_data,
-                             g_image_rgb565_frame.data(),
-                             VISION_DOWNSAMPLED_WIDTH,
-                             VISION_DOWNSAMPLED_HEIGHT);
 }
 
 static bool mode_enable_boundary_packet(vision_send_mode_enum mode)
@@ -342,12 +303,6 @@ static void config_camera_send_packet(vision_send_mode_enum mode)
 
     switch (mode)
     {
-        case VISION_SEND_RGB565:
-            seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_RGB565,
-                                                         g_image_rgb565_frame.data(),
-                                                         VISION_DOWNSAMPLED_WIDTH,
-                                                         VISION_DOWNSAMPLED_HEIGHT);
-            break;
         case VISION_SEND_BINARY:
             seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_GRAY,
                                                          const_cast<uint8 *>(vision_image_processor_binary_downsampled_u8_image()),
@@ -831,6 +786,8 @@ static void send_tcp_status()
     uint16 ipm_right_dot_num = 0;
     vision_image_processor_get_ipm_boundaries(&ipm_x1, nullptr, &ipm_x3, &ipm_y1, nullptr, &ipm_y3, &ipm_dot_num);
     vision_image_processor_get_ipm_boundary_side_counts(&ipm_left_dot_num, &ipm_right_dot_num);
+    // IPM 角点支路已关闭，网页端不再采集这些调试字段。
+#if 0
     uint16 *src_corner_left_x = nullptr;
     uint16 *src_corner_left_y = nullptr;
     uint16 src_corner_left_num = 0;
@@ -889,6 +846,7 @@ static void send_tcp_status()
                                                          &ipm_right_corner_state_y);
     vision_image_processor_get_ipm_boundary_corner_indices(&ipm_left_corner_index, &ipm_right_corner_index);
     vision_image_processor_get_ipm_boundary_straight_state(&ipm_left_boundary_straight, &ipm_right_boundary_straight);
+#endif
     uint16 *ipm_center_left_x = nullptr;
     uint16 *ipm_center_left_y = nullptr;
     uint16 ipm_center_left_num = 0;
@@ -905,15 +863,15 @@ static void send_tcp_status()
     uint16 *src_center_right_y = nullptr;
     uint16 src_center_right_num = 0;
     vision_image_processor_get_src_shifted_centerline_from_right(&src_center_right_x, &src_center_right_y, &src_center_right_num);
-    const float *selected_ipm_curvature = nullptr;
-    int selected_ipm_curvature_count = 0;
-    vision_image_processor_get_ipm_selected_centerline_curvature(&selected_ipm_curvature, &selected_ipm_curvature_count);
+    // IPM 角点支路已关闭，网页端不再采集 angle cos 调试数组。
+#if 0
     const float *left_ipm_boundary_angle_cos = nullptr;
     int left_ipm_boundary_angle_cos_count = 0;
     vision_image_processor_get_ipm_left_boundary_angle_cos(&left_ipm_boundary_angle_cos, &left_ipm_boundary_angle_cos_count);
     const float *right_ipm_boundary_angle_cos = nullptr;
     int right_ipm_boundary_angle_cos_count = 0;
     vision_image_processor_get_ipm_right_boundary_angle_cos(&right_ipm_boundary_angle_cos, &right_ipm_boundary_angle_cos_count);
+#endif
     bool ipm_track_valid = false;
     int ipm_track_index = -1;
     int ipm_track_x = 0;
@@ -927,20 +885,8 @@ static void send_tcp_status()
     uint16 maze_right_points_raw = 0;
     bool maze_left_ok = false;
     bool maze_right_ok = false;
-    bool ipm_weighted_decision_valid = false;
-    int ipm_weighted_decision_x = 0;
-    int ipm_weighted_decision_y = 0;
-    bool src_weighted_decision_valid = false;
-    int src_weighted_decision_x = 0;
-    int src_weighted_decision_y = 0;
     ipm_track_index = vision_image_processor_ipm_line_error_track_index();
     vision_image_processor_get_ipm_line_error_track_point(&ipm_track_valid, &ipm_track_x, &ipm_track_y);
-    vision_image_processor_get_ipm_weighted_decision_point(&ipm_weighted_decision_valid,
-                                                           &ipm_weighted_decision_x,
-                                                           &ipm_weighted_decision_y);
-    vision_image_processor_get_src_weighted_decision_point(&src_weighted_decision_valid,
-                                                           &src_weighted_decision_x,
-                                                           &src_weighted_decision_y);
     vision_image_processor_get_last_maze_detail_us(&maze_setup_us,
                                                    &maze_start_us,
                                                    &maze_trace_left_us,
@@ -1360,13 +1306,6 @@ static void send_tcp_status()
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_index, "ipm_track_index", ipm_track_index);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_track_point, "ipm_track_point",
                      {ipm_track_x, ipm_track_y});
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_first_point_error, "ipm_weighted_first_point_error",
-               vision_image_processor_ipm_weighted_first_point_error());
-    append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_weighted_decision_point && ipm_weighted_decision_valid, "ipm_weighted_decision_point",
-                     {ipm_weighted_decision_x, ipm_weighted_decision_y});
-    append_int_array(g_vision_runtime_config.udp_web_tcp_send_src_weighted_decision_point && src_weighted_decision_valid, "src_weighted_decision_point",
-                     {src_weighted_decision_x, src_weighted_decision_y});
-
     auto append_points = [&append_key, &line](bool enabled, const char *name, uint16 *xs, uint16 *ys, uint16 n, int max_w, int max_h) {
         if (!enabled)
         {
@@ -1393,7 +1332,7 @@ static void send_tcp_status()
         line += "]";
     };
 
-    auto append_float_array = [&append_key, &line](bool enabled, const char *name, const float *values, uint16 n) {
+    [[maybe_unused]] auto append_float_array = [&append_key, &line](bool enabled, const char *name, const float *values, uint16 n) {
         if (!enabled)
         {
             return;
@@ -1543,6 +1482,8 @@ static void send_tcp_status()
     append_int(true, "cross_right_upper_corner_index", cross_right_upper_index);
     append_int_array(cross_left_upper_found, "cross_left_upper_corner_point", {cross_left_upper_x, cross_left_upper_y});
     append_int_array(cross_right_upper_found, "cross_right_upper_corner_point", {cross_right_upper_x, cross_right_upper_y});
+    // IPM 角点支路已关闭，网页端不再发送边界角点/直边调试字段。
+#if 0
     append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
                   "left_boundary_corner", src_corner_left_x, src_corner_left_y, src_corner_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
     append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
@@ -1555,10 +1496,13 @@ static void send_tcp_status()
                      {src_left_corner_state_x, src_left_corner_state_y});
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_right_boundary && src_right_corner_found, "right_boundary_corner_point",
                      {src_right_corner_state_x, src_right_corner_state_y});
+#endif
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary,
                   "ipm_left_boundary", ipm_x1, ipm_y1, ipm_left_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary,
                   "ipm_right_boundary", ipm_x3, ipm_y3, ipm_right_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
+    // IPM 角点支路已关闭，网页端不再发送 IPM 角点/直边调试字段。
+#if 0
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary,
                   "ipm_left_boundary_corner", ipm_corner_left_x, ipm_corner_left_y, ipm_corner_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary,
@@ -1573,6 +1517,7 @@ static void send_tcp_status()
                      {ipm_left_corner_state_x, ipm_left_corner_state_y});
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary && ipm_right_corner_found, "ipm_right_boundary_corner_point",
                      {ipm_right_corner_state_x, ipm_right_corner_state_y});
+#endif
 
     const bool selected_is_right =
         (vision_image_processor_ipm_line_error_source() == VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT);
@@ -1608,10 +1553,8 @@ static void send_tcp_status()
     append_int(g_vision_runtime_config.udp_web_tcp_send_src_centerline_selected_count,
                "src_centerline_selected_count",
                selected_src_center_num);
-    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
-                       "ipm_centerline_selected_curvature",
-                       selected_ipm_curvature,
-                       static_cast<uint16>(std::clamp(selected_ipm_curvature_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
+    // IPM 角点支路已关闭，网页端不再发送 angle cos 调试数组。
+#if 0
     append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
                        "ipm_left_boundary_angle_cos",
                        left_ipm_boundary_angle_cos,
@@ -1620,6 +1563,7 @@ static void send_tcp_status()
                        "ipm_right_boundary_angle_cos",
                        right_ipm_boundary_angle_cos,
                        static_cast<uint16>(std::clamp(right_ipm_boundary_angle_cos_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
+#endif
 
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_gray_size, "gray_size",
                      {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
@@ -1671,10 +1615,6 @@ void vision_transport_send_step()
             config_camera_send_packet(mode);
         }
         refresh_camera_boundary_packet(mode);
-        if (mode == VISION_SEND_RGB565)
-        {
-            update_rgb565_from_bgr_source(vision_image_processor_bgr_downsampled_image());
-        }
         seekfree_assistant_camera_send();
         auto t1 = std::chrono::steady_clock::now();
         g_last_send_tick_us.store(static_cast<uint64>(

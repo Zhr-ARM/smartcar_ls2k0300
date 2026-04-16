@@ -752,19 +752,16 @@
     #grayCard { grid-column: span 4; order: 3; }
     #binaryCard { grid-column: span 4; order: 4; }
     #rgbCard { grid-column: span 4; order: 5; }
-    #ipmCard, #ipmRawCard, #curvatureCard { grid-column: span 4; }
+    #ipmCard, #ipmRawCard { grid-column: span 4; }
     #ipmCard { order: 6; }
     #ipmRawCard { order: 7; }
-    #curvatureCard { order: 8; }
-    #leftBoundaryAngleCosCard, #rightBoundaryAngleCosCard, #leftTraceDirCard, #rightTraceDirCard { grid-column: span 6; }
-    #leftBoundaryAngleCosCard { order: 9; }
-    #rightBoundaryAngleCosCard { order: 10; }
-    #leftTraceDirCard { order: 11; }
-    #rightTraceDirCard { order: 12; }
+    #leftTraceDirCard, #rightTraceDirCard { grid-column: span 6; }
+    #leftTraceDirCard { order: 8; }
+    #rightTraceDirCard { order: 9; }
     #leftTraceDirZoomCard, #rightTraceDirZoomCard { grid-column: span 6; }
-    #leftTraceDirZoomCard { order: 13; }
-    #rightTraceDirZoomCard { order: 14; }
-    #pidStatusCard { grid-column: span 12; order: 15; }
+    #leftTraceDirZoomCard { order: 10; }
+    #rightTraceDirZoomCard { order: 11; }
+    #pidStatusCard { grid-column: span 12; order: 12; }
     #statusCard { grid-column: span 12; order: 20; }
     #statusCard pre { max-height: 520px; }
     @media (max-width: 1400px) {
@@ -778,9 +775,6 @@
       #routeStateCard,
       #ipmCard,
       #ipmRawCard,
-      #curvatureCard,
-      #leftBoundaryAngleCosCard,
-      #rightBoundaryAngleCosCard,
       #leftTraceDirCard,
       #rightTraceDirCard,
       #leftTraceDirZoomCard,
@@ -821,9 +815,6 @@
       #statusCard,
       #ipmCard,
       #ipmRawCard,
-      #curvatureCard,
-      #leftBoundaryAngleCosCard,
-      #rightBoundaryAngleCosCard,
       #leftTraceDirCard,
       #rightTraceDirCard,
       #leftTraceDirZoomCard,
@@ -910,12 +901,8 @@
             <label><input type="checkbox" id="toggleMeanCenterline" /> 灰度图显示左右均值中线</label>
             <label><input type="checkbox" id="toggleIpmAnchorDot" checked /> 透视图显示锚点圆</label>
             <label><input type="checkbox" id="toggleBoundaryPointMode" checked /> 边界/中线按采样点显示</label>
-            <label><input type="checkbox" id="toggleCenterlineCurvatureChart" checked /> 显示中线曲率图</label>
-            <label><input type="checkbox" id="toggleBoundaryAngleCosCharts" checked /> 显示边界角点 cos 图</label>
             <label><input type="checkbox" id="toggleTraceDirCharts" checked /> 显示八邻域 dir 图</label>
             <label><input type="checkbox" id="toggleLocalCompute" /> 启用本地复算补数</label>
-            <label>曲率Y最小 <input id="curvatureYMinInput" type="number" step="0.01" value="-0.3" style="width: 72px;" /></label>
-            <label>曲率Y最大 <input id="curvatureYMaxInput" type="number" step="0.01" value="0.3" style="width: 72px;" /></label>
           </div>
         </div>
       </div>
@@ -1085,24 +1072,6 @@
         </div>
         <div class="route-state-clues" id="routeStateClues"></div>
         <div class="route-state-counters" id="routeStateCounters"></div>
-      </div>
-      <div class="card" id="curvatureCard">
-        <div class="title">中线曲率图（横轴=索引，纵轴=曲率）</div>
-        <div class="view">
-          <canvas id="curvatureCanvas" width="480" height="220"></canvas>
-        </div>
-      </div>
-      <div class="card" id="leftBoundaryAngleCosCard">
-        <div class="title">左边界 cos 图（横轴=索引，纵轴=cos）</div>
-        <div class="view">
-          <canvas id="leftBoundaryAngleCosCanvas" width="480" height="220"></canvas>
-        </div>
-      </div>
-      <div class="card" id="rightBoundaryAngleCosCard">
-        <div class="title">右边界 cos 图（横轴=索引，纵轴=cos）</div>
-        <div class="view">
-          <canvas id="rightBoundaryAngleCosCanvas" width="480" height="220"></canvas>
-        </div>
       </div>
       <div class="card" id="leftTraceDirCard">
         <div class="title">左八邻域 dir 图（横轴=索引，纵轴=dir）</div>
@@ -1321,12 +1290,6 @@
     const ipmCtx = ipmCanvas.getContext('2d');
     const ipmRawCanvas = document.getElementById('ipmRawCanvas');
     const ipmRawCtx = ipmRawCanvas.getContext('2d');
-    const curvatureCanvas = document.getElementById('curvatureCanvas');
-    const curvatureCtx = curvatureCanvas.getContext('2d');
-    const leftBoundaryAngleCosCanvas = document.getElementById('leftBoundaryAngleCosCanvas');
-    const leftBoundaryAngleCosCtx = leftBoundaryAngleCosCanvas.getContext('2d');
-    const rightBoundaryAngleCosCanvas = document.getElementById('rightBoundaryAngleCosCanvas');
-    const rightBoundaryAngleCosCtx = rightBoundaryAngleCosCanvas.getContext('2d');
     const leftTraceDirCanvas = document.getElementById('leftTraceDirCanvas');
     const leftTraceDirCtx = leftTraceDirCanvas.getContext('2d');
     const rightTraceDirCanvas = document.getElementById('rightTraceDirCanvas');
@@ -1433,9 +1396,6 @@
     const playbackPidCommonList = document.getElementById('playbackPidCommonList');
     const playbackPidLeftList = document.getElementById('playbackPidLeftList');
     const playbackPidRightList = document.getElementById('playbackPidRightList');
-    const curvatureCard = document.getElementById('curvatureCard');
-    const leftBoundaryAngleCosCard = document.getElementById('leftBoundaryAngleCosCard');
-    const rightBoundaryAngleCosCard = document.getElementById('rightBoundaryAngleCosCard');
     const leftTraceDirCard = document.getElementById('leftTraceDirCard');
     const rightTraceDirCard = document.getElementById('rightTraceDirCard');
     const leftTraceDirZoomCard = document.getElementById('leftTraceDirZoomCard');
@@ -1459,12 +1419,8 @@
     const toggleGrayBoundaries = document.getElementById('toggleGrayBoundaries');
     const toggleIpmAnchorDot = document.getElementById('toggleIpmAnchorDot');
     const toggleBoundaryPointMode = document.getElementById('toggleBoundaryPointMode');
-    const toggleCenterlineCurvatureChart = document.getElementById('toggleCenterlineCurvatureChart');
-    const toggleBoundaryAngleCosCharts = document.getElementById('toggleBoundaryAngleCosCharts');
     const toggleTraceDirCharts = document.getElementById('toggleTraceDirCharts');
     const toggleLocalCompute = document.getElementById('toggleLocalCompute');
-    const curvatureYMinInput = document.getElementById('curvatureYMinInput');
-    const curvatureYMaxInput = document.getElementById('curvatureYMaxInput');
     const ipmCenterlineSourceLabel = document.getElementById('ipmCenterlineSourceLabel');
     const rgbImg = new Image();
     const grayImg = new Image();
@@ -1479,16 +1435,12 @@
     let showMeanCenterline = false;
     let showIpmAnchorDot = true;
     let boundaryPointMode = true;
-    let showCenterlineCurvatureChart = true;
-    let showBoundaryAngleCosCharts = true;
     let showTraceDirCharts = true;
     let recordingState = null;
     let lastRecording = null;
     let paramPanelOpen = false;
     let savedPanelOpen = false;
     let isSyncingPlayback = false;
-    let curvatureYMin = -0.3;
-    let curvatureYMax = 0.3;
     let playbackVideoEntries = [];
     let playbackPrimaryKey = '';
     let fullDebugModeActive = true;
@@ -1546,9 +1498,6 @@
       receiverCore.setElementVisible(routeStateCard, true);
       receiverCore.setElementVisible(ipmCard, active);
       receiverCore.setElementVisible(ipmRawCard, active);
-      receiverCore.setElementVisible(curvatureCard, active && toggleCenterlineCurvatureChart.checked);
-      receiverCore.setElementVisible(leftBoundaryAngleCosCard, active && toggleBoundaryAngleCosCharts.checked);
-      receiverCore.setElementVisible(rightBoundaryAngleCosCard, active && toggleBoundaryAngleCosCharts.checked);
       receiverCore.setElementVisible(leftTraceDirCard, active && toggleTraceDirCharts.checked);
       receiverCore.setElementVisible(rightTraceDirCard, active && toggleTraceDirCharts.checked);
       receiverCore.setElementVisible(leftTraceDirZoomCard, active && toggleTraceDirCharts.checked);
@@ -1567,17 +1516,10 @@
       merged.ipm_size = Array.isArray(merged.ipm_size) ? merged.ipm_size : [280, 140];
       merged.left_boundary = Array.isArray(payload.leftBoundary) ? payload.leftBoundary : (merged.left_boundary || []);
       merged.right_boundary = Array.isArray(payload.rightBoundary) ? payload.rightBoundary : (merged.right_boundary || []);
-      merged.left_boundary_corner = Array.isArray(payload.leftBoundaryCorner) ? payload.leftBoundaryCorner : (merged.left_boundary_corner || []);
-      merged.right_boundary_corner = Array.isArray(payload.rightBoundaryCorner) ? payload.rightBoundaryCorner : (merged.right_boundary_corner || []);
       merged.ipm_left_boundary = Array.isArray(payload.ipmLeftBoundary) ? payload.ipmLeftBoundary : (merged.ipm_left_boundary || []);
       merged.ipm_right_boundary = Array.isArray(payload.ipmRightBoundary) ? payload.ipmRightBoundary : (merged.ipm_right_boundary || []);
-      merged.ipm_left_boundary_corner = Array.isArray(payload.ipmLeftBoundaryCorner) ? payload.ipmLeftBoundaryCorner : (merged.ipm_left_boundary_corner || []);
-      merged.ipm_right_boundary_corner = Array.isArray(payload.ipmRightBoundaryCorner) ? payload.ipmRightBoundaryCorner : (merged.ipm_right_boundary_corner || []);
       merged.src_centerline_selected_shift = Array.isArray(payload.centerline) ? payload.centerline : (merged.src_centerline_selected_shift || []);
       merged.ipm_centerline_selected_shift = Array.isArray(payload.ipmCenterline) ? payload.ipmCenterline : (merged.ipm_centerline_selected_shift || []);
-      merged.ipm_centerline_selected_curvature = Array.isArray(payload.centerlineCurvature) ? payload.centerlineCurvature : (merged.ipm_centerline_selected_curvature || []);
-      merged.ipm_left_boundary_angle_cos = Array.isArray(payload.leftBoundaryAngleCos) ? payload.leftBoundaryAngleCos : (merged.ipm_left_boundary_angle_cos || []);
-      merged.ipm_right_boundary_angle_cos = Array.isArray(payload.rightBoundaryAngleCos) ? payload.rightBoundaryAngleCos : (merged.ipm_right_boundary_angle_cos || []);
       merged.ipm_track_valid = !!payload.ipm_track_valid;
       merged.ipm_track_index = Number(payload.ipm_track_index);
       merged.ipm_track_point = Array.isArray(payload.ipm_track_point) ? payload.ipm_track_point : (merged.ipm_track_point || []);
@@ -1642,21 +1584,6 @@
         mid.push([Math.round((lx + rx) * 0.5), Math.round((ly + ry) * 0.5)]);
       }
       return mid;
-    }
-
-    function getSelectedCurvature(status) {
-      if (Array.isArray(status.ipm_centerline_selected_curvature)) return status.ipm_centerline_selected_curvature;
-      return [];
-    }
-
-    function getLeftBoundaryAngleCos(status) {
-      if (Array.isArray(status.ipm_left_boundary_angle_cos)) return status.ipm_left_boundary_angle_cos;
-      return [];
-    }
-
-    function getRightBoundaryAngleCos(status) {
-      if (Array.isArray(status.ipm_right_boundary_angle_cos)) return status.ipm_right_boundary_angle_cos;
-      return [];
     }
 
     function getTraceDirSeries(status, key) {
@@ -1998,27 +1925,11 @@
       renderStatusPanels(renderStatus);
       renderPidStatusPanel(renderStatus);
       drawIpmBoundaries(renderStatus);
-      drawCurvatureChart(renderStatus);
-      drawBoundaryAngleCosCharts(renderStatus);
       drawTraceDirCharts(renderStatus);
     };
 
     function setCardVisible(el, visible) {
       receiverCore.setElementVisible(el, visible);
-    }
-
-    function applyCurvatureYRangeFromInput() {
-      const minVal = Number(curvatureYMinInput.value);
-      const maxVal = Number(curvatureYMaxInput.value);
-      if (!Number.isFinite(minVal) || !Number.isFinite(maxVal) || minVal >= maxVal) {
-        curvatureYMinInput.value = String(curvatureYMin);
-        curvatureYMaxInput.value = String(curvatureYMax);
-        return;
-      }
-      curvatureYMin = minVal;
-      curvatureYMax = maxVal;
-      drawCurvatureChart(latestStatus || {});
-      drawBoundaryAngleCosCharts(latestStatus || {});
     }
 
     function formatStatusForPanel(status) {
@@ -2107,9 +2018,6 @@
       }
       push(trackRows, 'ipm_track_index', status.ipm_track_index);
       pushArray(trackRows, 'ipm_track_point', status.ipm_track_point);
-      push(trackRows, 'ipm_weighted_decision_point_error', status.ipm_weighted_first_point_error);
-      pushArray(trackRows, 'ipm_weighted_decision_point', status.ipm_weighted_decision_point);
-      pushArray(trackRows, 'src_weighted_decision_point', status.src_weighted_decision_point);
       push(trackRows, 'eight_left_first_frame_touch_index', status.eight_left_first_frame_touch_index);
       push(trackRows, 'eight_right_first_frame_touch_index', status.eight_right_first_frame_touch_index);
       pushArray(trackRows, 'eight_left_first_frame_touch_point', status.eight_left_first_frame_touch_point);
@@ -2117,20 +2025,8 @@
       addSection('巡线跟踪', trackRows);
 
       const cornerRows = [];
-      push(cornerRows, 'left_boundary_corner_found', status.left_boundary_corner_found);
-      push(cornerRows, 'right_boundary_corner_found', status.right_boundary_corner_found);
       push(cornerRows, 'left_boundary_straight', status.left_boundary_straight);
       push(cornerRows, 'right_boundary_straight', status.right_boundary_straight);
-      pushArray(cornerRows, 'left_boundary_corner_point', status.left_boundary_corner_point);
-      pushArray(cornerRows, 'right_boundary_corner_point', status.right_boundary_corner_point);
-      push(cornerRows, 'ipm_left_boundary_corner_found', status.ipm_left_boundary_corner_found);
-      push(cornerRows, 'ipm_right_boundary_corner_found', status.ipm_right_boundary_corner_found);
-      push(cornerRows, 'ipm_left_boundary_corner_index', status.ipm_left_boundary_corner_index);
-      push(cornerRows, 'ipm_right_boundary_corner_index', status.ipm_right_boundary_corner_index);
-      pushArray(cornerRows, 'ipm_left_boundary_corner_point', status.ipm_left_boundary_corner_point);
-      pushArray(cornerRows, 'ipm_right_boundary_corner_point', status.ipm_right_boundary_corner_point);
-      push(cornerRows, 'ipm_left_boundary_straight', status.ipm_left_boundary_straight);
-      push(cornerRows, 'ipm_right_boundary_straight', status.ipm_right_boundary_straight);
       push(cornerRows, 'cross_lower_corner_dir_enabled', status.cross_lower_corner_dir_enabled);
       push(cornerRows, 'cross_lower_corner_pair_valid', status.cross_lower_corner_pair_valid);
       push(cornerRows, 'cross_lower_left_corner_found', status.cross_lower_left_corner_found);
@@ -2178,8 +2074,6 @@
       pushCount(arrayRows, 'eight_right_trace', status.eight_right_trace);
       pushCount(arrayRows, 'eight_left_trace_dir', status.eight_left_trace_dir);
       pushCount(arrayRows, 'eight_right_trace_dir', status.eight_right_trace_dir);
-      pushCount(arrayRows, 'left_boundary_corner', status.left_boundary_corner);
-      pushCount(arrayRows, 'right_boundary_corner', status.right_boundary_corner);
       pushCount(arrayRows, 'cross_left_aux_trace', status.cross_left_aux_trace);
       pushCount(arrayRows, 'cross_right_aux_trace', status.cross_right_aux_trace);
       pushCount(arrayRows, 'cross_left_aux_trace_dir', status.cross_left_aux_trace_dir);
@@ -2188,17 +2082,12 @@
       pushCount(arrayRows, 'cross_right_aux_regular', status.cross_right_aux_regular);
       pushCount(arrayRows, 'ipm_left_boundary', status.ipm_left_boundary);
       pushCount(arrayRows, 'ipm_right_boundary', status.ipm_right_boundary);
-      pushCount(arrayRows, 'ipm_left_boundary_corner', status.ipm_left_boundary_corner);
-      pushCount(arrayRows, 'ipm_right_boundary_corner', status.ipm_right_boundary_corner);
       pushCount(arrayRows, 'ipm_raw_left_boundary', status.ipm_raw_left_boundary);
       pushCount(arrayRows, 'ipm_raw_right_boundary', status.ipm_raw_right_boundary);
       pushCount(arrayRows, 'ipm_centerline_selected_shift', getSelectedIpmCenterline(status));
       pushCount(arrayRows, 'src_centerline_selected_shift', getSelectedSrcCenterline(status));
       push(arrayRows, 'ipm_centerline_selected_count', status.ipm_centerline_selected_count);
       push(arrayRows, 'src_centerline_selected_count', status.src_centerline_selected_count);
-      pushCount(arrayRows, 'ipm_centerline_selected_curvature', getSelectedCurvature(status));
-      pushCount(arrayRows, 'ipm_left_boundary_angle_cos', getLeftBoundaryAngleCos(status));
-      pushCount(arrayRows, 'ipm_right_boundary_angle_cos', getRightBoundaryAngleCos(status));
       addSection('点列数量', arrayRows);
 
       return sections.length > 0 ? sections.join('\n\n') : 'waiting...';
@@ -2526,12 +2415,8 @@
           showMeanCenterline,
           showIpmAnchorDot,
           boundaryPointMode,
-          showCenterlineCurvatureChart,
-          showBoundaryAngleCosCharts,
           showTraceDirCharts,
-          localComputeEnabled: shouldUseLocalCompute(),
-          curvatureYMin,
-          curvatureYMax
+          localComputeEnabled: shouldUseLocalCompute()
         },
         latest_status: cloneStatus(latestStatus),
         latest_render_status: cloneStatus(getRenderStatus()),
@@ -2869,21 +2754,6 @@
       receiverCore.drawPointSet(ctx, pts, color, radius);
     }
 
-    function drawDecisionPoint(ctx, point) {
-      if (!Array.isArray(point) || point.length < 2) return;
-      const px = point[0] | 0;
-      const py = point[1] | 0;
-      ctx.fillStyle = '#c084fc';
-      ctx.beginPath();
-      ctx.arc(px, py, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#faf5ff';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(px, py, 5, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
     function drawIpmBoundariesToCanvas(status, canvas, ctx, leftKey, rightKey, centerData) {
       const ipmSize = status.ipm_size || [280, 140];
       const w = ipmSize[0] || 280;
@@ -2894,10 +2764,6 @@
       ctx.fillRect(0, 0, w, h);
       drawSeries(ctx, status[leftKey] || [], '#ff4d4f', 2, 1);
       drawSeries(ctx, status[rightKey] || [], '#22c55e', 2, 1);
-      if (canvas === ipmCanvas) {
-        drawPointSet(ctx, status.ipm_left_boundary_corner || [], '#facc15', 1);
-        drawPointSet(ctx, status.ipm_right_boundary_corner || [], '#fb923c', 1);
-      }
       if (Array.isArray(centerData) && centerData.length > 0) {
         drawSeries(ctx, centerData, '#facc15', 2, 1);
       }
@@ -2916,7 +2782,6 @@
         ctx.stroke();
         drawPointSet(ctx, [[cx, cy], [tx, ty], [tx, cy]], '#93c5fd', 2);
       }
-      drawDecisionPoint(ctx, status.ipm_weighted_decision_point);
       if (showIpmAnchorDot) {
         const cx = Math.max(0, Math.min(w - 1, Math.floor(w / 2)));
         const cy = Math.max(0, Math.min(h - 1, h));
@@ -2929,7 +2794,6 @@
 
     function drawIpmBoundaries(status) {
       const hasIpmMain = hasPointArray(status.ipm_left_boundary) || hasPointArray(status.ipm_right_boundary) ||
-        hasPointArray(status.ipm_left_boundary_corner) || hasPointArray(status.ipm_right_boundary_corner) ||
         hasPointArray(getSelectedIpmCenterline(status)) ||
         hasValue(status.ipm_track_valid);
       const hasIpmRaw = hasPointArray(status.ipm_raw_left_boundary) || hasPointArray(status.ipm_raw_right_boundary) ||
@@ -2944,27 +2808,6 @@
       if (hasIpmRaw) {
         drawIpmBoundariesToCanvas(status, ipmRawCanvas, ipmRawCtx, 'ipm_raw_left_boundary', 'ipm_raw_right_boundary', []);
       }
-    }
-
-    function drawCurveChartToCanvas(canvas, ctx, rawValues, yMinOverride, yMaxOverride) {
-      return receiverCore.drawCurveChartToCanvas(canvas, ctx, rawValues, {
-        yMin: Number.isFinite(yMinOverride) ? yMinOverride : curvatureYMin,
-        yMax: Number.isFinite(yMaxOverride) ? yMaxOverride : curvatureYMax
-      });
-    }
-
-    function drawCurvatureChart(status) {
-      setCardVisible(curvatureCard, showCenterlineCurvatureChart);
-      if (!showCenterlineCurvatureChart) return;
-      drawCurveChartToCanvas(curvatureCanvas, curvatureCtx, getSelectedCurvature(status));
-    }
-
-    function drawBoundaryAngleCosCharts(status) {
-      setCardVisible(leftBoundaryAngleCosCard, showBoundaryAngleCosCharts);
-      setCardVisible(rightBoundaryAngleCosCard, showBoundaryAngleCosCharts);
-      if (!showBoundaryAngleCosCharts) return;
-      drawCurveChartToCanvas(leftBoundaryAngleCosCanvas, leftBoundaryAngleCosCtx, getLeftBoundaryAngleCos(status), -1.0, 1.0);
-      drawCurveChartToCanvas(rightBoundaryAngleCosCanvas, rightBoundaryAngleCosCtx, getRightBoundaryAngleCos(status), -1.0, 1.0);
     }
 
     function getTraceDirChartLayout(canvas, pointCount) {
@@ -3432,14 +3275,11 @@
       if (showGrayBoundaries) {
         drawSeries(grayCtx, left, '#ff4d4f', 2, 1);
         drawSeries(grayCtx, right, '#22c55e', 2, 1);
-        drawPointSet(grayCtx, renderStatus.left_boundary_corner || [], '#facc15', 1);
-        drawPointSet(grayCtx, renderStatus.right_boundary_corner || [], '#fb923c', 1);
       }
       if (showMeanCenterline) {
         const meanCenterline = getMeanCenterlineFromBoundaries(renderStatus);
         drawSeries(grayCtx, meanCenterline, '#facc15', 2, 1);
       }
-      drawDecisionPoint(grayCtx, renderStatus.src_weighted_decision_point);
       renderInferFrame(renderStatus);
       renderBinaryFromGray();
       requestLocalCompute();
@@ -3815,14 +3655,8 @@
       }
       if (!hit) return '';
 
-      let cosText = 'N/A';
-      const angleCos = sideKey === 'ipm_left_boundary' ? getLeftBoundaryAngleCos(status) : getRightBoundaryAngleCos(status);
-      if (Array.isArray(angleCos) && hit.index < angleCos.length) {
-        const cv = Number(angleCos[hit.index]);
-        if (Number.isFinite(cv)) cosText = cv.toFixed(6);
-      }
       const sideLabel = sideKey === 'ipm_left_boundary' ? 'L' : 'R';
-      return ` | 边界:${sideLabel} idx:${hit.index} cos:${cosText}`;
+      return ` | 边界:${sideLabel} idx:${hit.index}`;
     }
 
     function bindPixelProbe(canvas, ctx, infoEl, extraTextFn) {
@@ -4043,9 +3877,7 @@
 
     function buildStatusSummary(status) {
       return receiverCore.buildStatusSummary(status, {
-        getSelectedIpmCenterline,
-        getLeftBoundaryAngleCos,
-        getRightBoundaryAngleCos
+        getSelectedIpmCenterline
       });
     }
 
@@ -4069,8 +3901,6 @@
         renderInferFrame(renderStatus || {});
         if (isFull || shouldUseLocalCompute()) {
           drawIpmBoundaries(renderStatus);
-          drawCurvatureChart(renderStatus);
-          drawBoundaryAngleCosCharts(renderStatus);
           drawTraceDirCharts(renderStatus);
           if (hasValue(renderStatus.ipm_centerline_source)) {
             ipmCenterlineSourceLabel.style.display = '';
@@ -4209,14 +4039,6 @@
       drawIpmBoundaries(getRenderStatus());
       if (grayFrameReady) renderGrayFrame();
     });
-    toggleCenterlineCurvatureChart.addEventListener('change', () => {
-      showCenterlineCurvatureChart = !!toggleCenterlineCurvatureChart.checked;
-      drawCurvatureChart(getRenderStatus() || {});
-    });
-    toggleBoundaryAngleCosCharts.addEventListener('change', () => {
-      showBoundaryAngleCosCharts = !!toggleBoundaryAngleCosCharts.checked;
-      drawBoundaryAngleCosCharts(getRenderStatus() || {});
-    });
     toggleTraceDirCharts.addEventListener('change', () => {
       showTraceDirCharts = !!toggleTraceDirCharts.checked;
       drawTraceDirCharts(getRenderStatus() || {});
@@ -4232,17 +4054,9 @@
       modeNote.textContent = buildModeExplanation(latestStatus || {});
       renderStatusPanels(getRenderStatus() || {});
       drawIpmBoundaries(getRenderStatus() || {});
-      drawCurvatureChart(getRenderStatus() || {});
-      drawBoundaryAngleCosCharts(getRenderStatus() || {});
       drawTraceDirCharts(getRenderStatus() || {});
       if (grayFrameReady) renderGrayFrame();
     });
-    curvatureYMinInput.addEventListener('change', applyCurvatureYRangeFromInput);
-    curvatureYMaxInput.addEventListener('change', applyCurvatureYRangeFromInput);
-    curvatureYMinInput.addEventListener('blur', applyCurvatureYRangeFromInput);
-    curvatureYMaxInput.addEventListener('blur', applyCurvatureYRangeFromInput);
-    showCenterlineCurvatureChart = !!toggleCenterlineCurvatureChart.checked;
-    showBoundaryAngleCosCharts = !!toggleBoundaryAngleCosCharts.checked;
     showTraceDirCharts = !!toggleTraceDirCharts.checked;
     rebuildPlaybackGrid({}, {});
     setDebugPageActive(true);

@@ -30,7 +30,7 @@ typedef struct
     // ==================== 参数区域 3: 网页发送 ====================
     // 包括逐飞助手发送、UDP 视频发送、TCP 状态发送及其字段开关。
     // 图传输出模式：
-    // VISION_THREAD_SEND_BINARY / VISION_THREAD_SEND_GRAY / VISION_THREAD_SEND_RGB565。
+    // VISION_THREAD_SEND_BINARY / VISION_THREAD_SEND_GRAY。
     int send_mode;
     // 图传发送上限帧率，0 表示不限速。
     uint32 send_max_fps;
@@ -145,9 +145,6 @@ typedef struct
     bool udp_web_tcp_send_ipm_centerline_source;
     bool udp_web_tcp_send_ipm_track_index;
     bool udp_web_tcp_send_ipm_track_point;
-    bool udp_web_tcp_send_ipm_weighted_first_point_error;
-    bool udp_web_tcp_send_ipm_weighted_decision_point;
-    bool udp_web_tcp_send_src_weighted_decision_point;
     // 边界/中线点列。
     bool udp_web_tcp_send_left_boundary;
     bool udp_web_tcp_send_right_boundary;
@@ -176,8 +173,6 @@ typedef struct
 
     // ==================== 参数区域 1: 视觉处理 ====================
     // 包括迷宫法起点、去畸变、IPM 边界/中线后处理。
-    // 采图模式：检测到红色矩形后，每 1s 保存一次推理 ROI 彩图。
-    bool roi_capture_mode;
     // 迷宫法左右起点搜索行，固定单行搜索。
     int maze_start_row;
     // 原图巡线方法：0=迷宫法，1=八邻域法。
@@ -199,6 +194,8 @@ typedef struct
     int cross_lower_corner_transition_max_len;
     // 十字下角点识别：左右候选角点 y 坐标最大允许差，超出则双边稳定标志无效。
     int cross_lower_corner_pair_y_diff_max;
+    // 普通原图下角点处理：截断后是否使用角点前边界拟合直线，并向角点上方补一段。
+    bool cross_lower_corner_extrapolate_enabled;
     // 十字补线触发的下角点最小 y 阈值，只有角点 y 严格大于该值才补线。
     int cross_lower_corner_extrapolate_min_y;
     // 十字下角点补线向上的延伸长度（按 y 行数计算）。

@@ -158,43 +158,6 @@ static uint16 g_ipm_xy_y3_boundary[VISION_BOUNDARY_NUM];
 static int g_ipm_boundary_count = 0;
 static int g_ipm_boundary_left_count = 0;
 static int g_ipm_boundary_right_count = 0;
-// 逆透视处理链边界三点法夹角 cos（基于等距采样边线）。
-static float g_ipm_left_boundary_angle_cos[VISION_BOUNDARY_NUM];
-static float g_ipm_right_boundary_angle_cos[VISION_BOUNDARY_NUM];
-static int g_ipm_left_boundary_angle_cos_count = 0;
-static int g_ipm_right_boundary_angle_cos_count = 0;
-static int g_ipm_left_boundary_corner_indices[VISION_BOUNDARY_NUM];
-static int g_ipm_right_boundary_corner_indices[VISION_BOUNDARY_NUM];
-static int g_ipm_left_boundary_corner_count = 0;
-static int g_ipm_right_boundary_corner_count = 0;
-static uint16 g_ipm_left_boundary_corner_x[VISION_BOUNDARY_NUM];
-static uint16 g_ipm_left_boundary_corner_y[VISION_BOUNDARY_NUM];
-static uint16 g_ipm_right_boundary_corner_x[VISION_BOUNDARY_NUM];
-static uint16 g_ipm_right_boundary_corner_y[VISION_BOUNDARY_NUM];
-static int g_ipm_left_boundary_corner_point_count = 0;
-static int g_ipm_right_boundary_corner_point_count = 0;
-static uint16 g_src_left_boundary_corner_x[VISION_BOUNDARY_NUM];
-static uint16 g_src_left_boundary_corner_y[VISION_BOUNDARY_NUM];
-static uint16 g_src_right_boundary_corner_x[VISION_BOUNDARY_NUM];
-static uint16 g_src_right_boundary_corner_y[VISION_BOUNDARY_NUM];
-static int g_src_left_boundary_corner_point_count = 0;
-static int g_src_right_boundary_corner_point_count = 0;
-static std::atomic<bool> g_src_left_boundary_corner_found(false);
-static std::atomic<bool> g_src_right_boundary_corner_found(false);
-static std::atomic<int> g_src_left_boundary_corner_first_x(0);
-static std::atomic<int> g_src_left_boundary_corner_first_y(0);
-static std::atomic<int> g_src_right_boundary_corner_first_x(0);
-static std::atomic<int> g_src_right_boundary_corner_first_y(0);
-static std::atomic<bool> g_ipm_left_boundary_corner_found(false);
-static std::atomic<bool> g_ipm_right_boundary_corner_found(false);
-static std::atomic<int> g_ipm_left_boundary_corner_first_x(0);
-static std::atomic<int> g_ipm_left_boundary_corner_first_y(0);
-static std::atomic<int> g_ipm_right_boundary_corner_first_x(0);
-static std::atomic<int> g_ipm_right_boundary_corner_first_y(0);
-static std::atomic<int> g_ipm_left_boundary_corner_first_index(-1);
-static std::atomic<int> g_ipm_right_boundary_corner_first_index(-1);
-static std::atomic<bool> g_ipm_left_boundary_straight_detected(false);
-static std::atomic<bool> g_ipm_right_boundary_straight_detected(false);
 // 逆透视处理链平移中线（左边界右移/右边界左移）。
 static uint16 g_ipm_shift_left_center_x[VISION_BOUNDARY_NUM];
 static uint16 g_ipm_shift_left_center_y[VISION_BOUNDARY_NUM];
@@ -211,14 +174,11 @@ static int g_src_shift_right_center_count = 0;
 
 // 图像缓存：
 // - g_image_bgr_full: full 分辨率原图；
-// - g_image_bgr/g_image_gray/g_image_binary_u8/g_image_rgb565: 处理分辨率图像。
+// - g_image_bgr/g_image_gray/g_image_binary_u8: 处理分辨率图像。
 static uint8 g_image_bgr_full[UVC_HEIGHT * UVC_WIDTH * 3];
 static uint8 g_image_bgr[kProcHeight * kProcWidth * 3];
 static uint8 g_image_gray[kProcHeight * kProcWidth];
 static uint8 g_image_binary_u8[kProcHeight * kProcWidth];
-static uint8 g_image_rgb565[kProcHeight * kProcWidth * 2];
-// 调试输出缓存：逆透视彩色图。
-static uint8 g_image_ipm_bgr[kIpmOutputHeight * kIpmOutputWidth * 3];
 // 去畸变映射表：输出(去畸变后)像素 -> 输入(原始畸变图)像素。
 static cv::Mat g_undistort_map_x;
 static cv::Mat g_undistort_map_y;
@@ -670,18 +630,6 @@ static void clear_ipm_saved_arrays()
     std::fill_n(g_ipm_xy_y1_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_xy_y2_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_xy_y3_boundary, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
-    std::fill_n(g_ipm_left_boundary_angle_cos, VISION_BOUNDARY_NUM, 0.0f);
-    std::fill_n(g_ipm_right_boundary_angle_cos, VISION_BOUNDARY_NUM, 0.0f);
-    std::fill_n(g_ipm_left_boundary_corner_indices, VISION_BOUNDARY_NUM, -1);
-    std::fill_n(g_ipm_right_boundary_corner_indices, VISION_BOUNDARY_NUM, -1);
-    std::fill_n(g_ipm_left_boundary_corner_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
-    std::fill_n(g_ipm_left_boundary_corner_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
-    std::fill_n(g_ipm_right_boundary_corner_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
-    std::fill_n(g_ipm_right_boundary_corner_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
-    std::fill_n(g_src_left_boundary_corner_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
-    std::fill_n(g_src_left_boundary_corner_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
-    std::fill_n(g_src_right_boundary_corner_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
-    std::fill_n(g_src_right_boundary_corner_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_shift_left_center_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_shift_left_center_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_shift_right_center_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
@@ -689,30 +637,6 @@ static void clear_ipm_saved_arrays()
     g_ipm_boundary_count = 0;
     g_ipm_boundary_left_count = 0;
     g_ipm_boundary_right_count = 0;
-    g_ipm_left_boundary_angle_cos_count = 0;
-    g_ipm_right_boundary_angle_cos_count = 0;
-    g_ipm_left_boundary_corner_count = 0;
-    g_ipm_right_boundary_corner_count = 0;
-    g_ipm_left_boundary_corner_point_count = 0;
-    g_ipm_right_boundary_corner_point_count = 0;
-    g_src_left_boundary_corner_point_count = 0;
-    g_src_right_boundary_corner_point_count = 0;
-    g_src_left_boundary_corner_found.store(false);
-    g_src_right_boundary_corner_found.store(false);
-    g_src_left_boundary_corner_first_x.store(0);
-    g_src_left_boundary_corner_first_y.store(0);
-    g_src_right_boundary_corner_first_x.store(0);
-    g_src_right_boundary_corner_first_y.store(0);
-    g_ipm_left_boundary_corner_found.store(false);
-    g_ipm_right_boundary_corner_found.store(false);
-    g_ipm_left_boundary_corner_first_x.store(0);
-    g_ipm_left_boundary_corner_first_y.store(0);
-    g_ipm_right_boundary_corner_first_x.store(0);
-    g_ipm_right_boundary_corner_first_y.store(0);
-    g_ipm_left_boundary_corner_first_index.store(-1);
-    g_ipm_right_boundary_corner_first_index.store(-1);
-    g_ipm_left_boundary_straight_detected.store(false);
-    g_ipm_right_boundary_straight_detected.store(false);
     g_ipm_shift_left_center_count = 0;
     g_ipm_shift_right_center_count = 0;
 }
@@ -3032,8 +2956,6 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                            int maze_trace_x_max,
                                                            int preferred_source)
 {
-    // 关闭整图逆透视彩色调试图，避免 warpPerspective + resize 带来的额外耗时。
-    std::memset(g_image_ipm_bgr, 0, kIpmOutputWidth * kIpmOutputHeight * 3);
     const std::array<uint16, VISION_BOUNDARY_NUM> prev_ipm_shift_left_center_x = [&]() {
         std::array<uint16, VISION_BOUNDARY_NUM> out{};
         std::copy_n(g_ipm_shift_left_center_x, VISION_BOUNDARY_NUM, out.data());
@@ -3113,7 +3035,17 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                        g_ipm_resample_step_px.load());
     }
 
-    // 直角点支路：弱平滑（1 次三角）后计算三点夹角 cos，并做局部极小值 + NMS。
+    // IPM 角点支路当前停用：
+    // 1) 不再拷贝 left_angle/right_angle；
+    // 2) 不再做 triangle_filter_boundary_points_inplace；
+    // 3) 不再计算三点夹角 cos；
+    // 4) 不再做角点检测/NMS；
+    // 5) 不再按首个角点截断边界；
+    // 6) 不再基于该支路回填 IPM/source corner 缓存；
+    // 7) 不再做 IPM 直边判定。
+    //
+    // 保留下面这整段原始代码作为恢复参考，后续若要恢复可直接取消注释。
+#if 0
     std::array<maze_point_t, VISION_BOUNDARY_NUM> left_angle{};
     std::array<maze_point_t, VISION_BOUNDARY_NUM> right_angle{};
     left_angle = left_proc;
@@ -3151,7 +3083,6 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                          g_ipm_right_boundary_corner_indices,
                                          &g_ipm_right_boundary_corner_count);
 
-    // 可选：若识别到直角角点，按首个角点截断其后边界，再进入曲率与中线计算。
     if (g_ipm_boundary_truncate_at_first_corner_enabled.load())
     {
         truncate_by_first_corner_inplace(left_proc.data(),
@@ -3223,6 +3154,7 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                    g_ipm_boundary_straight_min_points.load(),
                                                    g_ipm_boundary_straight_check_count.load(),
                                                    g_ipm_boundary_straight_min_cos.load()));
+#endif
 
     const vision_route_state_snapshot_t route_snapshot = vision_route_state_machine_snapshot();
 
@@ -4709,7 +4641,7 @@ bool vision_image_processor_process_step()
 {
     // 主处理步骤：
     // 1) 等待新帧；
-    // 2) 生成灰度/RGB565/二值图；
+    // 2) 生成灰度/二值图；
     // 3) 迷宫法双边线提取；
     // 4) 计算中线误差与逆透视结果；
     // 5) 更新时间统计，并把“成功处理帧序号”向前推进一次。
@@ -4769,22 +4701,6 @@ bool vision_image_processor_process_step()
         if (jump_count > 7)
         {
             g_zebra_cross_count.fetch_add(1);
-        }
-    }
-
-    // RGB565（当前处理分辨率）
-    for (int y = 0; y < kProcHeight; ++y)
-    {
-        const cv::Vec3b *row = bgr.ptr<cv::Vec3b>(y);
-        for (int x = 0; x < kProcWidth; ++x)
-        {
-            uint8 bb = row[x][0];
-            uint8 gg = row[x][1];
-            uint8 rr = row[x][2];
-            uint16 v = static_cast<uint16>(((rr >> 3) << 11) | ((gg >> 2) << 5) | (bb >> 3));
-            int idx = (y * kProcWidth + x) * 2;
-            g_image_rgb565[idx] = static_cast<uint8>(v >> 8);
-            g_image_rgb565[idx + 1] = static_cast<uint8>(v & 0xFF);
         }
     }
 
@@ -5265,11 +5181,17 @@ bool vision_image_processor_process_step()
                                                             right_cross_base_ipm_pts.data(),
                                                             static_cast<int>(right_cross_base_ipm_pts.size()));
         }
+        const bool cross_state_active =
+            (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CROSS);
         const bool cross1_state_active =
             (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CROSS) &&
             (route_snapshot_before_trace.sub_state == VISION_ROUTE_SUB_CROSS_1);
-        const bool skip_left_auto_extrapolate = cross1_state_active && g_cross_left_aux_found.load();
-        const bool skip_right_auto_extrapolate = cross1_state_active && g_cross_right_aux_found.load();
+        const bool lower_corner_extrapolate_enabled =
+            g_vision_runtime_config.cross_lower_corner_extrapolate_enabled && !cross_state_active;
+        const bool skip_left_auto_extrapolate =
+            !lower_corner_extrapolate_enabled || (cross1_state_active && g_cross_left_aux_found.load());
+        const bool skip_right_auto_extrapolate =
+            !lower_corner_extrapolate_enabled || (cross1_state_active && g_cross_right_aux_found.load());
         if (!skip_left_auto_extrapolate && left_num > 0)
         {
             const int extrapolate_min_y = g_vision_runtime_config.cross_lower_corner_extrapolate_min_y;
@@ -5816,7 +5738,6 @@ bool vision_image_processor_process_step()
     }
     else
     {
-        std::memset(g_image_ipm_bgr, 0, kIpmOutputWidth * kIpmOutputHeight * 3);
         clear_ipm_saved_arrays();
     }
     auto t_maze_end = std::chrono::steady_clock::now();
@@ -6167,13 +6088,6 @@ int vision_image_processor_ipm_centerline_curvature_step()
     return vision_line_error_layer_curvature_step();
 }
 
-void vision_image_processor_get_ipm_selected_centerline_curvature(const float **curvature, int *count)
-{
-    // 当前返回 line_error 实际选中的那条 IPM 中线曲率序列，
-    // 供控制层用来生成“来自视觉的目标横摆角速度”。
-    vision_line_error_layer_get_selected_centerline_curvature(curvature, count);
-}
-
 int vision_image_processor_ipm_selected_centerline_count()
 {
     return vision_line_error_layer_selected_centerline_count();
@@ -6189,36 +6103,9 @@ float vision_image_processor_ipm_straight_abs_error_sum()
     return vision_line_error_layer_abs_error_sum_to_required_index();
 }
 
-void vision_image_processor_get_ipm_left_boundary_angle_cos(const float **angle_cos, int *count)
-{
-    if (angle_cos) *angle_cos = g_ipm_left_boundary_angle_cos;
-    if (count) *count = g_ipm_left_boundary_angle_cos_count;
-}
-
-void vision_image_processor_get_ipm_right_boundary_angle_cos(const float **angle_cos, int *count)
-{
-    if (angle_cos) *angle_cos = g_ipm_right_boundary_angle_cos;
-    if (count) *count = g_ipm_right_boundary_angle_cos_count;
-}
-
 float vision_image_processor_ipm_mean_abs_offset_error()
 {
     return vision_line_error_layer_mean_abs_offset();
-}
-
-int vision_image_processor_ipm_weighted_first_point_error()
-{
-    return vision_line_error_layer_weighted_first_point_error();
-}
-
-void vision_image_processor_get_ipm_weighted_decision_point(bool *valid, int *x, int *y)
-{
-    vision_line_error_layer_get_ipm_weighted_decision_point(valid, x, y);
-}
-
-void vision_image_processor_get_src_weighted_decision_point(bool *valid, int *x, int *y)
-{
-    vision_line_error_layer_get_src_weighted_decision_point(valid, x, y);
 }
 
 int vision_image_processor_ipm_line_error_track_index()
@@ -6296,11 +6183,6 @@ const uint8 *vision_image_processor_bgr_full_image()
     return g_image_bgr_full;
 }
 
-const uint8 *vision_image_processor_rgb565_image()
-{
-    return g_image_rgb565;
-}
-
 const uint8 *vision_image_processor_gray_downsampled_image()
 {
     return g_image_gray;
@@ -6314,16 +6196,6 @@ const uint8 *vision_image_processor_binary_downsampled_u8_image()
 const uint8 *vision_image_processor_bgr_downsampled_image()
 {
     return g_image_bgr;
-}
-
-const uint8 *vision_image_processor_rgb565_downsampled_image()
-{
-    return g_image_rgb565;
-}
-
-const uint8 *vision_image_processor_ipm_bgr_downsampled_image()
-{
-    return g_image_ipm_bgr;
 }
 
 void vision_image_processor_get_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
@@ -6499,66 +6371,10 @@ void vision_image_processor_get_ipm_boundary_side_counts(uint16 *left_dot_num, u
     if (right_dot_num) *right_dot_num = static_cast<uint16>(g_ipm_boundary_right_count);
 }
 
-void vision_image_processor_get_src_boundary_corners(uint16 **left_x, uint16 **left_y, uint16 *left_num,
-                                                     uint16 **right_x, uint16 **right_y, uint16 *right_num)
-{
-    if (left_x) *left_x = g_src_left_boundary_corner_x;
-    if (left_y) *left_y = g_src_left_boundary_corner_y;
-    if (left_num) *left_num = static_cast<uint16>(g_src_left_boundary_corner_point_count);
-    if (right_x) *right_x = g_src_right_boundary_corner_x;
-    if (right_y) *right_y = g_src_right_boundary_corner_y;
-    if (right_num) *right_num = static_cast<uint16>(g_src_right_boundary_corner_point_count);
-}
-
-void vision_image_processor_get_ipm_boundary_corners(uint16 **left_x, uint16 **left_y, uint16 *left_num,
-                                                     uint16 **right_x, uint16 **right_y, uint16 *right_num)
-{
-    if (left_x) *left_x = g_ipm_left_boundary_corner_x;
-    if (left_y) *left_y = g_ipm_left_boundary_corner_y;
-    if (left_num) *left_num = static_cast<uint16>(g_ipm_left_boundary_corner_point_count);
-    if (right_x) *right_x = g_ipm_right_boundary_corner_x;
-    if (right_y) *right_y = g_ipm_right_boundary_corner_y;
-    if (right_num) *right_num = static_cast<uint16>(g_ipm_right_boundary_corner_point_count);
-}
-
-void vision_image_processor_get_src_boundary_corner_state(bool *left_found, int *left_x, int *left_y,
-                                                          bool *right_found, int *right_x, int *right_y)
-{
-    if (left_found) *left_found = g_src_left_boundary_corner_found.load();
-    if (left_x) *left_x = g_src_left_boundary_corner_first_x.load();
-    if (left_y) *left_y = g_src_left_boundary_corner_first_y.load();
-    if (right_found) *right_found = g_src_right_boundary_corner_found.load();
-    if (right_x) *right_x = g_src_right_boundary_corner_first_x.load();
-    if (right_y) *right_y = g_src_right_boundary_corner_first_y.load();
-}
-
 void vision_image_processor_get_src_boundary_straight_state(bool *left_straight, bool *right_straight)
 {
     if (left_straight) *left_straight = g_src_left_boundary_straight_detected.load();
     if (right_straight) *right_straight = g_src_right_boundary_straight_detected.load();
-}
-
-void vision_image_processor_get_ipm_boundary_corner_state(bool *left_found, int *left_x, int *left_y,
-                                                          bool *right_found, int *right_x, int *right_y)
-{
-    if (left_found) *left_found = g_ipm_left_boundary_corner_found.load();
-    if (left_x) *left_x = g_ipm_left_boundary_corner_first_x.load();
-    if (left_y) *left_y = g_ipm_left_boundary_corner_first_y.load();
-    if (right_found) *right_found = g_ipm_right_boundary_corner_found.load();
-    if (right_x) *right_x = g_ipm_right_boundary_corner_first_x.load();
-    if (right_y) *right_y = g_ipm_right_boundary_corner_first_y.load();
-}
-
-void vision_image_processor_get_ipm_boundary_corner_indices(int *left_index, int *right_index)
-{
-    if (left_index) *left_index = g_ipm_left_boundary_corner_first_index.load();
-    if (right_index) *right_index = g_ipm_right_boundary_corner_first_index.load();
-}
-
-void vision_image_processor_get_ipm_boundary_straight_state(bool *left_straight, bool *right_straight)
-{
-    if (left_straight) *left_straight = g_ipm_left_boundary_straight_detected.load();
-    if (right_straight) *right_straight = g_ipm_right_boundary_straight_detected.load();
 }
 
 int vision_image_processor_route_main_state()

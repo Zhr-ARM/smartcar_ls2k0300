@@ -22,10 +22,6 @@ static vision_thread_send_mode_enum vision_thread_sanitize_send_mode(vision_thre
     {
         return VISION_THREAD_SEND_BINARY;
     }
-    if (mode == VISION_THREAD_SEND_RGB565)
-    {
-        return VISION_THREAD_SEND_RGB565;
-    }
     return VISION_THREAD_SEND_GRAY;
 }
 
@@ -229,14 +225,4 @@ void vision_thread_set_ncnn_enabled(bool enabled)
 bool vision_thread_ncnn_enabled()
 {
     return vision_pipeline_ncnn_enabled();
-}
-
-void vision_thread_set_roi_capture_mode(bool enabled)
-{
-    vision_pipeline_set_roi_capture_mode(enabled);
-}
-
-bool vision_thread_roi_capture_mode_enabled()
-{
-    return vision_pipeline_roi_capture_mode_enabled();
 }

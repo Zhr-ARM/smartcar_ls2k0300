@@ -32,6 +32,6 @@ echo "生成APP"
 parent_dir_name=$(basename $(dirname $(pwd)))
 
 # 使用获取到的上级目录名称进行 scp 操作
-# scp -O $parent_dir_name root@172.21.79.138:/home/root/tst
-scp -O $parent_dir_name root@10.119.73.138:/home/root/tst
+scp -O $parent_dir_name root@172.21.79.138:/home/root/tst
+# scp -O $parent_dir_name root@10.119.73.138:/home/root/tst
 echo "传输完成"

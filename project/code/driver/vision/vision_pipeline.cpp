@@ -376,16 +376,6 @@ bool vision_pipeline_ncnn_enabled()
     return vision_infer_async_ncnn_enabled();
 }
 
-void vision_pipeline_set_roi_capture_mode(bool enabled)
-{
-    vision_infer_async_set_roi_capture_mode(enabled);
-}
-
-bool vision_pipeline_roi_capture_mode_enabled()
-{
-    return vision_infer_async_roi_capture_mode_enabled();
-}
-
 void vision_pipeline_get_red_rect(bool *found, int *x, int *y, int *w, int *h, int *cx, int *cy)
 {
     vision_image_processor_get_red_rect(found, x, y, w, h, cx, cy);

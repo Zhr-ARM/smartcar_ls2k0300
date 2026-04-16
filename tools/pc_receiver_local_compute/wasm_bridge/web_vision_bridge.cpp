@@ -50,26 +50,6 @@ void copy_point_set(const uint16 *xs,
     }
 }
 
-void copy_scalar_series(const float *src, int count, web_vision_scalar_series_t *dst)
-{
-    if (dst == nullptr)
-    {
-        return;
-    }
-    dst->count = 0;
-    if (src == nullptr || count <= 0)
-    {
-        return;
-    }
-
-    const int n = std::min(count, WEB_VISION_MAX_POINTS);
-    dst->count = n;
-    for (int i = 0; i < n; ++i)
-    {
-        dst->values[i] = src[i];
-    }
-}
-
 } // namespace
 
 bool web_vision_bridge_process(const web_vision_frame_t *frame,
@@ -146,22 +126,6 @@ bool web_vision_bridge_process(const web_vision_frame_t *frame,
     copy_point_set(left_x, left_y, boundary_count, &result->ipm_left_boundary);
     copy_point_set(right_x, right_y, boundary_count, &result->ipm_right_boundary);
 
-    uint16 *corner_left_x = nullptr;
-    uint16 *corner_left_y = nullptr;
-    uint16 *corner_right_x = nullptr;
-    uint16 *corner_right_y = nullptr;
-    uint16 corner_left_num = 0;
-    uint16 corner_right_num = 0;
-    vision_image_processor_get_src_boundary_corners(&corner_left_x, &corner_left_y, &corner_left_num,
-                                                    &corner_right_x, &corner_right_y, &corner_right_num);
-    copy_point_set(corner_left_x, corner_left_y, corner_left_num, &result->left_boundary_corner);
-    copy_point_set(corner_right_x, corner_right_y, corner_right_num, &result->right_boundary_corner);
-
-    vision_image_processor_get_ipm_boundary_corners(&corner_left_x, &corner_left_y, &corner_left_num,
-                                                    &corner_right_x, &corner_right_y, &corner_right_num);
-    copy_point_set(corner_left_x, corner_left_y, corner_left_num, &result->ipm_left_boundary_corner);
-    copy_point_set(corner_right_x, corner_right_y, corner_right_num, &result->ipm_right_boundary_corner);
-
     uint16 *shift_x = nullptr;
     uint16 *shift_y = nullptr;
     uint16 shift_num = 0;
@@ -180,15 +144,6 @@ bool web_vision_bridge_process(const web_vision_frame_t *frame,
         vision_image_processor_get_src_shifted_centerline_from_left(&shift_x, &shift_y, &shift_num);
         copy_point_set(shift_x, shift_y, shift_num, &result->src_centerline_selected_shift);
     }
-
-    const float *series = nullptr;
-    int series_count = 0;
-    vision_image_processor_get_ipm_selected_centerline_curvature(&series, &series_count);
-    copy_scalar_series(series, series_count, &result->centerline_curvature);
-    vision_image_processor_get_ipm_left_boundary_angle_cos(&series, &series_count);
-    copy_scalar_series(series, series_count, &result->left_boundary_angle_cos);
-    vision_image_processor_get_ipm_right_boundary_angle_cos(&series, &series_count);
-    copy_scalar_series(series, series_count, &result->right_boundary_angle_cos);
 
     std::snprintf(result->status_message,
                   sizeof(result->status_message),

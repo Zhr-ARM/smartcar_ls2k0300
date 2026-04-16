@@ -99,7 +99,7 @@ void draw_thick_overlay_line(int32 x_start,
 void screen_display_loop()
 {
     // 使用本地快照避免上游图像缓冲区在刷新时被并发改写导致撕裂。
-    std::vector<uint8> img_snapshot(VISION_PROC_WIDTH * VISION_PROC_HEIGHT * 2, 0);
+    std::vector<uint8> img_snapshot(VISION_PROC_WIDTH * VISION_PROC_HEIGHT, 0);
 
     while (g_screen_display_running.load())
     {
@@ -115,15 +115,6 @@ void screen_display_loop()
                 ips200_show_gray_image(0, 0, img_snapshot.data(), VISION_PROC_WIDTH, VISION_PROC_HEIGHT);
             }
         }
-        else if (mode == VISION_THREAD_SEND_RGB565)
-        {
-            const uint8 *img = vision_image_processor_rgb565_downsampled_image();
-            if (img != nullptr)
-            {
-                std::memcpy(img_snapshot.data(), img, VISION_PROC_WIDTH * VISION_PROC_HEIGHT * 2);
-                ips200_show_rgb565_image(0, 0, img_snapshot.data(), VISION_PROC_WIDTH, VISION_PROC_HEIGHT);
-            }
-        }
         else // VISION_THREAD_SEND_GRAY
         {
             const uint8 *img = vision_image_processor_gray_downsampled_image();
@@ -135,7 +126,6 @@ void screen_display_loop()
         }
 
         const float error_px = line_follow_thread_error();
-        const int32 x_center = VISION_PROC_WIDTH / 2;
         const float ratio = std::clamp(line_sample_ratio, 0.0f, 1.0f);
         int32 sample_y = std::clamp<int32>(static_cast<int32>(VISION_PROC_HEIGHT * ratio), 0, VISION_PROC_HEIGHT - 1);
 

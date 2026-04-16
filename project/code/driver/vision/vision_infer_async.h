@@ -123,10 +123,6 @@ bool vision_infer_async_enabled();
 void vision_infer_async_set_ncnn_enabled(bool enabled);
 bool vision_infer_async_ncnn_enabled();
 
-// 作用：ROI 抓图开关（检测到目标时按节流保存样本图）。
-void vision_infer_async_set_roi_capture_mode(bool enabled);
-bool vision_infer_async_roi_capture_mode_enabled();
-
 // 作用：提交一帧给异步推理线程。
 // 参数：proc/full 图像指针与尺寸；尺寸必须匹配当前固定分辨率。
 // 是否调用：是，vision_pipeline_process_step 每帧调用。

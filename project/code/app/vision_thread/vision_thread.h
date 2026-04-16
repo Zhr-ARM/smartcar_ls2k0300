@@ -8,8 +8,7 @@ class LQ_NCNN;
 typedef enum
 {
 	VISION_THREAD_SEND_BINARY = 0,
-	VISION_THREAD_SEND_GRAY = 1,
-	VISION_THREAD_SEND_RGB565 = 2
+	VISION_THREAD_SEND_GRAY = 1
 } vision_thread_send_mode_enum;
 
 bool vision_thread_init(const char *camera_path);
@@ -31,9 +30,5 @@ void vision_thread_set_infer_enabled(bool enabled);
 bool vision_thread_infer_enabled();
 void vision_thread_set_ncnn_enabled(bool enabled);
 bool vision_thread_ncnn_enabled();
-
-// 采图模式：检测到红色矩形后，保存推理 ROI 的 PNG 彩图。
-void vision_thread_set_roi_capture_mode(bool enabled);
-bool vision_thread_roi_capture_mode_enabled();
 
 #endif

@@ -154,20 +154,14 @@ int vision_image_processor_ipm_line_error_track_index();
 void vision_image_processor_get_ipm_line_error_track_point(bool *valid, int *x, int *y);
 void vision_image_processor_set_ipm_centerline_curvature_step(int step);
 int vision_image_processor_ipm_centerline_curvature_step();
-void vision_image_processor_get_ipm_selected_centerline_curvature(const float **curvature, int *count);
 int vision_image_processor_ipm_selected_centerline_count();
 int vision_image_processor_ipm_straight_required_last_index();
 float vision_image_processor_ipm_straight_abs_error_sum();
-void vision_image_processor_get_ipm_left_boundary_angle_cos(const float **angle_cos, int *count);
-void vision_image_processor_get_ipm_right_boundary_angle_cos(const float **angle_cos, int *count);
 float vision_image_processor_ipm_mean_abs_offset_error();
-int vision_image_processor_ipm_weighted_first_point_error();
-void vision_image_processor_get_ipm_weighted_decision_point(bool *valid, int *x, int *y);
-void vision_image_processor_get_src_weighted_decision_point(bool *valid, int *x, int *y);
 
 // 读取最近一帧处理耗时（单位：us）
 // capture_wait_us: 等待相机新帧
-// preprocess_us  : 当前分辨率 Gray/RGB565 生成
+// preprocess_us  : 当前分辨率 BGR/Gray 生成
 // otsu_us        : 全图OTSU二值化耗时
 // maze_us        : 下60%区域迷宫法双边线提取耗时
 // total_us       : process_step总耗时
@@ -206,14 +200,10 @@ const uint8 *vision_image_processor_gray_image();
 const uint8 *vision_image_processor_binary_u8_image();
 const uint8 *vision_image_processor_bgr_image();
 const uint8 *vision_image_processor_bgr_full_image();
-const uint8 *vision_image_processor_rgb565_image();
 // 降采样接口与主接口一致（当前输入即处理分辨率）
 const uint8 *vision_image_processor_gray_downsampled_image();
 const uint8 *vision_image_processor_binary_downsampled_u8_image();
 const uint8 *vision_image_processor_bgr_downsampled_image();
-const uint8 *vision_image_processor_rgb565_downsampled_image();
-// 调试图像：逆透视彩色图与逆透视边线图（黑底白线）
-const uint8 *vision_image_processor_ipm_bgr_downsampled_image();
 
 // 边界数据访问接口。
 // 当前返回原图(无逆透视)坐标系下的边界数组:
@@ -277,19 +267,7 @@ void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 
                                                uint16 **y1, uint16 **y2, uint16 **y3,
                                                uint16 *dot_num);
 void vision_image_processor_get_ipm_boundary_side_counts(uint16 *left_dot_num, uint16 *right_dot_num);
-// 左右边界角点（由 angle-cos 局部极小值 + NMS 选出），分别提供原图和 IPM 坐标。
-void vision_image_processor_get_src_boundary_corners(uint16 **left_x, uint16 **left_y, uint16 *left_num,
-                                                     uint16 **right_x, uint16 **right_y, uint16 *right_num);
-void vision_image_processor_get_ipm_boundary_corners(uint16 **left_x, uint16 **left_y, uint16 *left_num,
-                                                     uint16 **right_x, uint16 **right_y, uint16 *right_num);
-// 左右边界“首个角点”的实时状态，方便状态机直接读取。
-void vision_image_processor_get_src_boundary_corner_state(bool *left_found, int *left_x, int *left_y,
-                                                          bool *right_found, int *right_x, int *right_y);
 void vision_image_processor_get_src_boundary_straight_state(bool *left_straight, bool *right_straight);
-void vision_image_processor_get_ipm_boundary_corner_state(bool *left_found, int *left_x, int *left_y,
-                                                          bool *right_found, int *right_x, int *right_y);
-void vision_image_processor_get_ipm_boundary_corner_indices(int *left_index, int *right_index);
-void vision_image_processor_get_ipm_boundary_straight_state(bool *left_straight, bool *right_straight);
 int vision_image_processor_route_main_state();
 int vision_image_processor_route_sub_state();
 int vision_image_processor_route_preferred_source();

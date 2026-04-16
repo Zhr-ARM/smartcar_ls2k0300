@@ -19,7 +19,6 @@ std::atomic<float> g_ipm_line_error_speed_k(g_vision_runtime_config.ipm_line_err
 std::atomic<float> g_ipm_line_error_speed_b(g_vision_runtime_config.ipm_line_error_speed_b);
 std::atomic<int> g_ipm_line_error_index_min(g_vision_runtime_config.ipm_line_error_index_min);
 std::atomic<int> g_ipm_line_error_index_max(g_vision_runtime_config.ipm_line_error_index_max);
-std::atomic<bool> g_centerline_curvature_enabled(g_vision_runtime_config.ipm_centerline_curvature_enabled);
 
 std::mutex g_ipm_line_error_weighted_points_mutex;
 std::array<int, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> g_ipm_line_error_point_indices = {
@@ -34,80 +33,16 @@ std::array<float, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> g_ipm_line_error_weight
 };
 size_t g_ipm_line_error_weighted_point_count = g_vision_runtime_config.ipm_line_error_weighted_point_count;
 
-std::atomic<int> g_ipm_line_error_weighted_first_point_error(0);
 std::atomic<int> g_centerline_curvature_step(std::max(1, g_vision_runtime_config.ipm_centerline_curvature_step));
-
-bool g_ipm_weighted_decision_point_valid = false;
-int g_ipm_weighted_decision_point_x = 0;
-int g_ipm_weighted_decision_point_y = 0;
-bool g_src_weighted_decision_point_valid = false;
-int g_src_weighted_decision_point_x = 0;
-int g_src_weighted_decision_point_y = 0;
 
 bool g_ipm_line_error_track_valid = false;
 int g_ipm_line_error_track_index = -1;
 int g_ipm_line_error_track_x = 0;
 int g_ipm_line_error_track_y = 0;
-std::array<float, VISION_DOWNSAMPLED_HEIGHT * 2> g_selected_centerline_curvature = {};
-int g_selected_centerline_curvature_count = 0;
 float g_mean_abs_offset = 0.0f;
 int g_selected_centerline_count = 0;
 int g_required_last_index_for_straight = -1;
 float g_abs_error_sum_to_required_index = 0.0f;
-
-static void compute_selected_centerline_curvature(const uint16 *xs, const uint16 *ys, int count)
-{
-    g_selected_centerline_curvature.fill(0.0f);
-    g_selected_centerline_curvature_count = 0;
-    if (!g_centerline_curvature_enabled.load() || xs == nullptr || ys == nullptr || count <= 0)
-    {
-        return;
-    }
-
-    const int n = std::clamp(count, 0, static_cast<int>(g_selected_centerline_curvature.size()));
-    g_selected_centerline_curvature_count = n;
-    const int span = std::max(1, g_centerline_curvature_step.load());
-    if (n < 2)
-    {
-        return;
-    }
-
-    const float h = 1.0f;
-    const float inv_2sh = 1.0f / (2.0f * static_cast<float>(span) * h);
-    const float inv_sh2 = 1.0f / (static_cast<float>(span * span) * h * h);
-
-    for (int i = 0; i < n; ++i)
-    {
-        const int im = std::clamp(i - span, 0, n - 1);
-        const int ip = std::clamp(i + span, 0, n - 1);
-        if (im == ip)
-        {
-            continue;
-        }
-
-        const float xm = static_cast<float>(xs[im]);
-        const float x0 = static_cast<float>(xs[i]);
-        const float xp = static_cast<float>(xs[ip]);
-        const float ym = static_cast<float>(ys[im]);
-        const float y0 = static_cast<float>(ys[i]);
-        const float yp = static_cast<float>(ys[ip]);
-
-        const float x1 = (xp - xm) * inv_2sh;
-        const float y1 = (yp - ym) * inv_2sh;
-        const float x2 = (xp - 2.0f * x0 + xm) * inv_sh2;
-        const float y2 = (yp - 2.0f * y0 + ym) * inv_sh2;
-
-        g_selected_centerline_curvature[i] = x1 * y2 - x2 * y1;
-    }
-
-    std::array<float, VISION_DOWNSAMPLED_HEIGHT * 2> curvature_src = g_selected_centerline_curvature;
-    for (int i = 1; i + 1 < n; ++i)
-    {
-        g_selected_centerline_curvature[i] = (curvature_src[i - 1] +
-                                              2.0f * curvature_src[i] +
-                                              curvature_src[i + 1]) * 0.25f;
-    }
-}
 
 static void reset_ipm_line_error_weighted_points_to_default()
 {
@@ -134,21 +69,11 @@ void vision_line_error_layer_reset()
     g_ipm_line_error_index_min.store(g_vision_runtime_config.ipm_line_error_index_min);
     g_ipm_line_error_index_max.store(g_vision_runtime_config.ipm_line_error_index_max);
     reset_ipm_line_error_weighted_points_to_default();
-    g_ipm_line_error_weighted_first_point_error.store(0);
-    g_centerline_curvature_enabled.store(g_vision_runtime_config.ipm_centerline_curvature_enabled);
     g_centerline_curvature_step.store(std::max(1, g_vision_runtime_config.ipm_centerline_curvature_step));
-    g_ipm_weighted_decision_point_valid = false;
-    g_ipm_weighted_decision_point_x = 0;
-    g_ipm_weighted_decision_point_y = 0;
-    g_src_weighted_decision_point_valid = false;
-    g_src_weighted_decision_point_x = 0;
-    g_src_weighted_decision_point_y = 0;
     g_ipm_line_error_track_valid = false;
     g_ipm_line_error_track_index = -1;
     g_ipm_line_error_track_x = 0;
     g_ipm_line_error_track_y = 0;
-    g_selected_centerline_curvature.fill(0.0f);
-    g_selected_centerline_curvature_count = 0;
     g_mean_abs_offset = 0.0f;
     g_selected_centerline_count = 0;
     g_required_last_index_for_straight = -1;
@@ -163,21 +88,18 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
                                                                  int src_center_count,
                                                                  int ipm_center_x_ref)
 {
+    (void)src_center_x;
+    (void)src_center_y;
+    (void)src_center_count;
     g_ipm_line_error_track_valid = false;
     g_ipm_line_error_track_index = -1;
     g_ipm_line_error_track_x = 0;
     g_ipm_line_error_track_y = 0;
-    g_ipm_weighted_decision_point_valid = false;
-    g_ipm_weighted_decision_point_x = 0;
-    g_ipm_weighted_decision_point_y = 0;
-    g_src_weighted_decision_point_valid = false;
-    g_src_weighted_decision_point_x = 0;
-    g_src_weighted_decision_point_y = 0;
     g_selected_centerline_count = 0;
     g_required_last_index_for_straight = -1;
     g_abs_error_sum_to_required_index = 0.0f;
 
-    const int center_count = std::clamp(ipm_center_count, 0, static_cast<int>(g_selected_centerline_curvature.size()));
+    const int center_count = std::clamp(ipm_center_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2));
     if (center_count <= 0)
     {
         return 0;
@@ -185,14 +107,9 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     const uint16 *xs = ipm_center_x;
     const uint16 *ys = ipm_center_y;
     const int count = center_count;
-    const uint16 *src_xs = src_center_x;
-    const uint16 *src_ys = src_center_y;
-    const int src_count = std::max(0, src_center_count);
     g_selected_centerline_count = count;
     if (xs == nullptr || ys == nullptr || count <= 0)
     {
-        g_selected_centerline_curvature.fill(0.0f);
-        g_selected_centerline_curvature_count = 0;
         g_mean_abs_offset = 0.0f;
         g_selected_centerline_count = 0;
         g_required_last_index_for_straight = -1;
@@ -208,8 +125,6 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         }
         g_mean_abs_offset = (count > 0) ? static_cast<float>(sum_abs / static_cast<double>(count)) : 0.0f;
     }
-
-    compute_selected_centerline_curvature(xs, ys, count);
 
     float x = 0.0f;
     float y = 0.0f;
@@ -260,36 +175,6 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         }
         g_required_last_index_for_straight = last_required_index;
 
-        int decision_index = -1;
-        for (size_t i = 0; i < point_count; ++i)
-        {
-            const int idx = point_indices[i];
-            if (idx >= 0 && idx < count)
-            {
-                decision_index = idx;
-                break;
-            }
-        }
-        if (decision_index >= 0)
-        {
-            const int decision_point_error = static_cast<int>(xs[decision_index]) - ipm_center_x_ref;
-            g_ipm_line_error_weighted_first_point_error.store(decision_point_error);
-            // 动态间距模式已移除：原始加权模式固定使用配置索引点。
-            g_ipm_weighted_decision_point_valid = true;
-            g_ipm_weighted_decision_point_x = static_cast<int>(xs[decision_index]);
-            g_ipm_weighted_decision_point_y = static_cast<int>(ys[decision_index]);
-            if (src_xs != nullptr && src_ys != nullptr && decision_index < src_count)
-            {
-                g_src_weighted_decision_point_valid = true;
-                g_src_weighted_decision_point_x = static_cast<int>(src_xs[decision_index]);
-                g_src_weighted_decision_point_y = static_cast<int>(src_ys[decision_index]);
-            }
-        }
-        else
-        {
-            g_ipm_line_error_weighted_first_point_error.store(0);
-        }
-
         float total_weight = 0.0f;
         float valid_weight = 0.0f;
         for (size_t i = 0; i < point_count; ++i)
@@ -311,16 +196,6 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
             x = static_cast<float>(xs[fallback_idx]);
             y = static_cast<float>(ys[fallback_idx]);
             g_ipm_line_error_track_index = fallback_idx;
-            g_ipm_line_error_weighted_first_point_error.store(static_cast<int>(xs[fallback_idx]) - ipm_center_x_ref);
-            g_ipm_weighted_decision_point_valid = true;
-            g_ipm_weighted_decision_point_x = static_cast<int>(xs[fallback_idx]);
-            g_ipm_weighted_decision_point_y = static_cast<int>(ys[fallback_idx]);
-            if (src_xs != nullptr && src_ys != nullptr && fallback_idx < src_count)
-            {
-                g_src_weighted_decision_point_valid = true;
-                g_src_weighted_decision_point_x = static_cast<int>(src_xs[fallback_idx]);
-                g_src_weighted_decision_point_y = static_cast<int>(src_ys[fallback_idx]);
-            }
         }
         else
         {
@@ -478,18 +353,12 @@ int vision_line_error_layer_curvature_step()
 
 void vision_line_error_layer_set_curvature_enabled(bool enabled)
 {
-    g_centerline_curvature_enabled.store(enabled);
+    (void)enabled;
 }
 
 bool vision_line_error_layer_curvature_enabled()
 {
-    return g_centerline_curvature_enabled.load();
-}
-
-void vision_line_error_layer_get_selected_centerline_curvature(const float **curvature, int *count)
-{
-    if (curvature) *curvature = g_selected_centerline_curvature.data();
-    if (count) *count = g_selected_centerline_curvature_count;
+    return false;
 }
 
 float vision_line_error_layer_mean_abs_offset()
@@ -510,23 +379,4 @@ int vision_line_error_layer_required_last_index_for_straight()
 float vision_line_error_layer_abs_error_sum_to_required_index()
 {
     return g_abs_error_sum_to_required_index;
-}
-
-int vision_line_error_layer_weighted_first_point_error()
-{
-    return g_ipm_line_error_weighted_first_point_error.load();
-}
-
-void vision_line_error_layer_get_ipm_weighted_decision_point(bool *valid, int *x, int *y)
-{
-    if (valid) *valid = g_ipm_weighted_decision_point_valid;
-    if (x) *x = g_ipm_weighted_decision_point_x;
-    if (y) *y = g_ipm_weighted_decision_point_y;
-}
-
-void vision_line_error_layer_get_src_weighted_decision_point(bool *valid, int *x, int *y)
-{
-    if (valid) *valid = g_src_weighted_decision_point_valid;
-    if (x) *x = g_src_weighted_decision_point_x;
-    if (y) *y = g_src_weighted_decision_point_y;
 }

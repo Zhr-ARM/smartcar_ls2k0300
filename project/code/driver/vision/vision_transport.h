@@ -6,8 +6,7 @@
 typedef enum
 {
     VISION_SEND_BINARY = 0, // 发送二值图（黑白）。
-    VISION_SEND_GRAY = 1,   // 发送灰度图（可叠加边线）。
-    VISION_SEND_RGB565 = 2  // 发送 RGB565 彩图（纯图像）。
+    VISION_SEND_GRAY = 1    // 发送灰度图（可叠加边线）。
 } vision_send_mode_enum;
 
 // 作用：初始化 transport 模块内部状态。

@@ -11,15 +11,12 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
-#include <cerrno>
 #include <cstring>
 #include <cmath>
 #include <limits>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 namespace
 {
@@ -43,11 +40,6 @@ static constexpr int kRedSearchMinHRef = 36;
 static constexpr int kRedExpectedAreaPxRef = 60;
 static constexpr int kRedAreaMinPxRef = 20;
 static constexpr int kRedAreaMaxPxRef = 450;
-
-// ROI 抓图参数：每次检测到红框后按间隔抓图，最多抓取 kCaptureMaxCount 张。
-static constexpr int kCaptureMinIntervalMs = 1000;
-static constexpr int kCaptureMaxCount = 20;
-static constexpr const char *kCaptureDir = "vision_roi_captures";
 
 struct infer_job_t
 {
@@ -83,12 +75,6 @@ struct infer_worker_result_t
 static LQ_NCNN *g_ncnn = nullptr;
 static std::atomic<bool> g_infer_enabled(false);
 static std::atomic<bool> g_ncnn_enabled(false);
-
-// ROI 抓图状态。
-static std::atomic<bool> g_roi_capture_mode_enabled(false);
-static std::atomic<int> g_roi_capture_saved_count(0);
-static std::atomic<int64_t> g_roi_capture_last_save_ms(-(int64_t)kCaptureMinIntervalMs);
-static std::atomic<bool> g_roi_capture_done_notified(false);
 
 // 异步 worker 线程与共享任务/结果缓冲。
 static std::mutex g_infer_mutex;
@@ -149,76 +135,6 @@ static cv::Rect build_ncnn_proc_roi_from_red_rect(int red_x_proc,
     roi_x_proc = std::clamp(roi_x_proc, 0, std::max(0, kProcWidth - side_proc));
     roi_y_proc = std::clamp(roi_y_proc, 0, std::max(0, kProcHeight - side_proc));
     return cv::Rect(roi_x_proc, roi_y_proc, side_proc, side_proc) & cv::Rect(0, 0, kProcWidth, kProcHeight);
-}
-
-static int64_t steady_now_ms()
-{
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::steady_clock::now().time_since_epoch())
-        .count();
-}
-
-static void ensure_capture_dir_once()
-{
-    static std::once_flag flag;
-    std::call_once(flag, []() {
-        if (mkdir(kCaptureDir, 0777) != 0 && errno != EEXIST)
-        {
-            printf("[VISION CAPTURE] mkdir failed: %s err=%d\r\n", kCaptureDir, errno);
-        }
-    });
-}
-
-static void try_save_infer_roi_png(const cv::Mat &frame, const cv::Rect &ncnn_roi)
-{
-    if (!g_roi_capture_mode_enabled.load())
-    {
-        return;
-    }
-
-    const int saved = g_roi_capture_saved_count.load();
-    if (saved >= kCaptureMaxCount)
-    {
-        if (!g_roi_capture_done_notified.exchange(true))
-        {
-            printf("[VISION CAPTURE] done count=%d\r\n", saved);
-        }
-        return;
-    }
-
-    const int64_t now_ms = steady_now_ms();
-    const int64_t last_ms = g_roi_capture_last_save_ms.load();
-    if ((now_ms - last_ms) < kCaptureMinIntervalMs)
-    {
-        return;
-    }
-    g_roi_capture_last_save_ms.store(now_ms);
-
-    const int idx = g_roi_capture_saved_count.fetch_add(1);
-    if (idx >= kCaptureMaxCount)
-    {
-        g_roi_capture_saved_count.store(kCaptureMaxCount);
-        return;
-    }
-
-    const cv::Rect safe_roi = ncnn_roi & cv::Rect(0, 0, frame.cols, frame.rows);
-    if (safe_roi.width <= 0 || safe_roi.height <= 0)
-    {
-        return;
-    }
-
-    ensure_capture_dir_once();
-    cv::Mat roi = frame(safe_roi).clone();
-    char path[160] = {0};
-    std::snprintf(path, sizeof(path), "%s/roi_%02d.png", kCaptureDir, idx + 1);
-    if (cv::imwrite(path, roi))
-    {
-        printf("[VISION CAPTURE] saved %d/%d %s\r\n", idx + 1, kCaptureMaxCount, path);
-        if (idx + 1 >= kCaptureMaxCount && !g_roi_capture_done_notified.exchange(true))
-        {
-            printf("[VISION CAPTURE] done count=%d\r\n", kCaptureMaxCount);
-        }
-    }
 }
 
 static cv::Rect fallback_center_roi()
@@ -439,7 +355,6 @@ static void run_infer_worker()
                                                                      result.red_w,
                                                                      result.red_h);
 
-            try_save_infer_roi_png(job.proc_bgr, result.ncnn_roi_proc);
             if (g_ncnn_enabled.load())
             {
                 cv::Rect safe_roi = result.ncnn_roi_proc & cv::Rect(0, 0, kProcWidth, kProcHeight);
@@ -725,10 +640,6 @@ bool vision_infer_async_init(LQ_NCNN *ncnn, bool enabled)
     g_ncnn = ncnn;
     g_infer_enabled.store(enabled);
     g_ncnn_enabled.store(enabled);
-
-    g_roi_capture_saved_count.store(0);
-    g_roi_capture_last_save_ms.store(steady_now_ms() - kCaptureMinIntervalMs);
-    g_roi_capture_done_notified.store(false);
     reset_infer_shared_state();
 
     {
@@ -761,8 +672,6 @@ void vision_infer_async_cleanup()
         g_infer_worker_running = false;
     }
     reset_infer_shared_state();
-    g_roi_capture_saved_count.store(0);
-    g_roi_capture_done_notified.store(false);
 }
 
 void vision_infer_async_set_enabled(bool enabled)
@@ -787,31 +696,6 @@ void vision_infer_async_set_ncnn_enabled(bool enabled)
 bool vision_infer_async_ncnn_enabled()
 {
     return g_ncnn_enabled.load();
-}
-
-void vision_infer_async_set_roi_capture_mode(bool enabled)
-{
-    const bool prev = g_roi_capture_mode_enabled.exchange(enabled);
-    if (enabled && !prev)
-    {
-        g_roi_capture_saved_count.store(0);
-        g_roi_capture_last_save_ms.store(steady_now_ms() - kCaptureMinIntervalMs);
-        g_roi_capture_done_notified.store(false);
-        ensure_capture_dir_once();
-        printf("[VISION CAPTURE] mode=ON interval=%dms max=%d dir=%s\r\n",
-               kCaptureMinIntervalMs,
-               kCaptureMaxCount,
-               kCaptureDir);
-    }
-    else if (!enabled && prev)
-    {
-        printf("[VISION CAPTURE] mode=OFF saved=%d\r\n", g_roi_capture_saved_count.load());
-    }
-}
-
-bool vision_infer_async_roi_capture_mode_enabled()
-{
-    return g_roi_capture_mode_enabled.load();
 }
 
 void vision_infer_async_submit_frame(const uint8 *bgr_proc_data,

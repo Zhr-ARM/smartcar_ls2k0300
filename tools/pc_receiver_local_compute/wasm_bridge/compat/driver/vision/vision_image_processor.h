@@ -38,19 +38,12 @@ void vision_image_processor_get_ipm_boundaries(uint16 **x1, uint16 **x2, uint16 
 void vision_image_processor_get_boundaries(uint16 **x1, uint16 **x2, uint16 **x3,
                                            uint16 **y1, uint16 **y2, uint16 **y3,
                                            uint16 *dot_num);
-void vision_image_processor_get_src_boundary_corners(uint16 **left_x, uint16 **left_y, uint16 *left_num,
-                                                     uint16 **right_x, uint16 **right_y, uint16 *right_num);
-void vision_image_processor_get_ipm_boundary_corners(uint16 **left_x, uint16 **left_y, uint16 *left_num,
-                                                     uint16 **right_x, uint16 **right_y, uint16 *right_num);
 void vision_image_processor_get_ipm_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_ipm_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_src_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_src_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_ipm_line_error_track_point(bool *valid, int *x, int *y);
 int vision_image_processor_ipm_line_error_track_index();
-void vision_image_processor_get_ipm_selected_centerline_curvature(const float **curvature, int *count);
-void vision_image_processor_get_ipm_left_boundary_angle_cos(const float **angle_cos, int *count);
-void vision_image_processor_get_ipm_right_boundary_angle_cos(const float **angle_cos, int *count);
 uint8 vision_image_processor_get_last_otsu_threshold();
 
 #endif

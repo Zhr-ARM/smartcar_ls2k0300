@@ -236,7 +236,6 @@ int main(int, char**)
     vision_thread_set_infer_enabled(g_vision_runtime_config.infer_enabled); // 推理开关
     vision_thread_set_ncnn_enabled(g_vision_runtime_config.ncnn_enabled); // ncnn 子开关
     vision_thread_set_client_sender_enabled(g_vision_runtime_config.client_sender_enabled); // 逐飞发送开关
-    vision_thread_set_roi_capture_mode(g_vision_runtime_config.roi_capture_mode); // ROI 抓图开关
 
     // [视觉处理]
     vision_image_processor_set_maze_start_row(g_vision_runtime_config.maze_start_row); // 迷宫法起始搜索行
@@ -269,14 +268,13 @@ int main(int, char**)
     vision_image_processor_set_ipm_line_error_index_range(g_vision_runtime_config.ipm_line_error_index_min,
                                                           g_vision_runtime_config.ipm_line_error_index_max); // line_error 随速度索引区间
 
-    printf("[VISION CFG] mode=%d max_fps=%u infer=%d ncnn=%d client_send=%d screen=%d roi_capture=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_angle_step=%d ipm_straight_min_pts=%d ipm_straight_check=%d ipm_straight_min_cos=%.2f ipm_track_w=%.2f ipm_target_left=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
+    printf("[VISION CFG] mode=%d max_fps=%u infer=%d ncnn=%d client_send=%d screen=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_angle_step=%d ipm_straight_min_pts=%d ipm_straight_check=%d ipm_straight_min_cos=%.2f ipm_track_w=%.2f ipm_target_left=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
            static_cast<int>(vision_thread_get_send_mode()),
            static_cast<unsigned int>(vision_thread_get_send_max_fps()),
            vision_thread_infer_enabled() ? 1 : 0,
            vision_thread_ncnn_enabled() ? 1 : 0,
            vision_thread_client_sender_enabled() ? 1 : 0,
            g_vision_runtime_config.screen_display_enabled ? 1 : 0,
-           vision_thread_roi_capture_mode_enabled() ? 1 : 0,
            vision_image_processor_get_maze_start_row(),
            vision_image_processor_undistort_enabled() ? 1 : 0,
            vision_image_processor_ipm_triangle_filter_enabled() ? 1 : 0,

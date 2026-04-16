@@ -52,11 +52,6 @@ bool vision_pipeline_infer_enabled();
 void vision_pipeline_set_ncnn_enabled(bool enabled);
 bool vision_pipeline_ncnn_enabled();
 
-// 作用：ROI 抓图模式开关（检测到目标后保存 PNG）。
-// 意义：采集推理样本，便于离线排查。
-void vision_pipeline_set_roi_capture_mode(bool enabled);
-bool vision_pipeline_roi_capture_mode_enabled();
-
 // 作用：读取红色矩形结果（来自 image_processor 全局状态）。
 // 意义：供外部状态上报/UI显示使用。
 void vision_pipeline_get_red_rect(bool *found, int *x, int *y, int *w, int *h, int *cx, int *cy);

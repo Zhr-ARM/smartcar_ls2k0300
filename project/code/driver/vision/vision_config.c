@@ -46,8 +46,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 3. 若要兼顾“低负载 + 高保真”，优先把灰度图格式切到 PNG。
     // ==================== 本地显示与逐飞助手链路 ====================
     // 图传输出模式：
-    // 0=binary 二值图，1=gray 灰度图(带线)，2=rgb565 彩图。
-    .send_mode = 2,
+    // 0=binary 二值图，1=gray 灰度图(带线)。
+    .send_mode = 1,
     // 图传发送上限帧率，0 表示不限速。
     .send_max_fps = 60,
     // 推理总开关：false 时关闭红色识别与 ncnn 推理。
@@ -198,11 +198,6 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 发送当前实际跟踪点坐标 [x, y]。
     .udp_web_tcp_send_ipm_track_point = true,
     // 发送首点的当前偏差。
-    .udp_web_tcp_send_ipm_weighted_first_point_error = false,
-    // 发送逆透视图上的决策点坐标。
-    .udp_web_tcp_send_ipm_weighted_decision_point = false,
-    // 发送原图上的决策点坐标。
-    .udp_web_tcp_send_src_weighted_decision_point = false,
 
     // ==================== TCP 原图边界点列 ====================
     // 发送原图坐标系下的左边界点列。
@@ -235,8 +230,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    //.udp_web_server_ip = "172.21.79.129",
-    .udp_web_server_ip = "10.119.73.102",
+    .udp_web_server_ip = "172.21.79.129",
+    //.udp_web_server_ip = "10.119.73.102",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -250,8 +245,6 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 参数区域 1: 视觉处理 ====================
     // 说明：视觉处理链参数（迷宫法、去畸变、IPM 边界/中线后处理）集中在这里。
-    // ROI 抓图模式：检测到红框后周期性保存推理 ROI。
-    .roi_capture_mode = false,
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
     .maze_start_row = 100,
     // 原图巡线方法：0=迷宫法，1=八邻域法。
@@ -272,6 +265,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
     .cross_lower_corner_transition_max_len = 4,
     // 左右下角点 y 坐标最大差值：用于判断双下角点是否稳定同时成立。
     .cross_lower_corner_pair_y_diff_max = 30,
+    // 普通原图下角点处理：默认开启“截断后拟合直线并向上补一段”。
+    .cross_lower_corner_extrapolate_enabled = false,
     // 十字补线触发的下角点最小 y 阈值。
     .cross_lower_corner_extrapolate_min_y = 35,
     // 十字下角点补线向上的延伸长度（按 y 行数计算）。

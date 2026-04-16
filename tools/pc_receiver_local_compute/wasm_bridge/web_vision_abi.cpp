@@ -49,17 +49,6 @@ void append_point_set(std::string &out, const web_vision_point_set_t &pts)
     out += "]";
 }
 
-void append_scalar_series(std::string &out, const web_vision_scalar_series_t &series)
-{
-    out += "[";
-    for (int i = 0; i < series.count; ++i)
-    {
-        if (i > 0) out += ",";
-        out += std::to_string(series.values[i]);
-    }
-    out += "]";
-}
-
 void rebuild_last_result_json()
 {
     std::string out;
@@ -96,25 +85,10 @@ void rebuild_last_result_json()
     append_point_set(out, g_last_result.ipm_left_boundary);
     append_key("ipmRightBoundary");
     append_point_set(out, g_last_result.ipm_right_boundary);
-    append_key("leftBoundaryCorner");
-    append_point_set(out, g_last_result.left_boundary_corner);
-    append_key("rightBoundaryCorner");
-    append_point_set(out, g_last_result.right_boundary_corner);
-    append_key("ipmLeftBoundaryCorner");
-    append_point_set(out, g_last_result.ipm_left_boundary_corner);
-    append_key("ipmRightBoundaryCorner");
-    append_point_set(out, g_last_result.ipm_right_boundary_corner);
     append_key("centerline");
     append_point_set(out, g_last_result.src_centerline_selected_shift);
     append_key("ipmCenterline");
     append_point_set(out, g_last_result.centerline_selected_shift);
-
-    append_key("centerlineCurvature");
-    append_scalar_series(out, g_last_result.centerline_curvature);
-    append_key("leftBoundaryAngleCos");
-    append_scalar_series(out, g_last_result.left_boundary_angle_cos);
-    append_key("rightBoundaryAngleCos");
-    append_scalar_series(out, g_last_result.right_boundary_angle_cos);
 
     append_key("summary");
     append_json_escaped(out, g_last_result.status_message);
