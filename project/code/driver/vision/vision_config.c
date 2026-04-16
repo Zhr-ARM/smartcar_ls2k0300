@@ -366,7 +366,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 进入 straight 状态所需连续帧数。
     .route_straight_enter_consecutive_frames = 2,
     // straight 判定：从 0 到最后误差索引的绝对误差和必须小于该值。
-    .route_straight_abs_error_sum_max = 80.0f,
+    .route_straight_abs_error_sum_max = 20.0f,
     // cross_1：沿角点同 x 向上找白->黑转变，最多 75 行。
     .cross_aux_vertical_scan_max_rows = 75,
     // cross_1：辅助边界八邻域最多保存 80 个点。
@@ -390,7 +390,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // line_error 加权点数量。
     .ipm_line_error_weighted_point_count = 3,
     // line_error 加权索引点（0-based）。
-    .ipm_line_error_point_indices = {8, 12, 16},
+    .ipm_line_error_point_indices = {8, 16, 24},
     // line_error 各索引点对应权重。
     .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
