@@ -1,6 +1,7 @@
 #include "line_follow_thread.h"
 
 #include "imu_thread.h"
+#include "app/beep_thread/beep_thread.h"
 #include "driver/vision/vision_config.h"
 #include "driver/vision/vision_image_processor.h"
 #include "driver/vision/vision_route_state_machine.h"
@@ -23,6 +24,7 @@ namespace
 constexpr int32 LINE_FOLLOW_PERIOD_MS = 20;
 // 调度优先级：巡线线程作为中高优先级实时任务执行。
 constexpr int32 LINE_FOLLOW_THREAD_PRIORITY = 8;
+constexpr int32 LINE_FOLLOW_MAIN_STATE_SWITCH_BEEP_MS = 200;
 constexpr float LINE_FOLLOW_LOOP_DT_SECONDS = LINE_FOLLOW_PERIOD_MS / 1000.0f;
 constexpr float IMU_NOMINAL_DT_SECONDS = 0.005f;
 constexpr float VISION_NOMINAL_DT_SECONDS = 1.0f / 60.0f;
@@ -295,6 +297,8 @@ void log_route_state_transition_if_changed(int route_main_state, int route_sub_s
     const RouteProfileSelection current_selection =
         select_route_profile_selection(route_main_state, route_sub_state);
 
+    const bool main_state_changed = (route_main_state != g_last_logged_route_main_state);
+
     printf("[LINE_FOLLOW STATE] main %s -> %s, sub %s -> %s, profile %s -> %s\r\n",
            route_main_state_name(g_last_logged_route_main_state),
            route_main_state_name(route_main_state),
@@ -302,6 +306,10 @@ void log_route_state_transition_if_changed(int route_main_state, int route_sub_s
            route_sub_state_name(route_sub_state),
            previous_selection.name,
            current_selection.name);
+    if (main_state_changed)
+    {
+        beep_thread_request_beep(LINE_FOLLOW_MAIN_STATE_SWITCH_BEEP_MS);
+    }
 
     g_last_logged_route_main_state = route_main_state;
     g_last_logged_route_sub_state = route_sub_state;

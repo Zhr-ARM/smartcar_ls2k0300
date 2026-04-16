@@ -1,4 +1,5 @@
 #include "zf_common_headfile.h"
+#include "app/beep_thread/beep_thread.h"
 #include "battery.h"
 #include "uart_thread.h"
 #include "motor_thread.h"
@@ -20,13 +21,16 @@ volatile sig_atomic_t g_should_exit = 0;
 
 namespace
 {
-bool g_cleanup_done = false;
+constexpr float kStartupLowVoltageThresholdV = 11.6f;
+constexpr int kMainLoopPeriodMs = 50;
+constexpr int kBatteryRefreshPeriodMs = 1000;
+constexpr int kLowVoltageStatusPrintPeriodMs = 2000;
 
-void cleanup_once()
+bool g_worker_cleanup_done = false;
+
+void cleanup_worker_threads_once()
 {
-    battery_low_voltage_protection_silence_buzzer();
-
-    if (g_cleanup_done)
+    if (g_worker_cleanup_done)
     {
         return;
     }
@@ -39,7 +43,15 @@ void cleanup_once()
     motor_thread_cleanup();
     imu_thread_cleanup();
     uart_thread_cleanup();
-    g_cleanup_done = true;
+    g_worker_cleanup_done = true;
+}
+
+void cleanup_once()
+{
+    cleanup_worker_threads_once();
+    beep_thread_set_alarm_enabled(false);
+    beep_thread_cleanup();
+    battery_low_voltage_protection_silence_buzzer();
 }
 
 void stop_all_motion_immediately()
@@ -50,16 +62,39 @@ void stop_all_motion_immediately()
     brushless_driver.stop_all();
 }
 
-void handle_low_battery_protection()
+float read_battery_voltage_once_v()
 {
-    printf("[BATTERY] low voltage triggered=%.2fV threshold=%.2fV -> stopping all control loops\r\n",
-           static_cast<double>(battery_low_voltage_protection_filtered_voltage_v()),
-           static_cast<double>(battery_low_voltage_protection_threshold_v()));
+    battery_monitor.update();
+    return battery_monitor.voltage_v();
+}
+
+void handle_low_battery_startup_block(float measured_voltage_v)
+{
+    printf("[BATTERY] startup blocked voltage=%.2fV threshold=%.2fV\r\n",
+           static_cast<double>(measured_voltage_v),
+           static_cast<double>(kStartupLowVoltageThresholdV));
     printf("[BATTERY] buzzer alarm active, press Ctrl+C to stop alarm and exit\r\n");
 
     stop_all_motion_immediately();
-    cleanup_once();
-    battery_low_voltage_protection_run_alarm_loop(&g_should_exit);
+    cleanup_worker_threads_once();
+    beep_thread_set_alarm_enabled(true);
+
+    int elapsed_since_print_ms = kLowVoltageStatusPrintPeriodMs;
+    while (!g_should_exit)
+    {
+        if (elapsed_since_print_ms >= kLowVoltageStatusPrintPeriodMs)
+        {
+            const float current_voltage_v = read_battery_voltage_once_v();
+            printf("[BATTERY] startup alarm active voltage=%.2fV, waiting for Ctrl+C\r\n",
+                   static_cast<double>(current_voltage_v));
+            elapsed_since_print_ms = 0;
+        }
+
+        system_delay_ms(kMainLoopPeriodMs);
+        elapsed_since_print_ms += kMainLoopPeriodMs;
+    }
+
+    beep_thread_set_alarm_enabled(false);
 }
 } // namespace
 
@@ -81,12 +116,26 @@ int main(int, char**)
     signal(SIGTERM, exit_signal_handler);
     signal(SIGQUIT, exit_signal_handler);
     signal(SIGHUP, exit_signal_handler);
-    
-    battery_low_voltage_protection_init();
 
-    if (battery_low_voltage_protection_update())
+    if (!beep_thread_init())
     {
-        handle_low_battery_protection();
+        cleanup_once();
+        return -1;
+    }
+
+    battery_monitor.init();
+    const float startup_voltage_v = battery_monitor.voltage_v();
+    printf("[BATTERY] startup voltage=%.2fV threshold=%.2fV\r\n",
+           static_cast<double>(startup_voltage_v),
+           static_cast<double>(kStartupLowVoltageThresholdV));
+
+    if (startup_voltage_v < kStartupLowVoltageThresholdV)
+    {
+        handle_low_battery_startup_block(startup_voltage_v);
+        if (g_should_exit)
+        {
+            printf("收到Ctrl+C,程序即将退出\n");
+        }
         cleanup_once();
         return 0;
     }
@@ -265,17 +314,19 @@ int main(int, char**)
     //motor_thread_set_target_count(600.0f, 600.0f);
     
     system_delay_ms(50);
+    beep_thread_print_info();
     motor_thread_print_info();
     imu_thread_print_info();
     line_follow_thread_print_info();
 
     bool zebra_cross_stop_triggered = false;
+    int battery_refresh_elapsed_ms = kBatteryRefreshPeriodMs;
     while(!g_should_exit)
-    {   
-        if (battery_low_voltage_protection_update())
+    {
+        if (battery_refresh_elapsed_ms >= kBatteryRefreshPeriodMs)
         {
-            handle_low_battery_protection();
-            break;
+            battery_monitor.update();
+            battery_refresh_elapsed_ms = 0;
         }
 
         if (!zebra_cross_stop_triggered &&
@@ -289,7 +340,8 @@ int main(int, char**)
             motor_thread_cleanup();
         }
 
-        system_delay_ms(battery_low_voltage_protection_check_period_ms());
+        system_delay_ms(kMainLoopPeriodMs);
+        battery_refresh_elapsed_ms += kMainLoopPeriodMs;
     }
 
     battery_low_voltage_protection_silence_buzzer();
