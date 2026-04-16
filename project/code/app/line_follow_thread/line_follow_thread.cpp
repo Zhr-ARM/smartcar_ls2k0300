@@ -59,6 +59,10 @@ float g_applied_base_speed_state = -1.0f;
 // 位置环与角速度环各自最近一次真实更新后的输出，样本未更新时沿用旧值。
 float g_position_output_state = 0.0f;
 float g_yaw_rate_output_state = 0.0f;
+// 位置环用于动态Kd调度的误差变化率状态：只在拿到新视觉帧时推进一次。
+float g_position_error_rate_px_per_second = 0.0f;
+float g_last_position_control_error_px = 0.0f;
+bool g_has_last_position_control_error = false;
 // 最近一次已消费的 IMU / 视觉样本序号。
 uint32 g_last_imu_sample_seq = 0;
 uint32 g_last_vision_frame_seq = 0;
@@ -130,6 +134,39 @@ float compute_linear_abs_gain(float base_gain,
     // 一次增益律 + 限幅保护。
     return std::clamp(base_gain + linear_a * abs_error, min_gain, max_gain);
 }
+
+/**
+ * @brief 三段连续分段动态增益：不同误差段用不同斜率，但段间保持连续。
+ *
+ * 数学形式：
+ * gain = base
+ *      + a1 * clamp(|e|, 0, t1)
+ *      + a2 * clamp(|e|-t1, 0, t2-t1)
+ *      + a3 * max(|e|-t2, 0)
+ */
+float compute_piecewise_linear_abs_gain(float base_gain,
+                                        float low_a,
+                                        float low_threshold,
+                                        float mid_a,
+                                        float mid_threshold,
+                                        float high_a,
+                                        float min_gain,
+                                        float max_gain,
+                                        float error_value)
+{
+    const float abs_error = std::fabs(error_value);
+    const float clamped_low_threshold = std::max(low_threshold, 0.0f);
+    const float clamped_mid_threshold = std::max(mid_threshold, clamped_low_threshold);
+    const float low_segment = std::clamp(abs_error, 0.0f, clamped_low_threshold);
+    const float mid_segment =
+        std::clamp(abs_error - clamped_low_threshold, 0.0f, clamped_mid_threshold - clamped_low_threshold);
+    const float high_segment = std::max(abs_error - clamped_mid_threshold, 0.0f);
+    const float gain = base_gain +
+                       low_a * low_segment +
+                       mid_a * mid_segment +
+                       high_a * high_segment;
+    return std::clamp(gain, min_gain, max_gain);
+}
 // 把滤波后的像素误差转换成真正参与位置环控制的像素 control_error_px，
 // 同时保留便于调试的绝对误差量。
 ControlErrorState compute_control_error_state(float filtered_error_px)
@@ -162,6 +199,9 @@ void reset_line_follow_runtime_state()
     g_applied_base_speed_state = -1.0f;
     g_position_output_state = 0.0f;
     g_yaw_rate_output_state = 0.0f;
+    g_position_error_rate_px_per_second = 0.0f;
+    g_last_position_control_error_px = 0.0f;
+    g_has_last_position_control_error = false;
     g_last_imu_sample_seq = 0;
     g_last_vision_frame_seq = 0;
     g_has_last_imu_update_time = false;
@@ -331,9 +371,10 @@ float compute_signed_track_point_angle_deg(bool track_valid, int track_x, int tr
 
 void configure_line_follow_controllers_for_profile(const RouteProfile &profile,
                                                    float position_kp,
+                                                   float position_kd,
                                                    float yaw_rate_kp)
 {
-    position_pid1.set_params(position_kp, profile.position_ki, profile.position_kd);
+    position_pid1.set_params(position_kp, profile.position_ki, position_kd);
     position_pid1.set_integral_limit(profile.position_max_integral);
     position_pid1.set_output_limit(profile.position_max_output);
 
@@ -440,6 +481,33 @@ float compute_sample_dt_seconds(std::chrono::steady_clock::time_point now,
     last_time = now;
     has_last_time = true;
     return clamp_valid_dt_seconds(dt_seconds, fallback_dt_seconds, max_dt_seconds);
+}
+
+float update_position_error_rate_if_needed(bool vision_updated,
+                                           float control_error_px,
+                                           float fallback_dt_seconds)
+{
+    if (!vision_updated)
+    {
+        return g_position_error_rate_px_per_second;
+    }
+
+    const float safe_dt_seconds =
+        clamp_valid_dt_seconds(fallback_dt_seconds, VISION_NOMINAL_DT_SECONDS, VISION_MAX_DT_SECONDS);
+
+    if (!g_has_last_position_control_error)
+    {
+        g_position_error_rate_px_per_second = 0.0f;
+    }
+    else
+    {
+        g_position_error_rate_px_per_second =
+            (control_error_px - g_last_position_control_error_px) / safe_dt_seconds;
+    }
+
+    g_last_position_control_error_px = control_error_px;
+    g_has_last_position_control_error = true;
+    return g_position_error_rate_px_per_second;
 }
 
 float update_pid_output_state_if_needed(bool should_update,
@@ -679,11 +747,25 @@ void line_follow_loop()
 
         // 动态 Kp：误差越大，比例增益越强。
         // 这里不再对动态 Kp 的输入额外归一化，直接用经过死区/低增益处理后的像素误差。
-        const float dynamic_kp = compute_linear_abs_gain(route_profile.position_dynamic_kp_base,
-                                                         route_profile.position_dynamic_kp_quad_a,
-                                                         route_profile.position_dynamic_kp_min,
-                                                         route_profile.position_dynamic_kp_max,
-                                                         error_state.control_error_px);
+        const float dynamic_kp =
+            compute_piecewise_linear_abs_gain(route_profile.position_dynamic_kp_base,
+                                              route_profile.position_dynamic_kp_quad_a,
+                                              route_profile.position_dynamic_kp_low_error_threshold_px,
+                                              route_profile.position_dynamic_kp_mid_a,
+                                              route_profile.position_dynamic_kp_mid_error_threshold_px,
+                                              route_profile.position_dynamic_kp_high_a,
+                                              route_profile.position_dynamic_kp_min,
+                                              route_profile.position_dynamic_kp_max,
+                                              error_state.control_error_px);
+        const float position_error_rate_px_per_second =
+            update_position_error_rate_if_needed(vision_updated,
+                                                 error_state.control_error_px,
+                                                 vision_frame_dt_seconds);
+        const float dynamic_position_kd = compute_linear_abs_gain(route_profile.position_kd,
+                                                                  route_profile.position_dynamic_kd_quad_a,
+                                                                  route_profile.position_dynamic_kd_min,
+                                                                  route_profile.position_dynamic_kd_max,
+                                                                  position_error_rate_px_per_second);
 
         // 第二条支路：角速度环 PID。
         // 当前固定采用“跟踪点夹角 -> 目标横摆角速度”的路线：
@@ -706,7 +788,10 @@ void line_follow_loop()
             (route_profile.yaw_rate_kp_enable_error_threshold_px <= 0.0f) ||
             (error_state.abs_filtered_error_px >= route_profile.yaw_rate_kp_enable_error_threshold_px);
         const float applied_yaw_rate_kp = enable_yaw_rate_kp ? dynamic_yaw_rate_kp : 0.0f;
-        configure_line_follow_controllers_for_profile(route_profile, dynamic_kp, applied_yaw_rate_kp);
+        configure_line_follow_controllers_for_profile(route_profile,
+                                                      dynamic_kp,
+                                                      dynamic_position_kd,
+                                                      applied_yaw_rate_kp);
 
         // ---------------- 并级控制核心 ----------------
         // 第一条支路：位置环 PID，只负责“把车拉回中线”。

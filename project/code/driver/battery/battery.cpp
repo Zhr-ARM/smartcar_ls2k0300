@@ -7,7 +7,7 @@ constexpr const char *kBatteryBeepDevicePath = "/dev/zf_driver_gpio_beep";
 // 低压后打印电压、停控制线程并进入蜂鸣报警，直到用户主动退出程序。
 constexpr bool kBatteryProtectionEnabled = true;
 constexpr bool kBatteryAlarmEnabled = kBatteryProtectionEnabled;
-constexpr float kBatteryLowVoltageThresholdV = 11.3f;
+constexpr float kBatteryLowVoltageThresholdV = 11.8f;
 constexpr float kBatteryVoltageFilterAlpha = 0.35f;
 constexpr int kBatteryLowVoltageConfirmCount = 3;
 constexpr int kBatteryCheckPeriodMs =1000;

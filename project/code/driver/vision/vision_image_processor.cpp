@@ -3,6 +3,7 @@
 #include "driver/vision/vision_frame_capture.h"
 #include "driver/vision/vision_line_error_layer.h"
 #include "driver/vision/vision_route_state_machine.h"
+#include "driver/pid/pid_tuning.h"
 
 #include "app/motor_thread/motor_thread.h"
 
@@ -72,6 +73,15 @@ static constexpr int kBinaryMorphWhiteLow = 255 * 2;
 static constexpr int kInitialFrameWallKeepMaxYSpan = 15;
 static constexpr int kCrossLowerFitPointCount = 10;
 static constexpr int kCrossLowerFitMinPointCount = 2;
+static constexpr int kLineErrorProfileNormal = 0;
+static constexpr int kLineErrorProfileStraight = 1;
+static constexpr int kLineErrorProfileCross = 2;
+static constexpr int kLineErrorProfileCircleEnter = 3;
+static constexpr int kLineErrorProfileCircleInside = 4;
+static constexpr int kLineErrorProfileCircleExit = 5;
+static_assert(pid_tuning::line_error_preview::kWeightedPointCountMax ==
+                  static_cast<size_t>(VISION_LINE_ERROR_MAX_WEIGHTED_POINTS),
+              "line_error preview point count max must match vision config capacity");
 
 // 原图坐标系边线缓存：x1/x2/x3 对应 左/中/右边线，y1/y2/y3 为对应 y。
 static uint16 g_xy_x1_boundary[VISION_BOUNDARY_NUM];
@@ -294,10 +304,93 @@ static std::atomic<bool> g_ipm_centerline_curvature_enabled(g_vision_runtime_con
 static std::atomic<bool> g_keep_last_centerline_on_double_loss(g_vision_runtime_config.keep_last_centerline_on_double_loss);
 // 平移中线偏好源（左/右/无偏好自动），用于每帧选边。
 static std::atomic<int> g_ipm_line_error_preferred_source(static_cast<int>(g_vision_runtime_config.ipm_line_error_source));
+static int g_last_applied_line_error_profile_id = -1;
 
 // 对外暴露控制量（line_follow_thread 直接读取）。
 int line_error = 0;
 float line_sample_ratio = g_vision_processor_config.default_line_sample_ratio;
+
+static const pid_tuning::line_error_preview::WeightedProfile *select_line_error_weighted_profile_by_route(
+    const vision_route_state_snapshot_t &route_snapshot,
+    int *profile_id)
+{
+    if (profile_id)
+    {
+        *profile_id = kLineErrorProfileNormal;
+    }
+
+    switch (route_snapshot.main_state)
+    {
+        case VISION_ROUTE_MAIN_STRAIGHT:
+            if (profile_id) *profile_id = kLineErrorProfileStraight;
+            return &pid_tuning::line_error_preview::kStraightWeightedProfile;
+
+        case VISION_ROUTE_MAIN_CROSS:
+            if (profile_id) *profile_id = kLineErrorProfileCross;
+            return &pid_tuning::line_error_preview::kCrossWeightedProfile;
+
+        case VISION_ROUTE_MAIN_CIRCLE_LEFT:
+        case VISION_ROUTE_MAIN_CIRCLE_RIGHT:
+            switch (route_snapshot.sub_state)
+            {
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_1:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_1:
+                    if (profile_id) *profile_id = kLineErrorProfileCircleEnter;
+                    return &pid_tuning::line_error_preview::kCircleEnterWeightedProfile;
+
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_2:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_3:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_4:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_2:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:
+                    if (profile_id) *profile_id = kLineErrorProfileCircleInside;
+                    return &pid_tuning::line_error_preview::kCircleInsideWeightedProfile;
+
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_5:
+                case VISION_ROUTE_SUB_CIRCLE_LEFT_6:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:
+                case VISION_ROUTE_SUB_CIRCLE_RIGHT_6:
+                    if (profile_id) *profile_id = kLineErrorProfileCircleExit;
+                    return &pid_tuning::line_error_preview::kCircleExitWeightedProfile;
+
+                default:
+                    if (profile_id) *profile_id = kLineErrorProfileCircleEnter;
+                    return &pid_tuning::line_error_preview::kCircleEnterWeightedProfile;
+            }
+
+        case VISION_ROUTE_MAIN_NORMAL:
+        default:
+            if (profile_id) *profile_id = kLineErrorProfileNormal;
+            return &pid_tuning::line_error_preview::kNormalWeightedProfile;
+    }
+}
+
+static void apply_line_error_weighted_profile_if_needed(const vision_route_state_snapshot_t &route_snapshot)
+{
+    if (g_vision_runtime_config.ipm_line_error_method != VISION_IPM_LINE_ERROR_WEIGHTED_INDEX)
+    {
+        return;
+    }
+
+    int profile_id = kLineErrorProfileNormal;
+    const pid_tuning::line_error_preview::WeightedProfile *profile =
+        select_line_error_weighted_profile_by_route(route_snapshot, &profile_id);
+    if (profile == nullptr)
+    {
+        return;
+    }
+
+    if (g_last_applied_line_error_profile_id == profile_id)
+    {
+        return;
+    }
+
+    vision_line_error_layer_set_weighted_points(profile->point_indices,
+                                                profile->weights,
+                                                profile->weighted_point_count);
+    g_last_applied_line_error_profile_id = profile_id;
+}
 
 struct maze_point_t
 {
@@ -4619,6 +4712,7 @@ bool vision_image_processor_init(const char *camera_path)
     g_undistort_ready = false;
     init_undistort_remap_table();
     vision_line_error_layer_reset();
+    g_last_applied_line_error_profile_id = -1;
     line_error = 0;
     g_last_otsu_threshold = 127;
     g_last_maze_left_start_x = -1;
@@ -5331,6 +5425,7 @@ bool vision_image_processor_process_step()
     route_input.frame_encoder_delta = static_cast<uint32>(std::lround((std::fabs(motor_thread_left_count()) + std::fabs(motor_thread_right_count())) * 0.5f));
     vision_route_state_machine_update(&route_input);
     const vision_route_state_snapshot_t route_snapshot = vision_route_state_machine_snapshot();
+    apply_line_error_weighted_profile_if_needed(route_snapshot);
 
     if (route_snapshot.main_state == VISION_ROUTE_MAIN_CROSS)
     {

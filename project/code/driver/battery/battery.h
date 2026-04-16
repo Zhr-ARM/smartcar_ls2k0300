@@ -6,7 +6,7 @@
 
 #define BATTERY_ADC_REG_PATH "/sys/bus/iio/devices/iio:device0/in_voltage7_raw"
 #define BATTERY_ADC_SCALE_PATH "/sys/bus/iio/devices/iio:device0/in_voltage_scale"
-#define BATTERY_VOLTAGE_DIVIDER_RATIO (11.4f)
+#define BATTERY_VOLTAGE_DIVIDER_RATIO (11.0f)
 
 /**
  * @brief 电池电压监测类

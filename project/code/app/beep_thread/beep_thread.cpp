@@ -16,7 +16,7 @@ constexpr const char *kBeepDevicePath = "/dev/zf_driver_gpio_beep";
 constexpr int32 kBeepThreadPriority = 1;
 constexpr int kBeepThreadPeriodMs = 10;
 constexpr int kAlarmPeriodMs = 400;
-constexpr int kAlarmOnDurationMs = 220;
+constexpr int kAlarmOnDurationMs = 280;
 
 std::thread g_beep_thread;
 std::atomic<bool> g_beep_running(false);
