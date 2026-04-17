@@ -121,6 +121,21 @@ static bool cross_stage2_ready(const vision_route_state_input_t *input)
         return false;
     }
 
+    static constexpr int kCrossStage1CornerYEnterCross2Min = 75;
+    const bool left_ready = input->left_corner_found &&
+                            (input->left_corner_y >= kCrossStage1CornerYEnterCross2Min);
+    const bool right_ready = input->right_corner_found &&
+                             (input->right_corner_y >= kCrossStage1CornerYEnterCross2Min);
+    return left_ready || right_ready;
+}
+
+static bool cross_stage3_ready(const vision_route_state_input_t *input)
+{
+    if (input == nullptr)
+    {
+        return false;
+    }
+
     const int start_frame_wall_rows_min =
         std::max(1, g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min);
     return input->left_start_frame_wall_rows >= start_frame_wall_rows_min &&
@@ -377,6 +392,14 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
             }
             break;
         case VISION_ROUTE_SUB_CROSS_2:
+            if (cross_stage3_ready(input))
+            {
+                enter_state(VISION_ROUTE_MAIN_CROSS,
+                            VISION_ROUTE_SUB_CROSS_3,
+                            input->base_preferred_source);
+            }
+            break;
+        case VISION_ROUTE_SUB_CROSS_3:
             if (cross_exit_ready(input))
             {
                 enter_state(VISION_ROUTE_MAIN_NORMAL,

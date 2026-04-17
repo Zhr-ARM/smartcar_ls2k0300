@@ -725,6 +725,12 @@ static void send_tcp_status()
     int cross_right_upper_index = -1;
     int cross_right_upper_x = 0;
     int cross_right_upper_y = 0;
+    bool cross_stage2_frozen_left_found = false;
+    int cross_stage2_frozen_left_x = 0;
+    int cross_stage2_frozen_left_y = 0;
+    bool cross_stage2_frozen_right_found = false;
+    int cross_stage2_frozen_right_x = 0;
+    int cross_stage2_frozen_right_y = 0;
     vision_image_processor_get_cross_upper_corner_state(&cross_left_upper_found,
                                                         &cross_left_upper_index,
                                                         &cross_left_upper_x,
@@ -733,6 +739,12 @@ static void send_tcp_status()
                                                         &cross_right_upper_index,
                                                         &cross_right_upper_x,
                                                         &cross_right_upper_y);
+    vision_image_processor_get_cross_stage2_frozen_lower_corner_state(&cross_stage2_frozen_left_found,
+                                                                      &cross_stage2_frozen_left_x,
+                                                                      &cross_stage2_frozen_left_y,
+                                                                      &cross_stage2_frozen_right_found,
+                                                                      &cross_stage2_frozen_right_x,
+                                                                      &cross_stage2_frozen_right_y);
     auto count_dir_hits = [](const uint8 *dirs, uint16 count, uint8 target_dir) -> int {
         if (dirs == nullptr || count == 0)
         {
@@ -786,67 +798,6 @@ static void send_tcp_status()
     uint16 ipm_right_dot_num = 0;
     vision_image_processor_get_ipm_boundaries(&ipm_x1, nullptr, &ipm_x3, &ipm_y1, nullptr, &ipm_y3, &ipm_dot_num);
     vision_image_processor_get_ipm_boundary_side_counts(&ipm_left_dot_num, &ipm_right_dot_num);
-    // IPM 角点支路已关闭，网页端不再采集这些调试字段。
-#if 0
-    uint16 *src_corner_left_x = nullptr;
-    uint16 *src_corner_left_y = nullptr;
-    uint16 src_corner_left_num = 0;
-    uint16 *src_corner_right_x = nullptr;
-    uint16 *src_corner_right_y = nullptr;
-    uint16 src_corner_right_num = 0;
-    vision_image_processor_get_src_boundary_corners(&src_corner_left_x,
-                                                    &src_corner_left_y,
-                                                    &src_corner_left_num,
-                                                    &src_corner_right_x,
-                                                    &src_corner_right_y,
-                                                    &src_corner_right_num);
-    uint16 *ipm_corner_left_x = nullptr;
-    uint16 *ipm_corner_left_y = nullptr;
-    uint16 ipm_corner_left_num = 0;
-    uint16 *ipm_corner_right_x = nullptr;
-    uint16 *ipm_corner_right_y = nullptr;
-    uint16 ipm_corner_right_num = 0;
-    vision_image_processor_get_ipm_boundary_corners(&ipm_corner_left_x,
-                                                    &ipm_corner_left_y,
-                                                    &ipm_corner_left_num,
-                                                    &ipm_corner_right_x,
-                                                    &ipm_corner_right_y,
-                                                    &ipm_corner_right_num);
-    bool src_left_corner_found = false;
-    int src_left_corner_state_x = 0;
-    int src_left_corner_state_y = 0;
-    bool src_right_corner_found = false;
-    int src_right_corner_state_x = 0;
-    int src_right_corner_state_y = 0;
-    bool src_left_boundary_straight = false;
-    bool src_right_boundary_straight = false;
-    vision_image_processor_get_src_boundary_corner_state(&src_left_corner_found,
-                                                         &src_left_corner_state_x,
-                                                         &src_left_corner_state_y,
-                                                         &src_right_corner_found,
-                                                         &src_right_corner_state_x,
-                                                         &src_right_corner_state_y);
-    vision_image_processor_get_src_boundary_straight_state(&src_left_boundary_straight,
-                                                           &src_right_boundary_straight);
-    bool ipm_left_corner_found = false;
-    int ipm_left_corner_state_x = 0;
-    int ipm_left_corner_state_y = 0;
-    bool ipm_right_corner_found = false;
-    int ipm_right_corner_state_x = 0;
-    int ipm_right_corner_state_y = 0;
-    int ipm_left_corner_index = -1;
-    int ipm_right_corner_index = -1;
-    bool ipm_left_boundary_straight = false;
-    bool ipm_right_boundary_straight = false;
-    vision_image_processor_get_ipm_boundary_corner_state(&ipm_left_corner_found,
-                                                         &ipm_left_corner_state_x,
-                                                         &ipm_left_corner_state_y,
-                                                         &ipm_right_corner_found,
-                                                         &ipm_right_corner_state_x,
-                                                         &ipm_right_corner_state_y);
-    vision_image_processor_get_ipm_boundary_corner_indices(&ipm_left_corner_index, &ipm_right_corner_index);
-    vision_image_processor_get_ipm_boundary_straight_state(&ipm_left_boundary_straight, &ipm_right_boundary_straight);
-#endif
     uint16 *ipm_center_left_x = nullptr;
     uint16 *ipm_center_left_y = nullptr;
     uint16 ipm_center_left_num = 0;
@@ -863,15 +814,6 @@ static void send_tcp_status()
     uint16 *src_center_right_y = nullptr;
     uint16 src_center_right_num = 0;
     vision_image_processor_get_src_shifted_centerline_from_right(&src_center_right_x, &src_center_right_y, &src_center_right_num);
-    // IPM 角点支路已关闭，网页端不再采集 angle cos 调试数组。
-#if 0
-    const float *left_ipm_boundary_angle_cos = nullptr;
-    int left_ipm_boundary_angle_cos_count = 0;
-    vision_image_processor_get_ipm_left_boundary_angle_cos(&left_ipm_boundary_angle_cos, &left_ipm_boundary_angle_cos_count);
-    const float *right_ipm_boundary_angle_cos = nullptr;
-    int right_ipm_boundary_angle_cos_count = 0;
-    vision_image_processor_get_ipm_right_boundary_angle_cos(&right_ipm_boundary_angle_cos, &right_ipm_boundary_angle_cos_count);
-#endif
     bool ipm_track_valid = false;
     int ipm_track_index = -1;
     int ipm_track_x = 0;
@@ -1274,15 +1216,17 @@ static void send_tcp_status()
         cross_left_corner_post_frame_wall_rows >= g_vision_runtime_config.route_cross_entry_corner_post_frame_wall_rows_min &&
         cross_right_corner_post_frame_wall_rows >= g_vision_runtime_config.route_cross_entry_corner_post_frame_wall_rows_min;
     const bool cross_state_stage2_ready_now =
+        ((cross_lower_left_found && cross_lower_left_y >= 75) ||
+         (cross_lower_right_found && cross_lower_right_y >= 75));
+    const bool cross_state_stage3_ready_now =
         (src_left_start_frame_wall_rows >= g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min &&
          src_right_start_frame_wall_rows >= g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min);
     const bool cross_state_exit_ready_now =
-        (src_left_start_frame_wall_rows <= 0) &&
-        (src_right_start_frame_wall_rows <= 0) &&
         (cross_start_boundary_gap_x > 0) &&
         (cross_start_boundary_gap_x < g_vision_runtime_config.route_cross_exit_start_gap_x_max);
     append_bool(true, "cross_state_entry_ready_now", cross_state_entry_ready_now);
     append_bool(true, "cross_state_stage2_ready_now", cross_state_stage2_ready_now);
+    append_bool(true, "cross_state_stage3_ready_now", cross_state_stage3_ready_now);
     append_bool(true, "cross_state_exit_ready_now", cross_state_exit_ready_now);
     append_int(true, "cross_left_corner_post_frame_wall_rows", cross_left_corner_post_frame_wall_rows);
     append_int(true, "cross_right_corner_post_frame_wall_rows", cross_right_corner_post_frame_wall_rows);
@@ -1328,24 +1272,6 @@ static void send_tcp_status()
             line += ",";
             line += std::to_string(py);
             line += "]";
-        }
-        line += "]";
-    };
-
-    [[maybe_unused]] auto append_float_array = [&append_key, &line](bool enabled, const char *name, const float *values, uint16 n) {
-        if (!enabled)
-        {
-            return;
-        }
-        append_key(name);
-        line += "[";
-        for (uint16 i = 0; i < n; ++i)
-        {
-            if (i > 0)
-            {
-                line += ",";
-            }
-            line += std::to_string(values ? values[i] : 0.0f);
         }
         line += "]";
     };
@@ -1482,42 +1408,18 @@ static void send_tcp_status()
     append_int(true, "cross_right_upper_corner_index", cross_right_upper_index);
     append_int_array(cross_left_upper_found, "cross_left_upper_corner_point", {cross_left_upper_x, cross_left_upper_y});
     append_int_array(cross_right_upper_found, "cross_right_upper_corner_point", {cross_right_upper_x, cross_right_upper_y});
-    // IPM 角点支路已关闭，网页端不再发送边界角点/直边调试字段。
-#if 0
-    append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
-                  "left_boundary_corner", src_corner_left_x, src_corner_left_y, src_corner_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
-    append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
-                  "right_boundary_corner", src_corner_right_x, src_corner_right_y, src_corner_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
-    append_bool(g_vision_runtime_config.udp_web_tcp_send_left_boundary, "left_boundary_corner_found", src_left_corner_found);
-    append_bool(g_vision_runtime_config.udp_web_tcp_send_right_boundary, "right_boundary_corner_found", src_right_corner_found);
-    append_bool(g_vision_runtime_config.udp_web_tcp_send_left_boundary, "left_boundary_straight", src_left_boundary_straight);
-    append_bool(g_vision_runtime_config.udp_web_tcp_send_right_boundary, "right_boundary_straight", src_right_boundary_straight);
-    append_int_array(g_vision_runtime_config.udp_web_tcp_send_left_boundary && src_left_corner_found, "left_boundary_corner_point",
-                     {src_left_corner_state_x, src_left_corner_state_y});
-    append_int_array(g_vision_runtime_config.udp_web_tcp_send_right_boundary && src_right_corner_found, "right_boundary_corner_point",
-                     {src_right_corner_state_x, src_right_corner_state_y});
-#endif
+    append_bool(true, "cross_stage2_frozen_left_corner_found", cross_stage2_frozen_left_found);
+    append_bool(true, "cross_stage2_frozen_right_corner_found", cross_stage2_frozen_right_found);
+    append_int_array(cross_stage2_frozen_left_found,
+                     "cross_stage2_frozen_left_corner_point",
+                     {cross_stage2_frozen_left_x, cross_stage2_frozen_left_y});
+    append_int_array(cross_stage2_frozen_right_found,
+                     "cross_stage2_frozen_right_corner_point",
+                     {cross_stage2_frozen_right_x, cross_stage2_frozen_right_y});
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary,
                   "ipm_left_boundary", ipm_x1, ipm_y1, ipm_left_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary,
                   "ipm_right_boundary", ipm_x3, ipm_y3, ipm_right_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    // IPM 角点支路已关闭，网页端不再发送 IPM 角点/直边调试字段。
-#if 0
-    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary,
-                  "ipm_left_boundary_corner", ipm_corner_left_x, ipm_corner_left_y, ipm_corner_left_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary,
-                  "ipm_right_boundary_corner", ipm_corner_right_x, ipm_corner_right_y, ipm_corner_right_num, kIpmCanvasWidth, kIpmCanvasHeight);
-    append_bool(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary, "ipm_left_boundary_corner_found", ipm_left_corner_found);
-    append_bool(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary, "ipm_right_boundary_corner_found", ipm_right_corner_found);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary, "ipm_left_boundary_corner_index", ipm_left_corner_index);
-    append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary, "ipm_right_boundary_corner_index", ipm_right_corner_index);
-    append_bool(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary, "ipm_left_boundary_straight", ipm_left_boundary_straight);
-    append_bool(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary, "ipm_right_boundary_straight", ipm_right_boundary_straight);
-    append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary && ipm_left_corner_found, "ipm_left_boundary_corner_point",
-                     {ipm_left_corner_state_x, ipm_left_corner_state_y});
-    append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary && ipm_right_corner_found, "ipm_right_boundary_corner_point",
-                     {ipm_right_corner_state_x, ipm_right_corner_state_y});
-#endif
 
     const bool selected_is_right =
         (vision_image_processor_ipm_line_error_source() == VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT);
@@ -1553,18 +1455,6 @@ static void send_tcp_status()
     append_int(g_vision_runtime_config.udp_web_tcp_send_src_centerline_selected_count,
                "src_centerline_selected_count",
                selected_src_center_num);
-    // IPM 角点支路已关闭，网页端不再发送 angle cos 调试数组。
-#if 0
-    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
-                       "ipm_left_boundary_angle_cos",
-                       left_ipm_boundary_angle_cos,
-                       static_cast<uint16>(std::clamp(left_ipm_boundary_angle_cos_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
-    append_float_array(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_curvature,
-                       "ipm_right_boundary_angle_cos",
-                       right_ipm_boundary_angle_cos,
-                       static_cast<uint16>(std::clamp(right_ipm_boundary_angle_cos_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2))));
-#endif
-
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_gray_size, "gray_size",
                      {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_size, "ipm_size",

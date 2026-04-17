@@ -253,6 +253,12 @@ void vision_image_processor_get_cross_upper_corner_state(bool *left_found,
                                                          int *right_index,
                                                          int *right_x,
                                                          int *right_y);
+void vision_image_processor_get_cross_stage2_frozen_lower_corner_state(bool *left_found,
+                                                                       int *left_x,
+                                                                       int *left_y,
+                                                                       bool *right_found,
+                                                                       int *right_x,
+                                                                       int *right_y);
 void vision_image_processor_get_cross_route_debug_state(int *left_corner_post_frame_wall_rows,
                                                         int *right_corner_post_frame_wall_rows,
                                                         int *start_boundary_gap_x);

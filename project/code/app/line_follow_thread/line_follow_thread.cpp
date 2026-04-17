@@ -253,6 +253,7 @@ const char *route_sub_state_name(int route_sub_state)
         case VISION_ROUTE_SUB_NONE:                 return "NONE";
         case VISION_ROUTE_SUB_CROSS_1:              return "CROSS_1";
         case VISION_ROUTE_SUB_CROSS_2:              return "CROSS_2";
+        case VISION_ROUTE_SUB_CROSS_3:              return "CROSS_3";
         case VISION_ROUTE_SUB_CIRCLE_LEFT_1:        return "CIRCLE_LEFT_1";
         case VISION_ROUTE_SUB_CIRCLE_LEFT_2:        return "CIRCLE_LEFT_2";
         case VISION_ROUTE_SUB_CIRCLE_LEFT_3:        return "CIRCLE_LEFT_3";
