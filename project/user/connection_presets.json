@@ -32,6 +32,22 @@
       "build_target_port": 22,
       "build_target_app_path": "/home/root/tst",
       "build_target_config_path": "/home/root/tst/smartcar_config.toml"
+    },
+    {
+      "id": "hotspot_c",
+      "label": "热点 C",
+      "board_config_base_url": "http://172.21.79.138:18080",
+      "board_ssh_host": "172.21.79.138",
+      "board_ssh_port": 22,
+      "board_ssh_user": "root",
+      "board_ssh_target_path": "/home/root/tst/smartcar_config.toml",
+      "pc_receiver_ip": "172.21.79.179",
+      "assistant_receiver_ip": "172.21.79.179",
+      "build_target_host": "172.21.79.138",
+      "build_target_user": "root",
+      "build_target_port": 22,
+      "build_target_app_path": "/home/root/tst",
+      "build_target_config_path": "/home/root/tst/smartcar_config.toml"
     }
   ]
 }
