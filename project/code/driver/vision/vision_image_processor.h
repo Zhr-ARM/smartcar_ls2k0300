@@ -55,6 +55,9 @@ bool vision_image_processor_process_step();
 // 作用：读取“最近一次成功完成处理”的视觉帧序号。
 // 约定：仅当 process_step 成功处理完一帧时递增，供控制层判断是否拿到了新视觉样本。
 uint32 vision_image_processor_processed_frame_seq();
+// 从 g_vision_runtime_config / g_vision_processor_config 重新同步内部缓存。
+// 说明：用于启动时 TOML 加载后刷新全局静态默认值，避免某些原子量仍保留编译期初值。
+void vision_image_processor_reload_config_from_globals();
 
 // 作用：设置/获取迷宫法左右起点搜索行（单行搜索）。
 // 如何修改：建议范围 [1, H-2]；值越大越靠近图像底部。

@@ -345,14 +345,13 @@ public:
                                    float left_raw_feedback, float right_raw_feedback);
 
 private:
-    static constexpr int32 kFeedbackAverageWindow = pid_tuning::motor_speed::kFeedbackAverageWindow;
-    static constexpr float kFeedbackLowPassAlpha = pid_tuning::motor_speed::kFeedbackLowPassAlpha;
+    static constexpr int32 kFeedbackAverageWindowCapacity = 16;
 
     struct SpeedFeedbackFilter
     {
         float raw_prev1;
         float raw_prev2;
-        float averaged_history[kFeedbackAverageWindow];
+        float averaged_history[kFeedbackAverageWindowCapacity];
         float averaged_sum;
         int32 averaged_count;
         int32 averaged_index;
@@ -368,6 +367,8 @@ private:
     float compute_feedforward_duty(float target_count, float gain, float bias) const;
     float compute_decel_assist_duty(float target_count, float feedback_count) const;
     float update_feedback_filter(SpeedFeedbackFilter &filter, float raw_count);
+    static int32 feedback_average_window();
+    static float feedback_low_pass_alpha();
     static bool is_valid_pid_value(float value);
     static float clamp_float(float value, float min_value, float max_value);
     static float median_of_three(float a, float b, float c);

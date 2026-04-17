@@ -383,10 +383,10 @@ typedef struct
 
 // 视觉运行时配置：
 // main.cpp 在启动时统一从这里读取并下发到各视觉模块。
-extern const vision_runtime_config_t g_vision_runtime_config;
+extern vision_runtime_config_t g_vision_runtime_config;
 
 // 视觉处理器内部配置：
 // vision_image_processor.cpp 在初始化和算法处理中统一从这里读取。
-extern const vision_processor_config_t g_vision_processor_config;
+extern vision_processor_config_t g_vision_processor_config;
 
 #endif

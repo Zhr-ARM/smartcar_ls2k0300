@@ -5879,6 +5879,50 @@ uint32 vision_image_processor_processed_frame_seq()
     return g_processed_frame_seq.load();
 }
 
+void vision_image_processor_reload_config_from_globals()
+{
+    g_maze_start_row.store(g_vision_runtime_config.maze_start_row);
+    g_maze_trace_method.store(g_vision_runtime_config.maze_trace_method);
+    g_maze_trace_y_fallback_stop_delta.store(g_vision_runtime_config.maze_trace_y_fallback_stop_delta);
+    g_cross_lower_corner_dir_enabled.store(g_vision_runtime_config.cross_lower_corner_dir_enabled);
+    g_cross_lower_corner_pre_window.store(g_vision_runtime_config.cross_lower_corner_pre_window);
+    g_cross_lower_corner_post_window.store(g_vision_runtime_config.cross_lower_corner_post_window);
+    g_cross_lower_corner_pre_min_votes.store(g_vision_runtime_config.cross_lower_corner_pre_min_votes);
+    g_cross_lower_corner_post_min_votes.store(g_vision_runtime_config.cross_lower_corner_post_min_votes);
+    g_cross_lower_corner_transition_max_len.store(g_vision_runtime_config.cross_lower_corner_transition_max_len);
+    g_cross_lower_corner_pair_y_diff_max.store(g_vision_runtime_config.cross_lower_corner_pair_y_diff_max);
+    g_maze_trace_x_min.store(g_vision_processor_config.default_maze_trace_x_min);
+    g_maze_trace_x_max.store(g_vision_processor_config.default_maze_trace_x_max);
+    line_sample_ratio = g_vision_processor_config.default_line_sample_ratio;
+
+    g_undistort_enabled.store(g_vision_runtime_config.undistort_enabled);
+    g_ipm_triangle_filter_enabled.store(g_vision_runtime_config.ipm_triangle_filter_enabled);
+    g_ipm_resample_enabled.store(g_vision_runtime_config.ipm_resample_enabled);
+    g_ipm_resample_step_px.store(g_vision_runtime_config.ipm_resample_step_px);
+    g_ipm_boundary_min_point_dist_px.store(g_vision_runtime_config.ipm_boundary_min_point_dist_px);
+    g_ipm_boundary_spike_short_seg_max_px.store(g_vision_runtime_config.ipm_boundary_spike_short_seg_max_px);
+    g_ipm_boundary_spike_reverse_cos_threshold.store(g_vision_runtime_config.ipm_boundary_spike_reverse_cos_threshold);
+    g_ipm_boundary_angle_step.store(g_vision_runtime_config.ipm_boundary_angle_step);
+    g_ipm_boundary_corner_cos_threshold.store(g_vision_runtime_config.ipm_boundary_corner_cos_threshold);
+    g_ipm_boundary_corner_nms_radius.store(g_vision_runtime_config.ipm_boundary_corner_nms_radius);
+    g_ipm_boundary_truncate_at_first_corner_enabled.store(
+        g_vision_runtime_config.ipm_boundary_truncate_at_first_corner_enabled);
+    g_ipm_boundary_straight_min_points.store(g_vision_runtime_config.ipm_boundary_straight_min_points);
+    g_ipm_boundary_straight_check_count.store(g_vision_runtime_config.ipm_boundary_straight_check_count);
+    g_ipm_boundary_straight_min_cos.store(g_vision_runtime_config.ipm_boundary_straight_min_cos);
+    g_ipm_track_width_px.store(g_vision_runtime_config.ipm_track_width_px);
+    g_ipm_center_target_offset_from_left_px.store(g_vision_runtime_config.ipm_center_target_offset_from_left_px);
+    g_ipm_centerline_postprocess_enabled.store(g_vision_runtime_config.ipm_centerline_postprocess_enabled);
+    g_ipm_centerline_triangle_filter_enabled.store(g_vision_runtime_config.ipm_centerline_triangle_filter_enabled);
+    g_ipm_centerline_resample_enabled.store(g_vision_runtime_config.ipm_centerline_resample_enabled);
+    g_ipm_centerline_resample_step_px.store(g_vision_runtime_config.ipm_centerline_resample_step_px);
+    g_ipm_centerline_curvature_enabled.store(g_vision_runtime_config.ipm_centerline_curvature_enabled);
+    g_keep_last_centerline_on_double_loss.store(g_vision_runtime_config.keep_last_centerline_on_double_loss);
+    g_ipm_line_error_preferred_source.store(g_vision_runtime_config.ipm_line_error_source);
+
+    vision_line_error_layer_reset();
+}
+
 void vision_image_processor_set_maze_start_row(int row)
 {
     // 如何修改：建议保持在 [1, kProcHeight-2] 内。

@@ -1,6 +1,6 @@
 #include "driver/vision/vision_config.h"
 
-const vision_runtime_config_t g_vision_runtime_config = {
+vision_runtime_config_t g_vision_runtime_config = {
     // ==================== 参数区域 3: 网页发送 ====================
     // 说明：发送相关参数集中在最前，包含逐飞助手、UDP 视频、TCP 状态上报。
     //
@@ -230,8 +230,8 @@ const vision_runtime_config_t g_vision_runtime_config = {
 
     // ==================== 网页端网络地址配置 ====================
     // 电脑端接收服务 IP。
-    //.udp_web_server_ip = "172.21.79.129",
-    .udp_web_server_ip = "10.119.73.102",
+    .udp_web_server_ip = "172.21.79.129",
+    // .udp_web_server_ip = "10.119.73.102",
     // 电脑端 UDP 视频端口。
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
@@ -404,7 +404,7 @@ const vision_runtime_config_t g_vision_runtime_config = {
     // 基准速度方案B已移除，偏差层仅保留方案A所需参数。
 };
 
-const vision_processor_config_t g_vision_processor_config = {
+vision_processor_config_t g_vision_processor_config = {
     // ==================== 视觉处理器内部参数 ====================
     // 迷宫法单侧最大输出点数。
     .maze_trace_max_points = 180,

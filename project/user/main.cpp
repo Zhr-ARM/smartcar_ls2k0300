@@ -8,6 +8,7 @@
 #include "vision_thread.h"
 #include "screen_display_thread.h"
 #include "driver/pid/pid_tuning.h"
+#include "driver/config/smartcar_config.h"
 #include "driver/vision/vision_assistant_udp.h"
 #include "driver/vision/vision_config.h"
 #include "driver/vision/vision_infer_async.h"
@@ -16,6 +17,8 @@
 
 #include "brushless.h"
 #include "motor.h"
+
+#include <string>
 
 volatile sig_atomic_t g_should_exit = 0;
 
@@ -116,6 +119,17 @@ int main(int, char**)
     signal(SIGTERM, exit_signal_handler);
     signal(SIGQUIT, exit_signal_handler);
     signal(SIGHUP, exit_signal_handler);
+
+    std::string loaded_config_path;
+    std::string config_error_message;
+    if (!smartcar_config_load_from_default_locations(&loaded_config_path, &config_error_message))
+    {
+        printf("[CONFIG] load failed: %s\r\n", config_error_message.c_str());
+        cleanup_once();
+        return -1;
+    }
+    vision_image_processor_reload_config_from_globals();
+    printf("[CONFIG] loaded=%s\r\n", loaded_config_path.c_str());
 
     if (!beep_thread_init())
     {

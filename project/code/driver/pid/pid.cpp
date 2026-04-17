@@ -348,7 +348,7 @@ MotorSpeedPidController::SpeedFeedbackFilter::SpeedFeedbackFilter()
       filtered(0.0f),
       initialized(false)
 {
-    for (int32 i = 0; i < kFeedbackAverageWindow; ++i)
+    for (int32 i = 0; i < kFeedbackAverageWindowCapacity; ++i)
     {
         averaged_history[i] = 0.0f;
     }
@@ -367,10 +367,22 @@ void MotorSpeedPidController::SpeedFeedbackFilter::reset()
     filtered = 0.0f;
     initialized = false;
 
-    for (int32 i = 0; i < kFeedbackAverageWindow; ++i)
+    for (int32 i = 0; i < kFeedbackAverageWindowCapacity; ++i)
     {
         averaged_history[i] = 0.0f;
     }
+}
+
+int32 MotorSpeedPidController::feedback_average_window()
+{
+    return std::clamp(pid_tuning::motor_speed::kFeedbackAverageWindow,
+                      1,
+                      kFeedbackAverageWindowCapacity);
+}
+
+float MotorSpeedPidController::feedback_low_pass_alpha()
+{
+    return clamp_float(pid_tuning::motor_speed::kFeedbackLowPassAlpha, 0.0f, 1.0f);
 }
 
 /**
@@ -676,6 +688,9 @@ float MotorSpeedPidController::compute_decel_assist_duty(float target_count, flo
  */
 float MotorSpeedPidController::update_feedback_filter(SpeedFeedbackFilter &filter, float raw_count)
 {
+    const int32 active_feedback_average_window = feedback_average_window();
+    const float active_feedback_low_pass_alpha = feedback_low_pass_alpha();
+
     if (!filter.initialized)
     {
         filter.raw_prev1 = raw_count;
@@ -683,7 +698,7 @@ float MotorSpeedPidController::update_feedback_filter(SpeedFeedbackFilter &filte
         filter.averaged_history[0] = raw_count;
         filter.averaged_sum = raw_count;
         filter.averaged_count = 1;
-        filter.averaged_index = 1 % kFeedbackAverageWindow;
+        filter.averaged_index = 1 % active_feedback_average_window;
         filter.filtered = raw_count;
         filter.initialized = true;
         return raw_count;
@@ -694,23 +709,23 @@ float MotorSpeedPidController::update_feedback_filter(SpeedFeedbackFilter &filte
     filter.raw_prev2 = filter.raw_prev1;
     filter.raw_prev1 = raw_count;
 
-    if (filter.averaged_count < kFeedbackAverageWindow)
+    if (filter.averaged_count < active_feedback_average_window)
     {
         filter.averaged_history[filter.averaged_count] = median_value;
         filter.averaged_sum += median_value;
         ++filter.averaged_count;
-        filter.averaged_index = filter.averaged_count % kFeedbackAverageWindow;
+        filter.averaged_index = filter.averaged_count % active_feedback_average_window;
     }
     else
     {
         filter.averaged_sum -= filter.averaged_history[filter.averaged_index];
         filter.averaged_history[filter.averaged_index] = median_value;
         filter.averaged_sum += median_value;
-        filter.averaged_index = (filter.averaged_index + 1) % kFeedbackAverageWindow;
+        filter.averaged_index = (filter.averaged_index + 1) % active_feedback_average_window;
     }
 
     const float averaged_value = filter.averaged_sum / (float)filter.averaged_count;
-    filter.filtered = filter.filtered * (1.0f - kFeedbackLowPassAlpha) + averaged_value * kFeedbackLowPassAlpha;
+    filter.filtered = filter.filtered * (1.0f - active_feedback_low_pass_alpha) + averaged_value * active_feedback_low_pass_alpha;
     return filter.filtered;
 }
 
