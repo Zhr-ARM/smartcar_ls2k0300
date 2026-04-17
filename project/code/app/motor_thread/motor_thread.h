@@ -172,6 +172,7 @@ bool motor_thread_get_pid_params(MotorPidParams &params);
  */
 bool motor_thread_set_pid_params(const MotorPidParams &params);
 bool motor_thread_get_pid_debug_status(MotorPidDebugStatus &status);
+void motor_thread_request_reload_from_globals();
 
 /**
  * @brief 清理电机控制线程

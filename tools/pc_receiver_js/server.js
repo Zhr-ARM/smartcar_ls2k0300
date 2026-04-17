@@ -1,8 +1,10 @@
 const dgram = require('node:dgram');
 const http = require('node:http');
+const os = require('node:os');
 const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
+const { execFile } = require('node:child_process');
 const WebSocket = require('ws');
 const { summarizeSyncStatus } = require('../pc_receiver_local_compute/wasm_sync_meta.js');
 
@@ -13,6 +15,7 @@ const RECORDINGS_DIR = path.join(__dirname, 'recordings');
 const WASM_DIR = path.join(PUBLIC_DIR, 'wasm');
 const ROOT_DIR = path.join(__dirname, '..', '..');
 const WASM_SYNC_METADATA_PATH = path.join(WASM_DIR, 'vision_pipeline.sync.json');
+const SHARED_CONNECTION_PRESETS_PATH = path.join(ROOT_DIR, 'project', 'user', 'connection_presets.json');
 
 const BIND_HOST = process.env.BIND_HOST || '0.0.0.0';
 const UDP_PORT = Number(process.env.UDP_PORT || 10000);
@@ -21,6 +24,48 @@ const HTTP_PORT = Number(process.env.HTTP_PORT || 8080);
 const WEB_IMAGE_FORMAT_JPEG = 0;
 const WEB_IMAGE_FORMAT_PNG = 1;
 const WEB_IMAGE_FORMAT_BMP = 2;
+
+const defaultBoardConnectionStore = (() => {
+  const boardConfigBaseUrl = (process.env.BOARD_CONFIG_BASE_URL || 'http://172.21.79.138:18080').replace(/\/+$/, '');
+  const boardConfigUrl = new URL(boardConfigBaseUrl);
+  return {
+    active_preset: 'hotspot_a',
+    presets: [
+      {
+        id: 'hotspot_a',
+        label: '热点 A',
+        board_config_base_url: boardConfigBaseUrl,
+        board_ssh_host: process.env.BOARD_SSH_HOST || boardConfigUrl.hostname,
+        board_ssh_port: Number(process.env.BOARD_SSH_PORT || 22),
+        board_ssh_user: process.env.BOARD_SSH_USER || 'root',
+        board_ssh_target_path: process.env.BOARD_SSH_TARGET_PATH || '/home/root/tst/smartcar_config.toml',
+        pc_receiver_ip: process.env.PC_RECEIVER_IP || '172.21.79.129',
+        assistant_receiver_ip: process.env.ASSISTANT_RECEIVER_IP || (process.env.PC_RECEIVER_IP || '172.21.79.129'),
+        build_target_host: process.env.BUILD_TARGET_HOST || (process.env.BOARD_SSH_HOST || boardConfigUrl.hostname),
+        build_target_user: process.env.BUILD_TARGET_USER || (process.env.BOARD_SSH_USER || 'root'),
+        build_target_port: Number(process.env.BUILD_TARGET_PORT || process.env.BOARD_SSH_PORT || 22),
+        build_target_app_path: process.env.BUILD_TARGET_APP_PATH || '/home/root/tst',
+        build_target_config_path: process.env.BUILD_TARGET_CONFIG_PATH || (process.env.BOARD_SSH_TARGET_PATH || '/home/root/tst/smartcar_config.toml')
+      },
+      {
+        id: 'hotspot_b',
+        label: '热点 B',
+        board_config_base_url: 'http://10.119.73.138:18080',
+        board_ssh_host: '10.119.73.138',
+        board_ssh_port: 22,
+        board_ssh_user: 'root',
+        board_ssh_target_path: '/home/root/tst/smartcar_config.toml',
+        pc_receiver_ip: '10.119.73.102',
+        assistant_receiver_ip: '10.119.73.102',
+        build_target_host: '10.119.73.138',
+        build_target_user: 'root',
+        build_target_port: 22,
+        build_target_app_path: '/home/root/tst',
+        build_target_config_path: '/home/root/tst/smartcar_config.toml'
+      }
+    ]
+  };
+})();
 
 const latestByMode = {
   0: { image: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 0, format: WEB_IMAGE_FORMAT_JPEG },
@@ -35,6 +80,7 @@ const udpByteEvents = [];
 const udpFrameEvents = [];
 let cachedWasmSyncStatus = null;
 let cachedWasmSyncStatusAtMs = 0;
+let boardConnectionStore = loadBoardConnectionStore();
 
 let wss = null;
 
@@ -78,6 +124,102 @@ function ensureRecordingsDir() {
   fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
 }
 
+function normalizeBoardConnectionPreset(input, fallbackPreset = null) {
+  const fallback = fallbackPreset || defaultBoardConnectionStore.presets[0];
+  const rawBaseUrl = (input && input.board_config_base_url) || fallback.board_config_base_url;
+  const boardConfigBaseUrl = String(rawBaseUrl || '').trim().replace(/\/+$/, '');
+  let boardConfigUrl = null;
+  try {
+    boardConfigUrl = new URL(boardConfigBaseUrl);
+  } catch (_) {
+    throw new Error('board_config_base_url 无效，必须是 http://ip:port 形式');
+  }
+  const presetId = String((input && input.id) || fallback.id || '').trim();
+  const presetLabel = String((input && input.label) || fallback.label || '').trim();
+  const boardSshHost = String((input && input.board_ssh_host) || boardConfigUrl.hostname || '').trim();
+  const boardSshPort = Number((input && input.board_ssh_port) || fallback.board_ssh_port || 22);
+  const boardSshUser = String((input && input.board_ssh_user) || fallback.board_ssh_user || 'root').trim();
+  const boardSshTargetPath = String((input && input.board_ssh_target_path) || fallback.board_ssh_target_path || '/home/root/tst/smartcar_config.toml').trim();
+  const pcReceiverIp = String((input && input.pc_receiver_ip) || fallback.pc_receiver_ip || '').trim();
+  const assistantReceiverIp = String((input && input.assistant_receiver_ip) || pcReceiverIp).trim();
+  if (!presetId) throw new Error('preset id 不能为空');
+  if (!/^[A-Za-z0-9._-]+$/.test(presetId)) throw new Error('preset id 只能包含字母、数字、点、下划线、短横线');
+  if (!presetLabel) throw new Error('preset label 不能为空');
+  if (!boardSshHost) throw new Error('board_ssh_host 不能为空');
+  if (!Number.isFinite(boardSshPort) || boardSshPort <= 0) throw new Error('board_ssh_port 无效');
+  if (!boardSshUser) throw new Error('board_ssh_user 不能为空');
+  if (!boardSshTargetPath) throw new Error('board_ssh_target_path 不能为空');
+  if (!pcReceiverIp) throw new Error('pc_receiver_ip 不能为空');
+  if (!assistantReceiverIp) throw new Error('assistant_receiver_ip 不能为空');
+  return {
+    id: presetId,
+    label: presetLabel,
+    board_config_base_url: boardConfigBaseUrl,
+    board_ssh_host: boardSshHost,
+    board_ssh_port: Math.round(boardSshPort),
+    board_ssh_user: boardSshUser,
+    board_ssh_target_path: boardSshTargetPath,
+    pc_receiver_ip: pcReceiverIp,
+    assistant_receiver_ip: assistantReceiverIp,
+    build_target_host: String((input && input.build_target_host) || boardSshHost).trim(),
+    build_target_user: String((input && input.build_target_user) || boardSshUser).trim(),
+    build_target_port: Math.round(Number((input && input.build_target_port) || boardSshPort || 22)),
+    build_target_app_path: String((input && input.build_target_app_path) || '/home/root/tst').trim(),
+    build_target_config_path: String((input && input.build_target_config_path) || boardSshTargetPath).trim()
+  };
+}
+
+function normalizeBoardConnectionStore(input) {
+  if (input && Array.isArray(input.presets)) {
+    const normalizedPresets = input.presets.map((preset, index) =>
+      normalizeBoardConnectionPreset(preset, defaultBoardConnectionStore.presets[index] || defaultBoardConnectionStore.presets[0]));
+    const ids = new Set();
+    for (const preset of normalizedPresets) {
+      if (ids.has(preset.id)) throw new Error(`重复 preset id: ${preset.id}`);
+      ids.add(preset.id);
+    }
+    const activePreset = String(input.active_preset || '').trim();
+    if (!activePreset || !ids.has(activePreset)) throw new Error('active_preset 无效或不存在');
+    return {
+      active_preset: activePreset,
+      presets: normalizedPresets
+    };
+  }
+
+  const legacyPreset = normalizeBoardConnectionPreset(input || {}, defaultBoardConnectionStore.presets[0]);
+  return {
+    active_preset: legacyPreset.id || 'custom',
+    presets: [legacyPreset]
+  };
+}
+
+function loadBoardConnectionStore() {
+  try {
+    if (fs.existsSync(SHARED_CONNECTION_PRESETS_PATH)) {
+      const text = fs.readFileSync(SHARED_CONNECTION_PRESETS_PATH, 'utf8');
+      const parsed = text ? JSON.parse(text) : {};
+      return normalizeBoardConnectionStore(parsed);
+    }
+  } catch (err) {
+    console.warn(`[JS_RECEIVER] failed to load connection_presets.json: ${err.message}`);
+  }
+  return normalizeBoardConnectionStore(defaultBoardConnectionStore);
+}
+
+function saveBoardConnectionStore(store) {
+  fs.writeFileSync(SHARED_CONNECTION_PRESETS_PATH, JSON.stringify(store, null, 2), 'utf8');
+}
+
+function getBoardConnectionStore() {
+  return boardConnectionStore;
+}
+
+function getBoardConnectionSettings() {
+  const store = getBoardConnectionStore();
+  const active = store.presets.find((preset) => preset.id === store.active_preset);
+  return active || store.presets[0];
+}
+
 function sanitizeFolderName(name) {
   if (typeof name !== 'string') return '';
   const trimmed = name.trim();
@@ -98,6 +240,188 @@ function sendJson(res, code, obj) {
     'Cache-Control': 'no-store'
   });
   res.end(JSON.stringify(obj));
+}
+
+function readTextBody(req, limitBytes = 2 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limitBytes) {
+        reject(new Error('payload too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      resolve(Buffer.concat(chunks).toString('utf8'));
+    });
+    req.on('error', reject);
+  });
+}
+
+function proxyBoardConfig(pathname, method, bodyText = '') {
+  return new Promise((resolve, reject) => {
+    const settings = getBoardConnectionSettings();
+    const upstream = new URL(`${settings.board_config_base_url}${pathname}`);
+    const reqOptions = {
+      hostname: upstream.hostname,
+      port: upstream.port || 80,
+      path: `${upstream.pathname}${upstream.search || ''}`,
+      method,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Length': Buffer.byteLength(bodyText, 'utf8')
+      }
+    };
+    const upstreamReq = http.request(reqOptions, (upstreamRes) => {
+      const chunks = [];
+      upstreamRes.on('data', (chunk) => chunks.push(chunk));
+      upstreamRes.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        let json = {};
+        try {
+          json = text ? JSON.parse(text) : {};
+        } catch (_) {
+          json = { ok: false, message: text || `HTTP ${upstreamRes.statusCode}` };
+        }
+        if ((upstreamRes.statusCode || 500) >= 400) {
+          reject(new Error(json && json.message ? json.message : `HTTP ${upstreamRes.statusCode}`));
+          return;
+        }
+        resolve(json);
+      });
+    });
+    upstreamReq.on('error', reject);
+    if (bodyText) upstreamReq.write(bodyText);
+    upstreamReq.end();
+  });
+}
+
+function probeTcpPort(host, port, timeoutMs = 1200) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+    const finish = (online, error = '') => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve({ online, error });
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => finish(true, ''));
+    socket.once('timeout', () => finish(false, 'connect timeout'));
+    socket.once('error', (err) => finish(false, String(err && err.message ? err.message : err)));
+    socket.connect(port, host);
+  });
+}
+
+function probeBoardRuntimeHttp() {
+  return new Promise((resolve) => {
+    const settings = getBoardConnectionSettings();
+    const boardConfigUrl = new URL(settings.board_config_base_url);
+    const req = http.request({
+      hostname: boardConfigUrl.hostname,
+      port: boardConfigUrl.port || 80,
+      path: '/healthz',
+      method: 'GET',
+      timeout: 1500
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8').trim();
+        if (res.statusCode === 200 && text === 'ok') {
+          resolve({ online: true, error: '' });
+          return;
+        }
+        resolve({ online: false, error: text || `HTTP ${res.statusCode}` });
+      });
+    });
+    req.on('timeout', () => {
+      req.destroy(new Error('connect timeout'));
+    });
+    req.on('error', (err) => {
+      resolve({ online: false, error: String(err && err.message ? err.message : err) });
+    });
+    req.end();
+  });
+}
+
+function buildConfigStatusPayload() {
+  const settings = getBoardConnectionSettings();
+  return Promise.all([
+    probeBoardRuntimeHttp(),
+    probeTcpPort(settings.board_ssh_host, settings.board_ssh_port)
+  ]).then(([runtimeHttp, sshPort]) => ({
+    ok: true,
+    web_proxy_origin: `http://${BIND_HOST}:${HTTP_PORT}`,
+    connection_store: getBoardConnectionStore(),
+    connection_settings: settings,
+    board_config_base_url: settings.board_config_base_url,
+    runtime_http: runtimeHttp,
+    ssh_transport: {
+      host: settings.board_ssh_host,
+      port: settings.board_ssh_port,
+      user: settings.board_ssh_user,
+      target_path: settings.board_ssh_target_path,
+      online: sshPort.online,
+      error: sshPort.error || ''
+    }
+  }));
+}
+
+function execFileAsync(file, args) {
+  return new Promise((resolve, reject) => {
+    execFile(file, args, { timeout: 10000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      if (error) {
+        const detail = [stderr, stdout, error.message].filter(Boolean).join('\n').trim();
+        reject(new Error(detail || `${file} failed`));
+        return;
+      }
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
+async function pushConfigViaScp(tomlText) {
+  const settings = getBoardConnectionSettings();
+  const tmpPath = path.join(os.tmpdir(), `smartcar_config_${Date.now()}_${process.pid}.toml`);
+  fs.writeFileSync(tmpPath, tomlText, 'utf8');
+  try {
+    const remote = `${settings.board_ssh_user}@${settings.board_ssh_host}:${settings.board_ssh_target_path}`;
+    await execFileAsync('scp', [
+      '-O',
+      '-P', String(settings.board_ssh_port),
+      '-o', 'BatchMode=yes',
+      '-o', 'ConnectTimeout=5',
+      '-o', 'StrictHostKeyChecking=accept-new',
+      tmpPath,
+      remote
+    ]);
+  } finally {
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch (_) {
+      // ignore cleanup failure
+    }
+  }
+}
+
+async function pullConfigViaSsh() {
+  const settings = getBoardConnectionSettings();
+  const remote = `${settings.board_ssh_user}@${settings.board_ssh_host}`;
+  const result = await execFileAsync('ssh', [
+    '-p', String(settings.board_ssh_port),
+    '-o', 'BatchMode=yes',
+    '-o', 'ConnectTimeout=5',
+    '-o', 'StrictHostKeyChecking=accept-new',
+    remote,
+    `cat '${settings.board_ssh_target_path.replace(/'/g, `'\\''`)}'`
+  ]);
+  return result.stdout;
 }
 
 function readJsonBody(req, limitBytes = 300 * 1024 * 1024) {
@@ -472,6 +796,10 @@ function startHttpServer() {
       serveFile(res, path.join(PUBLIC_DIR, 'index.html'), 'text/html; charset=utf-8');
       return;
     }
+    if (pathname === '/config.html') {
+      serveFile(res, path.join(PUBLIC_DIR, 'config.html'), 'text/html; charset=utf-8');
+      return;
+    }
     if (pathname === '/playback.html') {
       serveFile(res, path.join(PUBLIC_DIR, 'playback.html'), 'text/html; charset=utf-8');
       return;
@@ -482,6 +810,10 @@ function startHttpServer() {
     }
     if (pathname === '/playback_app.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'playback_app.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/config_app.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'config_app.js'), 'application/javascript; charset=utf-8');
       return;
     }
     if (pathname === '/local_compute_app.js') {
@@ -515,6 +847,130 @@ function startHttpServer() {
         'Cache-Control': 'no-store'
       });
       res.end(payload);
+      return;
+    }
+
+    if (pathname === '/api/config/current') {
+      proxyBoardConfig('/api/config/current', 'GET')
+        .then((result) => {
+          sendJson(res, 200, Object.assign({ ok: true, board_config_base_url: getBoardConnectionSettings().board_config_base_url }, result));
+        })
+        .catch((err) => {
+          sendJson(res, 502, {
+            ok: false,
+            message: String(err && err.message ? err.message : err),
+            board_config_base_url: getBoardConnectionSettings().board_config_base_url
+          });
+        });
+      return;
+    }
+
+    if (pathname === '/api/config/connection_settings') {
+      if (req.method === 'GET') {
+        sendJson(res, 200, {
+          ok: true,
+          connection_store: getBoardConnectionStore(),
+          connection_settings: getBoardConnectionSettings()
+        });
+        return;
+      }
+      if (req.method === 'POST') {
+        readJsonBody(req, 128 * 1024).then((payload) => {
+          const normalized = normalizeBoardConnectionStore(payload || {});
+          boardConnectionStore = normalized;
+          saveBoardConnectionStore(normalized);
+          return buildConfigStatusPayload();
+        }).then((status) => {
+          sendJson(res, 200, status);
+        }).catch((err) => {
+          sendJson(res, 400, { ok: false, message: String(err && err.message ? err.message : err) });
+        });
+        return;
+      }
+    }
+
+    if (pathname === '/api/config/status') {
+      buildConfigStatusPayload()
+        .then((result) => sendJson(res, 200, result))
+        .catch((err) => sendJson(res, 500, { ok: false, message: String(err && err.message ? err.message : err) }));
+      return;
+    }
+
+    if (pathname === '/api/config/apply' && req.method === 'POST') {
+      readTextBody(req).then((bodyText) => {
+        return proxyBoardConfig('/api/config/apply', 'POST', bodyText);
+      }).then((result) => {
+        sendJson(res, 200, Object.assign({ ok: true, board_config_base_url: getBoardConnectionSettings().board_config_base_url }, result));
+      }).catch((err) => {
+        sendJson(res, 502, {
+          ok: false,
+          message: String(err && err.message ? err.message : err),
+          board_config_base_url: getBoardConnectionSettings().board_config_base_url
+        });
+      });
+      return;
+    }
+
+    if (pathname === '/api/config/ssh_push' && req.method === 'POST') {
+      readTextBody(req).then((bodyText) => {
+        return pushConfigViaScp(bodyText);
+      }).then(() => {
+        const settings = getBoardConnectionSettings();
+        sendJson(res, 200, {
+          ok: true,
+          message: 'ssh uploaded',
+          board_config_base_url: settings.board_config_base_url,
+          ssh_target: {
+            host: settings.board_ssh_host,
+            port: settings.board_ssh_port,
+            user: settings.board_ssh_user,
+            target_path: settings.board_ssh_target_path
+          }
+        });
+      }).catch((err) => {
+        const settings = getBoardConnectionSettings();
+        sendJson(res, 502, {
+          ok: false,
+          message: String(err && err.message ? err.message : err),
+          ssh_target: {
+            host: settings.board_ssh_host,
+            port: settings.board_ssh_port,
+            user: settings.board_ssh_user,
+            target_path: settings.board_ssh_target_path
+          }
+        });
+      });
+      return;
+    }
+
+    if (pathname === '/api/config/ssh_pull') {
+      pullConfigViaSsh().then((tomlText) => {
+        const settings = getBoardConnectionSettings();
+        sendJson(res, 200, {
+          ok: true,
+          message: 'ssh downloaded',
+          toml_text: tomlText,
+          board_config_base_url: settings.board_config_base_url,
+          ssh_target: {
+            host: settings.board_ssh_host,
+            port: settings.board_ssh_port,
+            user: settings.board_ssh_user,
+            target_path: settings.board_ssh_target_path
+          }
+        });
+      }).catch((err) => {
+        const settings = getBoardConnectionSettings();
+        sendJson(res, 502, {
+          ok: false,
+          message: String(err && err.message ? err.message : err),
+          ssh_target: {
+            host: settings.board_ssh_host,
+            port: settings.board_ssh_port,
+            user: settings.board_ssh_user,
+            target_path: settings.board_ssh_target_path
+          }
+        });
+      });
       return;
     }
 

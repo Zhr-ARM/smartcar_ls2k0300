@@ -125,7 +125,7 @@ ipm_centerline_curvature_enabled = true
 # IPM 中线曲率计算步长。
 ipm_centerline_curvature_step = 3
 # 斑马线检测总开关。
-zebra_cross_detection_enabled = false
+zebra_cross_detection_enabled = true
 # 双边都丢线时是否保留上一帧平移中线。
 keep_last_centerline_on_double_loss = true
 # 十字状态识别开关。

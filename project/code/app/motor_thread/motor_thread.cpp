@@ -48,6 +48,7 @@ std::atomic<float> g_left_hardware_duty{0.0f};
 std::atomic<float> g_right_hardware_duty{0.0f};
 std::atomic<int> g_left_dir_level{1};
 std::atomic<int> g_right_dir_level{1};
+std::atomic<bool> g_reload_from_globals_requested(false);
 
 /**
  * @brief 将调度策略枚举转换为字符串
@@ -164,6 +165,11 @@ void motor_loop()
             count_pid.compute(target_l_count, target_r_count,
                               left_raw_count,
                               right_raw_count);
+
+        if (g_reload_from_globals_requested.exchange(false))
+        {
+            count_pid.init(MotorSpeedPidController::default_config((float)MOTOR_MAX_DUTY_PERCENT));
+        }
 
         motor_driver.set_left_duty(control_state.left_duty);
         motor_driver.set_right_duty(control_state.right_duty);
@@ -419,6 +425,11 @@ bool motor_thread_get_pid_debug_status(MotorPidDebugStatus &status)
     status.right_pid_max_output_step = info.right_pid_max_output_step;
     status.runtime = motor_thread_uart_status();
     return true;
+}
+
+void motor_thread_request_reload_from_globals()
+{
+    g_reload_from_globals_requested.store(true);
 }
 
 void motor_thread_cleanup()

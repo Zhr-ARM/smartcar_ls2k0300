@@ -43,6 +43,7 @@ std::atomic<int32> g_thread_priority(0);
 std::atomic<float> g_normal_speed_reference(pid_tuning::route_line_follow::kNormalProfile.base_speed);
 std::atomic<float> g_line_error_px(0.0f);
 std::atomic<float> g_turn_output(0.0f);
+std::atomic<bool> g_reload_from_globals_requested(false);
 
 // 滤波后的归一化误差状态，跨周期保留。
 // 这里刻意保留“状态记忆”，因为巡线不是单次运算，而是连续控制。
@@ -720,6 +721,13 @@ void line_follow_loop()
 
     while (g_line_follow_running.load())
     {
+        if (g_reload_from_globals_requested.exchange(false))
+        {
+            position_pid1.reset();
+            position_pid2.reset();
+            g_normal_speed_reference.store(std::max(0.0f, pid_tuning::route_line_follow::kNormalProfile.base_speed));
+        }
+
         // 这里的 normal_speed_reference 表示“当前希望的 NORMAL 档直道参考速度”。
         // 各状态实际基础速度由 pid_tuning 里的绝对速度档位给出，再按这个直道参考速度做整体缩放。
         const float current_normal_speed_reference = g_normal_speed_reference.load();
@@ -1053,4 +1061,9 @@ bool line_follow_thread_get_pid_debug_status(LineFollowPidDebugStatus &status)
     std::lock_guard<std::mutex> lock(g_pid_debug_mutex);
     status = g_pid_debug_status;
     return true;
+}
+
+void line_follow_thread_request_reload_from_globals()
+{
+    g_reload_from_globals_requested.store(true);
 }

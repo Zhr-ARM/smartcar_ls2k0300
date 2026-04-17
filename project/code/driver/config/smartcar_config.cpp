@@ -1,13 +1,19 @@
 #include "driver/config/smartcar_config.h"
 
+#include "app/line_follow_thread/line_follow_thread.h"
+#include "app/motor_thread/motor_thread.h"
+#include "app/vision_thread/vision_thread.h"
 #include "driver/pid/pid_tuning.h"
 #include "driver/vision/vision_config.h"
+#include "driver/vision/vision_image_processor.h"
+#include "driver/vision/vision_transport.h"
 
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
+#include <mutex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -24,8 +30,71 @@ struct StringStorage
 };
 
 StringStorage g_string_storage;
+std::mutex g_config_mutex;
+std::string g_loaded_config_path;
 
 using RawMap = std::unordered_map<std::string, std::string>;
+
+struct PidSnapshot
+{
+    int32 imu_startup_calibrate_duration_ms = 0;
+    float imu_gyro_yaw_rate_sign = 0.0f;
+    float imu_gyro_yaw_rate_filter_alpha = 0.0f;
+
+    float motor_left_kp = 0.0f;
+    float motor_left_ki = 0.0f;
+    float motor_left_kd = 0.0f;
+    float motor_right_kp = 0.0f;
+    float motor_right_ki = 0.0f;
+    float motor_right_kd = 0.0f;
+    float motor_integral_limit = 0.0f;
+    float motor_max_output_step = 0.0f;
+    float motor_correction_limit = 0.0f;
+    float motor_left_feedforward_gain = 0.0f;
+    float motor_right_feedforward_gain = 0.0f;
+    float motor_left_feedforward_bias = 0.0f;
+    float motor_right_feedforward_bias = 0.0f;
+    float motor_feedforward_bias_threshold = 0.0f;
+    float motor_decel_error_threshold = 0.0f;
+    float motor_decel_duty_gain = 0.0f;
+    float motor_decel_duty_limit = 0.0f;
+    int32 motor_feedback_average_window = 0;
+    float motor_feedback_low_pass_alpha = 0.0f;
+
+    float yaw_rate_visual_curvature_filter_alpha = 0.0f;
+    float yaw_rate_track_point_angle_filter_alpha = 0.0f;
+
+    float line_follow_error_filter_alpha = 0.0f;
+    float line_follow_target_count_min = 0.0f;
+    float line_follow_target_count_max = 0.0f;
+    float line_follow_error_deadzone_px = 0.0f;
+    float line_follow_error_low_gain_limit_px = 0.0f;
+    float line_follow_error_low_gain = 0.0f;
+
+    pid_tuning::line_error_preview::WeightedProfile normal_weighted_profile{};
+    pid_tuning::line_error_preview::WeightedProfile straight_weighted_profile{};
+    pid_tuning::line_error_preview::WeightedProfile cross_weighted_profile{};
+    pid_tuning::line_error_preview::WeightedProfile circle_enter_weighted_profile{};
+    pid_tuning::line_error_preview::WeightedProfile circle_inside_weighted_profile{};
+    pid_tuning::line_error_preview::WeightedProfile circle_exit_weighted_profile{};
+
+    float route_global_base_speed_scale = 0.0f;
+    pid_tuning::route_line_follow::Profile normal_profile{};
+    pid_tuning::route_line_follow::Profile straight_profile{};
+    pid_tuning::route_line_follow::Profile cross_profile{};
+    pid_tuning::route_line_follow::Profile circle_enter_profile{};
+    pid_tuning::route_line_follow::Profile circle_inside_profile{};
+    pid_tuning::route_line_follow::Profile circle_exit_profile{};
+};
+
+struct ConfigSnapshot
+{
+    vision_runtime_config_t vision_runtime{};
+    vision_processor_config_t vision_processor{};
+    PidSnapshot pid{};
+    StringStorage strings{};
+    std::string loaded_path;
+};
 
 std::string trim(const std::string &value)
 {
@@ -73,16 +142,10 @@ std::string strip_comment(const std::string &line)
     return line;
 }
 
-bool parse_key_values(const std::string &path, RawMap *values, std::string *error_message)
+bool parse_key_values_text(const std::string &text, RawMap *values, std::string *error_message)
 {
-    std::ifstream input(path);
-    if (!input.is_open())
-    {
-        *error_message = "cannot open file: " + path;
-        return false;
-    }
-
     std::string section;
+    std::istringstream input(text);
     std::string line;
     int line_number = 0;
     while (std::getline(input, line))
@@ -135,6 +198,19 @@ bool parse_key_values(const std::string &path, RawMap *values, std::string *erro
     }
 
     return true;
+}
+
+bool parse_key_values(const std::string &path, RawMap *values, std::string *error_message)
+{
+    std::ifstream input(path, std::ios::binary);
+    if (!input.is_open())
+    {
+        *error_message = "cannot open file: " + path;
+        return false;
+    }
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    return parse_key_values_text(buffer.str(), values, error_message);
 }
 
 bool take_raw(const RawMap &values,
@@ -615,6 +691,207 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".turn_slowdown_max_rise_ratio_per_cycle", &profile->turn_slowdown_max_rise_ratio_per_cycle, error_message);
 }
 
+PidSnapshot capture_pid_snapshot()
+{
+    PidSnapshot snapshot;
+    snapshot.imu_startup_calibrate_duration_ms = pid_tuning::imu::kStartupCalibrateDurationMs;
+    snapshot.imu_gyro_yaw_rate_sign = pid_tuning::imu::kGyroYawRateSign;
+    snapshot.imu_gyro_yaw_rate_filter_alpha = pid_tuning::imu::kGyroYawRateFilterAlpha;
+
+    snapshot.motor_left_kp = pid_tuning::motor_speed::kLeftKp;
+    snapshot.motor_left_ki = pid_tuning::motor_speed::kLeftKi;
+    snapshot.motor_left_kd = pid_tuning::motor_speed::kLeftKd;
+    snapshot.motor_right_kp = pid_tuning::motor_speed::kRightKp;
+    snapshot.motor_right_ki = pid_tuning::motor_speed::kRightKi;
+    snapshot.motor_right_kd = pid_tuning::motor_speed::kRightKd;
+    snapshot.motor_integral_limit = pid_tuning::motor_speed::kIntegralLimit;
+    snapshot.motor_max_output_step = pid_tuning::motor_speed::kMaxOutputStep;
+    snapshot.motor_correction_limit = pid_tuning::motor_speed::kCorrectionLimit;
+    snapshot.motor_left_feedforward_gain = pid_tuning::motor_speed::kLeftFeedforwardGain;
+    snapshot.motor_right_feedforward_gain = pid_tuning::motor_speed::kRightFeedforwardGain;
+    snapshot.motor_left_feedforward_bias = pid_tuning::motor_speed::kLeftFeedforwardBias;
+    snapshot.motor_right_feedforward_bias = pid_tuning::motor_speed::kRightFeedforwardBias;
+    snapshot.motor_feedforward_bias_threshold = pid_tuning::motor_speed::kFeedforwardBiasThreshold;
+    snapshot.motor_decel_error_threshold = pid_tuning::motor_speed::kDecelErrorThreshold;
+    snapshot.motor_decel_duty_gain = pid_tuning::motor_speed::kDecelDutyGain;
+    snapshot.motor_decel_duty_limit = pid_tuning::motor_speed::kDecelDutyLimit;
+    snapshot.motor_feedback_average_window = pid_tuning::motor_speed::kFeedbackAverageWindow;
+    snapshot.motor_feedback_low_pass_alpha = pid_tuning::motor_speed::kFeedbackLowPassAlpha;
+
+    snapshot.yaw_rate_visual_curvature_filter_alpha = pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha;
+    snapshot.yaw_rate_track_point_angle_filter_alpha = pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha;
+
+    snapshot.line_follow_error_filter_alpha = pid_tuning::line_follow::kErrorFilterAlpha;
+    snapshot.line_follow_target_count_min = pid_tuning::line_follow::kTargetCountMin;
+    snapshot.line_follow_target_count_max = pid_tuning::line_follow::kTargetCountMax;
+    snapshot.line_follow_error_deadzone_px = pid_tuning::line_follow::kErrorDeadzonePx;
+    snapshot.line_follow_error_low_gain_limit_px = pid_tuning::line_follow::kErrorLowGainLimitPx;
+    snapshot.line_follow_error_low_gain = pid_tuning::line_follow::kErrorLowGain;
+
+    snapshot.normal_weighted_profile = pid_tuning::line_error_preview::kNormalWeightedProfile;
+    snapshot.straight_weighted_profile = pid_tuning::line_error_preview::kStraightWeightedProfile;
+    snapshot.cross_weighted_profile = pid_tuning::line_error_preview::kCrossWeightedProfile;
+    snapshot.circle_enter_weighted_profile = pid_tuning::line_error_preview::kCircleEnterWeightedProfile;
+    snapshot.circle_inside_weighted_profile = pid_tuning::line_error_preview::kCircleInsideWeightedProfile;
+    snapshot.circle_exit_weighted_profile = pid_tuning::line_error_preview::kCircleExitWeightedProfile;
+
+    snapshot.route_global_base_speed_scale = pid_tuning::route_line_follow::kGlobalBaseSpeedScale;
+    snapshot.normal_profile = pid_tuning::route_line_follow::kNormalProfile;
+    snapshot.straight_profile = pid_tuning::route_line_follow::kStraightProfile;
+    snapshot.cross_profile = pid_tuning::route_line_follow::kCrossProfile;
+    snapshot.circle_enter_profile = pid_tuning::route_line_follow::kCircleEnterProfile;
+    snapshot.circle_inside_profile = pid_tuning::route_line_follow::kCircleInsideProfile;
+    snapshot.circle_exit_profile = pid_tuning::route_line_follow::kCircleExitProfile;
+    return snapshot;
+}
+
+void restore_pid_snapshot(const PidSnapshot &snapshot)
+{
+    pid_tuning::imu::kStartupCalibrateDurationMs = snapshot.imu_startup_calibrate_duration_ms;
+    pid_tuning::imu::kGyroYawRateSign = snapshot.imu_gyro_yaw_rate_sign;
+    pid_tuning::imu::kGyroYawRateFilterAlpha = snapshot.imu_gyro_yaw_rate_filter_alpha;
+
+    pid_tuning::motor_speed::kLeftKp = snapshot.motor_left_kp;
+    pid_tuning::motor_speed::kLeftKi = snapshot.motor_left_ki;
+    pid_tuning::motor_speed::kLeftKd = snapshot.motor_left_kd;
+    pid_tuning::motor_speed::kRightKp = snapshot.motor_right_kp;
+    pid_tuning::motor_speed::kRightKi = snapshot.motor_right_ki;
+    pid_tuning::motor_speed::kRightKd = snapshot.motor_right_kd;
+    pid_tuning::motor_speed::kIntegralLimit = snapshot.motor_integral_limit;
+    pid_tuning::motor_speed::kMaxOutputStep = snapshot.motor_max_output_step;
+    pid_tuning::motor_speed::kCorrectionLimit = snapshot.motor_correction_limit;
+    pid_tuning::motor_speed::kLeftFeedforwardGain = snapshot.motor_left_feedforward_gain;
+    pid_tuning::motor_speed::kRightFeedforwardGain = snapshot.motor_right_feedforward_gain;
+    pid_tuning::motor_speed::kLeftFeedforwardBias = snapshot.motor_left_feedforward_bias;
+    pid_tuning::motor_speed::kRightFeedforwardBias = snapshot.motor_right_feedforward_bias;
+    pid_tuning::motor_speed::kFeedforwardBiasThreshold = snapshot.motor_feedforward_bias_threshold;
+    pid_tuning::motor_speed::kDecelErrorThreshold = snapshot.motor_decel_error_threshold;
+    pid_tuning::motor_speed::kDecelDutyGain = snapshot.motor_decel_duty_gain;
+    pid_tuning::motor_speed::kDecelDutyLimit = snapshot.motor_decel_duty_limit;
+    pid_tuning::motor_speed::kFeedbackAverageWindow = snapshot.motor_feedback_average_window;
+    pid_tuning::motor_speed::kFeedbackLowPassAlpha = snapshot.motor_feedback_low_pass_alpha;
+
+    pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha = snapshot.yaw_rate_visual_curvature_filter_alpha;
+    pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha = snapshot.yaw_rate_track_point_angle_filter_alpha;
+
+    pid_tuning::line_follow::kErrorFilterAlpha = snapshot.line_follow_error_filter_alpha;
+    pid_tuning::line_follow::kTargetCountMin = snapshot.line_follow_target_count_min;
+    pid_tuning::line_follow::kTargetCountMax = snapshot.line_follow_target_count_max;
+    pid_tuning::line_follow::kErrorDeadzonePx = snapshot.line_follow_error_deadzone_px;
+    pid_tuning::line_follow::kErrorLowGainLimitPx = snapshot.line_follow_error_low_gain_limit_px;
+    pid_tuning::line_follow::kErrorLowGain = snapshot.line_follow_error_low_gain;
+
+    pid_tuning::line_error_preview::kNormalWeightedProfile = snapshot.normal_weighted_profile;
+    pid_tuning::line_error_preview::kStraightWeightedProfile = snapshot.straight_weighted_profile;
+    pid_tuning::line_error_preview::kCrossWeightedProfile = snapshot.cross_weighted_profile;
+    pid_tuning::line_error_preview::kCircleEnterWeightedProfile = snapshot.circle_enter_weighted_profile;
+    pid_tuning::line_error_preview::kCircleInsideWeightedProfile = snapshot.circle_inside_weighted_profile;
+    pid_tuning::line_error_preview::kCircleExitWeightedProfile = snapshot.circle_exit_weighted_profile;
+
+    pid_tuning::route_line_follow::kGlobalBaseSpeedScale = snapshot.route_global_base_speed_scale;
+    pid_tuning::route_line_follow::kNormalProfile = snapshot.normal_profile;
+    pid_tuning::route_line_follow::kStraightProfile = snapshot.straight_profile;
+    pid_tuning::route_line_follow::kCrossProfile = snapshot.cross_profile;
+    pid_tuning::route_line_follow::kCircleEnterProfile = snapshot.circle_enter_profile;
+    pid_tuning::route_line_follow::kCircleInsideProfile = snapshot.circle_inside_profile;
+    pid_tuning::route_line_follow::kCircleExitProfile = snapshot.circle_exit_profile;
+}
+
+ConfigSnapshot capture_config_snapshot()
+{
+    ConfigSnapshot snapshot;
+    snapshot.vision_runtime = g_vision_runtime_config;
+    snapshot.vision_processor = g_vision_processor_config;
+    snapshot.pid = capture_pid_snapshot();
+    snapshot.strings = g_string_storage;
+    snapshot.loaded_path = g_loaded_config_path;
+    return snapshot;
+}
+
+void restore_config_snapshot(const ConfigSnapshot &snapshot)
+{
+    g_string_storage = snapshot.strings;
+    g_vision_runtime_config = snapshot.vision_runtime;
+    g_vision_processor_config = snapshot.vision_processor;
+    g_vision_runtime_config.udp_web_server_ip = g_string_storage.udp_web_server_ip.c_str();
+    g_vision_runtime_config.assistant_server_ip = g_string_storage.assistant_server_ip.c_str();
+    for (size_t i = 0; i < VISION_NCNN_CONFIG_MAX_LABELS; ++i)
+    {
+        g_vision_runtime_config.ncnn_labels[i] =
+            g_string_storage.ncnn_labels[i].empty() ? nullptr : g_string_storage.ncnn_labels[i].c_str();
+    }
+    restore_pid_snapshot(snapshot.pid);
+    g_loaded_config_path = snapshot.loaded_path;
+}
+
+void collect_restart_required_keys(const ConfigSnapshot &old_config,
+                                   std::vector<std::string> *restart_required_keys)
+{
+    if (restart_required_keys == nullptr)
+    {
+        return;
+    }
+    restart_required_keys->clear();
+
+    const auto push_if = [&](bool changed, const char *key) {
+        if (changed)
+        {
+            restart_required_keys->emplace_back(key);
+        }
+    };
+
+    push_if(old_config.vision_runtime.screen_display_enabled != g_vision_runtime_config.screen_display_enabled,
+            "vision.runtime.screen_display_enabled");
+    push_if(old_config.vision_runtime.udp_web_video_port != g_vision_runtime_config.udp_web_video_port,
+            "vision.runtime.web.video_port");
+    push_if(old_config.vision_runtime.udp_web_meta_port != g_vision_runtime_config.udp_web_meta_port,
+            "vision.runtime.web.meta_port");
+    push_if(std::string(old_config.vision_runtime.udp_web_server_ip ? old_config.vision_runtime.udp_web_server_ip : "") !=
+                std::string(g_vision_runtime_config.udp_web_server_ip ? g_vision_runtime_config.udp_web_server_ip : ""),
+            "vision.runtime.web.server_ip");
+    push_if(old_config.vision_runtime.assistant_udp_enabled != g_vision_runtime_config.assistant_udp_enabled,
+            "vision.runtime.assistant.enabled");
+    push_if(old_config.vision_runtime.assistant_server_port != g_vision_runtime_config.assistant_server_port,
+            "vision.runtime.assistant.server_port");
+    push_if(std::string(old_config.vision_runtime.assistant_server_ip ? old_config.vision_runtime.assistant_server_ip : "") !=
+                std::string(g_vision_runtime_config.assistant_server_ip ? g_vision_runtime_config.assistant_server_ip : ""),
+            "vision.runtime.assistant.server_ip");
+    push_if(old_config.vision_runtime.ncnn_input_width != g_vision_runtime_config.ncnn_input_width,
+            "vision.runtime.ncnn.input_width");
+    push_if(old_config.vision_runtime.ncnn_input_height != g_vision_runtime_config.ncnn_input_height,
+            "vision.runtime.ncnn.input_height");
+    push_if(old_config.vision_runtime.ncnn_label_count != g_vision_runtime_config.ncnn_label_count,
+            "vision.runtime.ncnn.label_count");
+    for (size_t i = 0; i < VISION_NCNN_CONFIG_MAX_LABELS; ++i)
+    {
+        const std::string old_label = old_config.vision_runtime.ncnn_labels[i] ? old_config.vision_runtime.ncnn_labels[i] : "";
+        const std::string new_label = g_vision_runtime_config.ncnn_labels[i] ? g_vision_runtime_config.ncnn_labels[i] : "";
+        if (old_label != new_label)
+        {
+            restart_required_keys->emplace_back("vision.runtime.ncnn.labels");
+            break;
+        }
+    }
+}
+
+void apply_runtime_changes_after_commit()
+{
+    vision_transport_udp_set_enabled(g_vision_runtime_config.udp_web_enabled);
+    vision_transport_udp_set_max_fps(g_vision_runtime_config.udp_web_max_fps);
+    vision_transport_udp_set_tcp_enabled(g_vision_runtime_config.udp_web_tcp_enabled);
+
+    vision_thread_set_send_mode(static_cast<vision_thread_send_mode_enum>(g_vision_runtime_config.send_mode));
+    vision_thread_set_send_max_fps(g_vision_runtime_config.send_max_fps);
+    vision_thread_set_infer_enabled(g_vision_runtime_config.infer_enabled);
+    vision_thread_set_ncnn_enabled(g_vision_runtime_config.ncnn_enabled);
+    vision_thread_set_client_sender_enabled(g_vision_runtime_config.client_sender_enabled);
+
+    vision_image_processor_reload_config_from_globals();
+    line_follow_thread_set_normal_speed_reference(pid_tuning::route_line_follow::kNormalProfile.base_speed);
+    line_follow_thread_request_reload_from_globals();
+    motor_thread_request_reload_from_globals();
+}
+
 bool load_from_path(const std::string &path, std::string *error_message)
 {
     RawMap values;
@@ -1005,6 +1282,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
 
 bool smartcar_config_load_from_default_locations(std::string *loaded_path, std::string *error_message)
 {
+    std::lock_guard<std::mutex> lock(g_config_mutex);
     std::vector<std::string> candidates;
     if (const char *env_path = std::getenv("SMARTCAR_CONFIG_PATH"))
     {
@@ -1012,7 +1290,7 @@ bool smartcar_config_load_from_default_locations(std::string *loaded_path, std::
     }
     candidates.emplace_back("./smartcar_config.toml");
     candidates.emplace_back("../user/smartcar_config.toml");
-    candidates.emplace_back("/home/root/smartcar_config.toml");
+    candidates.emplace_back("/home/root/tst/smartcar_config.toml");
 
     std::string first_open_error;
     for (const std::string &candidate : candidates)
@@ -1032,6 +1310,7 @@ bool smartcar_config_load_from_default_locations(std::string *loaded_path, std::
         {
             return false;
         }
+        g_loaded_config_path = candidate;
         if (loaded_path != nullptr)
         {
             *loaded_path = candidate;
@@ -1044,4 +1323,98 @@ bool smartcar_config_load_from_default_locations(std::string *loaded_path, std::
         *error_message = "smartcar_config.toml not found in default locations";
     }
     return false;
+}
+
+bool smartcar_config_apply_toml_text(const std::string &toml_text,
+                                     std::vector<std::string> *restart_required_keys,
+                                     std::string *error_message)
+{
+    std::lock_guard<std::mutex> lock(g_config_mutex);
+
+    const ConfigSnapshot old_config = capture_config_snapshot();
+    const std::string target_path = g_loaded_config_path.empty()
+                                        ? std::string("/home/root/tst/smartcar_config.toml")
+                                        : g_loaded_config_path;
+    const std::string validate_path = target_path + ".apply_validate";
+
+    {
+        std::ofstream output(validate_path, std::ios::binary | std::ios::trunc);
+        if (!output.is_open())
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = "cannot open validation file: " + validate_path;
+            }
+            return false;
+        }
+        output << toml_text;
+        if (!output.good())
+        {
+            if (error_message != nullptr)
+            {
+                *error_message = "failed to write validation file: " + validate_path;
+            }
+            return false;
+        }
+    }
+
+    if (!load_from_path(validate_path, error_message))
+    {
+        restore_config_snapshot(old_config);
+        std::remove(validate_path.c_str());
+        return false;
+    }
+
+    collect_restart_required_keys(old_config, restart_required_keys);
+
+    if (std::rename(validate_path.c_str(), target_path.c_str()) != 0)
+    {
+        restore_config_snapshot(old_config);
+        std::remove(validate_path.c_str());
+        if (error_message != nullptr)
+        {
+            *error_message = "failed to replace config file";
+        }
+        return false;
+    }
+
+    g_loaded_config_path = target_path;
+    apply_runtime_changes_after_commit();
+    return true;
+}
+
+bool smartcar_config_read_loaded_text(std::string *toml_text,
+                                      std::string *loaded_path,
+                                      std::string *error_message)
+{
+    std::lock_guard<std::mutex> lock(g_config_mutex);
+    const std::string path = g_loaded_config_path.empty()
+                                 ? std::string("/home/root/tst/smartcar_config.toml")
+                                 : g_loaded_config_path;
+    std::ifstream input(path, std::ios::binary);
+    if (!input.is_open())
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "cannot open config file: " + path;
+        }
+        return false;
+    }
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    if (toml_text != nullptr)
+    {
+        *toml_text = buffer.str();
+    }
+    if (loaded_path != nullptr)
+    {
+        *loaded_path = path;
+    }
+    return true;
+}
+
+std::string smartcar_config_loaded_path()
+{
+    std::lock_guard<std::mutex> lock(g_config_mutex);
+    return g_loaded_config_path;
 }

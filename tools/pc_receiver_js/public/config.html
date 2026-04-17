@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>主板参数配置</title>
+  <style>
+    :root {
+      --bg: #0f1720;
+      --panel: #16202c;
+      --panel-2: #1b2836;
+      --text: #e7edf3;
+      --muted: #9fb0bf;
+      --accent: #4cc2ff;
+      --ok: #3dcf8e;
+      --warn: #ffb347;
+      --danger: #ff6b6b;
+      --border: rgba(255, 255, 255, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans SC", "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #0f1720 0%, #0c131a 100%);
+      color: var(--text);
+    }
+    .page {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .topbar, .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    }
+    .topbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px;
+      margin-bottom: 18px;
+    }
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .panel {
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input[type="text"] {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    select {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .settings-grid .full {
+      grid-column: 1 / -1;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-primary {
+      background: linear-gradient(180deg, #1e8ec3 0%, #176d95 100%);
+      border-color: rgba(76, 194, 255, 0.35);
+    }
+    .btn-danger {
+      background: linear-gradient(180deg, #9c3f46 0%, #7d3036 100%);
+      border-color: rgba(255, 107, 107, 0.35);
+    }
+    .status-box {
+      white-space: pre-wrap;
+      background: #0c131a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      min-height: 92px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .status-box.ok { color: var(--ok); }
+    .status-box.warn { color: var(--warn); }
+    .status-box.error { color: var(--danger); }
+    .overview {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .overview-card {
+      background: linear-gradient(180deg, rgba(76, 194, 255, 0.08) 0%, rgba(27, 40, 54, 0.95) 100%);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .overview-card.offline {
+      background: linear-gradient(180deg, rgba(255, 107, 107, 0.1) 0%, rgba(27, 40, 54, 0.95) 100%);
+    }
+    .overview-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .badge-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
+    }
+    .status-badge.ok {
+      color: var(--ok);
+      border-color: rgba(61, 207, 142, 0.35);
+      background: rgba(61, 207, 142, 0.12);
+    }
+    .status-badge.warn {
+      color: var(--warn);
+      border-color: rgba(255, 179, 71, 0.35);
+      background: rgba(255, 179, 71, 0.12);
+    }
+    .status-badge.error {
+      color: var(--danger);
+      border-color: rgba(255, 107, 107, 0.35);
+      background: rgba(255, 107, 107, 0.12);
+    }
+    .overview-text {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    textarea {
+      width: 100%;
+      min-height: 70vh;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #0c131a;
+      color: var(--text);
+      padding: 16px;
+      font: 13px/1.55 "JetBrains Mono", monospace;
+    }
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 18px;
+    }
+    .meta-grid {
+      display: grid;
+      gap: 14px;
+    }
+    .meta-card {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .meta-card h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+    }
+    .meta-card p {
+      margin: 6px 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .restart-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--warn);
+      font-size: 13px;
+    }
+    a { color: var(--accent); }
+    @media (max-width: 980px) {
+      .overview {
+        grid-template-columns: 1fr;
+      }
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
+      .split {
+        grid-template-columns: 1fr;
+      }
+      textarea {
+        min-height: 50vh;
+      }
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="topbar">
+      <div>
+        <div class="title">主板参数配置</div>
+        <div class="subtitle">直接读取/应用主板上的 `smartcar_config.toml`，失败不生效，成功后立即热更新可热更参数。</div>
+      </div>
+      <div class="row">
+        <a class="btn" href="/index.html">返回实时页</a>
+        <a class="btn" href="/playback.html">打开回放页</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="title" style="margin-bottom:10px;">热点 / IP / SSH 连接设置</div>
+      <div class="settings-grid" style="margin-bottom:12px;">
+        <div>
+          <label for="presetSelect">连接预设</label>
+          <select id="presetSelect"></select>
+        </div>
+        <div>
+          <label for="presetLabelInput">预设显示名称</label>
+          <input id="presetLabelInput" type="text" placeholder="例如 热点 A" />
+        </div>
+        <div>
+          <label for="presetIdInput">预设 ID</label>
+          <input id="presetIdInput" type="text" placeholder="例如 hotspot_a" />
+        </div>
+        <div class="full">
+          <label for="boardConfigBaseUrlInput">主板运行态 HTTP 地址</label>
+          <input id="boardConfigBaseUrlInput" type="text" placeholder="例如 http://172.21.79.138:18080" />
+        </div>
+        <div>
+          <label for="boardSshHostInput">主板 SSH Host / IP</label>
+          <input id="boardSshHostInput" type="text" placeholder="例如 172.21.79.138" />
+        </div>
+        <div>
+          <label for="boardSshPortInput">主板 SSH 端口</label>
+          <input id="boardSshPortInput" type="text" placeholder="22" />
+        </div>
+        <div>
+          <label for="boardSshUserInput">主板 SSH 用户</label>
+          <input id="boardSshUserInput" type="text" placeholder="root" />
+        </div>
+        <div>
+          <label for="boardSshTargetPathInput">主板 TOML 路径</label>
+          <input id="boardSshTargetPathInput" type="text" placeholder="/home/root/tst/smartcar_config.toml" />
+        </div>
+        <div>
+          <label for="pcReceiverIpInput">电脑图传接收 IP</label>
+          <input id="pcReceiverIpInput" type="text" placeholder="例如 172.21.79.129" />
+        </div>
+        <div>
+          <label for="assistantReceiverIpInput">电脑助手接收 IP</label>
+          <input id="assistantReceiverIpInput" type="text" placeholder="例如 172.21.79.129" />
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn" id="newPresetBtn">新增预设</button>
+        <button class="btn" id="deletePresetBtn">删除当前预设</button>
+        <button class="btn btn-primary" id="saveConnectionSettingsBtn">保存连接设置</button>
+        <button class="btn" id="reloadConnectionSettingsBtn">重新读取连接设置</button>
+        <button class="btn" id="syncPresetToEditorBtn">同步预设 IP 到 TOML</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="overview" id="connectionOverview">
+        <div class="overview-card" id="runtimeOverviewCard">
+          <div class="overview-title">运行态热更新</div>
+          <div class="badge-row">
+            <span class="status-badge warn" id="runtimeHttpBadge">检测中</span>
+          </div>
+          <p class="overview-text" id="runtimeOverviewText">等待检测主板程序的配置 HTTP 服务...</p>
+        </div>
+        <div class="overview-card" id="sshOverviewCard">
+          <div class="overview-title">离线 SSH 落盘</div>
+          <div class="badge-row">
+            <span class="status-badge warn" id="sshBadge">检测中</span>
+          </div>
+          <p class="overview-text" id="sshOverviewText">等待检测主板 SSH 服务...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="align-items:flex-end;">
+        <div style="flex:1 1 420px;color:var(--muted);font-size:13px;line-height:1.6;">
+          参数页固定走电脑侧网页代理。主板程序在线时可直接热更新；主板程序没跑时，可用 SSH 只写配置文件。
+        </div>
+        <button class="btn" id="refreshStatusBtn">刷新连接状态</button>
+        <button class="btn" id="loadConfigBtn">读取当前配置</button>
+        <button class="btn btn-primary" id="applyConfigBtn">应用到主板</button>
+        <button class="btn" id="sshPullBtn">离线 SSH 读取主板</button>
+        <button class="btn" id="sshPushBtn">离线 SSH 写入主板</button>
+        <button class="btn" id="compareBoardBtn">比较主板文件</button>
+        <button class="btn" id="backupBoardBtn">备份主板文件</button>
+        <button class="btn" id="downloadConfigBtn">下载当前文本</button>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="panel">
+        <label for="configEditor">TOML 文本</label>
+        <textarea id="configEditor" spellcheck="false"></textarea>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-card">
+          <h3>接口状态</h3>
+          <p id="currentBaseUrlText">网页代理: --</p>
+          <p id="upstreamBaseUrlText">主板配置服务: --</p>
+          <p id="sshTargetText">SSH 目标: --</p>
+          <p id="loadedPathText">配置路径: --</p>
+          <p id="lastActionText">最近操作: --</p>
+        </div>
+        <div class="meta-card">
+          <h3>应用结果</h3>
+          <div id="applyStatusBox" class="status-box">等待操作...</div>
+        </div>
+        <div class="meta-card">
+          <h3>文件比较</h3>
+          <div id="compareStatusBox" class="status-box">等待比较...</div>
+        </div>
+        <div class="meta-card">
+          <h3>需重启参数</h3>
+          <ul id="restartRequiredList" class="restart-list">
+            <li>当前无</li>
+          </ul>
+        </div>
+        <div class="meta-card">
+          <h3>说明</h3>
+          <p>1. “应用到主板”要求主板程序已启动，会先校验再热更新。</p>
+          <p>2. “离线 SSH 读取主板”会直接从主板文件系统读取 TOML，并覆盖当前编辑框。</p>
+          <p>3. “离线 SSH 写入主板”只覆盖配置文件，不会热更新当前运行进程。</p>
+          <p>4. “比较主板文件”会先走 SSH 拉取主板 TOML，再和当前编辑框逐行比对。</p>
+          <p>5. “备份主板文件”会先走 SSH 拉取主板 TOML，再保存到本地带时间戳文件。</p>
+          <p>6. 标记为“需重启”的参数已经写入文件，但当前进程不会立即切换。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/config_app.js"></script>
+</body>
+</html>

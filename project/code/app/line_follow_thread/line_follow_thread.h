@@ -107,5 +107,6 @@ float line_follow_thread_normal_speed_reference();
  */
 float line_follow_thread_applied_base_speed();
 bool line_follow_thread_get_pid_debug_status(LineFollowPidDebugStatus &status);
+void line_follow_thread_request_reload_from_globals();
 
 #endif

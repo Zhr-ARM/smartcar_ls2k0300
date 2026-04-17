@@ -1,5 +1,6 @@
 #include "zf_common_headfile.h"
 #include "app/beep_thread/beep_thread.h"
+#include "app/config_http_thread/config_http_thread.h"
 #include "battery.h"
 #include "uart_thread.h"
 #include "motor_thread.h"
@@ -41,6 +42,7 @@ void cleanup_worker_threads_once()
     screen_display_thread_cleanup();
     line_follow_thread_cleanup();
     vision_thread_cleanup();
+    config_http_thread_cleanup();
     vision_assistant_udp_cleanup();
     vision_transport_udp_cleanup();
     motor_thread_cleanup();
@@ -161,6 +163,14 @@ int main(int, char**)
     }
 
     // 初始化逐飞助手独立 UDP 通道（不与网页端共用 IP/端口）。
+    if (!config_http_thread_init())
+    {
+        printf("[CONFIG_HTTP] init failed on port 18080\r\n");
+        cleanup();
+        return -1;
+    }
+    printf("[CONFIG_HTTP] ready=1 port=18080\r\n");
+
     if (g_vision_runtime_config.assistant_udp_enabled)
     {
         if (!vision_assistant_udp_init(g_vision_runtime_config.assistant_server_ip,
@@ -346,10 +356,10 @@ int main(int, char**)
             vision_image_processor_zebra_cross_count() >= 1)
         {
             zebra_cross_stop_triggered = true;
-            printf("[ZEBRA] zebra_cross_count=%d -> stopping all motors and brushless output\r\n",
+            printf("[ZEBRA] zebra_cross_count=%d -> requesting full process exit like Ctrl+C\r\n",
                    vision_image_processor_zebra_cross_count());
             stop_all_motion_immediately();
-            motor_thread_cleanup();
+            g_should_exit = 1;
         }
 
         system_delay_ms(kMainLoopPeriodMs);
