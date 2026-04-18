@@ -1,7 +1,6 @@
 #ifndef __BATTERY_H__
 #define __BATTERY_H__
 
-#include <csignal>
 #include "zf_common_headfile.h"
 
 #define BATTERY_ADC_REG_PATH "/sys/bus/iio/devices/iio:device0/in_voltage7_raw"
@@ -75,54 +74,5 @@ private:
 };
 
 extern BatteryMonitor battery_monitor;
-
-/**
- * @brief 初始化低压保护模块
- * 作用：初始化电池监测、低压判定状态和蜂鸣器默认状态
- */
-void battery_low_voltage_protection_init();
-
-/**
- * @brief 更新低压保护状态
- * 作用：刷新电池电压、执行滤波和连续低压确认
- * @return 若已经触发低压保护则返回 true
- */
-bool battery_low_voltage_protection_update();
-
-/**
- * @brief 获取低压保护是否已经锁存
- * @return 已触发并锁存返回 true
- */
-bool battery_low_voltage_protection_latched();
-
-/**
- * @brief 获取滤波后的电池电压
- * @return 当前用于低压判定的滤波电压，单位 V
- */
-float battery_low_voltage_protection_filtered_voltage_v();
-
-/**
- * @brief 获取低压保护阈值
- * @return 低压保护阈值，单位 V
- */
-float battery_low_voltage_protection_threshold_v();
-
-/**
- * @brief 获取建议的低压检测周期
- * @return 建议检测周期，单位 ms
- */
-int battery_low_voltage_protection_check_period_ms();
-
-/**
- * @brief 关闭蜂鸣器
- */
-void battery_low_voltage_protection_silence_buzzer();
-
-/**
- * @brief 进入低压蜂鸣报警循环
- * 作用：在主控制已停下后持续蜂鸣提醒，直到用户退出程序
- * @param exit_flag 外部退出标志；传空指针则表示不检查外部退出
- */
-void battery_low_voltage_protection_run_alarm_loop(volatile sig_atomic_t *exit_flag);
 
 #endif

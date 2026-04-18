@@ -183,7 +183,7 @@ cross_upper_dir6_post_run_len = 3
 ipm_line_error_source = 2
 # line_error 计算方法。
 # 0=固定索引，1=加权索引，2=随速度索引。
-ipm_line_error_method = 1
+ipm_line_error_method = 3
 # 固定索引模式下使用的中线点索引。
 ipm_line_error_fixed_index = 1
 # 加权索引模式下实际参与计算的点数。
@@ -196,9 +196,9 @@ ipm_line_error_point_indices = [8, 16, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 ipm_line_error_weights = [0.5, 0.3, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 # 随速度索引公式中的速度系数 k。
 # 公式：index = k * speed + b。
-ipm_line_error_speed_k = 0.02
+ipm_line_error_speed_k = 0.018
 # 随速度索引公式中的常数项 b。
-ipm_line_error_speed_b = 2.0
+ipm_line_error_speed_b = -4.5
 # 随速度索引模式允许的最小索引。
 ipm_line_error_index_min = 0
 # 随速度索引模式允许的最大索引。
@@ -243,7 +243,7 @@ data_profile = 0
 # 网页端 TCP 状态发送总开关。
 tcp_enabled = true
 # PC 接收端 IP 地址。
-server_ip = "172.21.79.129"
+server_ip = "10.119.73.102"
 # PC 接收端 UDP 视频端口。
 video_port = 10000
 # PC 接收端 TCP 状态端口。
@@ -361,7 +361,7 @@ ipm_size = true
 # 逐飞助手 UDP 通道开关。
 enabled = false
 # 逐飞助手接收端 IP。
-server_ip = "172.21.79.129"
+server_ip = "10.119.73.102"
 # 逐飞助手接收端端口。
 server_port = 8899
 
@@ -413,13 +413,13 @@ gyro_yaw_rate_filter_alpha = 0.45
 
 [pid.motor_speed]
 # 左轮速度环 Kp。
-left_kp = 0.085
+left_kp = 0.055
 # 左轮速度环 Ki。
 left_ki = 0.00078
 # 左轮速度环 Kd。
 left_kd = 0.0
 # 右轮速度环 Kp。
-right_kp = 0.085
+right_kp = 0.055
 # 右轮速度环 Ki。
 right_ki = 0.00078
 # 右轮速度环 Kd。
@@ -475,7 +475,7 @@ error_low_gain = 0.7
 # NORMAL 状态下参与加权预瞄的点数。
 weighted_point_count = 3
 # NORMAL 状态下参与加权预瞄的点索引。
-point_indices = [16, 20, 26]
+point_indices = [14, 18, 24]
 # NORMAL 状态下各预瞄点权重。
 weights = [0.5, 0.25, 0.25]
 
@@ -483,7 +483,7 @@ weights = [0.5, 0.25, 0.25]
 # STRAIGHT 状态下参与加权预瞄的点数。
 weighted_point_count = 3
 # STRAIGHT 状态下参与加权预瞄的点索引。
-point_indices = [14, 22, 28]
+point_indices = [16, 24, 29]
 # STRAIGHT 状态下各预瞄点权重。
 weights = [0.45, 0.35, 0.2]
 
@@ -526,12 +526,12 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 300.0
+base_speed = 375.0
 # NORMAL 档直道满速误差阈值。
 # 小于等于 0 表示关闭该逻辑。
 straight_full_speed_error_threshold_px = 0.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
-position_dynamic_kp_quad_a = 3.0
+position_dynamic_kp_quad_a = 0.0
 # NORMAL 档位置环动态 Kp 基础值。
 position_dynamic_kp_base = 2.1
 # NORMAL 档位置环动态 Kp 下限。
@@ -541,15 +541,15 @@ position_dynamic_kp_max = 50.0
 # NORMAL 档位置环动态 Kp 低误差段结束阈值。
 position_dynamic_kp_low_error_threshold_px = 3.0
 # NORMAL 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 4.6
+position_dynamic_kp_mid_a = 0.8
 # NORMAL 档位置环动态 Kp 中误差段结束阈值。
 position_dynamic_kp_mid_error_threshold_px = 10.0
 # NORMAL 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 5.6
+position_dynamic_kp_high_a = 1.7
 # NORMAL 档位置环 Ki。
 position_ki = 0.0
 # NORMAL 档位置环 Kd 基础值。
-position_kd = 0.15
+position_kd = 0.0
 # NORMAL 档位置环动态 Kd 一次项系数。
 position_dynamic_kd_quad_a = 0.0
 # NORMAL 档位置环动态 Kd 下限。
@@ -559,9 +559,9 @@ position_dynamic_kd_max = 2.0
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
-position_max_output = 210.0
+position_max_output = 240.0
 # NORMAL 档总转向输出限幅。
-steering_max_output = 210.0
+steering_max_output = 240.0
 # NORMAL 档由横向误差生成目标横摆角速度的增益。
 yaw_rate_ref_from_error_gain_dps = 0.0
 # NORMAL 档由曲率生成目标横摆角速度的增益。
@@ -589,15 +589,15 @@ yaw_rate_max_integral = 0.0
 # NORMAL 档角速度环输出限幅。
 yaw_rate_max_output = 200.0
 # NORMAL 档按误差降速的起始点。
-turn_slowdown_start_px = 1.0
+turn_slowdown_start_px = 50.0
 # NORMAL 档按误差降速的满量程点。
-turn_slowdown_full_px = 25.0
+turn_slowdown_full_px = 60.0
 # NORMAL 档按目标横摆角速度降速的起始点。
-yaw_rate_ref_slowdown_start_dps = 0.0
+yaw_rate_ref_slowdown_start_dps = 35.0
 # NORMAL 档按目标横摆角速度降速的满量程点。
-yaw_rate_ref_slowdown_full_dps = 0.0
+yaw_rate_ref_slowdown_full_dps = 140
 # NORMAL 档最低保速比例。
-turn_min_speed_scale = 0.9
+turn_min_speed_scale = 0.80
 # NORMAL 档单周期最大降速比例。
 turn_slowdown_max_drop_ratio_per_cycle = 0.82
 # NORMAL 档单周期最大升速比例。
@@ -605,7 +605,7 @@ turn_slowdown_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.straight]
 # STRAIGHT 档基础速度。
-base_speed = 370.0
+base_speed = 600.0
 # STRAIGHT 档直道满速误差阈值。
 straight_full_speed_error_threshold_px = 0.0
 # STRAIGHT 档位置环动态 Kp 低误差段一次项系数。

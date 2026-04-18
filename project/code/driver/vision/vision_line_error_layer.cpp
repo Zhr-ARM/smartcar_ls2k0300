@@ -173,7 +173,6 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         {
             last_required_index = std::max(last_required_index, point_indices[i]);
         }
-        g_required_last_index_for_straight = last_required_index;
 
         float total_weight = 0.0f;
         float valid_weight = 0.0f;
@@ -190,17 +189,16 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
             g_abs_error_sum_to_required_index = 0.0f;
             return 0;
         }
-        if (std::fabs(valid_weight) <= 1e-6f)
-        {
-            const int fallback_idx = count - 1;
-            x = static_cast<float>(xs[fallback_idx]);
-            y = static_cast<float>(ys[fallback_idx]);
-            g_ipm_line_error_track_index = fallback_idx;
-        }
-        else
+
+        int weighted_track_index = count - 1;
+        float weighted_x = static_cast<float>(xs[weighted_track_index]);
+        float weighted_y = static_cast<float>(ys[weighted_track_index]);
+        if (std::fabs(valid_weight) > 1e-6f)
         {
             const float weight_scale = total_weight / valid_weight;
             float weighted_index = 0.0f;
+            weighted_x = 0.0f;
+            weighted_y = 0.0f;
             for (size_t i = 0; i < point_count; ++i)
             {
                 const int idx = point_indices[i];
@@ -210,10 +208,37 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
                 }
                 const float effective_weight = weights[i] * weight_scale;
                 weighted_index += static_cast<float>(idx) * effective_weight;
-                x += static_cast<float>(xs[idx]) * effective_weight;
-                y += static_cast<float>(ys[idx]) * effective_weight;
+                weighted_x += static_cast<float>(xs[idx]) * effective_weight;
+                weighted_y += static_cast<float>(ys[idx]) * effective_weight;
             }
-            g_ipm_line_error_track_index = std::clamp(static_cast<int>(std::lround(weighted_index)), 0, count - 1);
+            weighted_track_index = std::clamp(static_cast<int>(std::lround(weighted_index)), 0, count - 1);
+        }
+
+        if (method == VISION_IPM_LINE_ERROR_WEIGHTED_SPEED_DELTA)
+        {
+            const float speed_k = g_ipm_line_error_speed_k.load();
+            const float speed_b = g_ipm_line_error_speed_b.load();
+            const float current_speed = line_follow_thread_applied_base_speed();
+            const int cfg_index_min = g_ipm_line_error_index_min.load();
+            const int cfg_index_max = g_ipm_line_error_index_max.load();
+            const int range_min = std::min(cfg_index_min, cfg_index_max);
+            const int range_max = std::max(cfg_index_min, cfg_index_max);
+            const int idx_delta = static_cast<int>(std::lround(speed_k * current_speed + speed_b));
+            const int idx = std::clamp(weighted_track_index + idx_delta,
+                                       range_min,
+                                       std::min(range_max, count - 1));
+
+            g_required_last_index_for_straight = idx;
+            g_ipm_line_error_track_index = idx;
+            x = static_cast<float>(xs[idx]);
+            y = static_cast<float>(ys[idx]);
+        }
+        else
+        {
+            g_required_last_index_for_straight = last_required_index;
+            g_ipm_line_error_track_index = weighted_track_index;
+            x = weighted_x;
+            y = weighted_y;
         }
     }
 
@@ -254,7 +279,7 @@ int vision_line_error_layer_source()
 void vision_line_error_layer_set_method(int method)
 {
     if (method >= static_cast<int>(VISION_IPM_LINE_ERROR_FIXED_INDEX) &&
-        method <= static_cast<int>(VISION_IPM_LINE_ERROR_SPEED_INDEX))
+        method <= static_cast<int>(VISION_IPM_LINE_ERROR_WEIGHTED_SPEED_DELTA))
     {
         g_ipm_line_error_method.store(method);
         return;

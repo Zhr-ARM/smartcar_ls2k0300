@@ -375,7 +375,9 @@ static const pid_tuning::line_error_preview::WeightedProfile *select_line_error_
 
 static void apply_line_error_weighted_profile_if_needed(const vision_route_state_snapshot_t &route_snapshot)
 {
-    if (g_vision_runtime_config.ipm_line_error_method != VISION_IPM_LINE_ERROR_WEIGHTED_INDEX)
+    const int method = g_vision_runtime_config.ipm_line_error_method;
+    if (method != VISION_IPM_LINE_ERROR_WEIGHTED_INDEX &&
+        method != VISION_IPM_LINE_ERROR_WEIGHTED_SPEED_DELTA)
     {
         return;
     }
@@ -5353,6 +5355,7 @@ void vision_image_processor_reload_config_from_globals()
     g_ipm_line_error_preferred_source.store(g_vision_runtime_config.ipm_line_error_source);
 
     vision_line_error_layer_reset();
+    g_last_applied_line_error_profile_id = -1;
 }
 
 void vision_image_processor_set_maze_start_row(int row)
@@ -5594,6 +5597,10 @@ vision_ipm_line_error_method_enum vision_image_processor_ipm_line_error_method()
     if (m == static_cast<int>(VISION_IPM_LINE_ERROR_FIXED_INDEX))
     {
         return VISION_IPM_LINE_ERROR_FIXED_INDEX;
+    }
+    if (m == static_cast<int>(VISION_IPM_LINE_ERROR_WEIGHTED_SPEED_DELTA))
+    {
+        return VISION_IPM_LINE_ERROR_WEIGHTED_SPEED_DELTA;
     }
     if (m == static_cast<int>(VISION_IPM_LINE_ERROR_SPEED_INDEX))
     {

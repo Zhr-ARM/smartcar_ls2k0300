@@ -327,7 +327,7 @@ typedef struct
     // 包括 line_error 取点策略与索引范围约束参数。
     // line_error 使用哪条平移中线追踪：左平移或右平移。
     int ipm_line_error_source;
-    // line_error 计算方法：0=固定索引，1=加权索引，2=随速度索引。
+    // line_error 计算方法：0=固定索引，1=加权索引，2=随速度索引，3=加权+速度增量。
     int ipm_line_error_method;
     // 固定索引模式下使用的中线点索引。
     int ipm_line_error_fixed_index;

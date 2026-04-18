@@ -31,7 +31,8 @@ typedef enum
 {
     VISION_IPM_LINE_ERROR_FIXED_INDEX = 0,
     VISION_IPM_LINE_ERROR_WEIGHTED_INDEX = 1,
-    VISION_IPM_LINE_ERROR_SPEED_INDEX = 2
+    VISION_IPM_LINE_ERROR_SPEED_INDEX = 2,
+    VISION_IPM_LINE_ERROR_WEIGHTED_SPEED_DELTA = 3
 } vision_ipm_line_error_method_enum;
 
 typedef enum
@@ -133,11 +134,12 @@ void vision_image_processor_set_ipm_centerline_curvature_enabled(bool enabled);
 bool vision_image_processor_ipm_centerline_curvature_enabled();
 // line_error 跟踪点配置：
 // - source: 偏好左/偏好右/无偏好自动（按边界点数择优）；
-// - method: 固定索引 / 加权索引 / 随速度索引；
+// - method: 固定索引 / 加权索引 / 随速度索引 / 加权索引+速度增量；
 // - fixed_index: 固定索引模式下使用的点索引；
 // - point_indices/weights: 加权索引模式下使用的索引与权重；
 // - speed_k/speed_b: 随速度索引模式公式 idx = k * speed + b；
-// - index_min/max: 随速度索引模式的索引限制区间。
+//                    加权+速度增量模式公式 idx = idx_weighted + (k * speed + b)；
+// - index_min/max: 随速度索引模式和加权+速度增量模式的索引限制区间。
 // 若加权索引中的某索引超出当前中线长度，则该索引权重会按剩余有效权重比例重分配。
 void vision_image_processor_set_ipm_line_error_source(vision_ipm_line_error_source_enum source);
 vision_ipm_line_error_source_enum vision_image_processor_ipm_line_error_source();

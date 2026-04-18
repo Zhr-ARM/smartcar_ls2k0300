@@ -25,9 +25,8 @@ volatile sig_atomic_t g_should_exit = 0;
 
 namespace
 {
-constexpr float kStartupLowVoltageThresholdV = 11.6f;
+constexpr float kStartupLowVoltageThresholdV = 9.8f;
 constexpr int kMainLoopPeriodMs = 50;
-constexpr int kBatteryRefreshPeriodMs = 1000;
 constexpr int kLowVoltageStatusPrintPeriodMs = 2000;
 
 bool g_worker_cleanup_done = false;
@@ -56,7 +55,6 @@ void cleanup_once()
     cleanup_worker_threads_once();
     beep_thread_set_alarm_enabled(false);
     beep_thread_cleanup();
-    battery_low_voltage_protection_silence_buzzer();
 }
 
 void stop_all_motion_immediately()
@@ -342,15 +340,8 @@ int main(int, char**)
     line_follow_thread_print_info();
 
     bool zebra_cross_stop_triggered = false;
-    int battery_refresh_elapsed_ms = kBatteryRefreshPeriodMs;
     while(!g_should_exit)
     {
-        if (battery_refresh_elapsed_ms >= kBatteryRefreshPeriodMs)
-        {
-            battery_monitor.update();
-            battery_refresh_elapsed_ms = 0;
-        }
-
         if (!zebra_cross_stop_triggered &&
             g_vision_runtime_config.zebra_cross_detection_enabled &&
             vision_image_processor_zebra_cross_count() >= 1)
@@ -363,10 +354,8 @@ int main(int, char**)
         }
 
         system_delay_ms(kMainLoopPeriodMs);
-        battery_refresh_elapsed_ms += kMainLoopPeriodMs;
     }
 
-    battery_low_voltage_protection_silence_buzzer();
     if (g_should_exit)
     {
         printf("收到Ctrl+C,程序即将退出\n");
