@@ -14,6 +14,13 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const RECORDINGS_DIR = path.join(__dirname, 'recordings');
 const WASM_DIR = path.join(PUBLIC_DIR, 'wasm');
 const ROOT_DIR = path.join(__dirname, '..', '..');
+const RL_DIR = path.join(ROOT_DIR, 'RL');
+const RL_CONFIG_DIR = path.join(RL_DIR, 'configs');
+const RL_DATA_DIR = path.join(RL_DIR, 'data');
+const RL_RAW_RUNS_DIR = path.join(RL_DATA_DIR, 'raw_runs');
+const RL_SYSTEM_ID_DIR = path.join(RL_DATA_DIR, 'system_id');
+const RL_TRAIN_STATUS_DIR = path.join(RL_DATA_DIR, 'train_status');
+const RL_RESULTS_DIR = path.join(RL_DIR, 'results');
 const WASM_SYNC_METADATA_PATH = path.join(WASM_DIR, 'vision_pipeline.sync.json');
 const SHARED_CONNECTION_PRESETS_PATH = path.join(ROOT_DIR, 'project', 'user', 'connection_presets.json');
 const SHARED_SMARTCAR_CONFIG_PATH = path.join(ROOT_DIR, 'project', 'user', 'smartcar_config.toml');
@@ -82,6 +89,66 @@ const udpFrameEvents = [];
 let cachedWasmSyncStatus = null;
 let cachedWasmSyncStatusAtMs = 0;
 let boardConnectionStore = loadBoardConnectionStore();
+const recentStatusFrames = [];
+const MAX_RECENT_STATUS_FRAMES = 60000;
+
+let rlCaptureState = {
+  active: false,
+  taskName: '',
+  captureId: '',
+  startedAtMs: 0,
+  stoppedAtMs: 0,
+  repeatIndex: 0,
+  repeatTotal: 0,
+  stepIndex: -1,
+  stepTag: '',
+  frames: [],
+  notes: [],
+  stopRequested: false,
+  abortReason: '',
+  baseTomlText: '',
+  appliedTomlText: '',
+  task: null,
+  currentStep: null,
+  stepsApplied: []
+};
+
+let rlTrainingState = {
+  active: false,
+  taskName: '',
+  startedAtMs: 0,
+  stoppedAtMs: 0,
+  pid: 0,
+  statusPath: '',
+  captureRunDir: '',
+  logLines: [],
+  exitCode: null,
+  error: '',
+  process: null
+};
+
+let rlOnlineState = {
+  active: false,
+  taskName: '',
+  startedAtMs: 0,
+  stoppedAtMs: 0,
+  stopRequested: false,
+  trialIndex: 0,
+  trialTotal: 0,
+  stepTag: '',
+  stepRepeat: 0,
+  baselineReward: null,
+  bestReward: null,
+  currentReward: null,
+  bestParams: null,
+  currentParams: null,
+  logs: [],
+  error: '',
+  phase: 'idle',
+  task: null,
+  baseTomlText: '',
+  resultPath: ''
+};
 
 let wss = null;
 
@@ -123,6 +190,14 @@ function getWasmSyncStatus() {
 
 function ensureRecordingsDir() {
   fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
+}
+
+function ensureRlDirs() {
+  fs.mkdirSync(RL_CONFIG_DIR, { recursive: true });
+  fs.mkdirSync(RL_RAW_RUNS_DIR, { recursive: true });
+  fs.mkdirSync(RL_SYSTEM_ID_DIR, { recursive: true });
+  fs.mkdirSync(RL_TRAIN_STATUS_DIR, { recursive: true });
+  fs.mkdirSync(RL_RESULTS_DIR, { recursive: true });
 }
 
 function normalizeBoardConnectionPreset(input, fallbackPreset = null) {
@@ -249,6 +324,875 @@ function sendJson(res, code, obj) {
     'Cache-Control': 'no-store'
   });
   res.end(JSON.stringify(obj));
+}
+
+function tailLines(lines, limit = 120) {
+  return Array.isArray(lines) ? lines.slice(Math.max(0, lines.length - limit)) : [];
+}
+
+function pushTrainLog(line) {
+  if (!line) return;
+  rlTrainingState.logLines.push(line);
+  if (rlTrainingState.logLines.length > 400) {
+    rlTrainingState.logLines.splice(0, rlTrainingState.logLines.length - 400);
+  }
+}
+
+function pushOnlineLog(line) {
+  if (!line) return;
+  rlOnlineState.logs.push(`[${new Date().toLocaleTimeString()}] ${line}`);
+  if (rlOnlineState.logs.length > 400) {
+    rlOnlineState.logs.splice(0, rlOnlineState.logs.length - 400);
+  }
+}
+
+function readJsonIfExists(filePath, fallback = null) {
+  try {
+    if (!fs.existsSync(filePath)) return fallback;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function listJsonFiles(dirPath) {
+  if (!fs.existsSync(dirPath)) return [];
+  return fs.readdirSync(dirPath)
+    .filter((name) => name.endsWith('.json'))
+    .map((name) => path.join(dirPath, name));
+}
+
+function pathExists(filePath) {
+  try {
+    return !!filePath && fs.existsSync(filePath);
+  } catch (_) {
+    return false;
+  }
+}
+
+function latestCaptureRunDir() {
+  if (!fs.existsSync(RL_RAW_RUNS_DIR)) return '';
+  const entries = fs.readdirSync(RL_RAW_RUNS_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({
+      name: entry.name,
+      fullPath: path.join(RL_RAW_RUNS_DIR, entry.name),
+      mtimeMs: fs.statSync(path.join(RL_RAW_RUNS_DIR, entry.name)).mtimeMs
+    }))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return entries.length ? entries[0].fullPath : '';
+}
+
+function latestResultFile() {
+  if (!fs.existsSync(RL_RESULTS_DIR)) return '';
+  const candidates = [];
+  for (const entry of fs.readdirSync(RL_RESULTS_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const bestPath = path.join(RL_RESULTS_DIR, entry.name, 'best_params.json');
+    if (!fs.existsSync(bestPath)) continue;
+    candidates.push({ path: bestPath, mtimeMs: fs.statSync(bestPath).mtimeMs });
+  }
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return candidates.length ? candidates[0].path : '';
+}
+
+function loadRlTask(taskName = 'task_speed_pid_default') {
+  const normalized = String(taskName || 'task_speed_pid_default').replace(/\.json$/i, '').trim();
+  const filePath = path.join(RL_CONFIG_DIR, `${normalized}.json`);
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`RL task config not found: ${normalized}`);
+  }
+  const task = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  return { name: normalized, filePath, task };
+}
+
+function currentMotorParamsFromToml(tomlText) {
+  return {
+    left_kp: Number(getTomlValue(tomlText, 'pid.motor_speed', 'left_kp')),
+    left_ki: Number(getTomlValue(tomlText, 'pid.motor_speed', 'left_ki')),
+    left_feedforward_gain: Number(getTomlValue(tomlText, 'pid.motor_speed', 'left_feedforward_gain')),
+    right_kp: Number(getTomlValue(tomlText, 'pid.motor_speed', 'right_kp')),
+    right_ki: Number(getTomlValue(tomlText, 'pid.motor_speed', 'right_ki')),
+    right_feedforward_gain: Number(getTomlValue(tomlText, 'pid.motor_speed', 'right_feedforward_gain'))
+  };
+}
+
+function normalizeCoreParams(params, task) {
+  const normalized = {};
+  const bounds = (task && task.parameter_bounds) || {};
+  const defaults = ((task && task.initial_params) || {});
+  for (const key of ['left_kp', 'left_ki', 'left_feedforward_gain', 'right_kp', 'right_ki', 'right_feedforward_gain']) {
+    const raw = Number(params && params[key]);
+    const fallback = Number(defaults[key]);
+    const lo = Number(bounds[key] && bounds[key][0]);
+    const hi = Number(bounds[key] && bounds[key][1]);
+    const base = Number.isFinite(raw) ? raw : fallback;
+    normalized[key] = Number.isFinite(lo) && Number.isFinite(hi) ? Math.min(hi, Math.max(lo, base)) : base;
+  }
+  return normalized;
+}
+
+function coreParamsToToml(tomlText, params) {
+  let nextToml = String(tomlText || '');
+  const mapping = [
+    ['pid.motor_speed', 'left_kp', params.left_kp],
+    ['pid.motor_speed', 'left_ki', params.left_ki],
+    ['pid.motor_speed', 'left_feedforward_gain', params.left_feedforward_gain],
+    ['pid.motor_speed', 'right_kp', params.right_kp],
+    ['pid.motor_speed', 'right_ki', params.right_ki],
+    ['pid.motor_speed', 'right_feedforward_gain', params.right_feedforward_gain]
+  ];
+  for (const [section, key, value] of mapping) {
+    nextToml = setTomlValue(nextToml, section, key, String(Number(value)));
+  }
+  return nextToml;
+}
+
+function stripTomlComment(raw) {
+  let inQuotes = false;
+  let escaped = false;
+  let out = '';
+  for (let i = 0; i < raw.length; i += 1) {
+    const ch = raw[i];
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      out += ch;
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      out += ch;
+      continue;
+    }
+    if (!inQuotes && ch === '#') break;
+    out += ch;
+  }
+  return out.trim();
+}
+
+function getTomlValue(text, sectionName, key) {
+  const lines = String(text || '').split('\n');
+  let currentSection = '';
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      currentSection = trimmed.slice(1, -1).trim();
+      continue;
+    }
+    if (currentSection !== sectionName) continue;
+    const eqIndex = line.indexOf('=');
+    if (eqIndex < 0) continue;
+    const rawKey = line.slice(0, eqIndex).trim();
+    if (rawKey !== key) continue;
+    return stripTomlComment(line.slice(eqIndex + 1));
+  }
+  return null;
+}
+
+function setTomlValue(text, sectionName, key, rawValue) {
+  const lines = String(text || '').split('\n');
+  let currentSection = '';
+  let replaced = false;
+  for (let i = 0; i < lines.length; i += 1) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      currentSection = trimmed.slice(1, -1).trim();
+      continue;
+    }
+    if (currentSection !== sectionName) continue;
+    const eqIndex = lines[i].indexOf('=');
+    if (eqIndex < 0) continue;
+    const rawKey = lines[i].slice(0, eqIndex).trim();
+    if (rawKey !== key) continue;
+    lines[i] = `${key} = ${rawValue}`;
+    replaced = true;
+    break;
+  }
+  if (!replaced) {
+    throw new Error(`TOML key not found: ${sectionName}.${key}`);
+  }
+  return lines.join('\n');
+}
+
+async function getConfigReadMode() {
+  const status = await buildConfigStatusPayload();
+  if (status && status.runtime_http && status.runtime_http.online) {
+    return { mode: 'runtime', status };
+  }
+  if (status && status.ssh_transport && status.ssh_transport.online) {
+    return { mode: 'ssh', status };
+  }
+  throw new Error('runtime HTTP and SSH are both unavailable');
+}
+
+async function readBoardTomlText() {
+  const { mode } = await getConfigReadMode();
+  if (mode === 'runtime') {
+    const result = await proxyBoardConfig('/api/config/current', 'GET');
+    return result.toml_text || '';
+  }
+  return pullConfigViaSsh();
+}
+
+async function applyBoardTomlText(tomlText) {
+  const { mode } = await getConfigReadMode();
+  if (mode === 'runtime') {
+    const result = await proxyBoardConfig('/api/config/apply', 'POST', tomlText);
+    saveSharedSmartcarConfig(tomlText);
+    return { mode, result };
+  }
+  await pushConfigViaScp(tomlText);
+  saveSharedSmartcarConfig(tomlText);
+  return { mode, result: { ok: true, message: 'ssh uploaded' } };
+}
+
+function appendStatusFrame(frame) {
+  const stamped = Object.assign({}, frame, {
+    _received_at_ms: Date.now()
+  });
+  recentStatusFrames.push(stamped);
+  if (recentStatusFrames.length > MAX_RECENT_STATUS_FRAMES) {
+    recentStatusFrames.splice(0, recentStatusFrames.length - MAX_RECENT_STATUS_FRAMES);
+  }
+  if (!rlCaptureState.active) return;
+  rlCaptureState.frames.push({
+    ...stamped,
+    capture_client_ts_ms: Date.now(),
+    capture_step_index: rlCaptureState.stepIndex,
+    capture_step_tag: rlCaptureState.stepTag || ''
+  });
+  if (rlCaptureState.frames.length > 120000) {
+    rlCaptureState.frames.splice(0, rlCaptureState.frames.length - 120000);
+  }
+  evaluateCaptureSafety(stamped);
+}
+
+function evaluateCaptureSafety(frame) {
+  if (!rlCaptureState.active || !rlCaptureState.task) return;
+  const safety = (((rlCaptureState.task || {}).capture || {}).safety) || {};
+  const maxAbsError = Number(safety.max_abs_error || 0);
+  const maxAbsDuty = Number(safety.max_abs_duty || 0);
+  const maxOscillationSpan = Number(safety.max_oscillation_span || 0);
+  const leftError = Math.abs(Number(frame.left_target_count || 0) - Number(frame.left_filtered_count || 0));
+  const rightError = Math.abs(Number(frame.right_target_count || 0) - Number(frame.right_filtered_count || 0));
+  const leftDuty = Math.abs(Number(frame.left_duty || 0));
+  const rightDuty = Math.abs(Number(frame.right_duty || 0));
+  const oscillation = Math.abs(Number(frame.left_filtered_count || 0) - Number(frame.right_filtered_count || 0));
+  let violation = '';
+  if (maxAbsError > 0 && (leftError > maxAbsError || rightError > maxAbsError)) {
+    violation = `abs_error>${maxAbsError}`;
+  } else if (maxAbsDuty > 0 && (leftDuty > maxAbsDuty || rightDuty > maxAbsDuty)) {
+    violation = `abs_duty>${maxAbsDuty}`;
+  } else if (maxOscillationSpan > 0 && oscillation > maxOscillationSpan) {
+    violation = `oscillation>${maxOscillationSpan}`;
+  }
+  if (!violation) {
+    rlCaptureState.notes.push({ ts: Date.now(), type: 'heartbeat', step: rlCaptureState.stepTag });
+    if (rlCaptureState.notes.length > 300) {
+      rlCaptureState.notes.splice(0, rlCaptureState.notes.length - 300);
+    }
+    return;
+  }
+  const maxConsecutive = Math.max(1, Number(safety.max_consecutive_violations || 4));
+  const recent = rlCaptureState.notes.filter((item) => item.type === 'violation' && item.value === violation);
+  rlCaptureState.notes.push({ ts: Date.now(), type: 'violation', value: violation, step: rlCaptureState.stepTag });
+  if (rlCaptureState.notes.length > 300) {
+    rlCaptureState.notes.splice(0, rlCaptureState.notes.length - 300);
+  }
+  if (recent.length + 1 >= maxConsecutive) {
+    rlCaptureState.abortReason = `capture safety triggered: ${violation}`;
+    rlCaptureState.stopRequested = true;
+  }
+}
+
+async function finalizeCapture(restoreReason = '') {
+  if (!rlCaptureState.startedAtMs) return;
+  const state = { ...rlCaptureState };
+  rlCaptureState.active = false;
+  rlCaptureState.stoppedAtMs = Date.now();
+  if (state.baseTomlText) {
+    try {
+      await applyBoardTomlText(state.baseTomlText);
+    } catch (err) {
+      state.notes.push({ ts: Date.now(), type: 'restore_error', value: String(err && err.message ? err.message : err) });
+    }
+  }
+
+  const outputDir = path.join(RL_RAW_RUNS_DIR, state.captureId || `capture_${Date.now()}`);
+  fs.mkdirSync(outputDir, { recursive: true });
+  const statusPayload = {
+    ok: true,
+    task_name: state.taskName,
+    capture_id: state.captureId,
+    recorded_at_ms: state.startedAtMs,
+    duration_ms: Math.max(0, rlCaptureState.stoppedAtMs - state.startedAtMs),
+    frame_count: state.frames.length,
+    statuses: state.frames,
+    session_meta: {
+      connection_settings: getBoardConnectionSettings(),
+      notes: state.notes,
+      restore_reason: restoreReason || state.abortReason || '',
+      steps_applied: state.stepsApplied,
+      original_toml_path: SHARED_SMARTCAR_CONFIG_PATH,
+      original_toml_text: state.baseTomlText
+    },
+    videos: {}
+  };
+  fs.writeFileSync(path.join(outputDir, 'status.json'), JSON.stringify(statusPayload, null, 2), 'utf8');
+  fs.writeFileSync(path.join(outputDir, 'meta.json'), JSON.stringify({
+    folder: path.basename(outputDir),
+    saved_at_ms: Date.now(),
+    recorded_at_ms: state.startedAtMs,
+    duration_ms: Math.max(0, Date.now() - state.startedAtMs),
+    frame_count: state.frames.length,
+    task_name: state.taskName,
+    abort_reason: state.abortReason || ''
+  }, null, 2), 'utf8');
+}
+
+function buildCaptureStatus() {
+  return {
+    ok: true,
+    active: !!rlCaptureState.active,
+    task_name: rlCaptureState.taskName,
+    capture_id: rlCaptureState.captureId,
+    started_at_ms: rlCaptureState.startedAtMs,
+    stopped_at_ms: rlCaptureState.stoppedAtMs,
+    step_index: rlCaptureState.stepIndex,
+    step_tag: rlCaptureState.stepTag,
+    frame_count: rlCaptureState.frames.length,
+    abort_reason: rlCaptureState.abortReason || '',
+    repeat_index: rlCaptureState.repeatIndex,
+    repeat_total: rlCaptureState.repeatTotal,
+    notes: tailLines(rlCaptureState.notes, 40),
+    latest_run_dir: latestCaptureRunDir()
+  };
+}
+
+async function runCaptureSequence() {
+  const state = rlCaptureState;
+  const { task } = state;
+  const sequence = ((task || {}).capture || {}).step_sequence || [];
+  const settleWindowMs = Number(((task || {}).capture || {}).settle_window_ms || 0);
+  const cooldownWindowMs = Number(((task || {}).capture || {}).cooldown_window_ms || 0);
+  const repeatCount = Math.max(1, Number(((task || {}).capture || {}).repeat_count || 1));
+
+  try {
+    rlCaptureState.repeatTotal = repeatCount;
+    for (let repeatIdx = 0; repeatIdx < repeatCount; repeatIdx += 1) {
+      rlCaptureState.repeatIndex = repeatIdx + 1;
+      for (let idx = 0; idx < sequence.length; idx += 1) {
+        if (!rlCaptureState.active || rlCaptureState.stopRequested) break;
+        const step = sequence[idx];
+        rlCaptureState.stepIndex = idx;
+        rlCaptureState.stepTag = String(step.tag || `step_${idx}`);
+        rlCaptureState.currentStep = step;
+        let nextToml = state.appliedTomlText || state.baseTomlText;
+        nextToml = setTomlValue(nextToml, 'pid.line_follow', 'fixed_target_count_override_enabled', 'true');
+        nextToml = setTomlValue(nextToml, 'pid.line_follow', 'fixed_left_target_count', String(Number(step.left_target || 0)));
+        nextToml = setTomlValue(nextToml, 'pid.line_follow', 'fixed_right_target_count', String(Number(step.right_target || 0)));
+        await applyBoardTomlText(nextToml);
+        rlCaptureState.appliedTomlText = nextToml;
+        rlCaptureState.stepsApplied.push({
+          repeat_index: repeatIdx + 1,
+          index: idx,
+          tag: rlCaptureState.stepTag,
+          left_target: Number(step.left_target || 0),
+          right_target: Number(step.right_target || 0),
+          duration_ms: Number(step.duration_ms || 0),
+          applied_at_ms: Date.now()
+        });
+        await new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(step.duration_ms || 0) + settleWindowMs)));
+        if (rlCaptureState.stopRequested) break;
+      }
+      if (!rlCaptureState.active || rlCaptureState.stopRequested) break;
+    }
+
+    if (cooldownWindowMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, cooldownWindowMs));
+    }
+  } catch (err) {
+    rlCaptureState.abortReason = String(err && err.message ? err.message : err);
+  } finally {
+    await finalizeCapture(rlCaptureState.abortReason || (rlCaptureState.stopRequested ? 'stop_requested' : 'completed'));
+  }
+}
+
+async function startRlCapture(taskName) {
+  if (rlCaptureState.active) {
+    throw new Error('RL capture is already running');
+  }
+  ensureRlDirs();
+  const loaded = loadRlTask(taskName);
+  const baseTomlText = await readBoardTomlText();
+  rlCaptureState = {
+    active: true,
+    taskName: loaded.task.task_name || loaded.name,
+    captureId: `capture_${Date.now()}`,
+    startedAtMs: Date.now(),
+    stoppedAtMs: 0,
+    repeatIndex: 0,
+    repeatTotal: 0,
+    stepIndex: -1,
+    stepTag: '',
+    frames: [],
+    notes: [],
+    stopRequested: false,
+    abortReason: '',
+    baseTomlText,
+    appliedTomlText: baseTomlText,
+    task: loaded.task,
+    currentStep: null,
+    stepsApplied: []
+  };
+  runCaptureSequence().catch((err) => {
+    rlCaptureState.abortReason = String(err && err.message ? err.message : err);
+    finalizeCapture(rlCaptureState.abortReason).catch(() => {});
+  });
+  return buildCaptureStatus();
+}
+
+async function stopRlCapture() {
+  rlCaptureState.stopRequested = true;
+  return buildCaptureStatus();
+}
+
+function buildTrainStatus() {
+  const liveStatus = rlTrainingState.statusPath ? readJsonIfExists(rlTrainingState.statusPath, null) : null;
+  return {
+    ok: true,
+    active: !!rlTrainingState.active,
+    task_name: rlTrainingState.taskName,
+    started_at_ms: rlTrainingState.startedAtMs,
+    stopped_at_ms: rlTrainingState.stoppedAtMs,
+    pid: rlTrainingState.pid,
+    exit_code: rlTrainingState.exitCode,
+    error: rlTrainingState.error || '',
+    status_path: rlTrainingState.statusPath,
+    capture_run_dir: rlTrainingState.captureRunDir,
+    logs: tailLines(rlTrainingState.logLines, 120),
+    live_status: liveStatus,
+    latest_result: readJsonIfExists(latestResultFile(), null)
+  };
+}
+
+function finishTrainingProcess(code, errorMessage = '') {
+  rlTrainingState.active = false;
+  rlTrainingState.stoppedAtMs = Date.now();
+  rlTrainingState.exitCode = code;
+  rlTrainingState.error = errorMessage;
+  rlTrainingState.pid = 0;
+  rlTrainingState.process = null;
+}
+
+async function startRlTraining(taskName, captureRunDir = '') {
+  if (rlTrainingState.active) {
+    throw new Error('RL training is already running');
+  }
+  ensureRlDirs();
+  const loaded = loadRlTask(taskName);
+  const selectedCaptureRun = captureRunDir || latestCaptureRunDir();
+  if (!selectedCaptureRun) {
+    throw new Error('no capture run available for training');
+  }
+  const statusPath = path.join(RL_TRAIN_STATUS_DIR, `${loaded.task.task_name || loaded.name}.json`);
+  const child = execFile(process.env.PYTHON || 'python3', [
+    path.join(ROOT_DIR, 'RL', 'train', 'train_sac.py'),
+    '--task-config', loaded.filePath,
+    '--capture-run', selectedCaptureRun,
+    '--status-path', statusPath
+  ]);
+
+  rlTrainingState = {
+    active: true,
+    taskName: loaded.task.task_name || loaded.name,
+    startedAtMs: Date.now(),
+    stoppedAtMs: 0,
+    pid: child.pid || 0,
+    statusPath,
+    captureRunDir: selectedCaptureRun,
+    logLines: [],
+    exitCode: null,
+    error: '',
+    process: child
+  };
+
+  child.stdout.on('data', (chunk) => {
+    pushTrainLog(String(chunk).trim());
+  });
+  child.stderr.on('data', (chunk) => {
+    pushTrainLog(String(chunk).trim());
+  });
+  child.on('error', (err) => {
+    pushTrainLog(String(err && err.message ? err.message : err));
+    finishTrainingProcess(-1, String(err && err.message ? err.message : err));
+  });
+  child.on('close', (code) => {
+    finishTrainingProcess(Number.isFinite(code) ? code : 0, code === 0 ? '' : 'training process exited with error');
+  });
+
+  return buildTrainStatus();
+}
+
+async function stopRlTraining() {
+  if (rlTrainingState.process && rlTrainingState.active) {
+    rlTrainingState.process.kill('SIGTERM');
+  }
+  rlTrainingState.active = false;
+  rlTrainingState.stoppedAtMs = Date.now();
+  return buildTrainStatus();
+}
+
+function latestBestParamsPayload() {
+  const bestFile = latestResultFile();
+  let selectedFile = bestFile;
+  const onlineCandidates = [];
+  if (fs.existsSync(RL_RESULTS_DIR)) {
+    for (const entry of fs.readdirSync(RL_RESULTS_DIR, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const onlinePath = path.join(RL_RESULTS_DIR, entry.name, 'online_best_params.json');
+      if (!fs.existsSync(onlinePath)) continue;
+      onlineCandidates.push({ path: onlinePath, mtimeMs: fs.statSync(onlinePath).mtimeMs });
+    }
+  }
+  onlineCandidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const latestOnline = onlineCandidates.length ? onlineCandidates[0].path : '';
+  if (latestOnline && (!selectedFile || fs.statSync(latestOnline).mtimeMs >= fs.statSync(selectedFile).mtimeMs)) {
+    selectedFile = latestOnline;
+  }
+  if (!selectedFile) return null;
+  const payload = readJsonIfExists(selectedFile, null);
+  if (!payload) return null;
+  return {
+    ...payload,
+    best_file: selectedFile,
+    evaluation: readJsonIfExists(path.join(path.dirname(selectedFile), 'evaluation.json'), null)
+  };
+}
+
+async function applyBestParamsToBoard() {
+  const best = latestBestParamsPayload();
+  if (!best || !best.params) {
+    throw new Error('no best params available');
+  }
+  let tomlText = await readBoardTomlText();
+  const mapping = [
+    ['pid.motor_speed', 'left_kp', best.params.left_kp],
+    ['pid.motor_speed', 'left_ki', best.params.left_ki],
+    ['pid.motor_speed', 'left_feedforward_gain', best.params.left_feedforward_gain],
+    ['pid.motor_speed', 'right_kp', best.params.right_kp],
+    ['pid.motor_speed', 'right_ki', best.params.right_ki],
+    ['pid.motor_speed', 'right_feedforward_gain', best.params.right_feedforward_gain]
+  ];
+  for (const [section, key, value] of mapping) {
+    tomlText = setTomlValue(tomlText, section, key, String(Number(value)));
+  }
+  const applied = await applyBoardTomlText(tomlText);
+  return {
+    ok: true,
+    applied,
+    best,
+    local_config_path: SHARED_SMARTCAR_CONFIG_PATH,
+    toml_text: tomlText
+  };
+}
+
+function buildOnlineStatus() {
+  return {
+    ok: true,
+    active: !!rlOnlineState.active,
+    task_name: rlOnlineState.taskName,
+    started_at_ms: rlOnlineState.startedAtMs,
+    stopped_at_ms: rlOnlineState.stoppedAtMs,
+    stop_requested: !!rlOnlineState.stopRequested,
+    phase: rlOnlineState.phase,
+    trial_index: rlOnlineState.trialIndex,
+    trial_total: rlOnlineState.trialTotal,
+    step_tag: rlOnlineState.stepTag,
+    step_repeat: rlOnlineState.stepRepeat,
+    baseline_reward: rlOnlineState.baselineReward,
+    current_reward: rlOnlineState.currentReward,
+    best_reward: rlOnlineState.bestReward,
+    current_params: rlOnlineState.currentParams,
+    best_params: rlOnlineState.bestParams,
+    error: rlOnlineState.error || '',
+    result_path: rlOnlineState.resultPath || '',
+    logs: tailLines(rlOnlineState.logs, 120)
+  };
+}
+
+function paramsFromLatestResultOrCurrent(task, tomlText) {
+  const online = (task && task.online_training) || {};
+  const bootstrapFrom = String(online.bootstrap_from || 'latest_best').trim();
+  if (bootstrapFrom === 'current_board') {
+    return normalizeCoreParams(currentMotorParamsFromToml(tomlText), task);
+  }
+  const latest = latestBestParamsPayload();
+  if (latest && latest.params) {
+    return normalizeCoreParams(latest.params, task);
+  }
+  return normalizeCoreParams(currentMotorParamsFromToml(tomlText), task);
+}
+
+function candidateFromBase(baseParams, task, progressRatio) {
+  const bounds = task.parameter_bounds || {};
+  const online = task.online_training || {};
+  const stdStart = Number(online.candidate_std_start_ratio || 0.12);
+  const stdEnd = Number(online.candidate_std_end_ratio || 0.03);
+  const ratio = Math.min(1, Math.max(0, progressRatio));
+  const noiseRatio = stdStart + (stdEnd - stdStart) * ratio;
+  const next = {};
+  for (const [key, value] of Object.entries(baseParams)) {
+    const lo = Number(bounds[key] && bounds[key][0]);
+    const hi = Number(bounds[key] && bounds[key][1]);
+    const span = Math.max(1e-6, hi - lo);
+    const noise = (Math.random() * 2 - 1) * span * noiseRatio;
+    next[key] = Math.min(hi, Math.max(lo, Number(value) + noise));
+  }
+  return next;
+}
+
+function waitMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
+function recentFramesBetween(beginMs, endMs) {
+  return recentStatusFrames.filter((frame) => {
+    const ts = Number(frame && frame._received_at_ms);
+    return Number.isFinite(ts) && ts >= beginMs && ts <= endMs;
+  });
+}
+
+function scoreFramesForStep(frames, leftTarget, rightTarget) {
+  const validFrames = Array.isArray(frames) ? frames : [];
+  const leftErrors = validFrames.map((frame) => Math.abs(Number(frame.left_filtered_count || 0) - Number(leftTarget || 0)));
+  const rightErrors = validFrames.map((frame) => Math.abs(Number(frame.right_filtered_count || 0) - Number(rightTarget || 0)));
+  const leftDuty = validFrames.map((frame) => Math.abs(Number(frame.left_duty || 0)));
+  const rightDuty = validFrames.map((frame) => Math.abs(Number(frame.right_duty || 0)));
+  const first2 = (leftErrors.slice(0, 2).reduce((a, b) => a + b, 0) + rightErrors.slice(0, 2).reduce((a, b) => a + b, 0));
+  const first20 = (leftErrors.slice(0, 20).reduce((a, b) => a + b, 0) + rightErrors.slice(0, 20).reduce((a, b) => a + b, 0));
+  const overshoot = validFrames.reduce((sum, frame) => {
+    const left = Math.max(0, Number(frame.left_filtered_count || 0) - Number(leftTarget || 0));
+    const right = Math.max(0, Number(frame.right_filtered_count || 0) - Number(rightTarget || 0));
+    return sum + left + right;
+  }, 0);
+  const heat = leftDuty.reduce((a, b) => a + Math.max(0, b - 24), 0) + rightDuty.reduce((a, b) => a + Math.max(0, b - 24), 0);
+  const reward = -first2 - 0.12 * first20 - 0.2 * overshoot - 0.08 * heat;
+  return {
+    reward,
+    first2_error_sum: first2,
+    first20_error_sum: first20,
+    overshoot_sum: overshoot,
+    heat_penalty: heat,
+    frame_count: validFrames.length
+  };
+}
+
+async function evaluateOnlineCandidate(task, baseTomlText, params) {
+  const online = task.online_training || {};
+  const stepTags = new Set(Array.isArray(online.use_sequence_tags) ? online.use_sequence_tags : []);
+  const sourceSteps = ((task.capture || {}).step_sequence || []).filter((step) => !stepTags.size || stepTags.has(String(step.tag || '')));
+  const repeatCount = Math.max(1, Number(online.evaluation_repeat_count || 1));
+  const minStepDurationMs = Math.max(0, Number(online.min_step_duration_ms || 900));
+  const interStepRestMs = Math.max(0, Number(online.inter_step_rest_ms || 200));
+  const safety = online.safety || {};
+  const maxMissing = Math.max(0, Number(safety.max_missing_frames_per_step || 6));
+  const maxAbsError = Number(safety.max_abs_error || 0);
+  const maxAbsDuty = Number(safety.max_abs_duty || 0);
+
+  let trialToml = coreParamsToToml(baseTomlText, params);
+  trialToml = setTomlValue(trialToml, 'pid.line_follow', 'fixed_target_count_override_enabled', 'true');
+  await applyBoardTomlText(trialToml);
+
+  const stepResults = [];
+  for (let repeatIdx = 0; repeatIdx < repeatCount; repeatIdx += 1) {
+    rlOnlineState.stepRepeat = repeatIdx + 1;
+    for (let idx = 0; idx < sourceSteps.length; idx += 1) {
+      if (rlOnlineState.stopRequested) {
+        throw new Error('online training stopped');
+      }
+      const step = sourceSteps[idx];
+      const leftTarget = Number(step.left_target || 0);
+      const rightTarget = Number(step.right_target || 0);
+      const stepDurationMs = Math.max(minStepDurationMs, Number(step.duration_ms || 0));
+      rlOnlineState.stepTag = String(step.tag || `step_${idx}`);
+
+      let targetToml = trialToml;
+      targetToml = setTomlValue(targetToml, 'pid.line_follow', 'fixed_left_target_count', String(leftTarget));
+      targetToml = setTomlValue(targetToml, 'pid.line_follow', 'fixed_right_target_count', String(rightTarget));
+      await applyBoardTomlText(targetToml);
+
+      const beginMs = Date.now();
+      await waitMs(stepDurationMs);
+      const endMs = Date.now();
+      const frames = recentFramesBetween(beginMs, endMs);
+      if (frames.length <= maxMissing) {
+        throw new Error(`online evaluation missing frames at ${rlOnlineState.stepTag}`);
+      }
+      if (maxAbsError > 0) {
+        const triggered = frames.some((frame) =>
+          Math.abs(Number(frame.left_filtered_count || 0) - leftTarget) > maxAbsError ||
+          Math.abs(Number(frame.right_filtered_count || 0) - rightTarget) > maxAbsError
+        );
+        if (triggered) {
+          throw new Error(`online safety abs_error exceeded at ${rlOnlineState.stepTag}`);
+        }
+      }
+      if (maxAbsDuty > 0) {
+        const triggered = frames.some((frame) =>
+          Math.abs(Number(frame.left_duty || 0)) > maxAbsDuty ||
+          Math.abs(Number(frame.right_duty || 0)) > maxAbsDuty
+        );
+        if (triggered) {
+          throw new Error(`online safety duty exceeded at ${rlOnlineState.stepTag}`);
+        }
+      }
+      stepResults.push({
+        repeat_index: repeatIdx + 1,
+        tag: rlOnlineState.stepTag,
+        left_target: leftTarget,
+        right_target: rightTarget,
+        duration_ms: stepDurationMs,
+        score: scoreFramesForStep(frames, leftTarget, rightTarget)
+      });
+      if (interStepRestMs > 0) {
+        await waitMs(interStepRestMs);
+      }
+    }
+  }
+
+  const total = stepResults.reduce((acc, item) => {
+    acc.reward += Number(item.score.reward || 0);
+    acc.first2_error_sum += Number(item.score.first2_error_sum || 0);
+    acc.first20_error_sum += Number(item.score.first20_error_sum || 0);
+    acc.overshoot_sum += Number(item.score.overshoot_sum || 0);
+    acc.heat_penalty += Number(item.score.heat_penalty || 0);
+    acc.frame_count += Number(item.score.frame_count || 0);
+    return acc;
+  }, { reward: 0, first2_error_sum: 0, first20_error_sum: 0, overshoot_sum: 0, heat_penalty: 0, frame_count: 0 });
+
+  return {
+    reward: total.reward,
+    metrics: total,
+    step_results: stepResults
+  };
+}
+
+async function finalizeOnlineTraining(restoreTomlText) {
+  try {
+    if (restoreTomlText) {
+      await applyBoardTomlText(restoreTomlText);
+    }
+  } catch (err) {
+    pushOnlineLog(`restore failed: ${String(err && err.message ? err.message : err)}`);
+  }
+  rlOnlineState.active = false;
+  rlOnlineState.stoppedAtMs = Date.now();
+  rlOnlineState.phase = rlOnlineState.error ? 'failed' : (rlOnlineState.stopRequested ? 'stopped' : 'completed');
+}
+
+async function runOnlineTrainingLoop() {
+  const state = rlOnlineState;
+  const task = state.task;
+  const trialTotal = Math.max(1, Number((task.online_training || {}).max_trials || 12));
+  rlOnlineState.trialTotal = trialTotal;
+
+  try {
+    rlOnlineState.phase = 'baseline';
+    const baselineEval = await evaluateOnlineCandidate(task, state.baseTomlText, state.currentParams);
+    rlOnlineState.baselineReward = baselineEval.reward;
+    rlOnlineState.currentReward = baselineEval.reward;
+    rlOnlineState.bestReward = baselineEval.reward;
+    rlOnlineState.bestParams = { ...state.currentParams };
+    pushOnlineLog(`baseline reward: ${baselineEval.reward.toFixed(3)}`);
+
+    for (let trial = 1; trial <= trialTotal; trial += 1) {
+      if (rlOnlineState.stopRequested) break;
+      rlOnlineState.phase = 'search';
+      rlOnlineState.trialIndex = trial;
+      const ratio = trialTotal <= 1 ? 1 : (trial - 1) / (trialTotal - 1);
+      const candidate = candidateFromBase(rlOnlineState.bestParams || rlOnlineState.currentParams, task, ratio);
+      rlOnlineState.currentParams = candidate;
+      pushOnlineLog(`trial ${trial}/${trialTotal} evaluating candidate`);
+      const evaluated = await evaluateOnlineCandidate(task, state.baseTomlText, candidate);
+      rlOnlineState.currentReward = evaluated.reward;
+      pushOnlineLog(`trial ${trial} reward: ${evaluated.reward.toFixed(3)}`);
+      if (rlOnlineState.bestReward == null || evaluated.reward > rlOnlineState.bestReward) {
+        rlOnlineState.bestReward = evaluated.reward;
+        rlOnlineState.bestParams = { ...candidate };
+        const resultDir = path.join(RL_RESULTS_DIR, task.task_name);
+        fs.mkdirSync(resultDir, { recursive: true });
+        const onlineBestPath = path.join(resultDir, 'online_best_params.json');
+        const payload = {
+          task_name: task.task_name,
+          algorithm: 'online_safe_search',
+          score: evaluated.reward,
+          baseline_reward: rlOnlineState.baselineReward,
+          params: rlOnlineState.bestParams,
+          metrics: evaluated.metrics,
+          step_results: evaluated.step_results,
+          updated_at_ms: Date.now()
+        };
+        fs.writeFileSync(onlineBestPath, JSON.stringify(payload, null, 2), 'utf8');
+        rlOnlineState.resultPath = onlineBestPath;
+        pushOnlineLog(`new online best found at trial ${trial}`);
+      }
+    }
+  } catch (err) {
+    rlOnlineState.error = String(err && err.message ? err.message : err);
+    pushOnlineLog(`online training error: ${rlOnlineState.error}`);
+  } finally {
+    await finalizeOnlineTraining(state.baseTomlText);
+  }
+}
+
+async function startRlOnlineTraining(taskName) {
+  if (rlOnlineState.active) {
+    throw new Error('online training is already running');
+  }
+  ensureRlDirs();
+  const loaded = loadRlTask(taskName);
+  const baseTomlText = await readBoardTomlText();
+  const baseParams = paramsFromLatestResultOrCurrent(loaded.task, baseTomlText);
+  rlOnlineState = {
+    active: true,
+    taskName: loaded.task.task_name || loaded.name,
+    startedAtMs: Date.now(),
+    stoppedAtMs: 0,
+    stopRequested: false,
+    trialIndex: 0,
+    trialTotal: 0,
+    stepTag: '',
+    stepRepeat: 0,
+    baselineReward: null,
+    bestReward: null,
+    currentReward: null,
+    bestParams: null,
+    currentParams: baseParams,
+    logs: [],
+    error: '',
+    phase: 'starting',
+    task: loaded.task,
+    baseTomlText,
+    resultPath: ''
+  };
+  pushOnlineLog('online training started with bounded safe search');
+  runOnlineTrainingLoop().catch((err) => {
+    rlOnlineState.error = String(err && err.message ? err.message : err);
+    finalizeOnlineTraining(baseTomlText).catch(() => {});
+  });
+  return buildOnlineStatus();
+}
+
+async function stopRlOnlineTraining() {
+  rlOnlineState.stopRequested = true;
+  pushOnlineLog('stop requested');
+  return buildOnlineStatus();
 }
 
 function readTextBody(req, limitBytes = 2 * 1024 * 1024) {
@@ -749,6 +1693,7 @@ function startTcpReceiver() {
         if (line) {
           try {
             latestStatus = JSON.parse(line);
+            appendStatusFrame(latestStatus);
             broadcastWs('status', latestStatus);
           } catch (_) {
             // ignore malformed lines
@@ -797,6 +1742,7 @@ function writeImage(res, frame, notReadyMessage) {
 
 function startHttpServer() {
   ensureRecordingsDir();
+  ensureRlDirs();
   const server = http.createServer((req, res) => {
     const reqUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     const pathname = reqUrl.pathname;
@@ -811,6 +1757,10 @@ function startHttpServer() {
     }
     if (pathname === '/speed_chart.html') {
       serveFile(res, path.join(PUBLIC_DIR, 'speed_chart.html'), 'text/html; charset=utf-8');
+      return;
+    }
+    if (pathname === '/rl_train.html') {
+      serveFile(res, path.join(PUBLIC_DIR, 'rl_train.html'), 'text/html; charset=utf-8');
       return;
     }
     if (pathname === '/playback.html') {
@@ -831,6 +1781,10 @@ function startHttpServer() {
     }
     if (pathname === '/speed_chart_app.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'speed_chart_app.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/rl_train_app.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'rl_train_app.js'), 'application/javascript; charset=utf-8');
       return;
     }
     if (pathname === '/local_compute_app.js') {
@@ -1011,6 +1965,95 @@ function startHttpServer() {
           }
         });
       });
+      return;
+    }
+
+    if (pathname === '/api/rl/capture/start' && req.method === 'POST') {
+      readJsonBody(req, 128 * 1024).then((payload) => {
+        return startRlCapture(payload && payload.task_name);
+      }).then((result) => {
+        sendJson(res, 200, result);
+      }).catch((err) => {
+        sendJson(res, 400, { ok: false, message: String(err && err.message ? err.message : err) });
+      });
+      return;
+    }
+
+    if (pathname === '/api/rl/capture/stop' && req.method === 'POST') {
+      stopRlCapture()
+        .then((result) => sendJson(res, 200, result))
+        .catch((err) => sendJson(res, 500, { ok: false, message: String(err && err.message ? err.message : err) }));
+      return;
+    }
+
+    if (pathname === '/api/rl/capture/status') {
+      sendJson(res, 200, buildCaptureStatus());
+      return;
+    }
+
+    if (pathname === '/api/rl/train/start' && req.method === 'POST') {
+      readJsonBody(req, 128 * 1024).then((payload) => {
+        return startRlTraining(payload && payload.task_name, payload && payload.capture_run_dir);
+      }).then((result) => {
+        sendJson(res, 200, result);
+      }).catch((err) => {
+        sendJson(res, 400, { ok: false, message: String(err && err.message ? err.message : err) });
+      });
+      return;
+    }
+
+    if (pathname === '/api/rl/train/stop' && req.method === 'POST') {
+      stopRlTraining()
+        .then((result) => sendJson(res, 200, result))
+        .catch((err) => sendJson(res, 500, { ok: false, message: String(err && err.message ? err.message : err) }));
+      return;
+    }
+
+    if (pathname === '/api/rl/train/status') {
+      sendJson(res, 200, buildTrainStatus());
+      return;
+    }
+
+    if (pathname === '/api/rl/online/start' && req.method === 'POST') {
+      readJsonBody(req, 128 * 1024).then((payload) => {
+        return startRlOnlineTraining(payload && payload.task_name);
+      }).then((result) => {
+        sendJson(res, 200, result);
+      }).catch((err) => {
+        sendJson(res, 400, { ok: false, message: String(err && err.message ? err.message : err) });
+      });
+      return;
+    }
+
+    if (pathname === '/api/rl/online/stop' && req.method === 'POST') {
+      stopRlOnlineTraining()
+        .then((result) => sendJson(res, 200, result))
+        .catch((err) => sendJson(res, 500, { ok: false, message: String(err && err.message ? err.message : err) }));
+      return;
+    }
+
+    if (pathname === '/api/rl/online/status') {
+      sendJson(res, 200, buildOnlineStatus());
+      return;
+    }
+
+    if (pathname === '/api/rl/results/latest') {
+      sendJson(res, 200, {
+        ok: true,
+        latest_result: latestBestParamsPayload(),
+        latest_capture_run: latestCaptureRunDir(),
+        train_status: buildTrainStatus(),
+        capture_status: buildCaptureStatus(),
+        online_status: buildOnlineStatus(),
+        tasks: listJsonFiles(RL_CONFIG_DIR).map((filePath) => path.basename(filePath))
+      });
+      return;
+    }
+
+    if (pathname === '/api/rl/apply_best' && req.method === 'POST') {
+      applyBestParamsToBoard()
+        .then((result) => sendJson(res, 200, result))
+        .catch((err) => sendJson(res, 400, { ok: false, message: String(err && err.message ? err.message : err) }));
       return;
     }
 

@@ -1,0 +1,40 @@
+{
+  "ok": true,
+  "task_name": "speed_pid_default",
+  "capture_id": "sample_bootstrap",
+  "recorded_at_ms": 0,
+  "duration_ms": 120,
+  "frame_count": 24,
+  "statuses": [
+    { "left_target_count": 0, "right_target_count": 0, "left_filtered_count": 0, "right_filtered_count": 0, "left_duty": 0, "right_duty": 0 },
+    { "left_target_count": 120, "right_target_count": 120, "left_filtered_count": 16, "right_filtered_count": 15, "left_duty": 9, "right_duty": 9 },
+    { "left_target_count": 120, "right_target_count": 120, "left_filtered_count": 30, "right_filtered_count": 29, "left_duty": 11, "right_duty": 11 },
+    { "left_target_count": 120, "right_target_count": 120, "left_filtered_count": 45, "right_filtered_count": 43, "left_duty": 12, "right_duty": 12 },
+    { "left_target_count": 120, "right_target_count": 120, "left_filtered_count": 58, "right_filtered_count": 57, "left_duty": 11.5, "right_duty": 11.4 },
+    { "left_target_count": 240, "right_target_count": 240, "left_filtered_count": 78, "right_filtered_count": 75, "left_duty": 16, "right_duty": 15.8 },
+    { "left_target_count": 240, "right_target_count": 240, "left_filtered_count": 105, "right_filtered_count": 101, "left_duty": 18, "right_duty": 17.6 },
+    { "left_target_count": 240, "right_target_count": 240, "left_filtered_count": 132, "right_filtered_count": 128, "left_duty": 17.5, "right_duty": 17.2 },
+    { "left_target_count": 240, "right_target_count": 240, "left_filtered_count": 156, "right_filtered_count": 151, "left_duty": 16.8, "right_duty": 16.5 },
+    { "left_target_count": 360, "right_target_count": 360, "left_filtered_count": 188, "right_filtered_count": 183, "left_duty": 22.5, "right_duty": 21.9 },
+    { "left_target_count": 360, "right_target_count": 360, "left_filtered_count": 228, "right_filtered_count": 221, "left_duty": 25, "right_duty": 24.3 },
+    { "left_target_count": 360, "right_target_count": 360, "left_filtered_count": 262, "right_filtered_count": 257, "left_duty": 24.1, "right_duty": 23.6 },
+    { "left_target_count": 360, "right_target_count": 360, "left_filtered_count": 291, "right_filtered_count": 286, "left_duty": 22.7, "right_duty": 22.2 },
+    { "left_target_count": 240, "right_target_count": 240, "left_filtered_count": 287, "right_filtered_count": 281, "left_duty": 12, "right_duty": 11.7 },
+    { "left_target_count": 240, "right_target_count": 240, "left_filtered_count": 274, "right_filtered_count": 268, "left_duty": 9.2, "right_duty": 9.0 },
+    { "left_target_count": 240, "right_target_count": 240, "left_filtered_count": 257, "right_filtered_count": 250, "left_duty": 8.6, "right_duty": 8.4 },
+    { "left_target_count": 240, "right_target_count": 240, "left_filtered_count": 245, "right_filtered_count": 239, "left_duty": 8.1, "right_duty": 8.0 },
+    { "left_target_count": 120, "right_target_count": 120, "left_filtered_count": 225, "right_filtered_count": 219, "left_duty": 1.4, "right_duty": 1.4 },
+    { "left_target_count": 120, "right_target_count": 120, "left_filtered_count": 194, "right_filtered_count": 188, "left_duty": -1.6, "right_duty": -1.5 },
+    { "left_target_count": 120, "right_target_count": 120, "left_filtered_count": 166, "right_filtered_count": 161, "left_duty": -0.8, "right_duty": -0.8 },
+    { "left_target_count": 120, "right_target_count": 120, "left_filtered_count": 145, "right_filtered_count": 141, "left_duty": 0.3, "right_duty": 0.3 },
+    { "left_target_count": 0, "right_target_count": 0, "left_filtered_count": 116, "right_filtered_count": 111, "left_duty": -6.2, "right_duty": -6.0 },
+    { "left_target_count": 0, "right_target_count": 0, "left_filtered_count": 82, "right_filtered_count": 79, "left_duty": -5.3, "right_duty": -5.0 },
+    { "left_target_count": 0, "right_target_count": 0, "left_filtered_count": 52, "right_filtered_count": 50, "left_duty": -3.5, "right_duty": -3.2 }
+  ],
+  "session_meta": {
+    "notes": [
+      { "type": "sample", "value": "bootstrap capture for offline pipeline smoke test" }
+    ]
+  },
+  "videos": {}
+}

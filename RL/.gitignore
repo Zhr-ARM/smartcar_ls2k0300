@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+
+data/system_id/*.json
+!data/system_id/.gitkeep
+
+data/train_status/*.json
+!data/train_status/.gitkeep
+
+results/*/
+!results/.gitkeep
+
+data/raw_runs/*
+!data/raw_runs/.gitkeep
+!data/raw_runs/sample_bootstrap/
+!data/raw_runs/sample_bootstrap/status.json
+!data/raw_runs/sample_bootstrap/meta.json

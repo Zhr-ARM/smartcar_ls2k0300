@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RL 速度环训练控制台</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --panel: rgba(10, 20, 34, 0.94);
+      --panel-2: rgba(13, 27, 45, 0.96);
+      --line: rgba(71, 85, 105, 0.95);
+      --text: #e5eef8;
+      --muted: #99abc0;
+      --brand: #7dd3fc;
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --error: #fb7185;
+      --accent: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(34, 197, 94, 0.10), transparent 24%),
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 24%),
+        linear-gradient(180deg, #08111d 0%, #050b14 100%);
+    }
+    .wrap {
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 12px 32px rgba(2, 6, 23, 0.32);
+      min-width: 0;
+    }
+    .hero-main {
+      padding: 20px 22px;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 30%),
+        linear-gradient(180deg, rgba(11, 20, 33, 0.98), rgba(8, 16, 28, 0.98));
+    }
+    .hero-side {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      background: var(--panel-2);
+    }
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.1;
+      letter-spacing: 0.01em;
+    }
+    .subtitle {
+      margin-top: 10px;
+      color: var(--brand);
+      line-height: 1.65;
+      font-size: 14px;
+      max-width: 72ch;
+    }
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .btn, button {
+      appearance: none;
+      border: 1px solid rgba(100, 116, 139, 0.95);
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.95);
+      color: var(--text);
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      text-decoration: none;
+      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+    }
+    .btn:hover, button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(125, 211, 252, 0.95);
+      background: rgba(18, 33, 55, 0.98);
+    }
+    .btn.primary, button.primary {
+      border-color: rgba(56, 189, 248, 0.96);
+      background: rgba(8, 49, 73, 0.98);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .section {
+      padding: 16px;
+    }
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+    .title {
+      margin: 0 0 12px;
+      font-size: 15px;
+      color: #d8e5f2;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .status {
+      padding: 11px 12px;
+      border-radius: 12px;
+      white-space: pre-wrap;
+      line-height: 1.55;
+      font-size: 13px;
+      color: var(--muted);
+      background: rgba(10, 18, 30, 0.88);
+      border: 1px solid rgba(51, 65, 85, 0.9);
+    }
+    .status.ok { color: #d1fae5; border-color: rgba(34, 197, 94, 0.55); }
+    .status.warn { color: #fef3c7; border-color: rgba(245, 158, 11, 0.55); }
+    .status.error { color: #ffe4e6; border-color: rgba(244, 63, 94, 0.55); }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    input, select, textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(71, 85, 105, 0.95);
+      background: rgba(7, 13, 24, 0.96);
+      color: var(--text);
+      padding: 10px 12px;
+      font: inherit;
+    }
+    textarea {
+      min-height: 260px;
+      resize: vertical;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .pill {
+      padding: 8px 11px;
+      border-radius: 999px;
+      background: rgba(7, 13, 24, 0.9);
+      border: 1px solid rgba(51, 65, 85, 0.9);
+      color: #c7d6e7;
+      font-size: 12px;
+    }
+    .param-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .param-card {
+      border-radius: 14px;
+      border: 1px solid rgba(51, 65, 85, 0.92);
+      background: rgba(7, 13, 24, 0.92);
+      padding: 12px;
+    }
+    .param-card-title {
+      color: #d8e5f2;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .param-list {
+      display: grid;
+      gap: 8px;
+    }
+    .param-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 7px 9px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.85);
+      color: #c9d7e6;
+      font-size: 12px;
+    }
+    .param-item strong {
+      color: #f3f8fd;
+      font-weight: 700;
+    }
+    .param-note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    @media (max-width: 1100px) {
+      .hero { grid-template-columns: 1fr; }
+      .span-4, .span-6, .span-8 { grid-column: span 12; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="card hero-main">
+        <h1>RL 速度环训练控制台</h1>
+        <div class="subtitle">
+          这页统一串起真板自动阶跃采集、系统辨识、离线强化学习训练和最佳参数回写。第一版聚焦左右轮独立的 6 个核心速度环参数，
+          主目标是两拍绝对误差和，辅以二十拍误差和、过冲和发热风险代理约束。
+        </div>
+        <div class="nav">
+          <a class="btn" href="/index.html">返回实时页</a>
+          <a class="btn" href="/config.html">参数配置</a>
+          <a class="btn" href="/speed_chart.html">左右轮图表</a>
+        </div>
+      </div>
+      <div class="card hero-side">
+        <div class="title">运行概览</div>
+        <div class="pill-row" id="overviewPills"></div>
+        <div id="overviewStatus" class="status">等待加载 RL 状态...</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card section span-4">
+        <div class="title">采集任务</div>
+        <div class="form-grid">
+          <label>
+            任务配置
+            <select id="taskNameInput"></select>
+          </label>
+          <label>
+            采集目录
+            <input id="captureDirInput" type="text" placeholder="自动生成" />
+          </label>
+        </div>
+        <div class="toolbar">
+          <button id="captureStartBtn" class="primary">启动自动采集</button>
+          <button id="captureStopBtn">停止采集</button>
+          <button id="refreshBtn">刷新状态</button>
+        </div>
+        <div id="captureStatus" class="status" style="margin-top:12px;">采集尚未开始。</div>
+      </div>
+
+      <div class="card section span-4">
+        <div class="title">训练任务</div>
+        <div class="form-grid">
+          <label>
+            训练任务
+            <select id="trainTaskNameInput"></select>
+          </label>
+          <label>
+            使用采集目录
+            <input id="trainCaptureDirInput" type="text" placeholder="默认最新采集目录" />
+          </label>
+        </div>
+        <div class="toolbar">
+          <button id="trainStartBtn" class="primary">启动训练</button>
+          <button id="trainStopBtn">停止训练</button>
+          <button id="applyBestBtn">应用最佳参数</button>
+        </div>
+        <div id="trainStatus" class="status" style="margin-top:12px;">训练尚未开始。</div>
+      </div>
+
+      <div class="card section span-4">
+        <div class="title">在线训练</div>
+        <div class="toolbar" style="margin-top:0;">
+          <button id="onlineStartBtn" class="primary">启动在线训练</button>
+          <button id="onlineStopBtn">停止在线训练</button>
+        </div>
+        <div id="onlineStatus" class="status" style="margin-top:12px;">在线训练尚未开始。</div>
+      </div>
+
+      <div class="card section span-4">
+        <div class="title">最佳结果</div>
+        <div id="resultStatus" class="status">还没有训练结果。</div>
+        <div class="toolbar">
+          <button id="loadLatestBtn">读取最新结果</button>
+        </div>
+      </div>
+
+      <div class="card section span-12">
+        <div class="title">左右轮当前最优参数</div>
+        <div class="param-grid">
+          <div class="param-card">
+            <div class="param-card-title">左轮</div>
+            <div id="leftBestParamList" class="param-list"></div>
+          </div>
+          <div class="param-card">
+            <div class="param-card-title">右轮</div>
+            <div id="rightBestParamList" class="param-list"></div>
+          </div>
+        </div>
+        <div id="bestParamNote" class="param-note">等待训练中的最优参数或最新结果...</div>
+      </div>
+
+      <div class="card section span-6">
+        <div class="title">训练日志</div>
+        <textarea id="trainLogBox" readonly></textarea>
+      </div>
+
+      <div class="card section span-6">
+        <div class="title">在线训练日志</div>
+        <textarea id="onlineLogBox" readonly></textarea>
+      </div>
+
+      <div class="card section span-6">
+        <div class="title">最佳参数与评估</div>
+        <textarea id="bestParamsBox" readonly></textarea>
+      </div>
+    </section>
+  </div>
+  <script src="/rl_train_app.js"></script>
+</body>
+</html>

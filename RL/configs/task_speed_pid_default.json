@@ -1,0 +1,93 @@
+{
+  "task_name": "speed_pid_default",
+  "seed": 42,
+  "controller_defaults": {
+    "integral_limit": 180.0,
+    "max_output_step": 15.0,
+    "correction_limit": 24.0,
+    "duty_limit": 30.0,
+    "left_feedforward_bias": 1.4,
+    "right_feedforward_bias": 1.4,
+    "feedforward_bias_threshold": 5.0,
+    "decel_error_threshold": 5.0,
+    "decel_duty_gain": 0.18,
+    "decel_duty_limit": 14.0,
+    "feedback_average_window": 2,
+    "feedback_low_pass_alpha": 0.95
+  },
+  "parameter_bounds": {
+    "left_kp": [0.02, 0.25],
+    "left_ki": [0.0, 0.01],
+    "left_feedforward_gain": [0.02, 0.2],
+    "right_kp": [0.02, 0.25],
+    "right_ki": [0.0, 0.01],
+    "right_feedforward_gain": [0.02, 0.2]
+  },
+  "initial_params": {
+    "left_kp": 0.085,
+    "left_ki": 0.00078,
+    "left_feedforward_gain": 0.09,
+    "right_kp": 0.085,
+    "right_ki": 0.00078,
+    "right_feedforward_gain": 0.09
+  },
+  "reward": {
+    "tail_weight": 0.12,
+    "overshoot_weight": 0.2,
+    "heat_weight": 0.08,
+    "invalid_weight": 3.0
+  },
+  "capture": {
+    "sample_window_ms": 480,
+    "settle_window_ms": 120,
+    "cooldown_window_ms": 250,
+    "repeat_count": 3,
+    "safety": {
+      "max_abs_error": 500.0,
+      "max_abs_duty": 28.0,
+      "max_oscillation_span": 360.0,
+      "max_consecutive_violations": 4
+    },
+    "step_sequence": [
+      { "left_target": 0.0, "right_target": 0.0, "duration_ms": 300, "tag": "idle" },
+      { "left_target": 180.0, "right_target": 180.0, "duration_ms": 480, "tag": "sync_step_low" },
+      { "left_target": 320.0, "right_target": 320.0, "duration_ms": 520, "tag": "sync_step_mid" },
+      { "left_target": 460.0, "right_target": 460.0, "duration_ms": 560, "tag": "sync_step_high" },
+      { "left_target": 420.0, "right_target": 240.0, "duration_ms": 520, "tag": "left_high_right_mid" },
+      { "left_target": 240.0, "right_target": 420.0, "duration_ms": 520, "tag": "left_mid_right_high" },
+      { "left_target": 120.0, "right_target": 320.0, "duration_ms": 480, "tag": "left_low_right_mid" },
+      { "left_target": 320.0, "right_target": 120.0, "duration_ms": 480, "tag": "left_mid_right_low" },
+      { "left_target": 260.0, "right_target": 260.0, "duration_ms": 480, "tag": "sync_hold_mid" },
+      { "left_target": 80.0, "right_target": 80.0, "duration_ms": 420, "tag": "sync_step_down_low" },
+      { "left_target": 0.0, "right_target": 0.0, "duration_ms": 320, "tag": "return_idle" }
+    ]
+  },
+  "training": {
+    "episodes_per_epoch": 32,
+    "max_episode_evals": 10,
+    "total_timesteps": 4000,
+    "learning_starts": 256,
+    "batch_size": 64,
+    "buffer_size": 20000,
+    "random_search_trials": 600,
+    "eval_sequences": 24
+  },
+  "online_training": {
+    "bootstrap_from": "current_board",
+    "max_trials": 12,
+    "evaluation_repeat_count": 1,
+    "min_step_duration_ms": 900,
+    "inter_step_rest_ms": 240,
+    "candidate_std_start_ratio": 0.06,
+    "candidate_std_end_ratio": 0.015,
+    "use_sequence_tags": [
+      "sync_step_low",
+      "sync_step_down_low"
+    ],
+    "safety": {
+      "max_abs_error": 520.0,
+      "max_abs_duty": 36.0,
+      "max_missing_frames_per_step": 6
+    }
+  }
+}
