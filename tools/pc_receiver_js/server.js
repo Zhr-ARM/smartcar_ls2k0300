@@ -4,6 +4,7 @@ const os = require('node:os');
 const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 const WebSocket = require('ws');
 const { summarizeSyncStatus } = require('../pc_receiver_local_compute/wasm_sync_meta.js');
@@ -449,6 +450,35 @@ function buildTomlVerifyResult(expectedText, actualText) {
     same_normalized: sameNormalized,
     expected_bytes: Buffer.byteLength(expected, 'utf8'),
     actual_bytes: Buffer.byteLength(actual, 'utf8')
+  };
+}
+
+function sha256Hex(text) {
+  return crypto.createHash('sha256').update(String(text || ''), 'utf8').digest('hex');
+}
+
+function buildTriPartyVerify(webText, boardText, localText) {
+  const web = String(webText || '');
+  const board = String(boardText || '');
+  const local = String(localText || '');
+  const webBoard = buildTomlVerifyResult(web, board);
+  const boardLocal = buildTomlVerifyResult(board, local);
+  const webLocal = buildTomlVerifyResult(web, local);
+  return {
+    ok: true,
+    all_same: !!(webBoard.same && boardLocal.same && webLocal.same),
+    web_board_same: !!webBoard.same,
+    board_local_same: !!boardLocal.same,
+    web_local_same: !!webLocal.same,
+    web_hash_sha256: sha256Hex(web),
+    board_hash_sha256: sha256Hex(board),
+    local_hash_sha256: sha256Hex(local),
+    web_bytes: Buffer.byteLength(web, 'utf8'),
+    board_bytes: Buffer.byteLength(board, 'utf8'),
+    local_bytes: Buffer.byteLength(local, 'utf8'),
+    web_board_verify: webBoard,
+    board_local_verify: boardLocal,
+    web_local_verify: webLocal
   };
 }
 
@@ -982,67 +1012,19 @@ function startHttpServer() {
             ok: true,
             loaded_path: boardCurrent.loaded_path || '',
             message: 'board config verified'
-          }, buildTomlVerifyResult(bodyText, boardCurrent.toml_text || ''));
+          }, buildTomlVerifyResult(bodyText, String(boardCurrent.toml_text || '')));
         } catch (err) {
           boardVerify = Object.assign(boardVerify, {
             message: String(err && err.message ? err.message : err)
           });
         }
-
-        let localSync = null;
-        let localVerify = {
-          ok: false,
-          same: false,
-          same_exact: false,
-          same_normalized: false,
-          expected_bytes: Buffer.byteLength(String(bodyText || ''), 'utf8'),
-          actual_bytes: 0,
-          path: LOCAL_SMARTCAR_CONFIG_PATH,
-          message: ''
-        };
-
-        if (boardVerify.ok && boardVerify.same) {
-          localSync = persistLocalConfigTomlSafely(bodyText);
-          if (localSync.ok) {
-            try {
-              const localText = readLocalConfigTomlText();
-              localVerify = Object.assign({
-                ok: true,
-                path: LOCAL_SMARTCAR_CONFIG_PATH,
-                message: 'local config verified'
-              }, buildTomlVerifyResult(bodyText, localText));
-            } catch (err) {
-              localVerify = Object.assign(localVerify, {
-                message: String(err && err.message ? err.message : err)
-              });
-            }
-          } else {
-            localVerify = Object.assign(localVerify, {
-              message: `local sync failed: ${localSync.message || 'unknown error'}`
-            });
-          }
-        } else {
-          localSync = {
-            ok: false,
-            skipped: true,
-            path: LOCAL_SMARTCAR_CONFIG_PATH,
-            message: 'skipped because board verification failed'
-          };
-          localVerify = Object.assign(localVerify, {
-            skipped: true,
-            message: 'skipped because board verification failed'
-          });
-        }
-
-        return { result: applyResult, boardVerify, localSync, localVerify };
-      }).then(({ result, boardVerify, localSync, localVerify }) => {
+        return { result: applyResult, boardVerify };
+      }).then(({ result, boardVerify }) => {
         sendJson(res, 200, Object.assign({
           ok: true,
           board_config_base_url: getBoardConnectionSettings().board_config_base_url,
           local_config_path: LOCAL_SMARTCAR_CONFIG_PATH,
-          board_verify: boardVerify,
-          local_sync: localSync,
-          local_verify: localVerify
+          board_verify: boardVerify
         }, result));
       }).catch((err) => {
         sendJson(res, 502, {
@@ -1055,17 +1037,21 @@ function startHttpServer() {
     }
 
     if (pathname === '/api/config/ssh_push' && req.method === 'POST') {
-      readTextBody(req).then((bodyText) => {
-        return pushConfigViaScp(bodyText).then(() => ({ bodyText }));
-      }).then(({ bodyText }) => {
+      readTextBody(req).then(async (bodyText) => {
+        await pushConfigViaScp(bodyText);
         const settings = getBoardConnectionSettings();
-        const localSync = persistLocalConfigTomlSafely(bodyText);
+        const boardText = await pullConfigViaSsh();
+        const boardVerify = Object.assign({
+          ok: true,
+          message: 'board file verified via ssh'
+        }, buildTomlVerifyResult(bodyText, boardText));
+
         sendJson(res, 200, {
           ok: true,
           message: 'ssh uploaded',
           board_config_base_url: settings.board_config_base_url,
           local_config_path: LOCAL_SMARTCAR_CONFIG_PATH,
-          local_sync: localSync,
+          board_verify: boardVerify,
           ssh_target: {
             host: settings.board_ssh_host,
             port: settings.board_ssh_port,
@@ -1084,6 +1070,54 @@ function startHttpServer() {
             user: settings.board_ssh_user,
             target_path: settings.board_ssh_target_path
           }
+        });
+      });
+      return;
+    }
+
+    if (pathname === '/api/config/local_update' && req.method === 'POST') {
+      readTextBody(req).then((bodyText) => {
+        const localSync = persistLocalConfigTomlSafely(bodyText);
+        let localVerify = {
+          ok: false,
+          same: false,
+          same_exact: false,
+          same_normalized: false,
+          expected_bytes: Buffer.byteLength(String(bodyText || ''), 'utf8'),
+          actual_bytes: 0,
+          path: LOCAL_SMARTCAR_CONFIG_PATH,
+          message: ''
+        };
+        if (localSync.ok) {
+          try {
+            const localText = readLocalConfigTomlText();
+            localVerify = Object.assign({
+              ok: true,
+              path: LOCAL_SMARTCAR_CONFIG_PATH,
+              message: 'local config verified'
+            }, buildTomlVerifyResult(bodyText, localText));
+          } catch (err) {
+            localVerify = Object.assign(localVerify, {
+              message: String(err && err.message ? err.message : err)
+            });
+          }
+        } else {
+          localVerify = Object.assign(localVerify, {
+            message: `local sync failed: ${localSync.message || 'unknown error'}`
+          });
+        }
+        sendJson(res, localSync.ok ? 200 : 500, {
+          ok: !!localSync.ok,
+          message: localSync.ok ? 'local config updated' : 'local config update failed',
+          local_config_path: LOCAL_SMARTCAR_CONFIG_PATH,
+          local_sync: localSync,
+          local_verify: localVerify
+        });
+      }).catch((err) => {
+        sendJson(res, 500, {
+          ok: false,
+          message: String(err && err.message ? err.message : err),
+          local_config_path: LOCAL_SMARTCAR_CONFIG_PATH
         });
       });
       return;

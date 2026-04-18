@@ -26,7 +26,7 @@ volatile sig_atomic_t g_should_exit = 0;
 namespace
 {
 constexpr float kStartupLowVoltageThresholdV = 9.8f;
-constexpr int kMainLoopPeriodMs = 50;
+constexpr int kMainLoopPeriodMs = 5;
 constexpr int kLowVoltageStatusPrintPeriodMs = 2000;
 
 bool g_worker_cleanup_done = false;
@@ -63,6 +63,55 @@ void stop_all_motion_immediately()
     motor_thread_set_target_count(0.0f, 0.0f);
     line_follow_thread_set_normal_speed_reference(0.0f);
     brushless_driver.stop_all();
+}
+
+float clamp_brushless_duty_percent(float duty_percent)
+{
+    if (duty_percent < 0.0f)
+    {
+        return 0.0f;
+    }
+    if (duty_percent > 100.0f)
+    {
+        return 100.0f;
+    }
+    return duty_percent;
+}
+
+void update_brushless_realtime_control()
+{
+    static bool last_enabled = false;
+    static float last_left_duty = 0.0f;
+    static float last_right_duty = 0.0f;
+
+    const bool enabled = pid_tuning::brushless::kRealtimeEnabled;
+    if (!enabled)
+    {
+        if (last_enabled)
+        {
+            brushless_driver.stop_all();
+            printf("[BRUSHLESS] realtime disabled -> stop all\r\n");
+        }
+        last_enabled = false;
+        last_left_duty = 0.0f;
+        last_right_duty = 0.0f;
+        return;
+    }
+
+    const float left_duty = clamp_brushless_duty_percent(pid_tuning::brushless::kLeftDutyPercent);
+    const float right_duty = clamp_brushless_duty_percent(pid_tuning::brushless::kRightDutyPercent);
+    brushless_driver.set_left_duty(left_duty);
+    brushless_driver.set_right_duty(right_duty);
+
+    if (!last_enabled || left_duty != last_left_duty || right_duty != last_right_duty)
+    {
+        printf("[BRUSHLESS] realtime enabled left=%.2f right=%.2f\r\n",
+               static_cast<double>(left_duty),
+               static_cast<double>(right_duty));
+        last_enabled = true;
+        last_left_duty = left_duty;
+        last_right_duty = right_duty;
+    }
 }
 
 float read_battery_voltage_once_v()
@@ -342,6 +391,8 @@ int main(int, char**)
     bool zebra_cross_stop_triggered = false;
     while(!g_should_exit)
     {
+        update_brushless_realtime_control();
+
         if (!zebra_cross_stop_triggered &&
             g_vision_runtime_config.zebra_cross_detection_enabled &&
             vision_image_processor_zebra_cross_count() >= 1)

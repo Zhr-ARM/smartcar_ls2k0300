@@ -46,5 +46,6 @@ float vision_line_error_layer_mean_abs_offset();
 int vision_line_error_layer_selected_centerline_count();
 int vision_line_error_layer_required_last_index_for_straight();
 float vision_line_error_layer_abs_error_sum_to_required_index();
+float vision_line_error_layer_front_weighted_abs_error_sum(int point_count);
 
 #endif

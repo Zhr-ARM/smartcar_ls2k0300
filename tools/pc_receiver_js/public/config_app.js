@@ -430,7 +430,8 @@
       lines.push(`电脑本地参数文件: 更新失败 (${localSync.path || '--'})`);
       lines.push(`失败原因: ${localSync.message || '未知错误'}`);
     } else if (applyResult && applyResult.local_config_path) {
-      lines.push(`电脑本地参数文件: ${applyResult.local_config_path} (未返回同步结果)`);
+      lines.push(`电脑本地参数文件: 未自动更新 (${applyResult.local_config_path})`);
+      lines.push('如需更新本地文件，请点击“更新到电脑端”。');
     }
     const localVerify = applyResult && applyResult.local_verify;
     if (localVerify) {
@@ -439,6 +440,69 @@
           ? '本地文件一致性校验: 通过'
           : `本地文件一致性校验: 未通过${localVerify.message ? ` (${localVerify.message})` : ''}`
       );
+    }
+    const tripleVerify = applyResult && applyResult.triple_verify;
+    if (tripleVerify) {
+      if (tripleVerify.ok) {
+        lines.push(
+          tripleVerify.all_same
+            ? '三端校验(网页提交/主板文件/本地文件): 全部一致'
+            : '三端校验(网页提交/主板文件/本地文件): 存在不一致'
+        );
+      } else {
+        lines.push(`三端校验: 未完成${tripleVerify.message ? ` (${tripleVerify.message})` : ''}`);
+      }
+    }
+    return lines.join('\n');
+  }
+
+  function buildSshPushStatusText(result, boardSummary) {
+    const lines = [];
+    lines.push(
+      boardSummary.same
+        ? 'SSH 写入成功，并已回读校验一致。\n配置文件已经落盘到主板，但不会自动热更新当前运行进程。'
+        : 'SSH 写入已完成，但回读校验发现主板文件与当前写入内容仍有差异，请看下方比较结果。'
+    );
+    const boardVerify = result && result.board_verify;
+    if (boardVerify) {
+      lines.push(
+        boardVerify.same
+          ? '板端一致性校验: 通过'
+          : `板端一致性校验: 未通过${boardVerify.message ? ` (${boardVerify.message})` : ''}`
+      );
+    }
+    const localSync = result && result.local_sync;
+    if (localSync) {
+      lines.push(
+        localSync.ok
+          ? `电脑本地参数文件已同步更新: ${localSync.path || '--'}`
+          : `电脑本地参数文件同步失败: ${localSync.path || '--'}\n失败原因: ${localSync.message || '未知错误'}`
+      );
+    } else if (result && result.local_config_path) {
+      lines.push(`电脑本地参数文件: 未自动更新 (${result.local_config_path})`);
+      lines.push('如需更新本地文件，请点击“更新到电脑端”。');
+    } else {
+      lines.push('电脑本地参数文件: 未自动更新');
+    }
+    const localVerify = result && result.local_verify;
+    if (localVerify) {
+      lines.push(
+        localVerify.same
+          ? '本地文件一致性校验: 通过'
+          : `本地文件一致性校验: 未通过${localVerify.message ? ` (${localVerify.message})` : ''}`
+      );
+    }
+    const tripleVerify = result && result.triple_verify;
+    if (tripleVerify) {
+      if (tripleVerify.ok) {
+        lines.push(
+          tripleVerify.all_same
+            ? '三端校验(网页提交/主板文件/本地文件): 全部一致'
+            : '三端校验(网页提交/主板文件/本地文件): 存在不一致'
+        );
+      } else {
+        lines.push(`三端校验: 未完成${tripleVerify.message ? ` (${tripleVerify.message})` : ''}`);
+      }
     }
     return lines.join('\n');
   }
@@ -506,25 +570,57 @@
       }
       lastActionText.textContent = `最近操作: SSH 写入成功 @ ${new Date().toLocaleTimeString()}`;
       setStatus(
-        [
-          summary.same
-            ? 'SSH 写入成功，并已回读校验一致。\n配置文件已经落盘到主板，但不会自动热更新当前运行进程。'
-            : 'SSH 写入已完成，但回读校验发现主板文件与当前写入内容仍有差异，请看下方比较结果。',
-          result.local_sync
-            ? (result.local_sync.ok
-              ? `电脑本地参数文件已同步更新: ${result.local_sync.path || '--'}`
-              : `电脑本地参数文件同步失败: ${result.local_sync.path || '--'}\n失败原因: ${result.local_sync.message || '未知错误'}`)
-            : (result.local_config_path
-              ? `电脑本地参数文件路径: ${result.local_config_path} (未返回同步结果)`
-              : '电脑本地参数文件: 未返回同步结果')
-        ].join('\n'),
-        (summary.same && (!result.local_sync || result.local_sync.ok)) ? 'ok' : 'warn'
+        buildSshPushStatusText(result, summary),
+        (
+          summary.same &&
+          (!result.board_verify || result.board_verify.same) &&
+          (!result.local_sync || result.local_sync.ok) &&
+          (!result.local_verify || result.local_verify.same) &&
+          (!result.triple_verify || (result.triple_verify.ok && result.triple_verify.all_same))
+        ) ? 'ok' : 'warn'
       );
       setCompareStatus(summary.text, summary.same ? 'ok' : 'warn');
       await refreshConnectionStatus().catch(() => {});
     } catch (err) {
       lastActionText.textContent = `最近操作: SSH 写入失败 @ ${new Date().toLocaleTimeString()}`;
       setStatus(`SSH 写入失败:\n${err.message}`, 'error');
+    }
+  }
+
+  async function updateLocalConfigFromEditor() {
+    let tomlText = configEditor.value;
+    if (!tomlText.trim()) {
+      setStatus('TOML 文本为空，不能更新到电脑端。', 'error');
+      return;
+    }
+    tomlText = syncPresetIpsIntoTomlText(tomlText);
+    configEditor.value = tomlText;
+    lastActionText.textContent = '最近操作: 正在更新电脑本地配置...';
+    setStatus('正在把当前编辑框 TOML 写入电脑本地参数文件...', 'warn');
+    try {
+      const result = await fetchJson('/api/config/local_update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        body: tomlText
+      });
+      const localSync = result && result.local_sync;
+      const localVerify = result && result.local_verify;
+      const lines = [
+        localSync && localSync.ok
+          ? `电脑本地参数文件已更新: ${localSync.path || '--'}`
+          : `电脑本地参数文件更新失败: ${(localSync && localSync.path) || '--'}`,
+        localVerify
+          ? (localVerify.same ? '本地文件一致性校验: 通过' : `本地文件一致性校验: 未通过${localVerify.message ? ` (${localVerify.message})` : ''}`)
+          : '本地文件一致性校验: 未返回'
+      ];
+      if (localSync && !localSync.ok && localSync.message) {
+        lines.push(`失败原因: ${localSync.message}`);
+      }
+      lastActionText.textContent = `最近操作: 更新电脑端成功 @ ${new Date().toLocaleTimeString()}`;
+      setStatus(lines.join('\n'), (localSync && localSync.ok && (!localVerify || localVerify.same)) ? 'ok' : 'warn');
+    } catch (err) {
+      lastActionText.textContent = `最近操作: 更新电脑端失败 @ ${new Date().toLocaleTimeString()}`;
+      setStatus(`更新电脑端失败:\n${err.message}`, 'error');
     }
   }
 
@@ -663,6 +759,7 @@
   });
   document.getElementById('sshPullBtn').addEventListener('click', sshPullCurrentConfig);
   document.getElementById('sshPushBtn').addEventListener('click', sshPushCurrentConfig);
+  document.getElementById('updateLocalConfigBtn').addEventListener('click', updateLocalConfigFromEditor);
   document.getElementById('compareBoardBtn').addEventListener('click', compareBoardFileAgainstEditor);
   document.getElementById('backupBoardBtn').addEventListener('click', backupBoardFileToLocal);
   document.getElementById('downloadConfigBtn').addEventListener('click', downloadCurrentText);

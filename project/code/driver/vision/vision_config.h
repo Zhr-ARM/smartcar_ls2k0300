@@ -306,9 +306,11 @@ typedef struct
     int circle_guide_target_offset_stage3;
     // 圆环 state5 补线：贴边连续段结束后，锚点向后偏移的索引数。
     int circle_guide_anchor_offset_stage5;
+    // straight 判定：参与判定的最少中线点数要求（固定窗口长度）。
+    int route_straight_min_centerline_points;
     // 进入 straight 状态所需的连续满足帧数。
     int route_straight_enter_consecutive_frames;
-    // straight 判定：从 0 到“当前误差计算最后索引”范围内的绝对误差和上限。
+    // straight 判定：固定窗口（前 N 个点）绝对误差和上限。
     float route_straight_abs_error_sum_max;
     // cross_1：从下角点沿同一 x 向上找“白->黑”转变时，最多向上扫描多少行。
     int cross_aux_vertical_scan_max_rows;

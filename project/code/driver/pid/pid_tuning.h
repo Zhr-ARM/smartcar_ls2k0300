@@ -35,6 +35,13 @@ extern int32 kFeedbackAverageWindow;
 extern float kFeedbackLowPassAlpha;
 } // namespace motor_speed
 
+namespace brushless
+{
+extern bool kRealtimeEnabled;
+extern float kLeftDutyPercent;
+extern float kRightDutyPercent;
+} // namespace brushless
+
 namespace yaw_rate_loop
 {
 extern float kVisualCurvatureFilterAlpha;
@@ -114,6 +121,11 @@ struct Profile
     float turn_slowdown_full_px;
     float yaw_rate_ref_slowdown_start_dps;
     float yaw_rate_ref_slowdown_full_dps;
+    int front_preview_slowdown_point_count;
+    float front_preview_slowdown_start_abs_error_sum;
+    float front_preview_slowdown_full_abs_error_sum;
+    float front_preview_slowdown_min_speed_scale;
+    float front_preview_slowdown_max_speed_scale;
     float turn_min_speed_scale;
     float turn_slowdown_max_drop_ratio_per_cycle;
     float turn_slowdown_max_rise_ratio_per_cycle;
@@ -123,6 +135,8 @@ extern float kGlobalBaseSpeedScale;
 
 bool is_dynamic_kp_range_valid(const Profile &profile);
 bool is_preview_slowdown_range_valid(const Profile &profile);
+bool is_front_preview_slowdown_range_valid(const Profile &profile);
+bool is_front_preview_speed_scale_range_valid(const Profile &profile);
 bool is_dynamic_position_kd_range_valid(const Profile &profile);
 bool is_position_kp_piecewise_range_valid(const Profile &profile);
 

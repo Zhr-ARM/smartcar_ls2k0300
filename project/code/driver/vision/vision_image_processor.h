@@ -163,6 +163,7 @@ int vision_image_processor_ipm_selected_centerline_count();
 int vision_image_processor_ipm_straight_required_last_index();
 float vision_image_processor_ipm_straight_abs_error_sum();
 float vision_image_processor_ipm_mean_abs_offset_error();
+float vision_image_processor_ipm_front_weighted_abs_error_sum(int point_count);
 
 // 读取最近一帧处理耗时（单位：us）
 // capture_wait_us: 等待相机新帧

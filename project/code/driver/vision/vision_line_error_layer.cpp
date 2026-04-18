@@ -12,6 +12,16 @@
 
 namespace
 {
+int straight_judge_min_centerline_points()
+{
+    return std::max(1, g_vision_runtime_config.route_straight_min_centerline_points);
+}
+
+int straight_judge_last_index()
+{
+    return straight_judge_min_centerline_points() - 1;
+}
+
 std::atomic<int> g_ipm_line_error_source(static_cast<int>(g_vision_runtime_config.ipm_line_error_source));
 std::atomic<int> g_ipm_line_error_method(static_cast<int>(g_vision_runtime_config.ipm_line_error_method));
 std::atomic<int> g_ipm_line_error_fixed_index(g_vision_runtime_config.ipm_line_error_fixed_index);
@@ -41,8 +51,9 @@ int g_ipm_line_error_track_x = 0;
 int g_ipm_line_error_track_y = 0;
 float g_mean_abs_offset = 0.0f;
 int g_selected_centerline_count = 0;
-int g_required_last_index_for_straight = -1;
+int g_required_last_index_for_straight = 19;
 float g_abs_error_sum_to_required_index = 0.0f;
+std::array<float, VISION_DOWNSAMPLED_HEIGHT * 2> g_front_abs_errors = {};
 
 static void reset_ipm_line_error_weighted_points_to_default()
 {
@@ -76,8 +87,9 @@ void vision_line_error_layer_reset()
     g_ipm_line_error_track_y = 0;
     g_mean_abs_offset = 0.0f;
     g_selected_centerline_count = 0;
-    g_required_last_index_for_straight = -1;
+    g_required_last_index_for_straight = straight_judge_last_index();
     g_abs_error_sum_to_required_index = 0.0f;
+    g_front_abs_errors.fill(0.0f);
 }
 
 int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ipm_center_x,
@@ -96,8 +108,9 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     g_ipm_line_error_track_x = 0;
     g_ipm_line_error_track_y = 0;
     g_selected_centerline_count = 0;
-    g_required_last_index_for_straight = -1;
+    g_required_last_index_for_straight = straight_judge_last_index();
     g_abs_error_sum_to_required_index = 0.0f;
+    g_front_abs_errors.fill(0.0f);
 
     const int center_count = std::clamp(ipm_center_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2));
     if (center_count <= 0)
@@ -112,8 +125,9 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     {
         g_mean_abs_offset = 0.0f;
         g_selected_centerline_count = 0;
-        g_required_last_index_for_straight = -1;
+        g_required_last_index_for_straight = straight_judge_last_index();
         g_abs_error_sum_to_required_index = 0.0f;
+        g_front_abs_errors.fill(0.0f);
         return 0;
     }
 
@@ -121,7 +135,14 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         double sum_abs = 0.0;
         for (int i = 0; i < count; ++i)
         {
-            sum_abs += std::fabs(static_cast<double>(xs[i]) - static_cast<double>(ipm_center_x_ref));
+            const float abs_error =
+                static_cast<float>(std::fabs(static_cast<double>(xs[i]) - static_cast<double>(ipm_center_x_ref)));
+            sum_abs += abs_error;
+            g_front_abs_errors[static_cast<size_t>(i)] = abs_error;
+        }
+        for (int i = count; i < static_cast<int>(g_front_abs_errors.size()); ++i)
+        {
+            g_front_abs_errors[static_cast<size_t>(i)] = 0.0f;
         }
         g_mean_abs_offset = (count > 0) ? static_cast<float>(sum_abs / static_cast<double>(count)) : 0.0f;
     }
@@ -133,7 +154,6 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     if (method == VISION_IPM_LINE_ERROR_FIXED_INDEX)
     {
         const int idx = std::clamp(g_ipm_line_error_fixed_index.load(), 0, count - 1);
-        g_required_last_index_for_straight = std::max(0, g_ipm_line_error_fixed_index.load());
         g_ipm_line_error_track_index = idx;
         x = static_cast<float>(xs[idx]);
         y = static_cast<float>(ys[idx]);
@@ -151,7 +171,6 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         const int idx = std::clamp(static_cast<int>(std::lround(idx_by_speed)),
                                    range_min,
                                    std::min(range_max, count - 1));
-        g_required_last_index_for_straight = idx;
         g_ipm_line_error_track_index = idx;
         x = static_cast<float>(xs[idx]);
         y = static_cast<float>(ys[idx]);
@@ -166,12 +185,6 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
             point_indices = g_ipm_line_error_point_indices;
             weights = g_ipm_line_error_weights;
             point_count = g_ipm_line_error_weighted_point_count;
-        }
-
-        int last_required_index = -1;
-        for (size_t i = 0; i < point_count; ++i)
-        {
-            last_required_index = std::max(last_required_index, point_indices[i]);
         }
 
         float total_weight = 0.0f;
@@ -228,22 +241,22 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
                                        range_min,
                                        std::min(range_max, count - 1));
 
-            g_required_last_index_for_straight = idx;
             g_ipm_line_error_track_index = idx;
             x = static_cast<float>(xs[idx]);
             y = static_cast<float>(ys[idx]);
         }
         else
         {
-            g_required_last_index_for_straight = last_required_index;
             g_ipm_line_error_track_index = weighted_track_index;
             x = weighted_x;
             y = weighted_y;
         }
     }
 
+    // 直道判定与前瞻解耦：固定用“直道最小点数参数”对应的前 N 个中线点做绝对误差和统计。
+    g_required_last_index_for_straight = straight_judge_last_index();
     g_abs_error_sum_to_required_index = 0.0f;
-    if (g_required_last_index_for_straight >= 0)
+    if (count > 0)
     {
         const int sum_last_index = std::min(g_required_last_index_for_straight, count - 1);
         for (int i = 0; i <= sum_last_index; ++i)
@@ -404,4 +417,41 @@ int vision_line_error_layer_required_last_index_for_straight()
 float vision_line_error_layer_abs_error_sum_to_required_index()
 {
     return g_abs_error_sum_to_required_index;
+}
+
+float vision_line_error_layer_front_weighted_abs_error_sum(int point_count)
+{
+    if (point_count <= 0 || g_selected_centerline_count <= 0)
+    {
+        return 0.0f;
+    }
+
+    const int effective_point_count = std::min(point_count, g_selected_centerline_count);
+    if (effective_point_count <= 0)
+    {
+        return 0.0f;
+    }
+
+    const float n = static_cast<float>(point_count);
+    const float total_weight_all = n * (n + 1.0f) * 0.5f;
+    if (total_weight_all <= 1.0e-6f)
+    {
+        return 0.0f;
+    }
+
+    float used_weight = 0.0f;
+    float weighted_abs_error_sum = 0.0f;
+    for (int i = 0; i < effective_point_count; ++i)
+    {
+        const float weight = static_cast<float>(point_count - i);
+        used_weight += weight;
+        weighted_abs_error_sum += g_front_abs_errors[static_cast<size_t>(i)] * weight;
+    }
+    if (used_weight <= 1.0e-6f)
+    {
+        return 0.0f;
+    }
+
+    const float redistribute_scale = total_weight_all / used_weight;
+    return weighted_abs_error_sum * redistribute_scale / total_weight_all;
 }

@@ -182,6 +182,78 @@
       font-size: 13px;
       line-height: 1.6;
     }
+    .pid-slowdown-wrap {
+      margin-top: 12px;
+      border: 1px solid rgba(71, 85, 105, 0.9);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(5, 12, 26, 0.88);
+    }
+    .pid-slowdown-wrap.standalone {
+      margin-top: 0;
+      min-height: 100%;
+    }
+    .pid-slowdown-title {
+      color: #e2e8f0;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 0.02em;
+    }
+    .pid-slowdown-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .pid-slowdown-card {
+      border: 1px solid rgba(71, 85, 105, 0.9);
+      border-radius: 10px;
+      padding: 8px;
+      background: rgba(15, 23, 42, 0.82);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+    .pid-slowdown-card.active {
+      border-color: rgba(56, 189, 248, 0.9);
+      background: rgba(12, 29, 46, 0.92);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.22);
+      transform: translateY(-1px);
+    }
+    .pid-slowdown-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .pid-slowdown-name {
+      color: #f8fafc;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .pid-slowdown-chip {
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: #cbd5e1;
+      border: 1px solid rgba(100, 116, 139, 0.9);
+      background: rgba(30, 41, 59, 0.88);
+      white-space: nowrap;
+    }
+    .pid-slowdown-chip.active {
+      color: #dbeafe;
+      border-color: rgba(56, 189, 248, 0.88);
+      background: rgba(12, 74, 110, 0.6);
+    }
+    .pid-slowdown-lines {
+      display: grid;
+      gap: 4px;
+      color: #cbd5e1;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .pid-slowdown-lines span {
+      color: #7dd3fc;
+    }
     .route-state-card {
       grid-column: 1 / -1;
       background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(9, 14, 24, 0.98));
@@ -752,16 +824,17 @@
     #grayCard { grid-column: span 4; order: 3; }
     #binaryCard { grid-column: span 4; order: 4; }
     #rgbCard { grid-column: span 4; order: 5; }
-    #ipmCard, #ipmRawCard { grid-column: span 4; }
+    #ipmCard, #ipmRawCard, #slowdownCard { grid-column: span 4; }
     #ipmCard { order: 6; }
     #ipmRawCard { order: 7; }
+    #slowdownCard { order: 8; }
     #leftTraceDirCard, #rightTraceDirCard { grid-column: span 6; }
-    #leftTraceDirCard { order: 8; }
-    #rightTraceDirCard { order: 9; }
+    #leftTraceDirCard { order: 9; }
+    #rightTraceDirCard { order: 10; }
     #leftTraceDirZoomCard, #rightTraceDirZoomCard { grid-column: span 6; }
-    #leftTraceDirZoomCard { order: 10; }
-    #rightTraceDirZoomCard { order: 11; }
-    #pidStatusCard { grid-column: span 12; order: 12; }
+    #leftTraceDirZoomCard { order: 11; }
+    #rightTraceDirZoomCard { order: 12; }
+    #pidStatusCard { grid-column: span 12; order: 13; }
     #statusCard { grid-column: span 12; order: 20; }
     #statusCard pre { max-height: 520px; }
     @media (max-width: 1400px) {
@@ -775,6 +848,7 @@
       #routeStateCard,
       #ipmCard,
       #ipmRawCard,
+      #slowdownCard,
       #leftTraceDirCard,
       #rightTraceDirCard,
       #leftTraceDirZoomCard,
@@ -806,6 +880,7 @@
       .grid { grid-template-columns: 1fr; }
       .infer-grid { grid-template-columns: 1fr; }
       .pid-panel { grid-template-columns: 1fr; }
+      .pid-slowdown-grid { grid-template-columns: 1fr; }
       .transport-panel { position: static; min-height: 0; }
       #inferCard,
       #routeStateCard,
@@ -815,6 +890,7 @@
       #statusCard,
       #ipmCard,
       #ipmRawCard,
+      #slowdownCard,
       #leftTraceDirCard,
       #rightTraceDirCard,
       #leftTraceDirZoomCard,
@@ -966,6 +1042,12 @@
         <div class="view">
           <canvas id="ipmRawCanvas" width="280" height="140"></canvas>
           <div class="pixel-info" id="ipmRawPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
+      </div>
+      <div class="card" id="slowdownCard">
+        <div class="title">三路减速判定</div>
+        <div class="pid-slowdown-wrap standalone">
+          <div class="pid-slowdown-grid" id="pidSlowdownCards"></div>
         </div>
       </div>
       <div class="card" id="statusCard">
@@ -1219,6 +1301,10 @@
                 <div class="pid-column">
                   <div class="pid-column-title">共同部分</div>
                   <div class="pid-list" id="playbackPidCommonList"></div>
+                  <div class="pid-slowdown-wrap">
+                    <div class="pid-slowdown-title">三路减速判定</div>
+                    <div class="pid-slowdown-grid" id="playbackPidSlowdownCards"></div>
+                  </div>
                 </div>
                 <div class="pid-column">
                   <div class="pid-column-title">左侧 PID 与执行链</div>
@@ -1310,6 +1396,7 @@
     const pidCommonList = document.getElementById('pidCommonList');
     const pidLeftList = document.getElementById('pidLeftList');
     const pidRightList = document.getElementById('pidRightList');
+    const pidSlowdownCards = document.getElementById('pidSlowdownCards');
     const statusEl = document.getElementById('status');
     const metaEl = document.getElementById('meta');
     const transportRateValueEl = document.getElementById('transportRateValue');
@@ -1397,6 +1484,7 @@
     const playbackPidCommonList = document.getElementById('playbackPidCommonList');
     const playbackPidLeftList = document.getElementById('playbackPidLeftList');
     const playbackPidRightList = document.getElementById('playbackPidRightList');
+    const playbackPidSlowdownCards = document.getElementById('playbackPidSlowdownCards');
     const leftTraceDirCard = document.getElementById('leftTraceDirCard');
     const rightTraceDirCard = document.getElementById('rightTraceDirCard');
     const leftTraceDirZoomCard = document.getElementById('leftTraceDirZoomCard');
@@ -1829,7 +1917,69 @@
         `<div class="pid-item"><strong>${label}</strong><span>${fmtPidValue(value)}</span></div>`).join('');
     }
 
-    function renderPidStatusPanelInto(status, commonContainer, leftContainer, rightContainer) {
+    function slowdownWinnerLabel(winner) {
+      if (winner === 1) return 'error_branch';
+      if (winner === 2) return 'preview_branch';
+      if (winner === 3) return 'front_preview_branch';
+      return 'none_or_force_full_speed';
+    }
+
+    function renderSlowdownCards(status, container) {
+      if (!container) return;
+      const winner = Number(status.pid_common_speed_slowdown_winner_branch) || 0;
+      const toNum = (value, fallback = 0) => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+      };
+      const branches = [
+        {
+          id: 1,
+          name: 'Error Branch',
+          lines: [
+            `输入值: <span>${fmtPidValue(status.pid_common_abs_filtered_error_px)}</span>`,
+            `阈值(start/full): <span>${fmtPidValue(status.pid_common_error_slowdown_start_px)} / ${fmtPidValue(status.pid_common_error_slowdown_full_px)}</span>`,
+            `判定(ready/triggered): <span>${fmtPidValue(status.pid_common_error_slowdown_ready)} / ${fmtPidValue(status.pid_common_error_slowdown_triggered)}</span>`,
+            `减速比例scale: <span>${fmtPidValue(status.pid_common_error_speed_scale)}</span>`
+          ]
+        },
+        {
+          id: 2,
+          name: 'Preview Branch',
+          lines: [
+            `输入值|yaw_ref|: <span>${fmtPidValue(Math.abs(toNum(status.pid_common_yaw_rate_ref_dps)))}</span>`,
+            `阈值(start/full): <span>${fmtPidValue(status.pid_common_preview_slowdown_start_dps)} / ${fmtPidValue(status.pid_common_preview_slowdown_full_dps)}</span>`,
+            `判定(ready/triggered): <span>${fmtPidValue(status.pid_common_preview_slowdown_ready)} / ${fmtPidValue(status.pid_common_preview_slowdown_triggered)}</span>`,
+            `减速比例scale: <span>${fmtPidValue(status.pid_common_preview_speed_scale)}</span>`
+          ]
+        },
+        {
+          id: 3,
+          name: 'Front Preview',
+          lines: [
+            `前瞻点数N: <span>${fmtPidValue(status.pid_common_front_preview_slowdown_point_count)}</span>`,
+            `衰减误差和: <span>${fmtPidValue(status.pid_common_front_preview_weighted_abs_error_sum)}</span>`,
+            `阈值(start/full): <span>${fmtPidValue(status.pid_common_front_preview_slowdown_start_abs_error_sum)} / ${fmtPidValue(status.pid_common_front_preview_slowdown_full_abs_error_sum)}</span>`,
+            `比例范围(min/max): <span>${fmtPidValue(status.pid_common_front_preview_slowdown_min_speed_scale)} / ${fmtPidValue(status.pid_common_front_preview_slowdown_max_speed_scale)}</span>`,
+            `判定/scale: <span>${fmtPidValue(status.pid_common_front_preview_slowdown_ready)} / ${fmtPidValue(status.pid_common_front_preview_slowdown_triggered)} / ${fmtPidValue(status.pid_common_front_preview_speed_scale)}</span>`
+          ]
+        }
+      ];
+      container.innerHTML = branches.map((branch) => {
+        const active = winner === branch.id;
+        const chip = active ? '选中支路' : '未选中';
+        return `
+          <div class="pid-slowdown-card${active ? ' active' : ''}">
+            <div class="pid-slowdown-card-head">
+              <div class="pid-slowdown-name">${branch.name}</div>
+              <div class="pid-slowdown-chip${active ? ' active' : ''}">${chip}</div>
+            </div>
+            <div class="pid-slowdown-lines">${branch.lines.map((line) => `<div>${line}</div>`).join('')}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderPidStatusPanelInto(status, commonContainer, leftContainer, rightContainer, slowdownContainer) {
       const commonRows = [
         ['vision_updated', status.pid_common_vision_updated],
         ['imu_updated', status.pid_common_imu_updated],
@@ -1861,6 +2011,7 @@
         ['route(yaw_gain/ref_limit/steer_max)', [status.pid_common_route_yaw_rate_ref_gain, status.pid_common_route_yaw_rate_ref_limit, status.pid_common_route_steering_max_output]],
         ['yaw_rate_kp_enable_error_threshold_px', status.pid_common_route_yaw_rate_kp_enable_error_threshold_px],
         ['mean_abs_path_error', status.pid_common_mean_abs_path_error],
+        ['slowdown_winner_branch', slowdownWinnerLabel(status.pid_common_speed_slowdown_winner_branch)],
         ['force_full_speed', status.pid_common_force_full_speed],
         ['steering(raw/clamped/applied)', [status.pid_common_raw_steering_output, status.pid_common_clamped_steering_output, status.pid_common_applied_steering_output]],
         ['line_follow_targets(L/R)', [status.pid_common_left_target_count_from_line_follow, status.pid_common_right_target_count_from_line_follow]],
@@ -1908,14 +2059,15 @@
       renderPidColumn(commonContainer, commonRows);
       renderPidColumn(leftContainer, leftRows);
       renderPidColumn(rightContainer, rightRows);
+      renderSlowdownCards(status, slowdownContainer);
     }
 
     function renderPidStatusPanel(status) {
-      renderPidStatusPanelInto(status, pidCommonList, pidLeftList, pidRightList);
+      renderPidStatusPanelInto(status, pidCommonList, pidLeftList, pidRightList, pidSlowdownCards);
     }
 
     function renderPlaybackPidStatusPanel(status) {
-      renderPidStatusPanelInto(status, playbackPidCommonList, playbackPidLeftList, playbackPidRightList);
+      renderPidStatusPanelInto(status, playbackPidCommonList, playbackPidLeftList, playbackPidRightList, playbackPidSlowdownCards);
     }
 
     localWorker.onmessage = (ev) => {

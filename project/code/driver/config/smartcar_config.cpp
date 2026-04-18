@@ -62,6 +62,9 @@ struct PidSnapshot
     float motor_decel_duty_limit = 0.0f;
     int32 motor_feedback_average_window = 0;
     float motor_feedback_low_pass_alpha = 0.0f;
+    bool brushless_realtime_enabled = false;
+    float brushless_left_duty_percent = 0.0f;
+    float brushless_right_duty_percent = 0.0f;
 
     float yaw_rate_visual_curvature_filter_alpha = 0.0f;
     float yaw_rate_track_point_angle_filter_alpha = 0.0f;
@@ -707,6 +710,11 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".turn_slowdown_full_px", &profile->turn_slowdown_full_px, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_slowdown_start_dps", &profile->yaw_rate_ref_slowdown_start_dps, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_slowdown_full_dps", &profile->yaw_rate_ref_slowdown_full_dps, error_message) &&
+           require_int(values, consumed, prefix + ".front_preview_slowdown_point_count", &profile->front_preview_slowdown_point_count, error_message) &&
+           require_float(values, consumed, prefix + ".front_preview_slowdown_start_abs_error_sum", &profile->front_preview_slowdown_start_abs_error_sum, error_message) &&
+           require_float(values, consumed, prefix + ".front_preview_slowdown_full_abs_error_sum", &profile->front_preview_slowdown_full_abs_error_sum, error_message) &&
+           require_float(values, consumed, prefix + ".front_preview_slowdown_min_speed_scale", &profile->front_preview_slowdown_min_speed_scale, error_message) &&
+           require_float(values, consumed, prefix + ".front_preview_slowdown_max_speed_scale", &profile->front_preview_slowdown_max_speed_scale, error_message) &&
            require_float(values, consumed, prefix + ".turn_min_speed_scale", &profile->turn_min_speed_scale, error_message) &&
            require_float(values, consumed, prefix + ".turn_slowdown_max_drop_ratio_per_cycle", &profile->turn_slowdown_max_drop_ratio_per_cycle, error_message) &&
            require_float(values, consumed, prefix + ".turn_slowdown_max_rise_ratio_per_cycle", &profile->turn_slowdown_max_rise_ratio_per_cycle, error_message);
@@ -738,6 +746,9 @@ PidSnapshot capture_pid_snapshot()
     snapshot.motor_decel_duty_limit = pid_tuning::motor_speed::kDecelDutyLimit;
     snapshot.motor_feedback_average_window = pid_tuning::motor_speed::kFeedbackAverageWindow;
     snapshot.motor_feedback_low_pass_alpha = pid_tuning::motor_speed::kFeedbackLowPassAlpha;
+    snapshot.brushless_realtime_enabled = pid_tuning::brushless::kRealtimeEnabled;
+    snapshot.brushless_left_duty_percent = pid_tuning::brushless::kLeftDutyPercent;
+    snapshot.brushless_right_duty_percent = pid_tuning::brushless::kRightDutyPercent;
 
     snapshot.yaw_rate_visual_curvature_filter_alpha = pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha;
     snapshot.yaw_rate_track_point_angle_filter_alpha = pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha;
@@ -791,6 +802,9 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
     pid_tuning::motor_speed::kDecelDutyLimit = snapshot.motor_decel_duty_limit;
     pid_tuning::motor_speed::kFeedbackAverageWindow = snapshot.motor_feedback_average_window;
     pid_tuning::motor_speed::kFeedbackLowPassAlpha = snapshot.motor_feedback_low_pass_alpha;
+    pid_tuning::brushless::kRealtimeEnabled = snapshot.brushless_realtime_enabled;
+    pid_tuning::brushless::kLeftDutyPercent = snapshot.brushless_left_duty_percent;
+    pid_tuning::brushless::kRightDutyPercent = snapshot.brushless_right_duty_percent;
 
     pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha = snapshot.yaw_rate_visual_curvature_filter_alpha;
     pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha = snapshot.yaw_rate_track_point_angle_filter_alpha;
@@ -1115,6 +1129,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_INT(circle_guide_min_frame_wall_segment_len);
     REQUIRE_RUNTIME_INT(circle_guide_target_offset_stage3);
     REQUIRE_RUNTIME_INT(circle_guide_anchor_offset_stage5);
+    REQUIRE_RUNTIME_INT(route_straight_min_centerline_points);
     REQUIRE_RUNTIME_INT(route_straight_enter_consecutive_frames);
     REQUIRE_RUNTIME_FLOAT(route_straight_abs_error_sum_max);
     REQUIRE_RUNTIME_INT(cross_aux_vertical_scan_max_rows);
@@ -1206,6 +1221,12 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_PID_FLOAT("pid.motor_speed.decel_duty_limit", pid_tuning::motor_speed::kDecelDutyLimit);
     REQUIRE_PID_INT("pid.motor_speed.feedback_average_window", pid_tuning::motor_speed::kFeedbackAverageWindow);
     REQUIRE_PID_FLOAT("pid.motor_speed.feedback_low_pass_alpha", pid_tuning::motor_speed::kFeedbackLowPassAlpha);
+    if (!require_bool(values, &consumed, "pid.brushless.realtime_enabled", &pid_tuning::brushless::kRealtimeEnabled, error_message))
+    {
+        return false;
+    }
+    REQUIRE_PID_FLOAT("pid.brushless.left_duty_percent", pid_tuning::brushless::kLeftDutyPercent);
+    REQUIRE_PID_FLOAT("pid.brushless.right_duty_percent", pid_tuning::brushless::kRightDutyPercent);
     REQUIRE_PID_FLOAT("pid.yaw_rate_loop.visual_curvature_filter_alpha", pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha);
     REQUIRE_PID_FLOAT("pid.yaw_rate_loop.track_point_angle_filter_alpha", pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha);
     REQUIRE_PID_FLOAT("pid.line_follow.error_filter_alpha", pid_tuning::line_follow::kErrorFilterAlpha);
@@ -1261,8 +1282,11 @@ bool load_from_path(const std::string &path, std::string *error_message)
     const auto route_valid = [](const pid_tuning::route_line_follow::Profile &profile) {
         return pid_tuning::route_line_follow::is_dynamic_kp_range_valid(profile) &&
                pid_tuning::route_line_follow::is_preview_slowdown_range_valid(profile) &&
+               pid_tuning::route_line_follow::is_front_preview_slowdown_range_valid(profile) &&
+               pid_tuning::route_line_follow::is_front_preview_speed_scale_range_valid(profile) &&
                pid_tuning::route_line_follow::is_dynamic_position_kd_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile);
+               pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile) &&
+               (profile.front_preview_slowdown_point_count >= 0);
     };
     if (!route_valid(pid_tuning::route_line_follow::kNormalProfile) ||
         !route_valid(pid_tuning::route_line_follow::kStraightProfile) ||
@@ -1272,6 +1296,17 @@ bool load_from_path(const std::string &path, std::string *error_message)
         !route_valid(pid_tuning::route_line_follow::kCircleExitProfile))
     {
         *error_message = "pid.route_line_follow contains invalid profile";
+        return false;
+    }
+    if (g_vision_runtime_config.route_straight_min_centerline_points < 1)
+    {
+        *error_message = "vision.runtime.route_straight_min_centerline_points must be >= 1";
+        return false;
+    }
+    if (pid_tuning::brushless::kLeftDutyPercent < 0.0f || pid_tuning::brushless::kLeftDutyPercent > 100.0f ||
+        pid_tuning::brushless::kRightDutyPercent < 0.0f || pid_tuning::brushless::kRightDutyPercent > 100.0f)
+    {
+        *error_message = "pid.brushless duty_percent must be in [0, 100]";
         return false;
     }
 

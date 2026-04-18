@@ -32,6 +32,13 @@ int32 kFeedbackAverageWindow = 2;
 float kFeedbackLowPassAlpha = 0.95f;
 } // namespace motor_speed
 
+namespace brushless
+{
+bool kRealtimeEnabled = false;
+float kLeftDutyPercent = 0.0f;
+float kRightDutyPercent = 0.0f;
+} // namespace brushless
+
 namespace yaw_rate_loop
 {
 float kVisualCurvatureFilterAlpha = 0.25f;
@@ -125,6 +132,23 @@ bool is_preview_slowdown_range_valid(const Profile &profile)
            (profile.yaw_rate_ref_slowdown_start_dps < profile.yaw_rate_ref_slowdown_full_dps);
 }
 
+bool is_front_preview_slowdown_range_valid(const Profile &profile)
+{
+    if (profile.front_preview_slowdown_point_count <= 0)
+    {
+        return true;
+    }
+    return profile.front_preview_slowdown_start_abs_error_sum <
+           profile.front_preview_slowdown_full_abs_error_sum;
+}
+
+bool is_front_preview_speed_scale_range_valid(const Profile &profile)
+{
+    return (profile.front_preview_slowdown_min_speed_scale >= 0.0f) &&
+           (profile.front_preview_slowdown_max_speed_scale <= 1.0f) &&
+           (profile.front_preview_slowdown_min_speed_scale <= profile.front_preview_slowdown_max_speed_scale);
+}
+
 bool is_dynamic_position_kd_range_valid(const Profile &profile)
 {
     return (profile.position_dynamic_kd_min <= profile.position_kd) &&
@@ -142,42 +166,42 @@ Profile kNormalProfile = {
     350.0f, 0.0f,
     3.0f, 2.1f, 0.0f, 50.0f, 3.0f, 4.6f, 10.0f, 5.6f, 0.0f, 0.15f, 0.0f, 0.0f, 2.0f, 0.0f, 210.0f, 210.0f,
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 200.0f,
-    1.0f, 25.0f, 0.0f, 0.0f, 0.90f, 0.82f, 0.01f
+    1.0f, 25.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 1.0f, 1.0f, 0.90f, 0.82f, 0.01f
 };
 
 Profile kStraightProfile = {
     370.0f, 0.0f,
     0.0f, 1.0f, 0.0f, 30.0f, 3.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f, 300.0f, 600.0f,
     0.0f, 0.0f, 4.0f, 360.0f, 0.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 160.0f,
-    1.0f, 10.0f, 0.0f, 0.0f, 0.20f, 0.95f, 0.5f
+    1.0f, 10.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 1.0f, 1.0f, 0.20f, 0.95f, 0.5f
 };
 
 Profile kCrossProfile = {
     350.0f, 0.0f,
     1.7f, 0.4f, 0.0f, 110.0f, 3.0f, 3.6f, 10.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 0.0f, 260.0f, 360.0f,
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 300.0f,
-    1.0f, 25.0f, 0.0f, 0.0f, 0.6f, 0.82f, 0.01f
+    1.0f, 25.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 1.0f, 1.0f, 0.6f, 0.82f, 0.01f
 };
 
 Profile kCircleEnterProfile = {
     320.0f, 0.0f,
     1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 9.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 0.0f, 400.0f, 720.0f,
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 320.0f,
-    1.0f, 25.0f, 0.0f, 0.0f, 0.55f, 0.75f, 0.01f
+    1.0f, 25.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 1.0f, 1.0f, 0.55f, 0.75f, 0.01f
 };
 
 Profile kCircleInsideProfile = {
     320.0f, 0.0f,
     1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 9.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f, 400.0f, 660.0f,
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
-    1.0f, 25.0f, 0.0f, 0.0f, 0.55f, 0.82f, 0.01f
+    1.0f, 25.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 1.0f, 1.0f, 0.55f, 0.82f, 0.01f
 };
 
 Profile kCircleExitProfile = {
     320.0f, 0.0f,
     1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 10.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 0.0f, 400.0f, 660.0f,
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
-    1.0f, 25.0f, 0.0f, 0.0f, 0.6f, 0.82f, 0.01f
+    1.0f, 25.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 1.0f, 1.0f, 0.6f, 0.82f, 0.01f
 };
 } // namespace route_line_follow
 } // namespace pid_tuning

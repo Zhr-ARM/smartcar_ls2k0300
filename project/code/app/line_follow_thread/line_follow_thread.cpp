@@ -421,6 +421,32 @@ float compute_progressive_slowdown_scale(float absolute_value,
     return 1.0f - slowdown_ratio * (1.0f - min_speed_scale);
 }
 
+float compute_front_preview_slowdown_scale(float weighted_abs_error_sum,
+                                           int point_count,
+                                           float slowdown_start_abs_error_sum,
+                                           float slowdown_full_abs_error_sum,
+                                           float min_speed_scale,
+                                           float max_speed_scale)
+{
+    if (point_count <= 0 || slowdown_full_abs_error_sum <= slowdown_start_abs_error_sum)
+    {
+        return 1.0f;
+    }
+
+    const float clamped_min_scale = std::clamp(min_speed_scale, 0.0f, 1.0f);
+    const float clamped_max_scale = std::clamp(max_speed_scale, clamped_min_scale, 1.0f);
+    if (weighted_abs_error_sum <= slowdown_start_abs_error_sum)
+    {
+        return clamped_max_scale;
+    }
+
+    const float slowdown_ratio = std::clamp((weighted_abs_error_sum - slowdown_start_abs_error_sum) /
+                                            (slowdown_full_abs_error_sum - slowdown_start_abs_error_sum),
+                                            0.0f,
+                                            1.0f);
+    return clamped_max_scale - slowdown_ratio * (clamped_max_scale - clamped_min_scale);
+}
+
 bool should_force_full_speed(const RouteProfile &profile,
                              float mean_abs_path_error,
                              float abs_yaw_rate_ref_dps)
@@ -438,25 +464,39 @@ float compute_desired_base_speed(float profile_base_speed,
                                  float abs_filtered_error_px,
                                  float abs_yaw_rate_ref_dps,
                                  float mean_abs_path_error,
+                                 float front_preview_weighted_abs_error_sum,
+                                 float &error_speed_scale,
+                                 float &preview_speed_scale,
+                                 float &front_preview_speed_scale,
                                  bool &force_full_speed)
 {
     force_full_speed = should_force_full_speed(profile, mean_abs_path_error, abs_yaw_rate_ref_dps);
+    error_speed_scale = 1.0f;
+    preview_speed_scale = 1.0f;
+    front_preview_speed_scale = 1.0f;
     if (force_full_speed)
     {
         return profile_base_speed;
     }
 
-    const float error_speed_scale =
+    error_speed_scale =
         compute_progressive_slowdown_scale(abs_filtered_error_px,
                                            profile.turn_slowdown_start_px,
                                            profile.turn_slowdown_full_px,
                                            profile.turn_min_speed_scale);
-    const float preview_speed_scale =
+    preview_speed_scale =
         compute_progressive_slowdown_scale(abs_yaw_rate_ref_dps,
                                            profile.yaw_rate_ref_slowdown_start_dps,
                                            profile.yaw_rate_ref_slowdown_full_dps,
                                            profile.turn_min_speed_scale);
-    return profile_base_speed * std::min(error_speed_scale, preview_speed_scale);
+    front_preview_speed_scale =
+        compute_front_preview_slowdown_scale(front_preview_weighted_abs_error_sum,
+                                             profile.front_preview_slowdown_point_count,
+                                             profile.front_preview_slowdown_start_abs_error_sum,
+                                             profile.front_preview_slowdown_full_abs_error_sum,
+                                             profile.front_preview_slowdown_min_speed_scale,
+                                             profile.front_preview_slowdown_max_speed_scale);
+    return profile_base_speed * std::min({error_speed_scale, preview_speed_scale, front_preview_speed_scale});
 }
 
 float clamp_valid_dt_seconds(float dt_seconds, float fallback_dt_seconds, float max_dt_seconds)
@@ -837,12 +877,55 @@ void line_follow_loop()
 
         bool force_full_speed = false; // 是否强制满速(即车身状态良好处于直道)的标志位
         const float mean_abs_path_error = vision_image_processor_ipm_mean_abs_offset_error(); // 视觉给出的整条分析路径平均绝对偏差像素
+        const float front_preview_weighted_abs_error_sum =
+            vision_image_processor_ipm_front_weighted_abs_error_sum(route_profile.front_preview_slowdown_point_count);
+        float error_speed_scale = 1.0f;
+        float preview_speed_scale = 1.0f;
+        float front_preview_speed_scale = 1.0f;
+        const bool error_slowdown_ready =
+            (route_profile.turn_slowdown_start_px > 0.0f) &&
+            (route_profile.turn_slowdown_full_px > route_profile.turn_slowdown_start_px);
+        const bool preview_slowdown_ready =
+            (route_profile.yaw_rate_ref_slowdown_start_dps > 0.0f) &&
+            (route_profile.yaw_rate_ref_slowdown_full_dps > route_profile.yaw_rate_ref_slowdown_start_dps);
+        const bool front_preview_slowdown_ready =
+            (route_profile.front_preview_slowdown_point_count > 0) &&
+            (route_profile.front_preview_slowdown_full_abs_error_sum >
+             route_profile.front_preview_slowdown_start_abs_error_sum);
         const float desired_base_speed = compute_desired_base_speed(profile_base_speed,
                                                                     route_profile,
                                                                     error_state.abs_filtered_error_px,
                                                                     abs_yaw_rate_ref_dps,
                                                                     mean_abs_path_error,
+                                                                    front_preview_weighted_abs_error_sum,
+                                                                    error_speed_scale,
+                                                                    preview_speed_scale,
+                                                                    front_preview_speed_scale,
                                                                     force_full_speed);
+        const bool error_slowdown_triggered =
+            error_slowdown_ready && (error_state.abs_filtered_error_px > route_profile.turn_slowdown_start_px);
+        const bool preview_slowdown_triggered =
+            preview_slowdown_ready && (abs_yaw_rate_ref_dps > route_profile.yaw_rate_ref_slowdown_start_dps);
+        const bool front_preview_slowdown_triggered =
+            front_preview_slowdown_ready &&
+            (front_preview_weighted_abs_error_sum > route_profile.front_preview_slowdown_start_abs_error_sum);
+        int speed_slowdown_winner_branch = 0; // 0: none/full-speed, 1: error, 2: preview, 3: front_preview
+        if (!force_full_speed)
+        {
+            if (error_speed_scale <= preview_speed_scale &&
+                error_speed_scale <= front_preview_speed_scale)
+            {
+                speed_slowdown_winner_branch = 1;
+            }
+            else if (preview_speed_scale <= front_preview_speed_scale)
+            {
+                speed_slowdown_winner_branch = 2;
+            }
+            else
+            {
+                speed_slowdown_winner_branch = 3;
+            }
+        }
         // 当前版本把“陀螺仪降速”整体拿掉，只保留视觉负责速度规划。
         // 若整条路径绝对偏差均值很小，且前方预瞄转向需求也不大，认为处于稳定直道，可直接给满基础速度。
         // 大弯主动降基础速度：
@@ -939,6 +1022,30 @@ void line_follow_loop()
             g_pid_debug_status.route_yaw_rate_kp_enable_error_threshold_px =
                 route_profile.yaw_rate_kp_enable_error_threshold_px;
             g_pid_debug_status.mean_abs_path_error = mean_abs_path_error;
+            g_pid_debug_status.front_preview_weighted_abs_error_sum = front_preview_weighted_abs_error_sum;
+            g_pid_debug_status.error_speed_scale = error_speed_scale;
+            g_pid_debug_status.preview_speed_scale = preview_speed_scale;
+            g_pid_debug_status.front_preview_speed_scale = front_preview_speed_scale;
+            g_pid_debug_status.error_slowdown_start_px = route_profile.turn_slowdown_start_px;
+            g_pid_debug_status.error_slowdown_full_px = route_profile.turn_slowdown_full_px;
+            g_pid_debug_status.error_slowdown_ready = error_slowdown_ready;
+            g_pid_debug_status.error_slowdown_triggered = error_slowdown_triggered;
+            g_pid_debug_status.preview_slowdown_start_dps = route_profile.yaw_rate_ref_slowdown_start_dps;
+            g_pid_debug_status.preview_slowdown_full_dps = route_profile.yaw_rate_ref_slowdown_full_dps;
+            g_pid_debug_status.preview_slowdown_ready = preview_slowdown_ready;
+            g_pid_debug_status.preview_slowdown_triggered = preview_slowdown_triggered;
+            g_pid_debug_status.front_preview_slowdown_point_count = route_profile.front_preview_slowdown_point_count;
+            g_pid_debug_status.front_preview_slowdown_start_abs_error_sum =
+                route_profile.front_preview_slowdown_start_abs_error_sum;
+            g_pid_debug_status.front_preview_slowdown_full_abs_error_sum =
+                route_profile.front_preview_slowdown_full_abs_error_sum;
+            g_pid_debug_status.front_preview_slowdown_min_speed_scale =
+                route_profile.front_preview_slowdown_min_speed_scale;
+            g_pid_debug_status.front_preview_slowdown_max_speed_scale =
+                route_profile.front_preview_slowdown_max_speed_scale;
+            g_pid_debug_status.front_preview_slowdown_ready = front_preview_slowdown_ready;
+            g_pid_debug_status.front_preview_slowdown_triggered = front_preview_slowdown_triggered;
+            g_pid_debug_status.speed_slowdown_winner_branch = speed_slowdown_winner_branch;
             g_pid_debug_status.force_full_speed = force_full_speed;
             g_pid_debug_status.raw_steering_output = raw_steering_output;
             g_pid_debug_status.clamped_steering_output = steering_output;

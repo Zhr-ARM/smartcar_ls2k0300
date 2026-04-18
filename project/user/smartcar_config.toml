@@ -162,9 +162,11 @@ circle_guide_min_frame_wall_segment_len = 8
 circle_guide_target_offset_stage3 = 5
 # 圆环 state5 补线锚点向后偏移的索引数。
 circle_guide_anchor_offset_stage5 = 0
+# straight 判定固定窗口最少中线点数。
+route_straight_min_centerline_points = 20
 # 进入 straight 状态所需的连续满足帧数。
 route_straight_enter_consecutive_frames = 2
-# straight 判定中绝对误差和上限。
+# straight 判定中固定窗口（前 N 点）绝对误差和上限。
 route_straight_abs_error_sum_max = 20.0
 # cross_1 中辅助点同 x 向上扫描白黑转变的最大行数。
 cross_aux_vertical_scan_max_rows = 75
@@ -243,7 +245,7 @@ data_profile = 0
 # 网页端 TCP 状态发送总开关。
 tcp_enabled = true
 # PC 接收端 IP 地址。
-server_ip = "10.119.73.102"
+server_ip = "172.21.79.129"
 # PC 接收端 UDP 视频端口。
 video_port = 10000
 # PC 接收端 TCP 状态端口。
@@ -361,7 +363,7 @@ ipm_size = true
 # 逐飞助手 UDP 通道开关。
 enabled = false
 # 逐飞助手接收端 IP。
-server_ip = "10.119.73.102"
+server_ip = "172.21.79.129"
 # 逐飞助手接收端端口。
 server_port = 8899
 
@@ -451,6 +453,14 @@ feedback_average_window = 2
 # 速度反馈低通滤波 alpha。
 feedback_low_pass_alpha = 0.95
 
+[pid.brushless]
+# 是否启用主循环实时无刷控制。
+realtime_enabled = true
+# 左侧无刷目标占空比，单位百分比 [0, 100]。
+left_duty_percent = 60.0
+# 右侧无刷目标占空比，单位百分比 [0, 100]。
+right_duty_percent = 60.0
+
 [pid.yaw_rate_loop]
 # 视觉曲率滤波 alpha。
 visual_curvature_filter_alpha = 0.25
@@ -507,7 +517,7 @@ weights = [0.5, 0.3, 0.2]
 # CIRCLE_INSIDE 状态下参与加权预瞄的点数。
 weighted_point_count = 3
 # CIRCLE_INSIDE 状态下参与加权预瞄的点索引。
-point_indices = [4, 8, 12]
+point_indices = [0, 4, 8]
 # CIRCLE_INSIDE 状态下各预瞄点权重。
 weights = [0.55, 0.3, 0.15]
 
@@ -526,7 +536,7 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 375.0
+base_speed = 450.0
 # NORMAL 档直道满速误差阈值。
 # 小于等于 0 表示关闭该逻辑。
 straight_full_speed_error_threshold_px = 0.0
@@ -595,7 +605,18 @@ turn_slowdown_full_px = 60.0
 # NORMAL 档按目标横摆角速度降速的起始点。
 yaw_rate_ref_slowdown_start_dps = 35.0
 # NORMAL 档按目标横摆角速度降速的满量程点。
-yaw_rate_ref_slowdown_full_dps = 140
+yaw_rate_ref_slowdown_full_dps = 140.0
+# NORMAL 档按前 n 点衰减绝对误差和降速的点数。
+# 小于等于 0 表示关闭这一路减速。
+front_preview_slowdown_point_count = 0
+# NORMAL 档按前 n 点衰减绝对误差和降速的起始点。
+front_preview_slowdown_start_abs_error_sum = 1.0
+# NORMAL 档按前 n 点衰减绝对误差和降速的满量程点。
+front_preview_slowdown_full_abs_error_sum = 10.0
+# NORMAL 档前瞻降速比例下限。
+front_preview_slowdown_min_speed_scale = 0.5
+# NORMAL 档前瞻降速比例上限。
+front_preview_slowdown_max_speed_scale = 1.0
 # NORMAL 档最低保速比例。
 turn_min_speed_scale = 0.80
 # NORMAL 档单周期最大降速比例。
@@ -605,7 +626,7 @@ turn_slowdown_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.straight]
 # STRAIGHT 档基础速度。
-base_speed = 600.0
+base_speed = 800.0
 # STRAIGHT 档直道满速误差阈值。
 straight_full_speed_error_threshold_px = 0.0
 # STRAIGHT 档位置环动态 Kp 低误差段一次项系数。
@@ -674,6 +695,17 @@ turn_slowdown_full_px = 10.0
 yaw_rate_ref_slowdown_start_dps = 0.0
 # STRAIGHT 档按目标横摆角速度降速的满量程点。
 yaw_rate_ref_slowdown_full_dps = 0.0
+# STRAIGHT 档按前 n 点衰减绝对误差和降速的点数。
+# 小于等于 0 表示关闭这一路减速。
+front_preview_slowdown_point_count = 0
+# STRAIGHT 档按前 n 点衰减绝对误差和降速的起始点。
+front_preview_slowdown_start_abs_error_sum = 2.0
+# STRAIGHT 档按前 n 点衰减绝对误差和降速的满量程点。
+front_preview_slowdown_full_abs_error_sum = 15.0
+# STRAIGHT 档前瞻降速比例下限。
+front_preview_slowdown_min_speed_scale = 0.5
+# STRAIGHT 档前瞻降速比例上限。
+front_preview_slowdown_max_speed_scale = 1.0
 # STRAIGHT 档最低保速比例。
 turn_min_speed_scale = 0.2
 # STRAIGHT 档单周期最大降速比例。
@@ -752,6 +784,17 @@ turn_slowdown_full_px = 25.0
 yaw_rate_ref_slowdown_start_dps = 0.0
 # CROSS 档按目标横摆角速度降速的满量程点。
 yaw_rate_ref_slowdown_full_dps = 0.0
+# CROSS 档按前 n 点衰减绝对误差和降速的点数。
+# 小于等于 0 表示关闭这一路减速。
+front_preview_slowdown_point_count = 0
+# CROSS 档按前 n 点衰减绝对误差和降速的起始点。
+front_preview_slowdown_start_abs_error_sum = 0.0
+# CROSS 档按前 n 点衰减绝对误差和降速的满量程点。
+front_preview_slowdown_full_abs_error_sum = 0.0
+# CROSS 档前瞻降速比例下限。
+front_preview_slowdown_min_speed_scale = 1.0
+# CROSS 档前瞻降速比例上限。
+front_preview_slowdown_max_speed_scale = 1.0
 # CROSS 档最低保速比例。
 turn_min_speed_scale = 0.6
 # CROSS 档单周期最大降速比例。
@@ -830,6 +873,17 @@ turn_slowdown_full_px = 25.0
 yaw_rate_ref_slowdown_start_dps = 0.0
 # CIRCLE_ENTER 档按目标横摆角速度降速的满量程点。
 yaw_rate_ref_slowdown_full_dps = 0.0
+# CIRCLE_ENTER 档按前 n 点衰减绝对误差和降速的点数。
+# 小于等于 0 表示关闭这一路减速。
+front_preview_slowdown_point_count = 0
+# CIRCLE_ENTER 档按前 n 点衰减绝对误差和降速的起始点。
+front_preview_slowdown_start_abs_error_sum = 0.0
+# CIRCLE_ENTER 档按前 n 点衰减绝对误差和降速的满量程点。
+front_preview_slowdown_full_abs_error_sum = 0.0
+# CIRCLE_ENTER 档前瞻降速比例下限。
+front_preview_slowdown_min_speed_scale = 1.0
+# CIRCLE_ENTER 档前瞻降速比例上限。
+front_preview_slowdown_max_speed_scale = 1.0
 # CIRCLE_ENTER 档最低保速比例。
 turn_min_speed_scale = 0.55
 # CIRCLE_ENTER 档单周期最大降速比例。
@@ -908,6 +962,17 @@ turn_slowdown_full_px = 25.0
 yaw_rate_ref_slowdown_start_dps = 0.0
 # CIRCLE_INSIDE 档按目标横摆角速度降速的满量程点。
 yaw_rate_ref_slowdown_full_dps = 0.0
+# CIRCLE_INSIDE 档按前 n 点衰减绝对误差和降速的点数。
+# 小于等于 0 表示关闭这一路减速。
+front_preview_slowdown_point_count = 0
+# CIRCLE_INSIDE 档按前 n 点衰减绝对误差和降速的起始点。
+front_preview_slowdown_start_abs_error_sum = 0.0
+# CIRCLE_INSIDE 档按前 n 点衰减绝对误差和降速的满量程点。
+front_preview_slowdown_full_abs_error_sum = 0.0
+# CIRCLE_INSIDE 档前瞻降速比例下限。
+front_preview_slowdown_min_speed_scale = 1.0
+# CIRCLE_INSIDE 档前瞻降速比例上限。
+front_preview_slowdown_max_speed_scale = 1.0
 # CIRCLE_INSIDE 档最低保速比例。
 turn_min_speed_scale = 0.55
 # CIRCLE_INSIDE 档单周期最大降速比例。
@@ -986,6 +1051,17 @@ turn_slowdown_full_px = 25.0
 yaw_rate_ref_slowdown_start_dps = 0.0
 # CIRCLE_EXIT 档按目标横摆角速度降速的满量程点。
 yaw_rate_ref_slowdown_full_dps = 0.0
+# CIRCLE_EXIT 档按前 n 点衰减绝对误差和降速的点数。
+# 小于等于 0 表示关闭这一路减速。
+front_preview_slowdown_point_count = 0
+# CIRCLE_EXIT 档按前 n 点衰减绝对误差和降速的起始点。
+front_preview_slowdown_start_abs_error_sum = 0.0
+# CIRCLE_EXIT 档按前 n 点衰减绝对误差和降速的满量程点。
+front_preview_slowdown_full_abs_error_sum = 0.0
+# CIRCLE_EXIT 档前瞻降速比例下限。
+front_preview_slowdown_min_speed_scale = 1.0
+# CIRCLE_EXIT 档前瞻降速比例上限。
+front_preview_slowdown_max_speed_scale = 1.0
 # CIRCLE_EXIT 档最低保速比例。
 turn_min_speed_scale = 0.6
 # CIRCLE_EXIT 档单周期最大降速比例。

@@ -5686,6 +5686,11 @@ float vision_image_processor_ipm_mean_abs_offset_error()
     return vision_line_error_layer_mean_abs_offset();
 }
 
+float vision_image_processor_ipm_front_weighted_abs_error_sum(int point_count)
+{
+    return vision_line_error_layer_front_weighted_abs_error_sum(point_count);
+}
+
 int vision_image_processor_ipm_line_error_track_index()
 {
     return vision_line_error_layer_track_index();

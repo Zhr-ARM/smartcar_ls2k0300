@@ -1008,6 +1008,35 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_route_yaw_rate_kp_enable_error_threshold_px",
                      line_follow_pid_debug.route_yaw_rate_kp_enable_error_threshold_px);
         append_float(enabled, "pid_common_mean_abs_path_error", line_follow_pid_debug.mean_abs_path_error);
+        append_float(enabled, "pid_common_front_preview_weighted_abs_error_sum",
+                     line_follow_pid_debug.front_preview_weighted_abs_error_sum);
+        append_float(enabled, "pid_common_error_speed_scale", line_follow_pid_debug.error_speed_scale);
+        append_float(enabled, "pid_common_preview_speed_scale", line_follow_pid_debug.preview_speed_scale);
+        append_float(enabled, "pid_common_front_preview_speed_scale", line_follow_pid_debug.front_preview_speed_scale);
+        append_float(enabled, "pid_common_error_slowdown_start_px", line_follow_pid_debug.error_slowdown_start_px);
+        append_float(enabled, "pid_common_error_slowdown_full_px", line_follow_pid_debug.error_slowdown_full_px);
+        append_bool(enabled, "pid_common_error_slowdown_ready", line_follow_pid_debug.error_slowdown_ready);
+        append_bool(enabled, "pid_common_error_slowdown_triggered", line_follow_pid_debug.error_slowdown_triggered);
+        append_float(enabled, "pid_common_preview_slowdown_start_dps", line_follow_pid_debug.preview_slowdown_start_dps);
+        append_float(enabled, "pid_common_preview_slowdown_full_dps", line_follow_pid_debug.preview_slowdown_full_dps);
+        append_bool(enabled, "pid_common_preview_slowdown_ready", line_follow_pid_debug.preview_slowdown_ready);
+        append_bool(enabled, "pid_common_preview_slowdown_triggered", line_follow_pid_debug.preview_slowdown_triggered);
+        append_int(enabled, "pid_common_front_preview_slowdown_point_count",
+                   line_follow_pid_debug.front_preview_slowdown_point_count);
+        append_float(enabled, "pid_common_front_preview_slowdown_start_abs_error_sum",
+                     line_follow_pid_debug.front_preview_slowdown_start_abs_error_sum);
+        append_float(enabled, "pid_common_front_preview_slowdown_full_abs_error_sum",
+                     line_follow_pid_debug.front_preview_slowdown_full_abs_error_sum);
+        append_float(enabled, "pid_common_front_preview_slowdown_min_speed_scale",
+                     line_follow_pid_debug.front_preview_slowdown_min_speed_scale);
+        append_float(enabled, "pid_common_front_preview_slowdown_max_speed_scale",
+                     line_follow_pid_debug.front_preview_slowdown_max_speed_scale);
+        append_bool(enabled, "pid_common_front_preview_slowdown_ready",
+                    line_follow_pid_debug.front_preview_slowdown_ready);
+        append_bool(enabled, "pid_common_front_preview_slowdown_triggered",
+                    line_follow_pid_debug.front_preview_slowdown_triggered);
+        append_int(enabled, "pid_common_speed_slowdown_winner_branch",
+                   line_follow_pid_debug.speed_slowdown_winner_branch);
         append_bool(enabled, "pid_common_force_full_speed", line_follow_pid_debug.force_full_speed);
         append_float(enabled, "pid_common_raw_steering_output", line_follow_pid_debug.raw_steering_output);
         append_float(enabled, "pid_common_clamped_steering_output", line_follow_pid_debug.clamped_steering_output);
@@ -1189,12 +1218,14 @@ static void send_tcp_status()
     const int straight_selected_centerline_count = vision_image_processor_ipm_selected_centerline_count();
     const int straight_required_last_index = vision_image_processor_ipm_straight_required_last_index();
     const float straight_abs_error_sum = vision_image_processor_ipm_straight_abs_error_sum();
+    const int straight_min_centerline_points =
+        std::max(1, g_vision_runtime_config.route_straight_min_centerline_points);
     const bool straight_state_ready_now =
-        (straight_required_last_index >= 0) &&
-        (straight_selected_centerline_count > straight_required_last_index) &&
+        (straight_selected_centerline_count >= straight_min_centerline_points) &&
         (straight_abs_error_sum < g_vision_runtime_config.route_straight_abs_error_sum_max);
     append_bool(true, "straight_state_ready_now", straight_state_ready_now);
     append_int(true, "straight_selected_centerline_count", straight_selected_centerline_count);
+    append_int(true, "straight_min_centerline_points", straight_min_centerline_points);
     append_int(true, "straight_required_last_index", straight_required_last_index);
     append_float(true, "straight_abs_error_sum", straight_abs_error_sum);
     append_float(true, "straight_abs_error_sum_max", g_vision_runtime_config.route_straight_abs_error_sum_max);

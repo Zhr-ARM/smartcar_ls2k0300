@@ -5,7 +5,6 @@
 
 namespace
 {
-
 static vision_route_main_state_enum g_main_state = VISION_ROUTE_MAIN_NORMAL;
 static vision_route_sub_state_enum g_sub_state = VISION_ROUTE_SUB_NONE;
 static int g_preferred_source = VISION_ROUTE_PREFERRED_SOURCE_AUTO;
@@ -92,8 +91,8 @@ static bool straight_state_ready(const vision_route_state_input_t *input)
         return false;
     }
 
-    return input->straight_required_last_index >= 0 &&
-           input->selected_centerline_count > input->straight_required_last_index &&
+    const int min_centerline_points = std::max(1, g_vision_runtime_config.route_straight_min_centerline_points);
+    return input->selected_centerline_count >= min_centerline_points &&
            input->straight_abs_error_sum < g_vision_runtime_config.route_straight_abs_error_sum_max;
 }
 

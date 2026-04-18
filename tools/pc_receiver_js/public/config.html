@@ -335,14 +335,15 @@
         <div style="flex:1 1 420px;color:var(--muted);font-size:13px;line-height:1.6;">
           参数页固定走电脑侧网页代理。主板程序在线时可直接热更新；主板程序没跑时，可用 SSH 只写配置文件。
         </div>
-        <button class="btn" id="refreshStatusBtn">刷新连接状态</button>
-        <button class="btn" id="loadConfigBtn">读取当前配置</button>
-        <button class="btn btn-primary" id="applyConfigBtn">应用到主板</button>
-        <button class="btn" id="sshPullBtn">离线 SSH 读取主板</button>
-        <button class="btn" id="sshPushBtn">离线 SSH 写入主板</button>
-        <button class="btn" id="compareBoardBtn">比较主板文件</button>
-        <button class="btn" id="backupBoardBtn">备份主板文件</button>
-        <button class="btn" id="downloadConfigBtn">下载当前文本</button>
+        <button class="btn" id="refreshStatusBtn" title="重新探测主板运行态 HTTP 与 SSH 连通性">刷新连接状态</button>
+        <button class="btn" id="loadConfigBtn" title="从主板运行态配置服务读取当前生效配置到编辑框">读取当前配置</button>
+        <button class="btn btn-primary" id="applyConfigBtn" title="在线下发到主板运行态并热更新；不会自动覆盖电脑本地文件">应用到主板</button>
+        <button class="btn" id="sshPullBtn" title="通过 SSH 直接读取主板配置文件到编辑框">离线 SSH 读取主板</button>
+        <button class="btn" id="sshPushBtn" title="通过 SSH 直接写主板配置文件；不会自动覆盖电脑本地文件">离线 SSH 写入主板</button>
+        <button class="btn" id="updateLocalConfigBtn" title="仅把当前编辑框 TOML 更新到电脑本地参数文件">更新到电脑端</button>
+        <button class="btn" id="compareBoardBtn" title="通过 SSH 拉取主板文件并和当前编辑框逐行比较">比较主板文件</button>
+        <button class="btn" id="backupBoardBtn" title="通过 SSH 拉取主板文件并下载为本地备份">备份主板文件</button>
+        <button class="btn" id="downloadConfigBtn" title="下载当前编辑框 TOML 文本到本地文件">下载当前文本</button>
       </div>
     </div>
 
@@ -377,12 +378,13 @@
         </div>
         <div class="meta-card">
           <h3>说明</h3>
-          <p>1. “应用到主板”要求主板程序已启动，会先校验再热更新。</p>
+          <p>1. “应用到主板”要求主板程序已启动，会先校验再热更新，不会自动更新电脑本地文件。</p>
           <p>2. “离线 SSH 读取主板”会直接从主板文件系统读取 TOML，并覆盖当前编辑框。</p>
-          <p>3. “离线 SSH 写入主板”只覆盖配置文件，不会热更新当前运行进程。</p>
-          <p>4. “比较主板文件”会先走 SSH 拉取主板 TOML，再和当前编辑框逐行比对。</p>
-          <p>5. “备份主板文件”会先走 SSH 拉取主板 TOML，再保存到本地带时间戳文件。</p>
-          <p>6. 标记为“需重启”的参数已经写入文件，但当前进程不会立即切换。</p>
+          <p>3. “离线 SSH 写入主板”只覆盖配置文件，不会热更新当前运行进程，也不会自动更新电脑本地文件。</p>
+          <p>4. “更新到电脑端”只会更新电脑本地参数文件，不会触发主板侧任何写入。</p>
+          <p>5. “比较主板文件”会先走 SSH 拉取主板 TOML，再和当前编辑框逐行比对。</p>
+          <p>6. “备份主板文件”会先走 SSH 拉取主板 TOML，再保存到本地带时间戳文件。</p>
+          <p>7. 标记为“需重启”的参数已经写入文件，但当前进程不会立即切换。</p>
         </div>
       </div>
     </div>

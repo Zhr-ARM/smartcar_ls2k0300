@@ -249,6 +249,12 @@
   }
 
   function renderPidStatusPanel(status) {
+    const slowdownWinnerLabel = (winner) => {
+      if (winner === 1) return 'error_branch';
+      if (winner === 2) return 'preview_branch';
+      if (winner === 3) return 'front_preview_branch';
+      return 'none_or_force_full_speed';
+    };
     const commonRows = [
       ['vision_updated', status.pid_common_vision_updated],
       ['imu_updated', status.pid_common_imu_updated],
@@ -280,6 +286,14 @@
       ['route(yaw_gain/ref_limit/steer_max)', [status.pid_common_route_yaw_rate_ref_gain, status.pid_common_route_yaw_rate_ref_limit, status.pid_common_route_steering_max_output]],
       ['yaw_kp_enable_error_threshold_px', status.pid_common_route_yaw_rate_kp_enable_error_threshold_px],
       ['mean_abs_path_error', status.pid_common_mean_abs_path_error],
+      ['slowdown_winner_branch', slowdownWinnerLabel(status.pid_common_speed_slowdown_winner_branch)],
+      ['slowdown.error(value/start/full)', [status.pid_common_abs_filtered_error_px, status.pid_common_error_slowdown_start_px, status.pid_common_error_slowdown_full_px]],
+      ['slowdown.error(ready/triggered/scale)', [status.pid_common_error_slowdown_ready, status.pid_common_error_slowdown_triggered, status.pid_common_error_speed_scale]],
+      ['slowdown.preview(value/start/full)', [Math.abs(Number(status.pid_common_yaw_rate_ref_dps) || 0), status.pid_common_preview_slowdown_start_dps, status.pid_common_preview_slowdown_full_dps]],
+      ['slowdown.preview(ready/triggered/scale)', [status.pid_common_preview_slowdown_ready, status.pid_common_preview_slowdown_triggered, status.pid_common_preview_speed_scale]],
+      ['slowdown.front_preview(n/value/start/full)', [status.pid_common_front_preview_slowdown_point_count, status.pid_common_front_preview_weighted_abs_error_sum, status.pid_common_front_preview_slowdown_start_abs_error_sum, status.pid_common_front_preview_slowdown_full_abs_error_sum]],
+      ['slowdown.front_preview(min/max_scale)', [status.pid_common_front_preview_slowdown_min_speed_scale, status.pid_common_front_preview_slowdown_max_speed_scale]],
+      ['slowdown.front_preview(ready/triggered/scale)', [status.pid_common_front_preview_slowdown_ready, status.pid_common_front_preview_slowdown_triggered, status.pid_common_front_preview_speed_scale]],
       ['force_full_speed', status.pid_common_force_full_speed],
       ['steering(raw/clamped/applied)', [status.pid_common_raw_steering_output, status.pid_common_clamped_steering_output, status.pid_common_applied_steering_output]],
       ['line_follow_targets(L/R)', [status.pid_common_left_target_count_from_line_follow, status.pid_common_right_target_count_from_line_follow]],
