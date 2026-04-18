@@ -16,6 +16,9 @@ const WASM_DIR = path.join(PUBLIC_DIR, 'wasm');
 const ROOT_DIR = path.join(__dirname, '..', '..');
 const WASM_SYNC_METADATA_PATH = path.join(WASM_DIR, 'vision_pipeline.sync.json');
 const SHARED_CONNECTION_PRESETS_PATH = path.join(ROOT_DIR, 'project', 'user', 'connection_presets.json');
+const LOCAL_SMARTCAR_CONFIG_PATH = path.resolve(
+  process.env.LOCAL_SMARTCAR_CONFIG_PATH || path.join(ROOT_DIR, 'project', 'user', 'smartcar_config.toml')
+);
 
 const BIND_HOST = process.env.BIND_HOST || '0.0.0.0';
 const UDP_PORT = Number(process.env.UDP_PORT || 10000);
@@ -358,6 +361,7 @@ function buildConfigStatusPayload() {
   ]).then(([runtimeHttp, sshPort]) => ({
     ok: true,
     web_proxy_origin: `http://${BIND_HOST}:${HTTP_PORT}`,
+    local_config_path: LOCAL_SMARTCAR_CONFIG_PATH,
     connection_store: getBoardConnectionStore(),
     connection_settings: settings,
     board_config_base_url: settings.board_config_base_url,
@@ -384,6 +388,68 @@ function execFileAsync(file, args) {
       resolve({ stdout, stderr });
     });
   });
+}
+
+function persistLocalConfigToml(tomlText) {
+  const targetPath = LOCAL_SMARTCAR_CONFIG_PATH;
+  const parentDir = path.dirname(targetPath);
+  fs.mkdirSync(parentDir, { recursive: true });
+  const tmpPath = `${targetPath}.tmp.${process.pid}.${Date.now()}`;
+  try {
+    fs.writeFileSync(tmpPath, tomlText, 'utf8');
+    fs.renameSync(tmpPath, targetPath);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch (_) {
+      // ignore cleanup failure
+    }
+    throw err;
+  }
+  return targetPath;
+}
+
+function persistLocalConfigTomlSafely(tomlText) {
+  try {
+    const pathSaved = persistLocalConfigToml(tomlText);
+    return {
+      ok: true,
+      path: pathSaved,
+      message: 'local config updated'
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      path: LOCAL_SMARTCAR_CONFIG_PATH,
+      message: String(err && err.message ? err.message : err)
+    };
+  }
+}
+
+function readLocalConfigTomlText() {
+  return fs.readFileSync(LOCAL_SMARTCAR_CONFIG_PATH, 'utf8');
+}
+
+function normalizeTomlForComparison(text) {
+  return String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n+$/g, '');
+}
+
+function buildTomlVerifyResult(expectedText, actualText) {
+  const expected = String(expectedText || '');
+  const actual = String(actualText || '');
+  const sameExact = expected === actual;
+  const sameNormalized = normalizeTomlForComparison(expected) === normalizeTomlForComparison(actual);
+  return {
+    same: sameExact || sameNormalized,
+    same_exact: sameExact,
+    same_normalized: sameNormalized,
+    expected_bytes: Buffer.byteLength(expected, 'utf8'),
+    actual_bytes: Buffer.byteLength(actual, 'utf8')
+  };
 }
 
 async function pushConfigViaScp(tomlText) {
@@ -897,10 +963,87 @@ function startHttpServer() {
     }
 
     if (pathname === '/api/config/apply' && req.method === 'POST') {
-      readTextBody(req).then((bodyText) => {
-        return proxyBoardConfig('/api/config/apply', 'POST', bodyText);
-      }).then((result) => {
-        sendJson(res, 200, Object.assign({ ok: true, board_config_base_url: getBoardConnectionSettings().board_config_base_url }, result));
+      readTextBody(req).then(async (bodyText) => {
+        const applyResult = await proxyBoardConfig('/api/config/apply', 'POST', bodyText);
+
+        let boardVerify = {
+          ok: false,
+          same: false,
+          same_exact: false,
+          same_normalized: false,
+          expected_bytes: Buffer.byteLength(String(bodyText || ''), 'utf8'),
+          actual_bytes: 0,
+          loaded_path: '',
+          message: ''
+        };
+        try {
+          const boardCurrent = await proxyBoardConfig('/api/config/current', 'GET');
+          boardVerify = Object.assign({
+            ok: true,
+            loaded_path: boardCurrent.loaded_path || '',
+            message: 'board config verified'
+          }, buildTomlVerifyResult(bodyText, boardCurrent.toml_text || ''));
+        } catch (err) {
+          boardVerify = Object.assign(boardVerify, {
+            message: String(err && err.message ? err.message : err)
+          });
+        }
+
+        let localSync = null;
+        let localVerify = {
+          ok: false,
+          same: false,
+          same_exact: false,
+          same_normalized: false,
+          expected_bytes: Buffer.byteLength(String(bodyText || ''), 'utf8'),
+          actual_bytes: 0,
+          path: LOCAL_SMARTCAR_CONFIG_PATH,
+          message: ''
+        };
+
+        if (boardVerify.ok && boardVerify.same) {
+          localSync = persistLocalConfigTomlSafely(bodyText);
+          if (localSync.ok) {
+            try {
+              const localText = readLocalConfigTomlText();
+              localVerify = Object.assign({
+                ok: true,
+                path: LOCAL_SMARTCAR_CONFIG_PATH,
+                message: 'local config verified'
+              }, buildTomlVerifyResult(bodyText, localText));
+            } catch (err) {
+              localVerify = Object.assign(localVerify, {
+                message: String(err && err.message ? err.message : err)
+              });
+            }
+          } else {
+            localVerify = Object.assign(localVerify, {
+              message: `local sync failed: ${localSync.message || 'unknown error'}`
+            });
+          }
+        } else {
+          localSync = {
+            ok: false,
+            skipped: true,
+            path: LOCAL_SMARTCAR_CONFIG_PATH,
+            message: 'skipped because board verification failed'
+          };
+          localVerify = Object.assign(localVerify, {
+            skipped: true,
+            message: 'skipped because board verification failed'
+          });
+        }
+
+        return { result: applyResult, boardVerify, localSync, localVerify };
+      }).then(({ result, boardVerify, localSync, localVerify }) => {
+        sendJson(res, 200, Object.assign({
+          ok: true,
+          board_config_base_url: getBoardConnectionSettings().board_config_base_url,
+          local_config_path: LOCAL_SMARTCAR_CONFIG_PATH,
+          board_verify: boardVerify,
+          local_sync: localSync,
+          local_verify: localVerify
+        }, result));
       }).catch((err) => {
         sendJson(res, 502, {
           ok: false,
@@ -913,13 +1056,16 @@ function startHttpServer() {
 
     if (pathname === '/api/config/ssh_push' && req.method === 'POST') {
       readTextBody(req).then((bodyText) => {
-        return pushConfigViaScp(bodyText);
-      }).then(() => {
+        return pushConfigViaScp(bodyText).then(() => ({ bodyText }));
+      }).then(({ bodyText }) => {
         const settings = getBoardConnectionSettings();
+        const localSync = persistLocalConfigTomlSafely(bodyText);
         sendJson(res, 200, {
           ok: true,
           message: 'ssh uploaded',
           board_config_base_url: settings.board_config_base_url,
+          local_config_path: LOCAL_SMARTCAR_CONFIG_PATH,
+          local_sync: localSync,
           ssh_target: {
             host: settings.board_ssh_host,
             port: settings.board_ssh_port,

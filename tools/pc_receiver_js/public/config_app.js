@@ -415,6 +415,31 @@
     if (!verifySummary.same) {
       lines.push('说明: 下方“比较结果”展示的是主板当前加载配置与本次提交内容的差异。');
     }
+    const boardVerify = applyResult && applyResult.board_verify;
+    if (boardVerify) {
+      lines.push(
+        boardVerify.same
+          ? '板端一致性校验: 通过'
+          : `板端一致性校验: 未通过${boardVerify.message ? ` (${boardVerify.message})` : ''}`
+      );
+    }
+    const localSync = applyResult && applyResult.local_sync;
+    if (localSync && localSync.ok) {
+      lines.push(`电脑本地参数文件: 已更新 (${localSync.path || '--'})`);
+    } else if (localSync && !localSync.ok) {
+      lines.push(`电脑本地参数文件: 更新失败 (${localSync.path || '--'})`);
+      lines.push(`失败原因: ${localSync.message || '未知错误'}`);
+    } else if (applyResult && applyResult.local_config_path) {
+      lines.push(`电脑本地参数文件: ${applyResult.local_config_path} (未返回同步结果)`);
+    }
+    const localVerify = applyResult && applyResult.local_verify;
+    if (localVerify) {
+      lines.push(
+        localVerify.same
+          ? '本地文件一致性校验: 通过'
+          : `本地文件一致性校验: 未通过${localVerify.message ? ` (${localVerify.message})` : ''}`
+      );
+    }
     return lines.join('\n');
   }
 
@@ -442,7 +467,12 @@
       setCompareStatus(verifySummary.text, verifySummary.same ? 'ok' : 'warn');
       setStatus(
         buildApplyStatusText(result, verifySummary),
-        verifySummary.same ? (result.restart_required ? 'warn' : 'ok') : 'warn'
+        (verifySummary.same &&
+         (!result.board_verify || result.board_verify.same) &&
+         (!result.local_verify || result.local_verify.same) &&
+         (!result.local_sync || result.local_sync.ok))
+          ? (result.restart_required ? 'warn' : 'ok')
+          : 'warn'
       );
       await refreshConnectionStatus().catch(() => {});
     } catch (err) {
@@ -476,10 +506,19 @@
       }
       lastActionText.textContent = `最近操作: SSH 写入成功 @ ${new Date().toLocaleTimeString()}`;
       setStatus(
-        summary.same
-          ? 'SSH 写入成功，并已回读校验一致。\n配置文件已经落盘到主板，但不会自动热更新当前运行进程。'
-          : 'SSH 写入已完成，但回读校验发现主板文件与当前写入内容仍有差异，请看下方比较结果。',
-        summary.same ? 'ok' : 'warn'
+        [
+          summary.same
+            ? 'SSH 写入成功，并已回读校验一致。\n配置文件已经落盘到主板，但不会自动热更新当前运行进程。'
+            : 'SSH 写入已完成，但回读校验发现主板文件与当前写入内容仍有差异，请看下方比较结果。',
+          result.local_sync
+            ? (result.local_sync.ok
+              ? `电脑本地参数文件已同步更新: ${result.local_sync.path || '--'}`
+              : `电脑本地参数文件同步失败: ${result.local_sync.path || '--'}\n失败原因: ${result.local_sync.message || '未知错误'}`)
+            : (result.local_config_path
+              ? `电脑本地参数文件路径: ${result.local_config_path} (未返回同步结果)`
+              : '电脑本地参数文件: 未返回同步结果')
+        ].join('\n'),
+        (summary.same && (!result.local_sync || result.local_sync.ok)) ? 'ok' : 'warn'
       );
       setCompareStatus(summary.text, summary.same ? 'ok' : 'warn');
       await refreshConnectionStatus().catch(() => {});

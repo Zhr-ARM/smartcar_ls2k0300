@@ -41,7 +41,11 @@ if (!assistantReceiverIp) {
   fail(`预设 ${presetId} 缺少 assistant_receiver_ip`);
 }
 
-const lines = fs.readFileSync(tomlFile, 'utf8').split('\n');
+const tomlText = fs.readFileSync(tomlFile, 'utf8');
+if (!tomlText.trim()) {
+  fail(`TOML 文件为空: ${tomlFile}（可能是之前磁盘满导致写入中断）`);
+}
+const lines = tomlText.split('\n');
 let section = '';
 let replacedWeb = false;
 let replacedAssistant = false;
@@ -74,5 +78,21 @@ if (!replacedAssistant) {
   fail('未找到 [vision.runtime.assistant] 下的 server_ip');
 }
 
-fs.writeFileSync(tomlFile, lines.join('\n'), 'utf8');
+const nextText = lines.join('\n');
+const dir = path.dirname(tomlFile);
+const base = path.basename(tomlFile);
+const tmpFile = path.join(dir, `.${base}.tmp.${process.pid}.${Date.now()}`);
+try {
+  fs.writeFileSync(tmpFile, nextText, 'utf8');
+  fs.renameSync(tmpFile, tomlFile);
+} catch (err) {
+  try {
+    if (fs.existsSync(tmpFile)) {
+      fs.unlinkSync(tmpFile);
+    }
+  } catch (_) {
+    // ignore cleanup failure
+  }
+  fail(`写入 TOML 失败: ${err && err.message ? err.message : String(err)}`);
+}
 console.log(`已同步 preset=${presetId} 到 ${path.basename(tomlFile)}`);
