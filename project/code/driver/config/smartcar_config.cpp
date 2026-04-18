@@ -13,12 +13,14 @@
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
+#include <limits.h>
 #include <mutex>
 #include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <unistd.h>
 
 namespace
 {
@@ -95,6 +97,25 @@ struct ConfigSnapshot
     StringStorage strings{};
     std::string loaded_path;
 };
+
+std::string executable_dir_config_path()
+{
+    char exe_path[PATH_MAX] = {0};
+    const ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len <= 0)
+    {
+        return "";
+    }
+
+    exe_path[len] = '\0';
+    std::string full_path(exe_path);
+    const size_t slash_pos = full_path.find_last_of('/');
+    if (slash_pos == std::string::npos)
+    {
+        return "";
+    }
+    return full_path.substr(0, slash_pos + 1) + "smartcar_config.toml";
+}
 
 std::string trim(const std::string &value)
 {
@@ -1283,46 +1304,27 @@ bool load_from_path(const std::string &path, std::string *error_message)
 bool smartcar_config_load_from_default_locations(std::string *loaded_path, std::string *error_message)
 {
     std::lock_guard<std::mutex> lock(g_config_mutex);
-    std::vector<std::string> candidates;
-    if (const char *env_path = std::getenv("SMARTCAR_CONFIG_PATH"))
+    const std::string target_path = executable_dir_config_path();
+    if (target_path.empty())
     {
-        candidates.emplace_back(env_path);
-    }
-    candidates.emplace_back("./smartcar_config.toml");
-    candidates.emplace_back("../user/smartcar_config.toml");
-    candidates.emplace_back("/home/root/tst/smartcar_config.toml");
-
-    std::string first_open_error;
-    for (const std::string &candidate : candidates)
-    {
-        std::ifstream test(candidate);
-        if (!test.is_open())
+        if (error_message != nullptr)
         {
-            if (first_open_error.empty())
-            {
-                first_open_error = "not found: " + candidate;
-            }
-            continue;
+            *error_message = "cannot resolve config path from /proc/self/exe";
         }
-        test.close();
-
-        if (!load_from_path(candidate, error_message))
-        {
-            return false;
-        }
-        g_loaded_config_path = candidate;
-        if (loaded_path != nullptr)
-        {
-            *loaded_path = candidate;
-        }
-        return true;
+        return false;
     }
 
-    if (error_message != nullptr)
+    if (!load_from_path(target_path, error_message))
     {
-        *error_message = "smartcar_config.toml not found in default locations";
+        return false;
     }
-    return false;
+
+    g_loaded_config_path = target_path;
+    if (loaded_path != nullptr)
+    {
+        *loaded_path = target_path;
+    }
+    return true;
 }
 
 bool smartcar_config_apply_toml_text(const std::string &toml_text,
@@ -1333,8 +1335,16 @@ bool smartcar_config_apply_toml_text(const std::string &toml_text,
 
     const ConfigSnapshot old_config = capture_config_snapshot();
     const std::string target_path = g_loaded_config_path.empty()
-                                        ? std::string("/home/root/tst/smartcar_config.toml")
+                                        ? executable_dir_config_path()
                                         : g_loaded_config_path;
+    if (target_path.empty())
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "cannot resolve config path from /proc/self/exe";
+        }
+        return false;
+    }
     const std::string validate_path = target_path + ".apply_validate";
 
     {
@@ -1389,8 +1399,16 @@ bool smartcar_config_read_loaded_text(std::string *toml_text,
 {
     std::lock_guard<std::mutex> lock(g_config_mutex);
     const std::string path = g_loaded_config_path.empty()
-                                 ? std::string("/home/root/tst/smartcar_config.toml")
+                                 ? executable_dir_config_path()
                                  : g_loaded_config_path;
+    if (path.empty())
+    {
+        if (error_message != nullptr)
+        {
+            *error_message = "cannot resolve config path from /proc/self/exe";
+        }
+        return false;
+    }
     std::ifstream input(path, std::ios::binary);
     if (!input.is_open())
     {
