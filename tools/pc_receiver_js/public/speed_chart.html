@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>左右轮实时转速图表</title>
+  <style>
+    :root {
+      --bg: #0d141b;
+      --panel: #15202b;
+      --panel-2: #1b2836;
+      --text: #e8eef5;
+      --muted: #9fb0bf;
+      --accent: #59c3ff;
+      --ok: #37d39a;
+      --warn: #ffbd59;
+      --danger: #ff7b72;
+      --left-actual: #39d98a;
+      --right-actual: #4cc2ff;
+      --left-target: #ffd166;
+      --right-target: #ff7aa2;
+      --grid: rgba(255, 255, 255, 0.08);
+      --border: rgba(255, 255, 255, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans SC", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(89, 195, 255, 0.08), transparent 28%),
+        linear-gradient(180deg, #0f1720 0%, #0b1117 100%);
+      color: var(--text);
+    }
+    .page {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .topbar, .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.22);
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 20px;
+      margin-bottom: 18px;
+    }
+    .title {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .subtitle {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: linear-gradient(180deg, #1d8ebf 0%, #155e82 100%);
+      border-color: rgba(89, 195, 255, 0.32);
+    }
+    .panel {
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+    .panel-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0 0 10px;
+    }
+    .panel-subtitle {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+    .control-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .legend label,
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(12, 19, 26, 0.84);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 13px;
+    }
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+    .meta-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .meta-card {
+      background: rgba(12, 19, 26, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .meta-card strong {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 6px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .meta-card span {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .tuning-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .tuning-column {
+      background: rgba(12, 19, 26, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      min-width: 0;
+    }
+    .tuning-column h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .field-list {
+      display: grid;
+      gap: 12px;
+    }
+    .field-card {
+      background: rgba(21, 32, 43, 0.94);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .field-card label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field-card input[type="text"],
+    .field-card input[type="number"] {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .field-card input[type="checkbox"] {
+      transform: translateY(1px);
+    }
+    .field-note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
+    .field-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .apply-status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .chart-shell {
+      position: relative;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background:
+        radial-gradient(circle at top right, rgba(89, 195, 255, 0.08), transparent 24%),
+        linear-gradient(180deg, #101924 0%, #0c131a 100%);
+    }
+    canvas {
+      width: 100%;
+      height: min(72vh, 820px);
+      display: block;
+      cursor: grab;
+    }
+    canvas.dragging {
+      cursor: grabbing;
+    }
+    .overlay {
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .overlay .pill {
+      pointer-events: auto;
+    }
+    .status-line {
+      white-space: pre-wrap;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+      background: rgba(12, 19, 26, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .status-line.ok { color: var(--ok); }
+    .status-line.warn { color: var(--warn); }
+    .status-line.error { color: var(--danger); }
+    @media (max-width: 1100px) {
+      .control-grid {
+        grid-template-columns: 1fr;
+      }
+      .meta-list {
+        grid-template-columns: 1fr 1fr;
+      }
+      .tuning-grid {
+        grid-template-columns: 1fr;
+      }
+      .apply-status-grid {
+        grid-template-columns: 1fr;
+      }
+      canvas {
+        height: 58vh;
+      }
+    }
+    @media (max-width: 720px) {
+      .page {
+        padding: 14px;
+      }
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .meta-list {
+        grid-template-columns: 1fr;
+      }
+      canvas {
+        height: 52vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="topbar">
+      <div>
+        <div class="title">左右轮实时转速图表</div>
+        <div class="subtitle">横轴是时间，纵轴是转速/计数值。支持拖动平移、滚轮缩放、固定最新数据在中间，目标速度与实际速度分色显示。</div>
+      </div>
+      <div class="row">
+        <a class="btn" href="/index.html">返回实时页</a>
+        <a class="btn" href="/config.html">参数配置</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">速度环参数调节</div>
+      <div class="panel-subtitle">这里直接编辑当前主板配置里和速度环计算相关的参数。点击“应用更改”后会自动根据在线或离线状态选择运行态应用或离线 SSH 写入；点击“取消更改”会从板端重新读取这些参数覆盖当前输入框。</div>
+      <div class="tuning-grid">
+        <div class="tuning-column">
+          <h3>左轮参数</h3>
+          <div id="leftFields" class="field-list"></div>
+        </div>
+        <div class="tuning-column">
+          <h3>公共参数</h3>
+          <div id="commonFields" class="field-list"></div>
+        </div>
+        <div class="tuning-column">
+          <h3>右轮参数</h3>
+          <div id="rightFields" class="field-list"></div>
+        </div>
+      </div>
+      <div class="tuning-grid" style="margin-top:16px;grid-template-columns:1fr;">
+        <div class="tuning-column">
+          <h3>固定时速训练</h3>
+          <div id="fixedTargetFields" class="field-list"></div>
+        </div>
+      </div>
+      <div class="button-row">
+        <button id="applyParamsBtn" class="btn btn-primary" type="button">应用更改</button>
+        <button id="cancelParamsBtn" class="btn" type="button">取消更改</button>
+      </div>
+      <div class="apply-status-grid">
+        <div id="paramStatusBox" class="status-line">等待读取板端速度环参数...</div>
+        <div id="paramCompareBox" class="status-line">这里会显示主板 / 本地文件比对结果。</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="control-grid">
+        <div class="legend">
+          <label><input id="leftActualToggle" type="checkbox" checked /><span class="swatch" style="background: var(--left-actual)"></span>左轮实际</label>
+          <label><input id="rightActualToggle" type="checkbox" checked /><span class="swatch" style="background: var(--right-actual)"></span>右轮实际</label>
+          <label><input id="leftTargetToggle" type="checkbox" checked /><span class="swatch" style="background: var(--left-target)"></span>左轮目标</label>
+          <label><input id="rightTargetToggle" type="checkbox" checked /><span class="swatch" style="background: var(--right-target)"></span>右轮目标</label>
+          <label><input id="followLatestToggle" type="checkbox" checked />固定最新数据在横轴中间</label>
+          <label><input id="pauseToggle" type="checkbox" />暂停接收新点</label>
+        </div>
+        <div class="row">
+          <button id="resetViewBtn" class="btn btn-primary" type="button">重置视图</button>
+          <button id="clearDataBtn" class="btn" type="button">清空历史</button>
+          <div class="pill">滚轮: 纵向缩放</div>
+          <div class="pill">Shift + 滚轮: 横向缩放</div>
+          <div class="pill">拖动: 平移</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="meta-list">
+        <div class="meta-card"><strong>连接状态</strong><span id="connectionText">等待数据...</span></div>
+        <div class="meta-card"><strong>样本数</strong><span id="sampleCountText">0</span></div>
+        <div class="meta-card"><strong>时间窗</strong><span id="windowText">--</span></div>
+        <div class="meta-card"><strong>Y 轴范围</strong><span id="yRangeText">--</span></div>
+        <div class="meta-card"><strong>当前光标</strong><span id="cursorText">--</span></div>
+        <div class="meta-card"><strong>最新值</strong><span id="latestText">--</span></div>
+      </div>
+    </div>
+
+    <div class="chart-shell">
+      <canvas id="speedChartCanvas"></canvas>
+      <div class="overlay">
+        <div class="pill" id="followBadge">跟随最新: 开</div>
+        <div class="pill" id="pauseBadge">采样: 实时</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div id="statusBox" class="status-line">等待 WebSocket 数据流...</div>
+    </div>
+  </div>
+
+  <script src="/speed_chart_app.js"></script>
+</body>
+</html>

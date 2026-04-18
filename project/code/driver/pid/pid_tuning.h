@@ -49,6 +49,9 @@ extern float kTargetCountMax;
 extern float kErrorDeadzonePx;
 extern float kErrorLowGainLimitPx;
 extern float kErrorLowGain;
+extern bool kFixedTargetCountOverrideEnabled;
+extern float kFixedLeftTargetCount;
+extern float kFixedRightTargetCount;
 } // namespace line_follow
 
 namespace line_error_preview

@@ -72,6 +72,9 @@ struct PidSnapshot
     float line_follow_error_deadzone_px = 0.0f;
     float line_follow_error_low_gain_limit_px = 0.0f;
     float line_follow_error_low_gain = 0.0f;
+    bool line_follow_fixed_target_count_override_enabled = false;
+    float line_follow_fixed_left_target_count = 0.0f;
+    float line_follow_fixed_right_target_count = 0.0f;
 
     pid_tuning::line_error_preview::WeightedProfile normal_weighted_profile{};
     pid_tuning::line_error_preview::WeightedProfile straight_weighted_profile{};
@@ -748,6 +751,9 @@ PidSnapshot capture_pid_snapshot()
     snapshot.line_follow_error_deadzone_px = pid_tuning::line_follow::kErrorDeadzonePx;
     snapshot.line_follow_error_low_gain_limit_px = pid_tuning::line_follow::kErrorLowGainLimitPx;
     snapshot.line_follow_error_low_gain = pid_tuning::line_follow::kErrorLowGain;
+    snapshot.line_follow_fixed_target_count_override_enabled = pid_tuning::line_follow::kFixedTargetCountOverrideEnabled;
+    snapshot.line_follow_fixed_left_target_count = pid_tuning::line_follow::kFixedLeftTargetCount;
+    snapshot.line_follow_fixed_right_target_count = pid_tuning::line_follow::kFixedRightTargetCount;
 
     snapshot.normal_weighted_profile = pid_tuning::line_error_preview::kNormalWeightedProfile;
     snapshot.straight_weighted_profile = pid_tuning::line_error_preview::kStraightWeightedProfile;
@@ -801,6 +807,9 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
     pid_tuning::line_follow::kErrorDeadzonePx = snapshot.line_follow_error_deadzone_px;
     pid_tuning::line_follow::kErrorLowGainLimitPx = snapshot.line_follow_error_low_gain_limit_px;
     pid_tuning::line_follow::kErrorLowGain = snapshot.line_follow_error_low_gain;
+    pid_tuning::line_follow::kFixedTargetCountOverrideEnabled = snapshot.line_follow_fixed_target_count_override_enabled;
+    pid_tuning::line_follow::kFixedLeftTargetCount = snapshot.line_follow_fixed_left_target_count;
+    pid_tuning::line_follow::kFixedRightTargetCount = snapshot.line_follow_fixed_right_target_count;
 
     pid_tuning::line_error_preview::kNormalWeightedProfile = snapshot.normal_weighted_profile;
     pid_tuning::line_error_preview::kStraightWeightedProfile = snapshot.straight_weighted_profile;
@@ -1214,6 +1223,16 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_PID_FLOAT("pid.line_follow.error_deadzone_px", pid_tuning::line_follow::kErrorDeadzonePx);
     REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain_limit_px", pid_tuning::line_follow::kErrorLowGainLimitPx);
     REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain", pid_tuning::line_follow::kErrorLowGain);
+    if (!require_bool(values,
+                      &consumed,
+                      "pid.line_follow.fixed_target_count_override_enabled",
+                      &pid_tuning::line_follow::kFixedTargetCountOverrideEnabled,
+                      error_message))
+    {
+        return false;
+    }
+    REQUIRE_PID_FLOAT("pid.line_follow.fixed_left_target_count", pid_tuning::line_follow::kFixedLeftTargetCount);
+    REQUIRE_PID_FLOAT("pid.line_follow.fixed_right_target_count", pid_tuning::line_follow::kFixedRightTargetCount);
     REQUIRE_PID_FLOAT("pid.route_line_follow.global.base_speed_scale", pid_tuning::route_line_follow::kGlobalBaseSpeedScale);
 
 #undef REQUIRE_PID_FLOAT

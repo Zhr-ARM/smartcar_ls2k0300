@@ -16,6 +16,7 @@ const WASM_DIR = path.join(PUBLIC_DIR, 'wasm');
 const ROOT_DIR = path.join(__dirname, '..', '..');
 const WASM_SYNC_METADATA_PATH = path.join(WASM_DIR, 'vision_pipeline.sync.json');
 const SHARED_CONNECTION_PRESETS_PATH = path.join(ROOT_DIR, 'project', 'user', 'connection_presets.json');
+const SHARED_SMARTCAR_CONFIG_PATH = path.join(ROOT_DIR, 'project', 'user', 'smartcar_config.toml');
 
 const BIND_HOST = process.env.BIND_HOST || '0.0.0.0';
 const UDP_PORT = Number(process.env.UDP_PORT || 10000);
@@ -208,6 +209,14 @@ function loadBoardConnectionStore() {
 
 function saveBoardConnectionStore(store) {
   fs.writeFileSync(SHARED_CONNECTION_PRESETS_PATH, JSON.stringify(store, null, 2), 'utf8');
+}
+
+function saveSharedSmartcarConfig(tomlText) {
+  fs.writeFileSync(SHARED_SMARTCAR_CONFIG_PATH, tomlText, 'utf8');
+}
+
+function readSharedSmartcarConfig() {
+  return fs.readFileSync(SHARED_SMARTCAR_CONFIG_PATH, 'utf8');
 }
 
 function getBoardConnectionStore() {
@@ -800,6 +809,10 @@ function startHttpServer() {
       serveFile(res, path.join(PUBLIC_DIR, 'config.html'), 'text/html; charset=utf-8');
       return;
     }
+    if (pathname === '/speed_chart.html') {
+      serveFile(res, path.join(PUBLIC_DIR, 'speed_chart.html'), 'text/html; charset=utf-8');
+      return;
+    }
     if (pathname === '/playback.html') {
       serveFile(res, path.join(PUBLIC_DIR, 'playback.html'), 'text/html; charset=utf-8');
       return;
@@ -814,6 +827,10 @@ function startHttpServer() {
     }
     if (pathname === '/config_app.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'config_app.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/speed_chart_app.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'speed_chart_app.js'), 'application/javascript; charset=utf-8');
       return;
     }
     if (pathname === '/local_compute_app.js') {
@@ -897,10 +914,26 @@ function startHttpServer() {
     }
 
     if (pathname === '/api/config/apply' && req.method === 'POST') {
+      let appliedBodyText = '';
       readTextBody(req).then((bodyText) => {
+        appliedBodyText = bodyText;
         return proxyBoardConfig('/api/config/apply', 'POST', bodyText);
       }).then((result) => {
-        sendJson(res, 200, Object.assign({ ok: true, board_config_base_url: getBoardConnectionSettings().board_config_base_url }, result));
+        saveSharedSmartcarConfig(appliedBodyText);
+        const localConfigText = readSharedSmartcarConfig();
+        return {
+          result,
+          localConfigText,
+          localConfigSame: localConfigText === appliedBodyText
+        };
+      }).then(({ result, localConfigText, localConfigSame }) => {
+        sendJson(res, 200, Object.assign({
+          ok: true,
+          board_config_base_url: getBoardConnectionSettings().board_config_base_url,
+          local_config_path: SHARED_SMARTCAR_CONFIG_PATH,
+          local_config_text: localConfigText,
+          local_config_same: localConfigSame
+        }, result));
       }).catch((err) => {
         sendJson(res, 502, {
           ok: false,
@@ -912,14 +945,21 @@ function startHttpServer() {
     }
 
     if (pathname === '/api/config/ssh_push' && req.method === 'POST') {
+      let uploadedBodyText = '';
       readTextBody(req).then((bodyText) => {
+        uploadedBodyText = bodyText;
         return pushConfigViaScp(bodyText);
       }).then(() => {
+        saveSharedSmartcarConfig(uploadedBodyText);
+        const localConfigText = readSharedSmartcarConfig();
         const settings = getBoardConnectionSettings();
         sendJson(res, 200, {
           ok: true,
           message: 'ssh uploaded',
           board_config_base_url: settings.board_config_base_url,
+          local_config_path: SHARED_SMARTCAR_CONFIG_PATH,
+          local_config_text: localConfigText,
+          local_config_same: localConfigText === uploadedBodyText,
           ssh_target: {
             host: settings.board_ssh_host,
             port: settings.board_ssh_port,

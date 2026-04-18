@@ -394,26 +394,35 @@
     return result;
   }
 
-  function buildApplyStatusText(applyResult, verifySummary) {
+  function buildApplyStatusText(applyResult, runtimeVerifySummary, localVerifySummary) {
     const lines = [];
     const restartKeys = Array.isArray(applyResult && applyResult.restart_required_keys)
       ? applyResult.restart_required_keys
       : [];
-    if (verifySummary.same) {
+    if (runtimeVerifySummary.same) {
       lines.push('应用请求已成功发送到主板，且回读校验一致。');
     } else {
       lines.push('主板返回应用成功，但回读校验发现“当前加载配置”与本次提交内容不一致。');
     }
+    if (localVerifySummary.same) {
+      lines.push('电脑端参数文件已同步更新，且回读比较一致。');
+    } else {
+      lines.push('电脑端参数文件已尝试写回，但回读比较发现与本次提交内容不一致。');
+    }
     lines.push(`主板配置服务: ${(applyResult && applyResult.board_config_base_url) || '--'}`);
     lines.push(`当前加载路径: ${(applyResult && applyResult.loaded_path) || '--'}`);
+    lines.push(`本地文件路径: ${(applyResult && applyResult.local_config_path) || '--'}`);
     lines.push(`需要重启的参数数: ${restartKeys.length}`);
     if (restartKeys.length > 0) {
       lines.push('说明: 这些参数已经写入文件，但运行中的主板进程需要重启后才会完全生效。');
     } else {
       lines.push('说明: 这次提交未命中“需重启参数”，可热更新部分应已立即生效。');
     }
-    if (!verifySummary.same) {
+    if (!runtimeVerifySummary.same) {
       lines.push('说明: 下方“比较结果”展示的是主板当前加载配置与本次提交内容的差异。');
+    }
+    if (!localVerifySummary.same) {
+      lines.push('说明: 电脑端本地文件同步也发现差异，请优先检查本地文件是否被其他进程改写。');
     }
     return lines.join('\n');
   }
@@ -436,13 +445,23 @@
         body: tomlText
       });
       const currentResult = await fetchCurrentConfigFromRuntime();
-      const verifySummary = summarizeDiff(currentResult.toml_text || '', tomlText);
+      const runtimeVerifySummary = summarizeDiff(currentResult.toml_text || '', tomlText);
+      const localVerifySummary = summarizeDiff(result.local_config_text || '', tomlText);
       lastActionText.textContent = `最近操作: 应用成功 @ ${new Date().toLocaleTimeString()}`;
       setRestartKeys(result.restart_required_keys || []);
-      setCompareStatus(verifySummary.text, verifySummary.same ? 'ok' : 'warn');
+      const compareLines = [
+        '[主板运行态比较]',
+        runtimeVerifySummary.text,
+        '',
+        '[电脑本地文件比较]',
+        localVerifySummary.text
+      ];
+      setCompareStatus(compareLines.join('\n'), (runtimeVerifySummary.same && localVerifySummary.same) ? 'ok' : 'warn');
       setStatus(
-        buildApplyStatusText(result, verifySummary),
-        verifySummary.same ? (result.restart_required ? 'warn' : 'ok') : 'warn'
+        buildApplyStatusText(result, runtimeVerifySummary, localVerifySummary),
+        (runtimeVerifySummary.same && localVerifySummary.same)
+          ? (result.restart_required ? 'warn' : 'ok')
+          : 'warn'
       );
       await refreshConnectionStatus().catch(() => {});
     } catch (err) {
@@ -469,19 +488,27 @@
         body: tomlText
       });
       const boardText = await fetchBoardFileViaSsh();
-      const summary = summarizeDiff(boardText, tomlText);
+      const runtimeSummary = summarizeDiff(boardText, tomlText);
+      const localSummary = summarizeDiff(result.local_config_text || '', tomlText);
       if (result.ssh_target) {
         sshTargetText.textContent =
           `SSH 目标: ${result.ssh_target.user}@${result.ssh_target.host}:${result.ssh_target.target_path} (port ${result.ssh_target.port})`;
       }
       lastActionText.textContent = `最近操作: SSH 写入成功 @ ${new Date().toLocaleTimeString()}`;
+      const compareLines = [
+        '[主板文件比较]',
+        runtimeSummary.text,
+        '',
+        '[电脑本地文件比较]',
+        localSummary.text
+      ];
       setStatus(
-        summary.same
-          ? 'SSH 写入成功，并已回读校验一致。\n配置文件已经落盘到主板，但不会自动热更新当前运行进程。'
-          : 'SSH 写入已完成，但回读校验发现主板文件与当前写入内容仍有差异，请看下方比较结果。',
-        summary.same ? 'ok' : 'warn'
+        (runtimeSummary.same && localSummary.same)
+          ? `SSH 写入成功，主板文件与电脑本地文件都已回读校验一致。\n本地文件路径: ${result.local_config_path || '--'}\n配置文件已经落盘到主板，但不会自动热更新当前运行进程。`
+          : `SSH 写入已完成，但主板文件或电脑本地文件的回读校验发现差异。\n本地文件路径: ${result.local_config_path || '--'}\n请看下方比较结果。`,
+        (runtimeSummary.same && localSummary.same) ? 'ok' : 'warn'
       );
-      setCompareStatus(summary.text, summary.same ? 'ok' : 'warn');
+      setCompareStatus(compareLines.join('\n'), (runtimeSummary.same && localSummary.same) ? 'ok' : 'warn');
       await refreshConnectionStatus().catch(() => {});
     } catch (err) {
       lastActionText.textContent = `最近操作: SSH 写入失败 @ ${new Date().toLocaleTimeString()}`;

@@ -25,6 +25,7 @@ volatile sig_atomic_t g_should_exit = 0;
 
 namespace
 {
+constexpr bool kStartupLowVoltageCheckEnabled = false;
 constexpr float kStartupLowVoltageThresholdV = 11.6f;
 constexpr int kMainLoopPeriodMs = 50;
 constexpr int kBatteryRefreshPeriodMs = 1000;
@@ -132,6 +133,10 @@ int main(int, char**)
     }
     vision_image_processor_reload_config_from_globals();
     printf("[CONFIG] loaded=%s\r\n", loaded_config_path.c_str());
+    printf("[RLPID] fixed_target_override=%d left=%.1f right=%.1f\r\n",
+           pid_tuning::line_follow::kFixedTargetCountOverrideEnabled ? 1 : 0,
+           static_cast<double>(pid_tuning::line_follow::kFixedLeftTargetCount),
+           static_cast<double>(pid_tuning::line_follow::kFixedRightTargetCount));
 
     if (!beep_thread_init())
     {
@@ -145,7 +150,11 @@ int main(int, char**)
            static_cast<double>(startup_voltage_v),
            static_cast<double>(kStartupLowVoltageThresholdV));
 
-    if (startup_voltage_v < kStartupLowVoltageThresholdV)
+    if (!kStartupLowVoltageCheckEnabled)
+    {
+        printf("[BATTERY] startup low voltage check disabled\r\n");
+    }
+    else if (startup_voltage_v < kStartupLowVoltageThresholdV)
     {
         handle_low_battery_startup_block(startup_voltage_v);
         if (g_should_exit)

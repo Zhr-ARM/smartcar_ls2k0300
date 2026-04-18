@@ -14,7 +14,7 @@ schema_version = 1
 send_mode = 1
 # 图像发送链路最大帧率。
 # 0 表示不限速。
-send_max_fps = 60
+send_max_fps = 0
 # 推理总开关。
 # false 时关闭红框检测和 ncnn 分类主链。
 infer_enabled = false
@@ -125,11 +125,11 @@ ipm_centerline_curvature_enabled = true
 # IPM 中线曲率计算步长。
 ipm_centerline_curvature_step = 3
 # 斑马线检测总开关。
-zebra_cross_detection_enabled = true
+zebra_cross_detection_enabled = false
 # 双边都丢线时是否保留上一帧平移中线。
 keep_last_centerline_on_double_loss = true
 # 十字状态识别开关。
-route_cross_detection_enabled = true
+route_cross_detection_enabled = false
 # normal/straight 进入 cross 所需的角点后沿边框连续行数最小值。
 route_cross_entry_corner_post_frame_wall_rows_min = 5
 # cross_1 进入 cross_2 的起始贴边连续行数阈值。
@@ -137,7 +137,7 @@ route_cross_stage2_enter_start_frame_wall_rows_min = 1
 # cross_2 退出到 normal 的起始左右边界 x 差最大阈值。
 route_cross_exit_start_gap_x_max = 155
 # 圆环状态识别开关。
-route_circle_detection_enabled = true
+route_circle_detection_enabled = false
 # 圆环入口判定中对侧边界最少点数要求。
 route_circle_entry_min_boundary_count = 20
 # 圆环入口判定中角点距离对侧边界尾部的最小保留余量。
@@ -221,9 +221,9 @@ labels = ["supplies", "vehicles", "weapons"]
 enabled = true
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
-max_fps = 30
+max_fps = 0
 # 是否发送灰度图。
-send_gray_jpeg = true
+send_gray_jpeg = false
 # 灰度图发送格式。
 # 0=JPEG，1=PNG，2=BMP。
 gray_image_format = 0
@@ -269,37 +269,37 @@ left_current_count = true
 # 是否发送右轮当前编码器速度。
 right_current_count = true
 # 是否发送左轮滤波后速度。
-left_filtered_count = false
+left_filtered_count = true
 # 是否发送右轮滤波后速度。
-right_filtered_count = false
+right_filtered_count = true
 # 是否发送左轮速度误差。
-left_error = false
+left_error = true
 # 是否发送右轮速度误差。
-right_error = false
+right_error = true
 # 是否发送左轮前馈输出。
-left_feedforward = false
+left_feedforward = true
 # 是否发送右轮前馈输出。
-right_feedforward = false
+right_feedforward = true
 # 是否发送左轮 PID 修正项。
-left_correction = false
+left_correction = true
 # 是否发送右轮 PID 修正项。
-right_correction = false
+right_correction = true
 # 是否发送左轮减速辅助项。
-left_decel_assist = false
+left_decel_assist = true
 # 是否发送右轮减速辅助项。
-right_decel_assist = false
+right_decel_assist = true
 # 是否发送左轮 duty。
-left_duty = false
+left_duty = true
 # 是否发送右轮 duty。
-right_duty = false
+right_duty = true
 # 是否发送左轮硬件 duty。
-left_hardware_duty = false
+left_hardware_duty = true
 # 是否发送右轮硬件 duty。
-right_hardware_duty = false
+right_hardware_duty = true
 # 是否发送左轮方向 GPIO 电平。
-left_dir_level = false
+left_dir_level = true
 # 是否发送右轮方向 GPIO 电平。
-right_dir_level = false
+right_dir_level = true
 # 是否发送当前 otsu 阈值。
 otsu_threshold = true
 # 是否发送等待新图像耗时。
@@ -311,11 +311,11 @@ perf_otsu_us = false
 # 是否发送迷宫法阶段耗时。
 perf_maze_us = false
 # 是否发送整帧总耗时。
-perf_total_us = true
+perf_total_us = false
 # 是否发送左边界原始真实点数。
-maze_left_points_raw = true
+maze_left_points_raw = false
 # 是否发送右边界原始真实点数。
-maze_right_points_raw = true
+maze_right_points_raw = false
 # 是否发送红框是否存在。
 red_found = false
 # 是否发送红框矩形。
@@ -325,7 +325,7 @@ roi_valid = false
 # 是否发送 ROI 矩形。
 roi_rect = false
 # 是否发送当前 IPM 跟踪点是否有效。
-ipm_track_valid = true
+ipm_track_valid = false
 # 是否发送 line_error 取点方式。
 ipm_track_method = false
 # 是否发送当前选中的中线来源。
@@ -333,29 +333,29 @@ ipm_centerline_source = false
 # 是否发送当前实际使用的中线点索引。
 ipm_track_index = false
 # 是否发送当前实际跟踪点坐标。
-ipm_track_point = true
+ipm_track_point = false
 # 是否发送原图左边界点列。
-left_boundary = true
+left_boundary = false
 # 是否发送原图右边界点列。
-right_boundary = true
+right_boundary = false
 # 是否发送 IPM 左边界点列。
-ipm_left_boundary = true
+ipm_left_boundary = false
 # 是否发送 IPM 右边界点列。
-ipm_right_boundary = true
+ipm_right_boundary = false
 # 是否发送当前选中的 IPM 平移中线。
-ipm_centerline_selected_shift = true
+ipm_centerline_selected_shift = false
 # 是否发送当前选中的原图回投平移中线。
-src_centerline_selected_shift = true
+src_centerline_selected_shift = false
 # 是否发送当前选中的 IPM 平移中线点数。
-ipm_centerline_selected_count = true
+ipm_centerline_selected_count = false
 # 是否发送当前选中的原图回投平移中线点数。
-src_centerline_selected_count = true
+src_centerline_selected_count = false
 # 是否发送当前选中的 IPM 平移中线曲率数组。
-ipm_centerline_selected_curvature = true
+ipm_centerline_selected_curvature = false
 # 是否发送灰度图尺寸。
-gray_size = true
+gray_size = false
 # 是否发送 IPM 图尺寸。
-ipm_size = true
+ipm_size = false
 
 [vision.runtime.assistant]
 # 逐飞助手 UDP 通道开关。
@@ -417,19 +417,19 @@ left_kp = 0.085
 # 左轮速度环 Ki。
 left_ki = 0.00078
 # 左轮速度环 Kd。
-left_kd = 0.0
+left_kd = 0
 # 右轮速度环 Kp。
 right_kp = 0.085
 # 右轮速度环 Ki。
 right_ki = 0.00078
 # 右轮速度环 Kd。
-right_kd = 0.0
+right_kd = 0
 # 速度环积分限幅。
-integral_limit = 180.0
+integral_limit = 180
 # 单周期 PID 修正项最大变化步长。
-max_output_step = 15.0
+max_output_step = 15
 # PID 修正项总限幅。
-correction_limit = 24.0
+correction_limit = 24
 # 左轮前馈斜率。
 left_feedforward_gain = 0.09
 # 右轮前馈斜率。
@@ -439,13 +439,13 @@ left_feedforward_bias = 1.4
 # 右轮静摩擦补偿。
 right_feedforward_bias = 1.4
 # 静摩擦补偿触发阈值。
-feedforward_bias_threshold = 5.0
+feedforward_bias_threshold = 5
 # 减速辅助触发误差阈值。
-decel_error_threshold = 5.0
+decel_error_threshold = 5
 # 减速辅助增益。
 decel_duty_gain = 0.18
 # 减速辅助最大输出。
-decel_duty_limit = 14.0
+decel_duty_limit = 14
 # 速度反馈平均窗口长度。
 feedback_average_window = 2
 # 速度反馈低通滤波 alpha。
@@ -470,6 +470,13 @@ error_deadzone_px = 0.6
 error_low_gain_limit_px = 3.0
 # 小误差区间降增益倍率。
 error_low_gain = 0.7
+# 是否启用固定左右轮目标值覆盖。
+# 开启后，左右轮目标不再跟随视觉误差与转向输出变化。
+fixed_target_count_override_enabled = true
+# 固定左轮目标值。
+fixed_left_target_count = 100
+# 固定右轮目标值。
+fixed_right_target_count = 0
 
 [pid.line_error_preview.normal]
 # NORMAL 状态下参与加权预瞄的点数。

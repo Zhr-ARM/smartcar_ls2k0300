@@ -589,6 +589,13 @@ float clamp_steering_to_wheel_room(float applied_base_speed, float raw_steering_
                       available_steering_limit);
 }
 
+float clamp_target_count(float target_count)
+{
+    return std::clamp(target_count,
+                      pid_tuning::line_follow::kTargetCountMin,
+                      pid_tuning::line_follow::kTargetCountMax);
+}
+
 bool update_filtered_yaw_rate_if_new_sample(float *sample_dt_seconds_out)
 {
     const uint32 imu_sample_seq = imu_thread_gyro_z_sample_seq();
@@ -866,12 +873,14 @@ void line_follow_loop()
         //
         // 这里先根据当前基础速度剩余的轮速余量，再收一次 steering_output，
         // 避免最后再由左右轮目标限幅“硬裁切”，让转向行为尽量保持可预期。
-        const float left_target = std::clamp(applied_base_speed - steering_output, // 计算得到的电机左轮最终目标速度
-                                             pid_tuning::line_follow::kTargetCountMin,
-                                             pid_tuning::line_follow::kTargetCountMax);
-        const float right_target = std::clamp(applied_base_speed + steering_output, // 计算得到的电机右轮最终目标速度
-                                              pid_tuning::line_follow::kTargetCountMin,
-                                              pid_tuning::line_follow::kTargetCountMax);
+        float left_target = clamp_target_count(applied_base_speed - steering_output); // 计算得到的电机左轮最终目标速度
+        float right_target = clamp_target_count(applied_base_speed + steering_output); // 计算得到的电机右轮最终目标速度
+        if (pid_tuning::line_follow::kFixedTargetCountOverrideEnabled)
+        {
+            // RLPID 训练模式下直接使用配置给定的左右轮目标，切断视觉误差到轮速目标的映射。
+            left_target = clamp_target_count(pid_tuning::line_follow::kFixedLeftTargetCount);
+            right_target = clamp_target_count(pid_tuning::line_follow::kFixedRightTargetCount);
+        }
         // 重新用限幅后的左右轮目标反推实际差速，保证对外上报值和真正下发给电机的一致。
         const float applied_steering_output = (right_target - left_target) * 0.5f; // 反推出来并实际下放给电机的转向差速调整量
         motor_thread_set_target_count(left_target, right_target);
