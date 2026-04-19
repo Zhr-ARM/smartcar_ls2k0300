@@ -771,6 +771,8 @@ static void send_tcp_status()
                                                        &cross_start_boundary_gap_x);
     bool src_left_trace_has_frame_wall = false;
     bool src_right_trace_has_frame_wall = false;
+    bool src_left_boundary_straight = false;
+    bool src_right_boundary_straight = false;
     int src_left_start_frame_wall_rows = 0;
     int src_right_start_frame_wall_rows = 0;
     uint16 *src_left_circle_guide_x = nullptr;
@@ -781,6 +783,8 @@ static void send_tcp_status()
     uint16 src_right_circle_guide_num = 0;
     vision_image_processor_get_src_trace_frame_wall_state(&src_left_trace_has_frame_wall,
                                                           &src_right_trace_has_frame_wall);
+    vision_image_processor_get_src_boundary_straight_state(&src_left_boundary_straight,
+                                                           &src_right_boundary_straight);
     vision_image_processor_get_src_start_frame_wall_rows(&src_left_start_frame_wall_rows,
                                                          &src_right_start_frame_wall_rows);
     vision_image_processor_get_src_circle_guide_lines(&src_left_circle_guide_x,
@@ -838,6 +842,78 @@ static void send_tcp_status()
                                                    &maze_right_points_raw,
                                                    &maze_left_ok,
                                                    &maze_right_ok);
+    struct circle_entry_raw_gap_debug_t
+    {
+        bool ok = false;
+        int min_observed_gap_px = -1;
+        int checked_rows = 0;
+        int failed_row_y = -1;
+        bool missing_point = false;
+    };
+    auto find_trace_x_at_row = [](uint16 *xs, uint16 *ys, uint16 n, int target_y, int *x_out) -> bool {
+        if (x_out == nullptr || xs == nullptr || ys == nullptr || n == 0)
+        {
+            return false;
+        }
+        const int safe_n = std::max(0, static_cast<int>(n));
+        for (int i = 0; i < safe_n; ++i)
+        {
+            if (static_cast<int>(ys[i]) != target_y)
+            {
+                continue;
+            }
+            *x_out = static_cast<int>(xs[i]);
+            return true;
+        }
+        return false;
+    };
+    auto calc_circle_entry_raw_gap_debug = [&](int corner_y) -> circle_entry_raw_gap_debug_t {
+        circle_entry_raw_gap_debug_t debug{};
+        const int row_offset = std::max(g_vision_runtime_config.route_circle_entry_corner_row_offset, 0);
+        const int rows_to_check = std::max(g_vision_runtime_config.route_circle_entry_gap_check_rows, 1);
+        const int min_gap_px = g_vision_runtime_config.route_circle_entry_min_raw_boundary_gap;
+        const int start_y = corner_y - row_offset;
+
+        for (int i = 0; i < rows_to_check; ++i)
+        {
+            const int target_y = start_y - i;
+            if (target_y <= 0 || target_y >= (VISION_DOWNSAMPLED_HEIGHT - 1))
+            {
+                debug.failed_row_y = target_y;
+                return debug;
+            }
+
+            int left_x = 0;
+            int right_x = 0;
+            const bool left_found = find_trace_x_at_row(eight_left_x, eight_left_y, eight_left_num, target_y, &left_x);
+            const bool right_found = find_trace_x_at_row(eight_right_x, eight_right_y, eight_right_num, target_y, &right_x);
+            if (!left_found || !right_found)
+            {
+                debug.failed_row_y = target_y;
+                debug.missing_point = true;
+                return debug;
+            }
+
+            const int gap_px = right_x - left_x;
+            if (debug.min_observed_gap_px < 0 || gap_px < debug.min_observed_gap_px)
+            {
+                debug.min_observed_gap_px = gap_px;
+            }
+            debug.checked_rows += 1;
+            if (gap_px <= min_gap_px)
+            {
+                debug.failed_row_y = target_y;
+                return debug;
+            }
+        }
+
+        debug.ok = true;
+        return debug;
+    };
+    const circle_entry_raw_gap_debug_t left_circle_raw_gap_debug =
+        calc_circle_entry_raw_gap_debug(cross_lower_left_y);
+    const circle_entry_raw_gap_debug_t right_circle_raw_gap_debug =
+        calc_circle_entry_raw_gap_debug(cross_lower_right_y);
 
     const int64_t ts_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                               std::chrono::steady_clock::now().time_since_epoch())
@@ -1247,8 +1323,8 @@ static void send_tcp_status()
         cross_left_corner_post_frame_wall_rows >= g_vision_runtime_config.route_cross_entry_corner_post_frame_wall_rows_min &&
         cross_right_corner_post_frame_wall_rows >= g_vision_runtime_config.route_cross_entry_corner_post_frame_wall_rows_min;
     const bool cross_state_stage2_ready_now =
-        ((cross_lower_left_found && cross_lower_left_y >= 75) ||
-         (cross_lower_right_found && cross_lower_right_y >= 75));
+        ((cross_lower_left_found && cross_lower_left_y >= g_vision_runtime_config.route_cross_stage1_enter_corner_y_min) ||
+         (cross_lower_right_found && cross_lower_right_y >= g_vision_runtime_config.route_cross_stage1_enter_corner_y_min));
     const bool cross_state_stage3_ready_now =
         (src_left_start_frame_wall_rows >= g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min &&
          src_right_start_frame_wall_rows >= g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min);
@@ -1264,20 +1340,44 @@ static void send_tcp_status()
     append_int(true, "cross_start_boundary_gap_x", cross_start_boundary_gap_x);
     append_int(true, "route_cross_entry_corner_post_frame_wall_rows_min", g_vision_runtime_config.route_cross_entry_corner_post_frame_wall_rows_min);
     append_int(true, "route_cross_stage2_enter_start_frame_wall_rows_min", g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min);
+    append_int(true, "route_cross_stage1_enter_corner_y_min", g_vision_runtime_config.route_cross_stage1_enter_corner_y_min);
     append_int(true, "route_cross_exit_start_gap_x_max", g_vision_runtime_config.route_cross_exit_start_gap_x_max);
+    append_int(true, "route_cross_stage3_jump_x_threshold_px", g_vision_runtime_config.route_cross_stage3_jump_x_threshold_px);
+    append_int(true, "route_cross_stage3_cut_forward_points", g_vision_runtime_config.route_cross_stage3_cut_forward_points);
+    append_int(true, "route_cross_stage3_left_anchor_x", g_vision_runtime_config.route_cross_stage3_left_anchor_x);
+    append_int(true, "route_cross_stage3_left_anchor_y", g_vision_runtime_config.route_cross_stage3_left_anchor_y);
+    append_int(true, "route_cross_stage3_right_anchor_x", g_vision_runtime_config.route_cross_stage3_right_anchor_x);
+    append_int(true, "route_cross_stage3_right_anchor_y", g_vision_runtime_config.route_cross_stage3_right_anchor_y);
     append_bool(true, "route_circle_detection_enabled", g_vision_runtime_config.route_circle_detection_enabled);
     append_int(true, "route_circle_entry_min_boundary_count", g_vision_runtime_config.route_circle_entry_min_boundary_count);
     append_int(true, "route_circle_entry_corner_tail_margin", g_vision_runtime_config.route_circle_entry_corner_tail_margin);
+    append_int(true, "route_circle_entry_corner_row_offset", g_vision_runtime_config.route_circle_entry_corner_row_offset);
+    append_int(true, "route_circle_entry_gap_check_rows", g_vision_runtime_config.route_circle_entry_gap_check_rows);
+    append_int(true, "route_circle_entry_min_raw_boundary_gap", g_vision_runtime_config.route_circle_entry_min_raw_boundary_gap);
+    append_int(true, "route_circle_entry_corner_y_min", g_vision_runtime_config.route_circle_entry_corner_y_min);
     append_int(true, "route_circle_stage_frame_wall_rows_enter", g_vision_runtime_config.route_circle_stage_frame_wall_rows_enter);
     append_int(true, "route_circle_stage3_frame_wall_rows_trigger", g_vision_runtime_config.route_circle_stage3_frame_wall_rows_trigger);
     append_int(true, "route_circle_stage6_maze_start_row", g_vision_runtime_config.route_circle_stage6_maze_start_row);
     append_int(true, "circle_guide_min_frame_wall_segment_len", g_vision_runtime_config.circle_guide_min_frame_wall_segment_len);
     append_int(true, "circle_guide_target_offset_stage3", g_vision_runtime_config.circle_guide_target_offset_stage3);
     append_int(true, "circle_guide_anchor_offset_stage5", g_vision_runtime_config.circle_guide_anchor_offset_stage5);
+    append_int(true, "route_circle_apply_touch_margin_px", g_vision_runtime_config.route_circle_apply_touch_margin_px);
+    append_bool(true, "left_boundary_straight", src_left_boundary_straight);
+    append_bool(true, "right_boundary_straight", src_right_boundary_straight);
     append_bool(true, "src_left_trace_has_frame_wall", src_left_trace_has_frame_wall);
     append_bool(true, "src_right_trace_has_frame_wall", src_right_trace_has_frame_wall);
     append_int(true, "left_start_frame_wall_rows", src_left_start_frame_wall_rows);
     append_int(true, "right_start_frame_wall_rows", src_right_start_frame_wall_rows);
+    append_bool(true, "left_circle_entry_raw_gap_ok", left_circle_raw_gap_debug.ok);
+    append_bool(true, "right_circle_entry_raw_gap_ok", right_circle_raw_gap_debug.ok);
+    append_int(true, "left_circle_entry_raw_gap_min_px", left_circle_raw_gap_debug.min_observed_gap_px);
+    append_int(true, "right_circle_entry_raw_gap_min_px", right_circle_raw_gap_debug.min_observed_gap_px);
+    append_int(true, "left_circle_entry_raw_gap_checked_rows", left_circle_raw_gap_debug.checked_rows);
+    append_int(true, "right_circle_entry_raw_gap_checked_rows", right_circle_raw_gap_debug.checked_rows);
+    append_int(true, "left_circle_entry_raw_gap_failed_row_y", left_circle_raw_gap_debug.failed_row_y);
+    append_int(true, "right_circle_entry_raw_gap_failed_row_y", right_circle_raw_gap_debug.failed_row_y);
+    append_bool(true, "left_circle_entry_raw_gap_missing_point", left_circle_raw_gap_debug.missing_point);
+    append_bool(true, "right_circle_entry_raw_gap_missing_point", right_circle_raw_gap_debug.missing_point);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_index, "ipm_track_index", ipm_track_index);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_track_point, "ipm_track_point",
                      {ipm_track_x, ipm_track_y});

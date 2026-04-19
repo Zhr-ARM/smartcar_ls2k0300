@@ -131,6 +131,7 @@
     const gap = Number(status && status.cross_start_boundary_gap_x);
     const entryReady = !!(status && status.cross_state_entry_ready_now);
     const stage2Ready = !!(status && status.cross_state_stage2_ready_now);
+    const stage3Ready = !!(status && status.cross_state_stage3_ready_now);
     const exitReady = !!(status && status.cross_state_exit_ready_now);
     const mainState = Number(status && status.route_main_state);
     const subState = Number(status && status.route_sub_state);
@@ -147,10 +148,13 @@
     const hasData = Number.isFinite(leftRows) || Number.isFinite(rightRows) || Number.isFinite(gap);
 
     crossFocusPanel.classList.remove('ready', 'not-ready');
-    crossFocusPanel.classList.add((entryReady || stage2Ready || exitReady || mainState === 4) ? 'ready' : 'not-ready');
+    crossFocusPanel.classList.add((entryReady || stage2Ready || stage3Ready || exitReady || mainState === 4) ? 'ready' : 'not-ready');
+    let crossStateLabel = '十字-cross_1 运行中';
+    if (subState === 2) crossStateLabel = '十字-cross_2 运行中';
+    if (subState === 3) crossStateLabel = '十字-cross_3 运行中';
     crossFocusBadge.textContent = !hasData
       ? '等待数据'
-      : (mainState === 4 ? (subState === 2 ? '十字-cross_2 运行中' : '十字-cross_1 运行中') : (entryReady ? '满足十字入口' : '未满足十字入口'));
+      : (mainState === 4 ? crossStateLabel : (entryReady ? '满足十字入口' : '未满足十字入口'));
     crossFocusLeftRows.textContent = Number.isFinite(leftRows) ? String(leftRows) : '--';
     crossFocusRightRows.textContent = Number.isFinite(rightRows) ? String(rightRows) : '--';
     crossFocusGap.textContent = Number.isFinite(gap) ? String(gap) : '--';
@@ -164,7 +168,8 @@
     const details = [];
     details.push(`入口=${entryReady ? '命中' : '未命中'}`);
     details.push(`cross_1->2=${stage2Ready ? '命中' : '未命中'}`);
-    details.push(`cross_2->normal=${exitReady ? '命中' : '未命中'}`);
+    details.push(`cross_2->3=${stage3Ready ? '命中' : '未命中'}`);
+    details.push(`cross_3->normal=${exitReady ? '命中' : '未命中'}`);
     details.push(`辅助线 L=${leftAux ? '有' : '无'} R=${rightAux ? '有' : '无'}`);
     details.push(`辅线点数 L=${Number.isFinite(leftAuxTraceCount) ? leftAuxTraceCount : '--'}/${Number.isFinite(leftAuxRegularCount) ? leftAuxRegularCount : '--'} R=${Number.isFinite(rightAuxTraceCount) ? rightAuxTraceCount : '--'}/${Number.isFinite(rightAuxRegularCount) ? rightAuxRegularCount : '--'}`);
     details.push(`辅线 dir5 L=${Number.isFinite(leftAuxDir5Count) ? leftAuxDir5Count : '--'} R=${Number.isFinite(rightAuxDir5Count) ? rightAuxDir5Count : '--'}`);

@@ -102,18 +102,19 @@
     if (state === 0) return '无子状态';
     if (state === 1) return '十字-cross_1';
     if (state === 2) return '十字-cross_2';
-    if (state === 3) return '左环岛-circle_1';
-    if (state === 4) return '左环岛-circle_2';
-    if (state === 5) return '左环岛-circle_3';
-    if (state === 6) return '左环岛-circle_4';
-    if (state === 7) return '左环岛-circle_5';
-    if (state === 8) return '左环岛-circle_6';
-    if (state === 9) return '右环岛-circle_1';
-    if (state === 10) return '右环岛-circle_2';
-    if (state === 11) return '右环岛-circle_3';
-    if (state === 12) return '右环岛-circle_4';
-    if (state === 13) return '右环岛-circle_5';
-    if (state === 14) return '右环岛-circle_6';
+    if (state === 3) return '十字-cross_3';
+    if (state === 4) return '左环岛-circle_1';
+    if (state === 5) return '左环岛-circle_2';
+    if (state === 6) return '左环岛-circle_3';
+    if (state === 7) return '左环岛-circle_4';
+    if (state === 8) return '左环岛-circle_5';
+    if (state === 9) return '左环岛-circle_6';
+    if (state === 10) return '右环岛-circle_1';
+    if (state === 11) return '右环岛-circle_2';
+    if (state === 12) return '右环岛-circle_3';
+    if (state === 13) return '右环岛-circle_4';
+    if (state === 14) return '右环岛-circle_5';
+    if (state === 15) return '右环岛-circle_6';
     return `未知子状态(${state})`;
   }
 
@@ -149,20 +150,21 @@
   }
 
   function describeRouteSubState(subState) {
-    if (subState === 3) return '入口观察阶段，等待左侧起始贴左边框累计达到进入阈值。';
-    if (subState === 4) return '已贴左边框，等待左侧起始贴边消失，准备进入第一次补右线。';
-    if (subState === 5) return '执行左环 stage3，右线由补线接管，等待右侧起始贴边连续增大。';
-    if (subState === 6) return '等待右侧角点出现，确认已经推进到出环前半段。';
-    if (subState === 7) return '执行左环 stage5，继续补右线，等待右侧重新连续贴右边框。';
-    if (subState === 8) return '收尾阶段，搜线起始行抬高，等待双侧重新都成为直边。';
-    if (subState === 9) return '入口观察阶段，等待右侧起始贴右边框累计达到进入阈值。';
-    if (subState === 10) return '已贴右边框，等待右侧起始贴边消失，准备进入第一次补左线。';
-    if (subState === 11) return '执行右环 stage3，左线由补线接管，等待左侧起始贴边连续增大。';
-    if (subState === 12) return '等待左侧角点出现，确认已经推进到出环前半段。';
-    if (subState === 13) return '执行右环 stage5，继续补左线，等待左侧重新连续贴左边框。';
-    if (subState === 14) return '收尾阶段，搜线起始行抬高，等待双侧重新都成为直边。';
     if (subState === 1) return '十字第一阶段：沿下角点竖直上探，尝试接管左右辅助边界。';
-    if (subState === 2) return '十字第二阶段：在原始 dir 中寻找上角点，并把上角点后的规则边界送入后续流程。';
+    if (subState === 2) return '十字第二阶段：角点高度达到阈值后进入等待起始贴边累计阶段。';
+    if (subState === 3) return '十字第三阶段：等待起始 gap 收敛，满足出口后退回 normal。';
+    if (subState === 4) return '左环入口观察阶段，等待左起始贴边达到阈值。';
+    if (subState === 5) return '左环入口确认后，等待左起始贴边清零。';
+    if (subState === 6) return '左环 stage3：补右线阶段，等待右起始贴边超过触发值。';
+    if (subState === 7) return '左环 stage4：等待右侧角点。';
+    if (subState === 8) return '左环 stage5：继续补右线，等待右起始贴边达到进入阈值。';
+    if (subState === 9) return '左环收尾阶段，等待双侧直边重新同时命中。';
+    if (subState === 10) return '右环入口观察阶段，等待右起始贴边达到阈值。';
+    if (subState === 11) return '右环入口确认后，等待右起始贴边清零。';
+    if (subState === 12) return '右环 stage3：补左线阶段，等待左起始贴边超过触发值。';
+    if (subState === 13) return '右环 stage4：等待左侧角点。';
+    if (subState === 14) return '右环 stage5：继续补左线，等待左起始贴边达到进入阈值。';
+    if (subState === 15) return '右环收尾阶段，等待双侧直边重新同时命中。';
     return '普通巡线阶段。';
   }
 
@@ -209,6 +211,10 @@
     const routeCircleDetectionEnabled = toBool(status && status.route_circle_detection_enabled);
     const circleEntryMinBoundaryCount = toFiniteNumber(status && status.route_circle_entry_min_boundary_count);
     const circleEntryCornerTailMargin = toFiniteNumber(status && status.route_circle_entry_corner_tail_margin);
+    const circleEntryCornerRowOffset = toFiniteNumber(status && status.route_circle_entry_corner_row_offset);
+    const circleEntryGapCheckRows = toFiniteNumber(status && status.route_circle_entry_gap_check_rows);
+    const circleEntryMinRawBoundaryGap = toFiniteNumber(status && status.route_circle_entry_min_raw_boundary_gap);
+    const circleEntryCornerYMin = toFiniteNumber(status && status.route_circle_entry_corner_y_min);
     const circleStageEnterRows = toFiniteNumber(status && status.route_circle_stage_frame_wall_rows_enter);
     const circleStage3RowsTrigger = toFiniteNumber(status && status.route_circle_stage3_frame_wall_rows_trigger);
     const circleStage6MazeStartRow = toFiniteNumber(status && status.route_circle_stage6_maze_start_row);
@@ -218,6 +224,7 @@
     const routeCrossDetectionEnabled = toBool(status && status.route_cross_detection_enabled);
     const crossEntryReadyNow = toBool(status && status.cross_state_entry_ready_now);
     const crossStage2ReadyNow = toBool(status && status.cross_state_stage2_ready_now);
+    const crossStage3ReadyNow = toBool(status && status.cross_state_stage3_ready_now);
     const crossExitReadyNow = toBool(status && status.cross_state_exit_ready_now);
     const crossLeftPostFrameRows = toFiniteNumber(status && status.cross_left_corner_post_frame_wall_rows);
     const crossRightPostFrameRows = toFiniteNumber(status && status.cross_right_corner_post_frame_wall_rows);
@@ -230,35 +237,75 @@
     const crossLeftUpperFound = toBool(status && status.cross_left_upper_corner_found);
     const crossRightUpperFound = toBool(status && status.cross_right_upper_corner_found);
     const straightSelectedCenterlineCount = toFiniteNumber(status && status.straight_selected_centerline_count);
+    const straightMinCenterlinePoints = toFiniteNumber(status && status.straight_min_centerline_points);
     const straightRequiredLastIndex = toFiniteNumber(status && status.straight_required_last_index);
     const straightAbsErrorSum = toFiniteNumber(status && status.straight_abs_error_sum);
     const straightAbsErrorSumMax = toFiniteNumber(status && status.straight_abs_error_sum_max);
     const straightEnterConsecutiveFrames = toFiniteNumber(status && status.straight_enter_consecutive_frames);
     const straightReadyNow = toBool(status && status.straight_state_ready_now);
+    const leftCircleEntryRawGapOk = toBool(status && status.left_circle_entry_raw_gap_ok);
+    const rightCircleEntryRawGapOk = toBool(status && status.right_circle_entry_raw_gap_ok);
+    const leftCircleEntryRawGapMinPx = toFiniteNumber(status && status.left_circle_entry_raw_gap_min_px);
+    const rightCircleEntryRawGapMinPx = toFiniteNumber(status && status.right_circle_entry_raw_gap_min_px);
+    const leftCircleEntryRawGapCheckedRows = toFiniteNumber(status && status.left_circle_entry_raw_gap_checked_rows);
+    const rightCircleEntryRawGapCheckedRows = toFiniteNumber(status && status.right_circle_entry_raw_gap_checked_rows);
+    const leftCircleEntryRawGapFailedRowY = toFiniteNumber(status && status.left_circle_entry_raw_gap_failed_row_y);
+    const rightCircleEntryRawGapFailedRowY = toFiniteNumber(status && status.right_circle_entry_raw_gap_failed_row_y);
+    const leftCircleEntryRawGapMissingPoint = toBool(status && status.left_circle_entry_raw_gap_missing_point);
+    const rightCircleEntryRawGapMissingPoint = toBool(status && status.right_circle_entry_raw_gap_missing_point);
+    const eightLeftTraceCount = countPointSeries(status && status.eight_left_trace);
+    const eightRightTraceCount = countPointSeries(status && status.eight_right_trace);
+
+    const straightPointCountOk =
+      straightSelectedCenterlineCount !== null &&
+      straightMinCenterlinePoints !== null &&
+      straightSelectedCenterlineCount >= straightMinCenterlinePoints;
+    const straightErrorSumOk =
+      straightAbsErrorSum !== null &&
+      straightAbsErrorSumMax !== null &&
+      straightAbsErrorSum < straightAbsErrorSumMax;
+    const straightStateHit = straightReadyNow || (straightPointCountOk && straightErrorSumOk);
     const leftCircleEntryHit =
       routeCircleDetectionEnabled &&
       rightStraight &&
       leftCornerFound &&
       leftCornerY !== null &&
-      leftCornerY > 60 &&
+      circleEntryCornerYMin !== null &&
+      leftCornerY > circleEntryCornerYMin &&
       leftCornerIndex !== null &&
       rightBoundaryCount !== null &&
       circleEntryMinBoundaryCount !== null &&
       circleEntryCornerTailMargin !== null &&
       rightBoundaryCount > circleEntryMinBoundaryCount &&
+      leftCircleEntryRawGapOk &&
       leftCornerIndex < (rightBoundaryCount - circleEntryCornerTailMargin);
     const rightCircleEntryHit =
       routeCircleDetectionEnabled &&
       leftStraight &&
       rightCornerFound &&
       rightCornerY !== null &&
-      rightCornerY > 60 &&
+      circleEntryCornerYMin !== null &&
+      rightCornerY > circleEntryCornerYMin &&
       rightCornerIndex !== null &&
       leftBoundaryCount !== null &&
       circleEntryMinBoundaryCount !== null &&
       circleEntryCornerTailMargin !== null &&
       leftBoundaryCount > circleEntryMinBoundaryCount &&
+      rightCircleEntryRawGapOk &&
       rightCornerIndex < (leftBoundaryCount - circleEntryCornerTailMargin);
+    const crossEntryHit =
+      routeCrossDetectionEnabled &&
+      leftCornerFound &&
+      rightCornerFound &&
+      leftCornerIndex !== null &&
+      rightCornerIndex !== null &&
+      leftCornerIndex >= 0 &&
+      rightCornerIndex >= 0 &&
+      crossLeftPostFrameRows !== null &&
+      crossRightPostFrameRows !== null &&
+      crossEntryPostFrameRowsMin !== null &&
+      crossLeftPostFrameRows >= crossEntryPostFrameRowsMin &&
+      crossRightPostFrameRows >= crossEntryPostFrameRowsMin;
 
     function toBool(value) {
       if (value === true || value === false) return value;
@@ -267,6 +314,79 @@
     }
 
     const clues = [];
+    const rawFlagLines = [];
+    const judgeMetricLines = [];
+
+    const pushRaw = (label, value, detail) => {
+      rawFlagLines.push({
+        label,
+        value,
+        detail
+      });
+    };
+    const pushJudgeMetric = (label, hit, actual, standard) => {
+      judgeMetricLines.push({
+        label,
+        value: formatHit(hit),
+        detail: `实际=${actual} | 标准=${standard}`
+      });
+    };
+
+    pushRaw('角点命中', `L=${leftCornerFound ? 1 : 0} R=${rightCornerFound ? 1 : 0}`, `idx L=${leftCornerIndex !== null ? leftCornerIndex : '--'} R=${rightCornerIndex !== null ? rightCornerIndex : '--'}`);
+    pushRaw('角点坐标', `L.y=${leftCornerY !== null ? leftCornerY : '--'} R.y=${rightCornerY !== null ? rightCornerY : '--'}`, `corner_y_min=${circleEntryCornerYMin !== null ? circleEntryCornerYMin : '--'}`);
+    pushRaw('原图直边标志', `L=${leftStraight ? 1 : 0} R=${rightStraight ? 1 : 0}`);
+    pushRaw('原图贴边标志', `L=${leftHasFrameWall ? 1 : 0} R=${rightHasFrameWall ? 1 : 0}`);
+    pushRaw('起始贴边行数', `L=${leftStartFrameRows !== null ? leftStartFrameRows : '--'} R=${rightStartFrameRows !== null ? rightStartFrameRows : '--'}`);
+    pushRaw('原图边界点数', `L=${leftBoundaryCount !== null ? leftBoundaryCount : '--'} R=${rightBoundaryCount !== null ? rightBoundaryCount : '--'}`);
+    pushRaw('原图八邻域点数', `L=${eightLeftTraceCount !== null ? eightLeftTraceCount : '--'} R=${eightRightTraceCount !== null ? eightRightTraceCount : '--'}`);
+    pushRaw('circle raw gap', `L=${leftCircleEntryRawGapOk ? 1 : 0} R=${rightCircleEntryRawGapOk ? 1 : 0}`, `min_gap L=${leftCircleEntryRawGapMinPx !== null ? leftCircleEntryRawGapMinPx : '--'} R=${rightCircleEntryRawGapMinPx !== null ? rightCircleEntryRawGapMinPx : '--'}`);
+    pushRaw('circle raw gap 行检查', `L=${leftCircleEntryRawGapCheckedRows !== null ? leftCircleEntryRawGapCheckedRows : '--'} R=${rightCircleEntryRawGapCheckedRows !== null ? rightCircleEntryRawGapCheckedRows : '--'}`, `rows=${circleEntryGapCheckRows !== null ? circleEntryGapCheckRows : '--'} offset=${circleEntryCornerRowOffset !== null ? circleEntryCornerRowOffset : '--'} min_gap=${circleEntryMinRawBoundaryGap !== null ? circleEntryMinRawBoundaryGap : '--'}`);
+    pushRaw('circle raw gap 失败信息', `L.row=${leftCircleEntryRawGapFailedRowY !== null ? leftCircleEntryRawGapFailedRowY : '--'} R.row=${rightCircleEntryRawGapFailedRowY !== null ? rightCircleEntryRawGapFailedRowY : '--'}`, `missing_point L=${leftCircleEntryRawGapMissingPoint ? 1 : 0} R=${rightCircleEntryRawGapMissingPoint ? 1 : 0}`);
+    pushRaw('十字起始 gap', `${crossStartGapX !== null ? crossStartGapX : '--'}`);
+
+    pushJudgeMetric(
+      '直道入口',
+      straightStateHit,
+      `count=${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'}, abs_sum=${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'}`,
+      `count>=${straightMinCenterlinePoints !== null ? straightMinCenterlinePoints : '--'}, abs_sum<${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}`
+    );
+    pushJudgeMetric(
+      '十字入口',
+      crossEntryHit,
+      `corner(L/R)=${leftCornerFound ? 1 : 0}/${rightCornerFound ? 1 : 0}, post_rows(L/R)=${crossLeftPostFrameRows !== null ? crossLeftPostFrameRows : '--'}/${crossRightPostFrameRows !== null ? crossRightPostFrameRows : '--'}`,
+      `corner=1/1 且 corner_idx>=0 且 post_rows(L/R)>=${crossEntryPostFrameRowsMin !== null ? crossEntryPostFrameRowsMin : '--'}`
+    );
+    pushJudgeMetric(
+      'cross_1->cross_2',
+      crossStage2ReadyNow,
+      `corner_y(L/R)=${leftCornerY !== null ? leftCornerY : '--'}/${rightCornerY !== null ? rightCornerY : '--'}`,
+      `任一 corner_y>=${toFiniteNumber(status && status.route_cross_stage1_enter_corner_y_min) !== null ? toFiniteNumber(status && status.route_cross_stage1_enter_corner_y_min) : '--'}`
+    );
+    pushJudgeMetric(
+      'cross_2->cross_3',
+      crossStage3ReadyNow,
+      `start_rows(L/R)=${leftStartFrameRows !== null ? leftStartFrameRows : '--'}/${rightStartFrameRows !== null ? rightStartFrameRows : '--'}`,
+      `start_rows(L/R)>=${crossStage2StartFrameRowsMin !== null ? crossStage2StartFrameRowsMin : '--'}`
+    );
+    pushJudgeMetric(
+      'cross_3->normal',
+      crossExitReadyNow,
+      `start_gap_x=${crossStartGapX !== null ? crossStartGapX : '--'}`,
+      `0 < start_gap_x < ${crossExitStartGapXMax !== null ? crossExitStartGapXMax : '--'}`
+    );
+    pushJudgeMetric(
+      '左环入口',
+      leftCircleEntryHit,
+      `right_straight=${rightStraight ? 1 : 0}, left_corner=${leftCornerFound ? 1 : 0}, left_corner_y=${leftCornerY !== null ? leftCornerY : '--'}, right_count=${rightBoundaryCount !== null ? rightBoundaryCount : '--'}, raw_gap_ok=${leftCircleEntryRawGapOk ? 1 : 0}`,
+      `right_straight=1, left_corner=1, corner_y>${circleEntryCornerYMin !== null ? circleEntryCornerYMin : '--'}, right_count>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'}, raw_gap_ok=1, corner_idx<right_count-${circleEntryCornerTailMargin !== null ? circleEntryCornerTailMargin : '--'}`
+    );
+    pushJudgeMetric(
+      '右环入口',
+      rightCircleEntryHit,
+      `left_straight=${leftStraight ? 1 : 0}, right_corner=${rightCornerFound ? 1 : 0}, right_corner_y=${rightCornerY !== null ? rightCornerY : '--'}, left_count=${leftBoundaryCount !== null ? leftBoundaryCount : '--'}, raw_gap_ok=${rightCircleEntryRawGapOk ? 1 : 0}`,
+      `left_straight=1, right_corner=1, corner_y>${circleEntryCornerYMin !== null ? circleEntryCornerYMin : '--'}, left_count>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'}, raw_gap_ok=1, corner_idx<left_count-${circleEntryCornerTailMargin !== null ? circleEntryCornerTailMargin : '--'}`
+    );
+
     clues.push(`阶段说明：${describeRouteSubState(subState)}`);
     clues.push(`原图角点：左=${leftCornerFound ? '有' : '无'}，右=${rightCornerFound ? '有' : '无'}`);
     clues.push(`原图直边：左=${leftStraight ? '有' : '无'}，右=${rightStraight ? '有' : '无'}`);
@@ -317,16 +437,7 @@
     };
 
     if (mainState === 0) {
-      const straightPointCountOk =
-        straightRequiredLastIndex !== null &&
-        straightSelectedCenterlineCount !== null &&
-        straightSelectedCenterlineCount > straightRequiredLastIndex;
-      const straightErrorSumOk =
-        straightAbsErrorSum !== null &&
-        straightAbsErrorSumMax !== null &&
-        straightAbsErrorSum < straightAbsErrorSumMax;
-      const straightStateHit = straightReadyNow;
-      if (crossEntryReadyNow) {
+      if (crossEntryHit) {
         judgments.push('当前已经满足十字入口条件：双侧下角点都存在，且角点后的边框边界连续行数达标。');
       } else if (straightStateHit) {
         judgments.push('当前已经满足直道判定：中线点数充足，且前段误差绝对值总和低于阈值。');
@@ -344,14 +455,14 @@
         judgments.push('当前没有满足圆环入口的组合条件，状态机继续留在正常巡线。');
       }
 
-      pushCondition('十字入口', formatHit(crossEntryReadyNow), `双角点=${leftCornerFound && rightCornerFound ? 1 : 0}；角点后贴边 左=${crossLeftPostFrameRows !== null ? crossLeftPostFrameRows : '--'} 右=${crossRightPostFrameRows !== null ? crossRightPostFrameRows : '--'}；阈值=${crossEntryPostFrameRowsMin !== null ? crossEntryPostFrameRowsMin : '--'}`);
-      pushCondition('直道态入口', formatHit(straightStateHit), `中线点数=${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} > 最后索引=${straightRequiredLastIndex !== null ? straightRequiredLastIndex : '--'}；误差和=${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'} < 阈值=${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}；连续帧=${straightEnterConsecutiveFrames !== null ? straightEnterConsecutiveFrames : '--'}`);
-      pushCondition('直道点数条件', formatHit(!!straightPointCountOk), `${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} > ${straightRequiredLastIndex !== null ? straightRequiredLastIndex : '--'}`);
+      pushCondition('十字入口', formatHit(crossEntryHit), `双角点=${leftCornerFound && rightCornerFound ? 1 : 0}；角点索引 L=${leftCornerIndex !== null ? leftCornerIndex : '--'} R=${rightCornerIndex !== null ? rightCornerIndex : '--'}；角点后贴边 左=${crossLeftPostFrameRows !== null ? crossLeftPostFrameRows : '--'} 右=${crossRightPostFrameRows !== null ? crossRightPostFrameRows : '--'}；阈值=${crossEntryPostFrameRowsMin !== null ? crossEntryPostFrameRowsMin : '--'}`);
+      pushCondition('直道态入口', formatHit(straightStateHit), `中线点数=${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} >= 阈值=${straightMinCenterlinePoints !== null ? straightMinCenterlinePoints : '--'}；误差和=${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'} < 阈值=${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}；连续帧=${straightEnterConsecutiveFrames !== null ? straightEnterConsecutiveFrames : '--'}`);
+      pushCondition('直道点数条件', formatHit(!!straightPointCountOk), `${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} >= ${straightMinCenterlinePoints !== null ? straightMinCenterlinePoints : '--'}`);
       pushCondition('直道误差和条件', formatHit(!!straightErrorSumOk), `${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'} < ${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}`);
-      pushCondition('左环入口', formatHit(!!leftCircleEntryHit), `右直边=${rightStraight ? 1 : 0} 左角点=${leftCornerFound ? 1 : 0} 左角点y=${leftCornerY !== null ? leftCornerY : '--'}>60 右点数=${rightBoundaryCount !== null ? rightBoundaryCount : '--'}>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'} 左角点索引=${leftCornerIndex !== null ? leftCornerIndex : '--'} < 右点数-${circleEntryCornerTailMargin !== null ? circleEntryCornerTailMargin : '--'}`);
-      pushCondition('右环入口', formatHit(!!rightCircleEntryHit), `左直边=${leftStraight ? 1 : 0} 右角点=${rightCornerFound ? 1 : 0} 右角点y=${rightCornerY !== null ? rightCornerY : '--'}>60 左点数=${leftBoundaryCount !== null ? leftBoundaryCount : '--'}>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'} 右角点索引=${rightCornerIndex !== null ? rightCornerIndex : '--'} < 左点数-${circleEntryCornerTailMargin !== null ? circleEntryCornerTailMargin : '--'}`);
+      pushCondition('左环入口', formatHit(!!leftCircleEntryHit), `右直边=${rightStraight ? 1 : 0} 左角点=${leftCornerFound ? 1 : 0} 左角点y=${leftCornerY !== null ? leftCornerY : '--'}>${circleEntryCornerYMin !== null ? circleEntryCornerYMin : '--'} 右点数=${rightBoundaryCount !== null ? rightBoundaryCount : '--'}>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'} raw_gap_ok=${leftCircleEntryRawGapOk ? 1 : 0}`);
+      pushCondition('右环入口', formatHit(!!rightCircleEntryHit), `左直边=${leftStraight ? 1 : 0} 右角点=${rightCornerFound ? 1 : 0} 右角点y=${rightCornerY !== null ? rightCornerY : '--'}>${circleEntryCornerYMin !== null ? circleEntryCornerYMin : '--'} 左点数=${leftBoundaryCount !== null ? leftBoundaryCount : '--'}>${circleEntryMinBoundaryCount !== null ? circleEntryMinBoundaryCount : '--'} raw_gap_ok=${rightCircleEntryRawGapOk ? 1 : 0}`);
 
-      if (crossEntryReadyNow) {
+      if (crossEntryHit) {
         nextStateLabel = '十字-cross_1';
         nextReasons.push('十字入口条件优先于圆环，当前帧会先切入 cross_1。');
       } else if (straightStateHit) {
@@ -367,17 +478,9 @@
         nextReasons.push('圆环入口条件未全部命中，继续保持正常巡线。');
       }
     } else if (mainState === 1) {
-      const straightPointCountOk =
-        straightRequiredLastIndex !== null &&
-        straightSelectedCenterlineCount !== null &&
-        straightSelectedCenterlineCount > straightRequiredLastIndex;
-      const straightErrorSumOk =
-        straightAbsErrorSum !== null &&
-        straightAbsErrorSumMax !== null &&
-        straightAbsErrorSum < straightAbsErrorSumMax;
-      const straightKeepHit = straightReadyNow;
+      const straightKeepHit = straightStateHit;
       judgments.push('当前处于直道态：只要中线点数条件和误差和条件任一失效，就会退回 normal。');
-      pushCondition('直道点数条件', formatHit(!!straightPointCountOk), `${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} > ${straightRequiredLastIndex !== null ? straightRequiredLastIndex : '--'}`);
+      pushCondition('直道点数条件', formatHit(!!straightPointCountOk), `${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} >= ${straightMinCenterlinePoints !== null ? straightMinCenterlinePoints : '--'}`);
       pushCondition('直道误差和条件', formatHit(!!straightErrorSumOk), `${straightAbsErrorSum !== null ? straightAbsErrorSum.toFixed(1) : '--'} < ${straightAbsErrorSumMax !== null ? straightAbsErrorSumMax.toFixed(1) : '--'}`);
       nextStateLabel = '直道态';
       nextReasons.push('当前仍满足直道态保持条件。');
@@ -387,22 +490,26 @@
       }
     } else if (mainState === 4) {
       judgments.push('当前处于十字主状态，十字逻辑会优先于圆环逻辑继续推进。');
-      pushCondition('cross_1 -> cross_2', formatHit(crossStage2ReadyNow), `双角点同时丢失 或 起始贴边 左=${leftStartFrameRows !== null ? leftStartFrameRows : '--'} 右=${rightStartFrameRows !== null ? rightStartFrameRows : '--'} >= ${crossStage2StartFrameRowsMin !== null ? crossStage2StartFrameRowsMin : '--'}`);
-      pushCondition('cross_2 -> normal', formatHit(crossExitReadyNow), `起始贴边清零 且 start_gap=${crossStartGapX !== null ? crossStartGapX : '--'} < ${crossExitStartGapXMax !== null ? crossExitStartGapXMax : '--'}`);
+      pushCondition('cross_1 -> cross_2', formatHit(crossStage2ReadyNow), `任一角点 y 达标；当前 L=${leftCornerY !== null ? leftCornerY : '--'} R=${rightCornerY !== null ? rightCornerY : '--'}`);
+      pushCondition('cross_2 -> cross_3', formatHit(crossStage3ReadyNow), `起始贴边 左=${leftStartFrameRows !== null ? leftStartFrameRows : '--'} 右=${rightStartFrameRows !== null ? rightStartFrameRows : '--'} >= ${crossStage2StartFrameRowsMin !== null ? crossStage2StartFrameRowsMin : '--'}`);
+      pushCondition('cross_3 -> normal', formatHit(crossExitReadyNow), `0 < start_gap=${crossStartGapX !== null ? crossStartGapX : '--'} < ${crossExitStartGapXMax !== null ? crossExitStartGapXMax : '--'}`);
       pushCondition('辅助边界', `L=${crossLeftAuxFound ? '有' : '无'} R=${crossRightAuxFound ? '有' : '无'}`, 'cross_1 竖直上探后接八邻域辅助线');
-      pushCondition('上角点', `L=${crossLeftUpperFound ? '有' : '无'} R=${crossRightUpperFound ? '有' : '无'}`, 'cross_2 在原始 dir 中寻找 4->6 跳变后再找 dir=5');
+      pushCondition('上角点', `L=${crossLeftUpperFound ? '有' : '无'} R=${crossRightUpperFound ? '有' : '无'}`, 'cross_2/cross_3 用于确认十字上部结构');
       if (subState === 1) {
         nextStateLabel = crossStage2ReadyNow ? '十字-cross_2' : '十字-cross_1';
         nextReasons.push(crossStage2ReadyNow ? '当前满足十字第二阶段切换条件，下一次状态更新会进入 cross_2。' : '继续在 cross_1 中尝试利用下角点上探接管辅助边界。');
       } else if (subState === 2) {
-        nextStateLabel = crossExitReadyNow ? '正常巡线' : '十字-cross_2';
-        nextReasons.push(crossExitReadyNow ? '十字出口条件成立，状态机会回到 normal。' : '继续保持 cross_2，并等待出口 gap 收敛。');
+        nextStateLabel = crossStage3ReadyNow ? '十字-cross_3' : '十字-cross_2';
+        nextReasons.push(crossStage3ReadyNow ? '当前满足十字第三阶段切换条件，下一次状态更新会进入 cross_3。' : '继续保持 cross_2，等待双侧起始贴边累计达标。');
+      } else if (subState === 3) {
+        nextStateLabel = crossExitReadyNow ? '正常巡线' : '十字-cross_3';
+        nextReasons.push(crossExitReadyNow ? '十字出口条件成立，状态机会回到 normal。' : '继续保持 cross_3，并等待出口 gap 收敛。');
       } else {
         nextReasons.push('等待十字子状态稳定。');
       }
     } else if (mainState === 2) {
       judgments.push(`左环岛状态下，当前固定偏向 ${formatRoutePreferredSource(preferredSource)}。`);
-      if (subState === 5 || subState === 7) {
+      if (subState === 6 || subState === 8) {
         judgments.push(`当前处于补右线阶段，右侧辅助线点数=${rightGuideCount !== null ? rightGuideCount : 0}。`);
       }
       pushCondition('左起始贴边行数', leftStartFrameRows !== null ? leftStartFrameRows : '--', `circle_1 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}，circle_2 需回到 0`);
@@ -410,22 +517,22 @@
       pushCondition('右侧角点', formatHit(rightCornerFound), 'circle_4 进入 circle_5');
       pushCondition('右侧辅助线', rightGuideCount !== null ? rightGuideCount : '--', `stage3 offset=${circleGuideTargetOffsetStage3 !== null ? circleGuideTargetOffsetStage3 : '--'} stage5 offset=${circleGuideAnchorOffsetStage5 !== null ? circleGuideAnchorOffsetStage5 : '--'} 最短贴边段=${circleGuideMinSegmentLen !== null ? circleGuideMinSegmentLen : '--'}`);
       pushCondition('双侧直边', formatHit(leftStraight && rightStraight), `circle_6 返回正常巡线，maze_start_row >= ${circleStage6MazeStartRow !== null ? circleStage6MazeStartRow : '--'}`);
-      if (subState === 3) {
+      if (subState === 4) {
         nextStateLabel = '左环岛-circle_2';
         nextReasons.push(`左边界起始连续贴左边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_2。`);
-      } else if (subState === 4) {
+      } else if (subState === 5) {
         nextStateLabel = '左环岛-circle_3';
         nextReasons.push('左边界起始行不再贴左边框时，进入 circle_3。');
-      } else if (subState === 5) {
+      } else if (subState === 6) {
         nextStateLabel = '左环岛-circle_4';
         nextReasons.push(`右边界起始连续贴右边框超过 ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'} 行时，进入 circle_4。`);
-      } else if (subState === 6) {
+      } else if (subState === 7) {
         nextStateLabel = '左环岛-circle_5';
         nextReasons.push('右边界检测到角点后，进入 circle_5。');
-      } else if (subState === 7) {
+      } else if (subState === 8) {
         nextStateLabel = '左环岛-circle_6';
         nextReasons.push(`右边界起始连续贴右边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_6。`);
-      } else if (subState === 8) {
+      } else if (subState === 9) {
         nextStateLabel = '正常巡线';
         nextReasons.push('双侧重新同时识别为直边后，退出左环岛。');
       } else {
@@ -433,7 +540,7 @@
       }
     } else if (mainState === 3) {
       judgments.push(`右环岛状态下，当前固定偏向 ${formatRoutePreferredSource(preferredSource)}。`);
-      if (subState === 11 || subState === 13) {
+      if (subState === 12 || subState === 14) {
         judgments.push(`当前处于补左线阶段，左侧辅助线点数=${leftGuideCount !== null ? leftGuideCount : 0}。`);
       }
       pushCondition('右起始贴边行数', rightStartFrameRows !== null ? rightStartFrameRows : '--', `circle_1 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}，circle_2 需回到 0`);
@@ -441,22 +548,22 @@
       pushCondition('左侧角点', formatHit(leftCornerFound), 'circle_4 进入 circle_5');
       pushCondition('左侧辅助线', leftGuideCount !== null ? leftGuideCount : '--', `stage3 offset=${circleGuideTargetOffsetStage3 !== null ? circleGuideTargetOffsetStage3 : '--'} stage5 offset=${circleGuideAnchorOffsetStage5 !== null ? circleGuideAnchorOffsetStage5 : '--'} 最短贴边段=${circleGuideMinSegmentLen !== null ? circleGuideMinSegmentLen : '--'}`);
       pushCondition('双侧直边', formatHit(leftStraight && rightStraight), `circle_6 返回正常巡线，maze_start_row >= ${circleStage6MazeStartRow !== null ? circleStage6MazeStartRow : '--'}`);
-      if (subState === 9) {
+      if (subState === 10) {
         nextStateLabel = '右环岛-circle_2';
         nextReasons.push(`右边界起始连续贴右边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_2。`);
-      } else if (subState === 10) {
+      } else if (subState === 11) {
         nextStateLabel = '右环岛-circle_3';
         nextReasons.push('右边界起始行不再贴右边框时，进入 circle_3。');
-      } else if (subState === 11) {
+      } else if (subState === 12) {
         nextStateLabel = '右环岛-circle_4';
         nextReasons.push(`左边界起始连续贴左边框超过 ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'} 行时，进入 circle_4。`);
-      } else if (subState === 12) {
+      } else if (subState === 13) {
         nextStateLabel = '右环岛-circle_5';
         nextReasons.push('左边界检测到角点后，进入 circle_5。');
-      } else if (subState === 13) {
+      } else if (subState === 14) {
         nextStateLabel = '右环岛-circle_6';
         nextReasons.push(`左边界起始连续贴左边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_6。`);
-      } else if (subState === 14) {
+      } else if (subState === 15) {
         nextStateLabel = '正常巡线';
         nextReasons.push('双侧重新同时识别为直边后，退出右环岛。');
       } else {
@@ -465,6 +572,14 @@
     } else {
       judgments.push('等待状态机首次更新。');
       nextReasons.push('等待有效状态数据。');
+    }
+
+    for (const item of judgeMetricLines) {
+      conditionLines.push({
+        label: item.label,
+        value: item.value,
+        detail: item.detail
+      });
     }
 
     const counters = [
@@ -497,6 +612,8 @@
       nextStateLabel,
       nextReasons,
       conditionLines,
+      rawFlagLines,
+      judgeMetricLines,
       clues,
       judgments,
       counters
@@ -769,15 +886,36 @@
     if (Number.isFinite(Number(status.route_right_loss_count))) push('route_right_loss_count', status.route_right_loss_count);
     if (Number.isFinite(Number(status.route_right_gain_count))) push('route_right_gain_count', status.route_right_gain_count);
     if (Number.isFinite(Number(status.zebra_cross_count))) push('zebra_cross_count', status.zebra_cross_count);
+    if (hasValue(status.cross_state_entry_ready_now)) push('cross_state_entry_ready_now', status.cross_state_entry_ready_now);
+    if (hasValue(status.cross_state_stage2_ready_now)) push('cross_state_stage2_ready_now', status.cross_state_stage2_ready_now);
+    if (hasValue(status.cross_state_stage3_ready_now)) push('cross_state_stage3_ready_now', status.cross_state_stage3_ready_now);
+    if (hasValue(status.cross_state_exit_ready_now)) push('cross_state_exit_ready_now', status.cross_state_exit_ready_now);
     if (hasValue(status.route_circle_detection_enabled)) push('route_circle_detection_enabled', status.route_circle_detection_enabled);
     if (Number.isFinite(Number(status.route_circle_entry_min_boundary_count))) push('route_circle_entry_min_boundary_count', status.route_circle_entry_min_boundary_count);
     if (Number.isFinite(Number(status.route_circle_entry_corner_tail_margin))) push('route_circle_entry_corner_tail_margin', status.route_circle_entry_corner_tail_margin);
+    if (Number.isFinite(Number(status.route_circle_entry_corner_row_offset))) push('route_circle_entry_corner_row_offset', status.route_circle_entry_corner_row_offset);
+    if (Number.isFinite(Number(status.route_circle_entry_gap_check_rows))) push('route_circle_entry_gap_check_rows', status.route_circle_entry_gap_check_rows);
+    if (Number.isFinite(Number(status.route_circle_entry_min_raw_boundary_gap))) push('route_circle_entry_min_raw_boundary_gap', status.route_circle_entry_min_raw_boundary_gap);
     if (Number.isFinite(Number(status.route_circle_stage_frame_wall_rows_enter))) push('route_circle_stage_frame_wall_rows_enter', status.route_circle_stage_frame_wall_rows_enter);
     if (Number.isFinite(Number(status.route_circle_stage3_frame_wall_rows_trigger))) push('route_circle_stage3_frame_wall_rows_trigger', status.route_circle_stage3_frame_wall_rows_trigger);
     if (Number.isFinite(Number(status.route_circle_stage6_maze_start_row))) push('route_circle_stage6_maze_start_row', status.route_circle_stage6_maze_start_row);
     if (Number.isFinite(Number(status.circle_guide_min_frame_wall_segment_len))) push('circle_guide_min_frame_wall_segment_len', status.circle_guide_min_frame_wall_segment_len);
     if (Number.isFinite(Number(status.circle_guide_target_offset_stage3))) push('circle_guide_target_offset_stage3', status.circle_guide_target_offset_stage3);
     if (Number.isFinite(Number(status.circle_guide_anchor_offset_stage5))) push('circle_guide_anchor_offset_stage5', status.circle_guide_anchor_offset_stage5);
+    if (hasValue(status.left_boundary_straight)) push('left_boundary_straight', status.left_boundary_straight);
+    if (hasValue(status.right_boundary_straight)) push('right_boundary_straight', status.right_boundary_straight);
+    if (hasValue(status.src_left_trace_has_frame_wall)) push('src_left_trace_has_frame_wall', status.src_left_trace_has_frame_wall);
+    if (hasValue(status.src_right_trace_has_frame_wall)) push('src_right_trace_has_frame_wall', status.src_right_trace_has_frame_wall);
+    if (hasValue(status.left_circle_entry_raw_gap_ok)) push('left_circle_entry_raw_gap_ok', status.left_circle_entry_raw_gap_ok);
+    if (hasValue(status.right_circle_entry_raw_gap_ok)) push('right_circle_entry_raw_gap_ok', status.right_circle_entry_raw_gap_ok);
+    if (Number.isFinite(Number(status.left_circle_entry_raw_gap_min_px))) push('left_circle_entry_raw_gap_min_px', status.left_circle_entry_raw_gap_min_px);
+    if (Number.isFinite(Number(status.right_circle_entry_raw_gap_min_px))) push('right_circle_entry_raw_gap_min_px', status.right_circle_entry_raw_gap_min_px);
+    if (Number.isFinite(Number(status.left_circle_entry_raw_gap_checked_rows))) push('left_circle_entry_raw_gap_checked_rows', status.left_circle_entry_raw_gap_checked_rows);
+    if (Number.isFinite(Number(status.right_circle_entry_raw_gap_checked_rows))) push('right_circle_entry_raw_gap_checked_rows', status.right_circle_entry_raw_gap_checked_rows);
+    if (Number.isFinite(Number(status.left_circle_entry_raw_gap_failed_row_y))) push('left_circle_entry_raw_gap_failed_row_y', status.left_circle_entry_raw_gap_failed_row_y);
+    if (Number.isFinite(Number(status.right_circle_entry_raw_gap_failed_row_y))) push('right_circle_entry_raw_gap_failed_row_y', status.right_circle_entry_raw_gap_failed_row_y);
+    if (hasValue(status.left_circle_entry_raw_gap_missing_point)) push('left_circle_entry_raw_gap_missing_point', status.left_circle_entry_raw_gap_missing_point);
+    if (hasValue(status.right_circle_entry_raw_gap_missing_point)) push('right_circle_entry_raw_gap_missing_point', status.right_circle_entry_raw_gap_missing_point);
     push('ipm_track_index', status.ipm_track_index);
     if (Array.isArray(status.ipm_track_point)) push('ipm_track_point', formatArrayInline(status.ipm_track_point));
     push('eight_left_first_frame_touch_index', status.eight_left_first_frame_touch_index);

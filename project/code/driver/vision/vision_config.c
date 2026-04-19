@@ -341,19 +341,33 @@ vision_runtime_config_t g_vision_runtime_config = {
     .route_cross_entry_corner_post_frame_wall_rows_min = 5,
     // cross_1 -> cross_2：起始巡线行一旦碰到边框边界就认为进入 cross_2 条件成立。
     .route_cross_stage2_enter_start_frame_wall_rows_min = 1,
+    // cross_1 -> cross_2：任一角点 y 达到该阈值即允许进入下一阶段。
+    .route_cross_stage1_enter_corner_y_min = 75,
     // cross_2 -> normal：左右起始边界 x 差小于 150 视为驶出十字。
     .route_cross_exit_start_gap_x_max = 155,
+    // cross_3：规则边界跳变阈值（相邻 x 差）。
+    .route_cross_stage3_jump_x_threshold_px = 15,
+    // cross_3：命中跳变后向前推进点数。
+    .route_cross_stage3_cut_forward_points = 2,
+    // cross_3 左侧桥接锚点。
+    .route_cross_stage3_left_anchor_x = 15,
+    .route_cross_stage3_left_anchor_y = 100,
+    // cross_3 右侧桥接锚点。
+    .route_cross_stage3_right_anchor_x = 145,
+    .route_cross_stage3_right_anchor_y = 100,
     // 状态机圆环识别开关。
     .route_circle_detection_enabled = true,
     // 圆环入口判定：对侧边界最少点数。
     .route_circle_entry_min_boundary_count = 20,
     // 圆环入口判定：角点索引距离边界尾部至少保留的余量。
     .route_circle_entry_corner_tail_margin = 20,
+    // 圆环入口判定：角点 y 最小阈值。
+    .route_circle_entry_corner_y_min = 60,
     // 圆环状态 1/5 的起始贴边连续行数阈值。
     .route_circle_stage_frame_wall_rows_enter = 30,
     // 圆环状态 3 的对侧起始贴边连续行数触发阈值。
     .route_circle_stage3_frame_wall_rows_trigger = 70,
-    // 圆环状态 6：搜线起始行至少抬高到该行。
+    // 圆环状态 6：搜线起始行最多抬高到该行（行号越小越靠上）。
     .route_circle_stage6_maze_start_row = 50,
     // 圆环状态中线偏移：仅在 circle4/5 生效；左圆环相对左边界偏移，右圆环走镜像偏移。
     .route_circle_center_target_offset_from_left_px = 14.0f,
@@ -363,6 +377,8 @@ vision_runtime_config_t g_vision_runtime_config = {
     .circle_guide_target_offset_stage3 = 5,
     // 圆环 state5 补线锚点向后偏移索引。
     .circle_guide_anchor_offset_stage5 = 0,
+    // 圆环送 IPM 前触边判定边距。
+    .route_circle_apply_touch_margin_px = 2,
     // straight 判定：固定窗口最少中线点数（前 N 点）。
     .route_straight_min_centerline_points = 20,
     // 进入 straight 状态所需连续帧数。

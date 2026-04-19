@@ -277,8 +277,20 @@ typedef struct
     // cross_1 -> cross_2 的“起始行已经贴边”阈值。
     // 当前设计里 1 表示起始行一旦用到边框边界就触发。
     int route_cross_stage2_enter_start_frame_wall_rows_min;
+    // cross_1 -> cross_2 的角点 y 最小阈值（任一侧满足即可）。
+    int route_cross_stage1_enter_corner_y_min;
     // cross_2 -> normal 的起始左右边界 x 差最大阈值（px）。
     int route_cross_exit_start_gap_x_max;
+    // cross_3 规则边界跳变检测阈值（相邻点 x 差）。
+    int route_cross_stage3_jump_x_threshold_px;
+    // cross_3 命中跳变后向前推进的点数。
+    int route_cross_stage3_cut_forward_points;
+    // cross_3 左侧桥接锚点（原图坐标）。
+    int route_cross_stage3_left_anchor_x;
+    int route_cross_stage3_left_anchor_y;
+    // cross_3 右侧桥接锚点（原图坐标）。
+    int route_cross_stage3_right_anchor_x;
+    int route_cross_stage3_right_anchor_y;
     // 状态机圆环识别开关：true=允许进入圆环状态，false=禁用圆环识别。
     bool route_circle_detection_enabled;
     // 圆环入口判定：对侧边界最少点数，同时角点索引需距离边界尾部至少保留该余量。
@@ -291,11 +303,13 @@ typedef struct
     int route_circle_entry_gap_check_rows;
     // 圆环入口判定：原始左右边界在每个检查行上的最小间距阈值（px）。
     int route_circle_entry_min_raw_boundary_gap;
+    // 圆环入口判定：角点 y 最小阈值。
+    int route_circle_entry_corner_y_min;
     // 圆环状态 1/5 进入下一阶段时，起始贴边连续行数阈值。
     int route_circle_stage_frame_wall_rows_enter;
     // 圆环状态 3 进入下一阶段时，对侧起始贴边连续行数阈值。
     int route_circle_stage3_frame_wall_rows_trigger;
-    // 圆环状态 6：搜线起始行至少抬高到该行。
+    // 圆环状态 6：搜线起始行最多抬高到该行（行号越小越靠上）。
     int route_circle_stage6_maze_start_row;
     // 圆环状态中线目标偏移（仅在 circle4/5 生效，左圆环）：相对左边界的偏移像素。
     // 右圆环在 circle4/5 自动使用镜像偏移：track_width - 该值。
@@ -306,6 +320,8 @@ typedef struct
     int circle_guide_target_offset_stage3;
     // 圆环 state5 补线：贴边连续段结束后，锚点向后偏移的索引数。
     int circle_guide_anchor_offset_stage5;
+    // 圆环送 IPM 前硬截断触边判定边距（像素）。
+    int route_circle_apply_touch_margin_px;
     // straight 判定：参与判定的最少中线点数要求（固定窗口长度）。
     int route_straight_min_centerline_points;
     // 进入 straight 状态所需的连续满足帧数。

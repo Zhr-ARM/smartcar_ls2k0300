@@ -1153,6 +1153,16 @@
             <div class="route-state-lines" id="routeConditionLines"></div>
           </div>
         </div>
+        <div class="route-state-grid">
+          <div class="route-state-block">
+            <div class="route-state-block-title">原图标志层（当前值）</div>
+            <div class="route-state-lines" id="routeRawFlagLines"></div>
+          </div>
+          <div class="route-state-block">
+            <div class="route-state-block-title">状态判断（实际 / 标准）</div>
+            <div class="route-state-lines" id="routeJudgeMetricLines"></div>
+          </div>
+        </div>
         <div class="route-state-clues" id="routeStateClues"></div>
         <div class="route-state-counters" id="routeStateCounters"></div>
       </div>
@@ -1292,6 +1302,16 @@
                   <div class="route-state-lines" id="playbackRouteConditionLines"></div>
                 </div>
               </div>
+              <div class="route-state-grid">
+                <div class="route-state-block">
+                  <div class="route-state-block-title">原图标志层（当前值）</div>
+                  <div class="route-state-lines" id="playbackRouteRawFlagLines"></div>
+                </div>
+                <div class="route-state-block">
+                  <div class="route-state-block-title">状态判断（实际 / 标准）</div>
+                  <div class="route-state-lines" id="playbackRouteJudgeMetricLines"></div>
+                </div>
+              </div>
               <div class="route-state-clues" id="playbackRouteStateClues"></div>
               <div class="route-state-counters" id="playbackRouteStateCounters"></div>
             </div>
@@ -1361,7 +1381,7 @@
       </div>
     </div>
   </div>
-  <script src="/shared_receiver_core.js?v=20260413-route-state-2"></script>
+  <script src="/shared_receiver_core.js?v=20260419-route-state-input-judge"></script>
   <script>
     const rgbCanvas = document.getElementById('rgbCanvas');
     const rgbCtx = rgbCanvas.getContext('2d');
@@ -1455,6 +1475,8 @@
     const routeNextStateValue = document.getElementById('routeNextStateValue');
     const routeNextReason = document.getElementById('routeNextReason');
     const routeConditionLines = document.getElementById('routeConditionLines');
+    const routeRawFlagLines = document.getElementById('routeRawFlagLines');
+    const routeJudgeMetricLines = document.getElementById('routeJudgeMetricLines');
     const routeStateClues = document.getElementById('routeStateClues');
     const routeStateCounters = document.getElementById('routeStateCounters');
     const playbackRouteMainStateValue = document.getElementById('playbackRouteMainStateValue');
@@ -1479,6 +1501,8 @@
     const playbackRouteNextStateValue = document.getElementById('playbackRouteNextStateValue');
     const playbackRouteNextReason = document.getElementById('playbackRouteNextReason');
     const playbackRouteConditionLines = document.getElementById('playbackRouteConditionLines');
+    const playbackRouteRawFlagLines = document.getElementById('playbackRouteRawFlagLines');
+    const playbackRouteJudgeMetricLines = document.getElementById('playbackRouteJudgeMetricLines');
     const playbackRouteStateClues = document.getElementById('playbackRouteStateClues');
     const playbackRouteStateCounters = document.getElementById('playbackRouteStateCounters');
     const playbackPidCommonList = document.getElementById('playbackPidCommonList');
@@ -1736,6 +1760,7 @@
       const gap = Number(status && status.cross_start_boundary_gap_x);
       const entryReady = !!(status && status.cross_state_entry_ready_now);
       const stage2Ready = !!(status && status.cross_state_stage2_ready_now);
+      const stage3Ready = !!(status && status.cross_state_stage3_ready_now);
       const exitReady = !!(status && status.cross_state_exit_ready_now);
       const mainState = Number(status && status.route_main_state);
       const subState = Number(status && status.route_sub_state);
@@ -1752,11 +1777,14 @@
       const hasData = Number.isFinite(leftRows) || Number.isFinite(rightRows) || Number.isFinite(gap);
 
       refs.panel.classList.remove('ready', 'not-ready');
-      refs.panel.classList.add((entryReady || stage2Ready || exitReady || mainState === 4) ? 'ready' : 'not-ready');
+      refs.panel.classList.add((entryReady || stage2Ready || stage3Ready || exitReady || mainState === 4) ? 'ready' : 'not-ready');
+      let crossStateLabel = '十字-cross_1 运行中';
+      if (subState === 2) crossStateLabel = '十字-cross_2 运行中';
+      if (subState === 3) crossStateLabel = '十字-cross_3 运行中';
       refs.badge.textContent = !hasData
         ? '等待数据'
         : (mainState === 4
-            ? (subState === 2 ? '十字-cross_2 运行中' : '十字-cross_1 运行中')
+            ? crossStateLabel
             : (entryReady ? '满足十字入口' : '未满足十字入口'));
       refs.leftRows.textContent = Number.isFinite(leftRows) ? String(leftRows) : '--';
       refs.rightRows.textContent = Number.isFinite(rightRows) ? String(rightRows) : '--';
@@ -1771,7 +1799,8 @@
       const details = [];
       details.push(`入口=${entryReady ? '命中' : '未命中'}`);
       details.push(`cross_1->2=${stage2Ready ? '命中' : '未命中'}`);
-      details.push(`cross_2->normal=${exitReady ? '命中' : '未命中'}`);
+      details.push(`cross_2->3=${stage3Ready ? '命中' : '未命中'}`);
+      details.push(`cross_3->normal=${exitReady ? '命中' : '未命中'}`);
       details.push(`辅助线 L=${leftAux ? '有' : '无'} R=${rightAux ? '有' : '无'}`);
       details.push(`辅线点数 L=${Number.isFinite(leftAuxTraceCount) ? leftAuxTraceCount : '--'}/${Number.isFinite(leftAuxRegularCount) ? leftAuxRegularCount : '--'} R=${Number.isFinite(rightAuxTraceCount) ? rightAuxTraceCount : '--'}/${Number.isFinite(rightAuxRegularCount) ? rightAuxRegularCount : '--'}`);
       details.push(`辅线 dir5 L=${Number.isFinite(leftAuxDir5Count) ? leftAuxDir5Count : '--'} R=${Number.isFinite(rightAuxDir5Count) ? rightAuxDir5Count : '--'}`);
@@ -1808,6 +1837,32 @@
         line.className = 'route-state-line';
         line.innerHTML = `<strong>${item.label}</strong>${item.value}${item.detail ? ` | ${item.detail}` : ''}`;
         refs.conditionLines.appendChild(line);
+      }
+
+      if (refs.rawFlagLines) {
+        refs.rawFlagLines.innerHTML = '';
+        const rawLines = Array.isArray(route.rawFlagLines) && route.rawFlagLines.length > 0
+          ? route.rawFlagLines
+          : [{ label: '原图标志层', value: '--', detail: '等待状态机输入层数据...' }];
+        for (const item of rawLines) {
+          const line = document.createElement('div');
+          line.className = 'route-state-line';
+          line.innerHTML = `<strong>${item.label}</strong>${item.value}${item.detail ? ` | ${item.detail}` : ''}`;
+          refs.rawFlagLines.appendChild(line);
+        }
+      }
+
+      if (refs.judgeMetricLines) {
+        refs.judgeMetricLines.innerHTML = '';
+        const judgeLines = Array.isArray(route.judgeMetricLines) && route.judgeMetricLines.length > 0
+          ? route.judgeMetricLines
+          : [{ label: '状态判断', value: '--', detail: '等待状态机输入层数据...' }];
+        for (const item of judgeLines) {
+          const line = document.createElement('div');
+          line.className = 'route-state-line';
+          line.innerHTML = `<strong>${item.label}</strong>${item.value}${item.detail ? ` | ${item.detail}` : ''}`;
+          refs.judgeMetricLines.appendChild(line);
+        }
       }
 
       refs.stateClues.innerHTML = '';
@@ -1857,6 +1912,8 @@
         nextStateValue: routeNextStateValue,
         nextReason: routeNextReason,
         conditionLines: routeConditionLines,
+        rawFlagLines: routeRawFlagLines,
+        judgeMetricLines: routeJudgeMetricLines,
         stateClues: routeStateClues,
         stateCounters: routeStateCounters
       });
@@ -1890,6 +1947,8 @@
         nextStateValue: playbackRouteNextStateValue,
         nextReason: playbackRouteNextReason,
         conditionLines: playbackRouteConditionLines,
+        rawFlagLines: playbackRouteRawFlagLines,
+        judgeMetricLines: playbackRouteJudgeMetricLines,
         stateClues: playbackRouteStateClues,
         stateCounters: playbackRouteStateCounters
       });
@@ -2191,6 +2250,10 @@
       push(cornerRows, 'cross_left_corner_post_frame_wall_rows', status.cross_left_corner_post_frame_wall_rows);
       push(cornerRows, 'cross_right_corner_post_frame_wall_rows', status.cross_right_corner_post_frame_wall_rows);
       push(cornerRows, 'cross_start_boundary_gap_x', status.cross_start_boundary_gap_x);
+      push(cornerRows, 'cross_state_entry_ready_now', status.cross_state_entry_ready_now);
+      push(cornerRows, 'cross_state_stage2_ready_now', status.cross_state_stage2_ready_now);
+      push(cornerRows, 'cross_state_stage3_ready_now', status.cross_state_stage3_ready_now);
+      push(cornerRows, 'cross_state_exit_ready_now', status.cross_state_exit_ready_now);
       push(cornerRows, 'cross_left_aux_found', status.cross_left_aux_found);
       push(cornerRows, 'cross_right_aux_found', status.cross_right_aux_found);
       pushArray(cornerRows, 'cross_left_aux_transition_point', status.cross_left_aux_transition_point);
@@ -2203,6 +2266,18 @@
       pushArray(cornerRows, 'cross_right_upper_corner_point', status.cross_right_upper_corner_point);
       push(cornerRows, 'left_start_frame_wall_rows', status.left_start_frame_wall_rows);
       push(cornerRows, 'right_start_frame_wall_rows', status.right_start_frame_wall_rows);
+      push(cornerRows, 'src_left_trace_has_frame_wall', status.src_left_trace_has_frame_wall);
+      push(cornerRows, 'src_right_trace_has_frame_wall', status.src_right_trace_has_frame_wall);
+      push(cornerRows, 'left_circle_entry_raw_gap_ok', status.left_circle_entry_raw_gap_ok);
+      push(cornerRows, 'right_circle_entry_raw_gap_ok', status.right_circle_entry_raw_gap_ok);
+      push(cornerRows, 'left_circle_entry_raw_gap_min_px', status.left_circle_entry_raw_gap_min_px);
+      push(cornerRows, 'right_circle_entry_raw_gap_min_px', status.right_circle_entry_raw_gap_min_px);
+      push(cornerRows, 'left_circle_entry_raw_gap_checked_rows', status.left_circle_entry_raw_gap_checked_rows);
+      push(cornerRows, 'right_circle_entry_raw_gap_checked_rows', status.right_circle_entry_raw_gap_checked_rows);
+      push(cornerRows, 'left_circle_entry_raw_gap_failed_row_y', status.left_circle_entry_raw_gap_failed_row_y);
+      push(cornerRows, 'right_circle_entry_raw_gap_failed_row_y', status.right_circle_entry_raw_gap_failed_row_y);
+      push(cornerRows, 'left_circle_entry_raw_gap_missing_point', status.left_circle_entry_raw_gap_missing_point);
+      push(cornerRows, 'right_circle_entry_raw_gap_missing_point', status.right_circle_entry_raw_gap_missing_point);
       push(cornerRows, 'cross_lower_corner_pre_window', status.cross_lower_corner_pre_window);
       push(cornerRows, 'cross_lower_corner_post_window', status.cross_lower_corner_post_window);
       push(cornerRows, 'cross_lower_corner_pre_min_votes', status.cross_lower_corner_pre_min_votes);
@@ -2212,6 +2287,10 @@
       push(cornerRows, 'route_cross_entry_corner_post_frame_wall_rows_min', status.route_cross_entry_corner_post_frame_wall_rows_min);
       push(cornerRows, 'route_cross_stage2_enter_start_frame_wall_rows_min', status.route_cross_stage2_enter_start_frame_wall_rows_min);
       push(cornerRows, 'route_cross_exit_start_gap_x_max', status.route_cross_exit_start_gap_x_max);
+      push(cornerRows, 'route_circle_entry_corner_row_offset', status.route_circle_entry_corner_row_offset);
+      push(cornerRows, 'route_circle_entry_gap_check_rows', status.route_circle_entry_gap_check_rows);
+      push(cornerRows, 'route_circle_entry_min_raw_boundary_gap', status.route_circle_entry_min_raw_boundary_gap);
+      push(cornerRows, 'route_circle_entry_corner_y_min', status.route_circle_entry_corner_y_min);
       push(cornerRows, 'cross_aux_vertical_scan_max_rows', status.cross_aux_vertical_scan_max_rows);
       push(cornerRows, 'cross_aux_trace_max_points', status.cross_aux_trace_max_points);
       push(cornerRows, 'cross_aux_trace_upward_rows_max', status.cross_aux_trace_upward_rows_max);

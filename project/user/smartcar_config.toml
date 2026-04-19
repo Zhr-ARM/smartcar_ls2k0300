@@ -129,13 +129,25 @@ zebra_cross_detection_enabled = true
 # 双边都丢线时是否保留上一帧平移中线。
 keep_last_centerline_on_double_loss = true
 # 十字状态识别开关。
-route_cross_detection_enabled = false
+route_cross_detection_enabled = true
 # normal/straight 进入 cross 所需的角点后沿边框连续行数最小值。
 route_cross_entry_corner_post_frame_wall_rows_min = 5
 # cross_1 进入 cross_2 的起始贴边连续行数阈值。
 route_cross_stage2_enter_start_frame_wall_rows_min = 1
+# cross_1 进入 cross_2 时角点 y 的最小阈值（任一侧满足即可）。
+route_cross_stage1_enter_corner_y_min = 75
 # cross_2 退出到 normal 的起始左右边界 x 差最大阈值。
 route_cross_exit_start_gap_x_max = 155
+# cross_3 规则边界跳变检测阈值（相邻点 x 差）。
+route_cross_stage3_jump_x_threshold_px = 15
+# cross_3 命中跳变后向前推进的点数。
+route_cross_stage3_cut_forward_points = 8
+# cross_3 左侧桥接锚点坐标。
+route_cross_stage3_left_anchor_x = 15
+route_cross_stage3_left_anchor_y = 100
+# cross_3 右侧桥接锚点坐标。
+route_cross_stage3_right_anchor_x = 145
+route_cross_stage3_right_anchor_y = 100
 # 圆环状态识别开关。
 route_circle_detection_enabled = true
 # 圆环入口判定中对侧边界最少点数要求。
@@ -148,12 +160,14 @@ route_circle_entry_corner_row_offset = 0
 route_circle_entry_gap_check_rows = 0
 # 圆环入口判定中原始左右边界最小间距阈值。
 route_circle_entry_min_raw_boundary_gap = 0
+# 圆环入口判定中角点 y 最小阈值。
+route_circle_entry_corner_y_min = 60
 # 圆环状态 1/5 进入下一阶段的起始贴边连续行数阈值。
 route_circle_stage_frame_wall_rows_enter = 30
 # 圆环状态 3 进入下一阶段的对侧起始贴边连续行数阈值。
 route_circle_stage3_frame_wall_rows_trigger = 70
-# 圆环状态 6 抬高迷宫法搜线起始行的最小值。
-route_circle_stage6_maze_start_row = 50
+# 圆环状态 6 抬高迷宫法搜线起始行的上限（行号越小越靠上）。
+route_circle_stage6_maze_start_row = 80
 # 圆环状态 circle4/5 的目标中线相对左边界偏移。
 route_circle_center_target_offset_from_left_px = 14.0
 # 圆环补线中贴边连续段的最小长度阈值。
@@ -162,6 +176,8 @@ circle_guide_min_frame_wall_segment_len = 8
 circle_guide_target_offset_stage3 = 5
 # 圆环 state5 补线锚点向后偏移的索引数。
 circle_guide_anchor_offset_stage5 = 0
+# 圆环送 IPM 前触边判定边距（像素）。
+route_circle_apply_touch_margin_px = 2
 # straight 判定固定窗口最少中线点数。
 route_straight_min_centerline_points = 20
 # 进入 straight 状态所需的连续满足帧数。
@@ -509,7 +525,7 @@ weights = [0.5, 0.4, 0.1]
 # CIRCLE_ENTER 状态下参与加权预瞄的点数。
 weighted_point_count = 3
 # CIRCLE_ENTER 状态下参与加权预瞄的点索引。
-point_indices = [5, 10, 15]
+point_indices = [0, 2, 4]
 # CIRCLE_ENTER 状态下各预瞄点权重。
 weights = [0.5, 0.3, 0.2]
 
@@ -517,15 +533,15 @@ weights = [0.5, 0.3, 0.2]
 # CIRCLE_INSIDE 状态下参与加权预瞄的点数。
 weighted_point_count = 3
 # CIRCLE_INSIDE 状态下参与加权预瞄的点索引。
-point_indices = [0, 4, 8]
+point_indices = [0, 2, 4]
 # CIRCLE_INSIDE 状态下各预瞄点权重。
-weights = [0.55, 0.3, 0.15]
+weights = [0.5, 0.3, 0.2]
 
 [pid.line_error_preview.circle_exit]
 # CIRCLE_EXIT 状态下参与加权预瞄的点数。
 weighted_point_count = 3
 # CIRCLE_EXIT 状态下参与加权预瞄的点索引。
-point_indices = [5, 10, 15]
+point_indices = [0, 2, 4]
 # CIRCLE_EXIT 状态下各预瞄点权重。
 weights = [0.5, 0.3, 0.2]
 
@@ -626,7 +642,7 @@ turn_slowdown_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.straight]
 # STRAIGHT 档基础速度。
-base_speed = 800.0
+base_speed = 400.0
 # STRAIGHT 档直道满速误差阈值。
 straight_full_speed_error_threshold_px = 0.0
 # STRAIGHT 档位置环动态 Kp 低误差段一次项系数。
@@ -804,7 +820,7 @@ turn_slowdown_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.circle_enter]
 # CIRCLE_ENTER 档基础速度。
-base_speed = 320.0
+base_speed = 250.0
 # CIRCLE_ENTER 档直道满速误差阈值。
 straight_full_speed_error_threshold_px = 0.0
 # CIRCLE_ENTER 档位置环动态 Kp 低误差段一次项系数。
@@ -893,7 +909,7 @@ turn_slowdown_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.circle_inside]
 # CIRCLE_INSIDE 档基础速度。
-base_speed = 320.0
+base_speed = 250.0
 # CIRCLE_INSIDE 档直道满速误差阈值。
 straight_full_speed_error_threshold_px = 0.0
 # CIRCLE_INSIDE 档位置环动态 Kp 低误差段一次项系数。
@@ -982,7 +998,7 @@ turn_slowdown_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.circle_exit]
 # CIRCLE_EXIT 档基础速度。
-base_speed = 320.0
+base_speed = 250.0
 # CIRCLE_EXIT 档直道满速误差阈值。
 straight_full_speed_error_threshold_px = 0.0
 # CIRCLE_EXIT 档位置环动态 Kp 低误差段一次项系数。

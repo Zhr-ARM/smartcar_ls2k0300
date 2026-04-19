@@ -61,7 +61,7 @@ static bool left_circle_entry_ready(const vision_route_state_input_t *input)
 
     return input->right_straight &&
            input->left_corner_found &&
-           input->left_corner_y > 60 &&
+           input->left_corner_y > g_vision_runtime_config.route_circle_entry_corner_y_min &&
            input->left_corner_index >= 0 &&
            input->right_boundary_count > g_vision_runtime_config.route_circle_entry_min_boundary_count &&
            input->left_circle_entry_raw_gap_ok &&
@@ -77,7 +77,7 @@ static bool right_circle_entry_ready(const vision_route_state_input_t *input)
 
     return input->left_straight &&
            input->right_corner_found &&
-           input->right_corner_y > 60 &&
+           input->right_corner_y > g_vision_runtime_config.route_circle_entry_corner_y_min &&
            input->right_corner_index >= 0 &&
            input->left_boundary_count > g_vision_runtime_config.route_circle_entry_min_boundary_count &&
            input->right_circle_entry_raw_gap_ok &&
@@ -120,11 +120,11 @@ static bool cross_stage2_ready(const vision_route_state_input_t *input)
         return false;
     }
 
-    static constexpr int kCrossStage1CornerYEnterCross2Min = 75;
+    const int corner_y_min = std::max(1, g_vision_runtime_config.route_cross_stage1_enter_corner_y_min);
     const bool left_ready = input->left_corner_found &&
-                            (input->left_corner_y >= kCrossStage1CornerYEnterCross2Min);
+                            (input->left_corner_y >= corner_y_min);
     const bool right_ready = input->right_corner_found &&
-                             (input->right_corner_y >= kCrossStage1CornerYEnterCross2Min);
+                             (input->right_corner_y >= corner_y_min);
     return left_ready || right_ready;
 }
 
