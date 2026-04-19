@@ -203,12 +203,6 @@ int main(int, char**)
         return 0;
     }
 
-    if (!imu_thread_init())
-    {
-        cleanup();
-        return -1;
-    }
-
     // 初始化逐飞助手独立 UDP 通道（不与网页端共用 IP/端口）。
     if (!config_http_thread_init())
     {

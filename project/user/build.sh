@@ -16,6 +16,7 @@ TARGET_PORT="22"
 TARGET_APP_PATH="/home/root/tst"
 TARGET_CONFIG_PATH="/home/root/tst/smartcar_config.toml"
 MAKE_JOBS="12"
+CAMERA_CAPTURE_WIDTH="320"
 
 print_usage() {
     cat <<EOF
@@ -25,6 +26,8 @@ print_usage() {
   如需临时覆盖:
     ./build.sh --preset hotspot_a
     ./build.sh --preset hotspot_b
+    ./build.sh --camera-width 160
+    ./build.sh --camera-width 320
     ./build.sh --jobs 16
 
 说明:
@@ -39,6 +42,7 @@ print_usage() {
      port=$TARGET_PORT
      app_path=$TARGET_APP_PATH
      config_path=$TARGET_CONFIG_PATH
+     camera_width=$CAMERA_CAPTURE_WIDTH
 EOF
 }
 
@@ -124,6 +128,10 @@ while [ $# -gt 0 ]; do
             MAKE_JOBS="$2"
             shift 2
             ;;
+        --camera-width)
+            CAMERA_CAPTURE_WIDTH="$2"
+            shift 2
+            ;;
         -h|--help)
             print_usage
             exit 0
@@ -141,10 +149,21 @@ if [ -z "$TARGET_HOST" ] || [ -z "$TARGET_USER" ]; then
     exit 1
 fi
 
+if [ "$CAMERA_CAPTURE_WIDTH" != "160" ] && [ "$CAMERA_CAPTURE_WIDTH" != "320" ]; then
+    echo "CAMERA_CAPTURE_WIDTH 仅支持 160 或 320，当前: $CAMERA_CAPTURE_WIDTH"
+    exit 1
+fi
+
+UVC_RES_PRESET="1"
+if [ "$CAMERA_CAPTURE_WIDTH" = "160" ]; then
+    UVC_RES_PRESET="0"
+fi
+
 echo "[BUILD] 目标预设: ${TARGET_PRESET}"
 echo "[BUILD] 目标主板: ${TARGET_USER}@${TARGET_HOST}:${TARGET_PORT}"
 echo "[BUILD] APP 目标路径: ${TARGET_APP_PATH}"
 echo "[BUILD] 配置目标路径: ${TARGET_CONFIG_PATH}"
+echo "[BUILD] 摄像头采图宽度: ${CAMERA_CAPTURE_WIDTH} (UVC_RES_PRESET=${UVC_RES_PRESET})"
 
 node "$SYNC_TOML_SCRIPT" "$CONNECTION_PRESETS_FILE" "$TARGET_PRESET" "$SCRIPT_DIR/smartcar_config.toml" || {
     echo "同步 smartcar_config.toml 中的电脑接收端 IP 失败。"
@@ -161,7 +180,7 @@ find . -mindepth 1 ! -name "本文件夹作用.txt" -exec rm -rf {} + || {
     exit 1
 }
 
-cmake ../user -DCMAKE_EXPORT_COMPILE_COMMANDS=ON || {
+cmake ../user -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUVC_RES_PRESET="${UVC_RES_PRESET}" || {
     echo "cmake 命令执行失败。"
     exit 1
 }
