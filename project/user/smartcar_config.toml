@@ -242,7 +242,7 @@ data_profile = 0
 # 网页端 TCP 状态发送总开关。
 tcp_enabled = true
 # PC 接收端 IP 地址。
-server_ip = "10.119.73.102"
+server_ip = "172.21.79.129"
 # PC 接收端 UDP 视频端口。
 video_port = 10000
 # PC 接收端 TCP 状态端口。
@@ -360,7 +360,7 @@ ipm_size = true
 # 逐飞助手 UDP 通道开关。
 enabled = false
 # 逐飞助手接收端 IP。
-server_ip = "10.119.73.102"
+server_ip = "172.21.79.129"
 # 逐飞助手接收端端口。
 server_port = 8899
 
