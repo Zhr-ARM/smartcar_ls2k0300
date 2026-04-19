@@ -129,7 +129,7 @@ zebra_cross_detection_enabled = true
 # 双边都丢线时是否保留上一帧平移中线。
 keep_last_centerline_on_double_loss = true
 # 十字状态识别开关。
-route_cross_detection_enabled = true
+route_cross_detection_enabled = false
 # normal/straight 进入 cross 所需的角点后沿边框连续行数最小值。
 route_cross_entry_corner_post_frame_wall_rows_min = 5
 # cross_1 进入 cross_2 的起始贴边连续行数阈值。
@@ -457,9 +457,9 @@ feedback_low_pass_alpha = 0.95
 # 是否启用主循环实时无刷控制。
 realtime_enabled = true
 # 左侧无刷目标占空比，单位百分比 [0, 100]。
-left_duty_percent = 60.0
+left_duty_percent = 0.0
 # 右侧无刷目标占空比，单位百分比 [0, 100]。
-right_duty_percent = 60.0
+right_duty_percent = 0.0
 
 [pid.yaw_rate_loop]
 # 视觉曲率滤波 alpha。
@@ -536,7 +536,7 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 450.0
+base_speed = 320.0
 # NORMAL 档直道满速误差阈值。
 # 小于等于 0 表示关闭该逻辑。
 straight_full_speed_error_threshold_px = 0.0

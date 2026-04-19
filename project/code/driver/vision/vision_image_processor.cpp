@@ -158,6 +158,8 @@ static std::atomic<int> g_src_left_start_frame_wall_rows(0);
 static std::atomic<int> g_src_right_start_frame_wall_rows(0);
 static std::atomic<bool> g_src_left_boundary_straight_detected(false);
 static std::atomic<bool> g_src_right_boundary_straight_detected(false);
+static std::atomic<int> g_src_left_first_frame_touch_after_valid_y(-1);
+static std::atomic<int> g_src_right_first_frame_touch_after_valid_y(-1);
 static uint16 g_src_left_circle_guide_x[VISION_BOUNDARY_NUM];
 static uint16 g_src_left_circle_guide_y[VISION_BOUNDARY_NUM];
 static uint16 g_src_right_circle_guide_x[VISION_BOUNDARY_NUM];
@@ -3552,27 +3554,10 @@ static int extract_one_point_per_row_from_contour(const maze_point_t *raw_pts,
 
     std::array<int, kProcHeight> border_x{};
     border_x.fill(-1);
-    int initial_frame_end = 0;
-    bool keep_initial_frame_wall = false;
-    if (skip_artificial_frame && point_touches_artificial_frame(raw_pts[0].x, raw_pts[0].y))
-    {
-        while (initial_frame_end < raw_num &&
-               point_touches_artificial_frame(raw_pts[initial_frame_end].x, raw_pts[initial_frame_end].y))
-        {
-            ++initial_frame_end;
-        }
-        if (initial_frame_end > 0 && initial_frame_end < raw_num)
-        {
-            const int initial_frame_y_span = std::abs(raw_pts[0].y - raw_pts[initial_frame_end - 1].y);
-            keep_initial_frame_wall = initial_frame_y_span < kInitialFrameWallKeepMaxYSpan;
-        }
-    }
 
     for (int i = 0; i < raw_num; ++i)
     {
-        const bool is_initial_frame_wall = keep_initial_frame_wall && i < initial_frame_end;
         if (skip_artificial_frame &&
-            !is_initial_frame_wall &&
             point_touches_artificial_frame(raw_pts[i].x, raw_pts[i].y))
         {
             continue;
@@ -3601,29 +3586,6 @@ static int extract_one_point_per_row_from_contour(const maze_point_t *raw_pts,
     return out_num;
 }
 
-static bool initial_frame_wall_can_be_kept_for_ipm(const maze_point_t *raw_pts, int raw_num)
-{
-    if (raw_pts == nullptr || raw_num <= 1 || !point_touches_artificial_frame(raw_pts[0].x, raw_pts[0].y))
-    {
-        return false;
-    }
-
-    int initial_frame_end = 0;
-    while (initial_frame_end < raw_num &&
-           point_touches_artificial_frame(raw_pts[initial_frame_end].x, raw_pts[initial_frame_end].y))
-    {
-        ++initial_frame_end;
-    }
-
-    if (initial_frame_end <= 0 || initial_frame_end >= raw_num)
-    {
-        return false;
-    }
-
-    const int initial_frame_y_span = std::abs(raw_pts[0].y - raw_pts[initial_frame_end - 1].y);
-    return initial_frame_y_span < kInitialFrameWallKeepMaxYSpan;
-}
-
 static int trace_num_for_ipm_artificial_frame_policy(const maze_point_t *raw_pts,
                                                      int raw_num,
                                                      int first_frame_touch_index)
@@ -3633,10 +3595,6 @@ static int trace_num_for_ipm_artificial_frame_policy(const maze_point_t *raw_pts
         return 0;
     }
     if (first_frame_touch_index < 0)
-    {
-        return raw_num;
-    }
-    if (first_frame_touch_index == 0 && initial_frame_wall_can_be_kept_for_ipm(raw_pts, raw_num))
     {
         return raw_num;
     }
@@ -3714,6 +3672,32 @@ static int trim_initial_artificial_frame_prefix_inplace(maze_point_t *pts,
     }
     *num = remaining;
     return prefix_end;
+}
+
+static void truncate_regular_boundary_at_touch_y_inplace(maze_point_t *pts, int *num, int touch_y)
+{
+    if (pts == nullptr || num == nullptr || *num <= 0)
+    {
+        return;
+    }
+
+    const int in_num = std::clamp(*num, 0, VISION_BOUNDARY_NUM);
+    if (in_num <= 0)
+    {
+        *num = 0;
+        return;
+    }
+
+    // 每行规则数组按 y 由大到小排列：
+    // 首个 y <= touch_y 的点即“触边起点行”，该点及其后续（更远处）全部丢弃。
+    for (int i = 0; i < in_num; ++i)
+    {
+        if (pts[i].y <= touch_y)
+        {
+            *num = i;
+            return;
+        }
+    }
 }
 
 static int rebuild_boundary_points_from_row_table(const std::array<int, kProcHeight> &border_x,
@@ -4106,6 +4090,8 @@ bool vision_image_processor_process_step()
     int right_ipm_num = 0;
     int left_first_frame_touch_index = -1;
     int right_first_frame_touch_index = -1;
+    int left_trace_first_touch_y_work = -1;
+    int right_trace_first_touch_y_work = -1;
     int left_start_frame_wall_rows = 0;
     int right_start_frame_wall_rows = 0;
     int left_corner_post_frame_wall_rows = 0;
@@ -4136,6 +4122,8 @@ bool vision_image_processor_process_step()
     g_src_right_trace_has_frame_wall.store(false);
     g_src_left_start_frame_wall_rows.store(0);
     g_src_right_start_frame_wall_rows.store(0);
+    g_src_left_first_frame_touch_after_valid_y.store(-1);
+    g_src_right_first_frame_touch_after_valid_y.store(-1);
     clear_src_circle_guide_cache();
     left_trace_dirs.fill(255);
     right_trace_dirs.fill(255);
@@ -4335,6 +4323,16 @@ bool vision_image_processor_process_step()
                     std::clamp(right_trace_num, 0, VISION_BOUNDARY_NUM),
                     right_trace_dirs_raw.data());
 
+        // 八邻域工作层触边检测：在任何 trim 前先记录第一次触边行坐标。
+        if (left_first_frame_touch_index >= 0 && left_first_frame_touch_index < left_trace_num)
+        {
+            left_trace_first_touch_y_work = left_trace_pts[left_first_frame_touch_index].y;
+        }
+        if (right_first_frame_touch_index >= 0 && right_first_frame_touch_index < right_trace_num)
+        {
+            right_trace_first_touch_y_work = right_trace_pts[right_first_frame_touch_index].y;
+        }
+
         if (!cross3_state_active_before_trace)
         {
             trim_initial_artificial_frame_prefix_inplace(left_trace_pts.data(),
@@ -4393,8 +4391,8 @@ bool vision_image_processor_process_step()
                                          right_regular_num,
                                          right_pts.data(),
                                          static_cast<int>(right_pts.size()));
-        left_start_frame_wall_rows = count_leading_side_frame_wall_rows(left_trace_pts_raw.data(), left_trace_raw_num, true);
-        right_start_frame_wall_rows = count_leading_side_frame_wall_rows(right_trace_pts_raw.data(), right_trace_raw_num, false);
+        left_start_frame_wall_rows = count_leading_side_frame_wall_rows(left_trace_pts.data(), left_trace_num, true);
+        right_start_frame_wall_rows = count_leading_side_frame_wall_rows(right_trace_pts.data(), right_trace_num, false);
         g_src_left_start_frame_wall_rows.store(left_start_frame_wall_rows);
         g_src_right_start_frame_wall_rows.store(right_start_frame_wall_rows);
         start_boundary_gap_x = (left_num > 0 && right_num > 0) ? (right_pts[0].x - left_pts[0].x) : 0;
@@ -4518,8 +4516,13 @@ bool vision_image_processor_process_step()
         const bool cross_state_active =
             (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CROSS);
         const bool cross1_state_active = cross1_state_active_before_trace;
+        const bool circle_state_active_before_trace =
+            (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE_LEFT) ||
+            (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE_RIGHT);
         const bool lower_corner_extrapolate_enabled =
-            g_vision_runtime_config.cross_lower_corner_extrapolate_enabled && !cross_state_active;
+            g_vision_runtime_config.cross_lower_corner_extrapolate_enabled &&
+            !cross_state_active &&
+            circle_state_active_before_trace;
         const bool skip_left_auto_extrapolate =
             !lower_corner_extrapolate_enabled || (cross1_state_active && g_cross_left_aux_found.load());
         const bool skip_right_auto_extrapolate =
@@ -4586,6 +4589,37 @@ bool vision_image_processor_process_step()
                 right_ok = false;
                 right_num = 0;
             }
+        }
+    }
+
+    // 在上一帧主状态为 NORMAL/STRAIGHT 时：
+    // 在八邻域工作层检测“第一次触边”行坐标，再作用到按行规则边界。
+    // 使用 before_trace 状态，避免本帧已切入 CROSS 导致 NORMAL/STRAIGHT 策略失效。
+    if (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_NORMAL ||
+        route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_STRAIGHT)
+    {
+        const int left_touch_y = left_trace_first_touch_y_work;
+        const int right_touch_y = right_trace_first_touch_y_work;
+        const bool left_touch_found = (left_touch_y >= 0);
+        const bool right_touch_found = (right_touch_y >= 0);
+        g_src_left_first_frame_touch_after_valid_y.store(left_touch_found ? left_touch_y : -1);
+        g_src_right_first_frame_touch_after_valid_y.store(right_touch_found ? right_touch_y : -1);
+
+        if (left_touch_found && left_regular_num > 0)
+        {
+            truncate_regular_boundary_at_touch_y_inplace(left_regular_pts.data(), &left_regular_num, left_touch_y);
+            left_num = copy_boundary_points(left_regular_pts.data(),
+                                            left_regular_num,
+                                            left_pts.data(),
+                                            static_cast<int>(left_pts.size()));
+        }
+        if (right_touch_found && right_regular_num > 0)
+        {
+            truncate_regular_boundary_at_touch_y_inplace(right_regular_pts.data(), &right_regular_num, right_touch_y);
+            right_num = copy_boundary_points(right_regular_pts.data(),
+                                             right_regular_num,
+                                             right_pts.data(),
+                                             static_cast<int>(right_pts.size()));
         }
     }
     auto t_maze_trace_end = std::chrono::steady_clock::now();
