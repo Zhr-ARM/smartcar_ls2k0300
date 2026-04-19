@@ -25,9 +25,9 @@ volatile sig_atomic_t g_should_exit = 0;
 
 namespace
 {
-constexpr float kStartupLowVoltageThresholdV = 9.8f;
+[[maybe_unused]] constexpr float kStartupLowVoltageThresholdV = 9.8f;
 constexpr int kMainLoopPeriodMs = 5;
-constexpr int kLowVoltageStatusPrintPeriodMs = 2000;
+[[maybe_unused]] constexpr int kLowVoltageStatusPrintPeriodMs = 2000;
 
 bool g_worker_cleanup_done = false;
 
@@ -57,7 +57,7 @@ void cleanup_once()
     beep_thread_cleanup();
 }
 
-void stop_all_motion_immediately()
+[[maybe_unused]] void stop_all_motion_immediately()
 {
     // 先把目标清零，避免清线程前还有旧的速度目标继续下发。
     motor_thread_set_target_count(0.0f, 0.0f);
@@ -65,7 +65,7 @@ void stop_all_motion_immediately()
     brushless_driver.stop_all();
 }
 
-float clamp_brushless_duty_percent(float duty_percent)
+[[maybe_unused]] float clamp_brushless_duty_percent(float duty_percent)
 {
     if (duty_percent < 0.0f)
     {
@@ -78,7 +78,7 @@ float clamp_brushless_duty_percent(float duty_percent)
     return duty_percent;
 }
 
-void update_brushless_realtime_control()
+[[maybe_unused]] void update_brushless_realtime_control()
 {
     static bool last_enabled = false;
     static float last_left_duty = 0.0f;
@@ -114,13 +114,13 @@ void update_brushless_realtime_control()
     }
 }
 
-float read_battery_voltage_once_v()
+[[maybe_unused]] float read_battery_voltage_once_v()
 {
     battery_monitor.update();
     return battery_monitor.voltage_v();
 }
 
-void handle_low_battery_startup_block(float measured_voltage_v)
+[[maybe_unused]] void handle_low_battery_startup_block(float measured_voltage_v)
 {
     printf("[BATTERY] startup blocked voltage=%.2fV threshold=%.2fV\r\n",
            static_cast<double>(measured_voltage_v),
@@ -180,34 +180,35 @@ int main(int, char**)
     vision_image_processor_reload_config_from_globals();
     printf("[CONFIG] loaded=%s\r\n", loaded_config_path.c_str());
 
-    if (!beep_thread_init())
-    {
-        cleanup_once();
-        return -1;
-    }
-
-    battery_monitor.init();
-    const float startup_voltage_v = battery_monitor.voltage_v();
-    printf("[BATTERY] startup voltage=%.2fV threshold=%.2fV\r\n",
-           static_cast<double>(startup_voltage_v),
-           static_cast<double>(kStartupLowVoltageThresholdV));
-
-    if (startup_voltage_v < kStartupLowVoltageThresholdV)
-    {
-        handle_low_battery_startup_block(startup_voltage_v);
-        if (g_should_exit)
-        {
-            printf("收到Ctrl+C,程序即将退出\n");
-        }
-        cleanup_once();
-        return 0;
-    }
-
-    if (!imu_thread_init())
-    {
-        cleanup();
-        return -1;
-    }
+    // [320x240 vision-only] 关闭非视觉模块初始化。
+    // if (!beep_thread_init())
+    // {
+    //     cleanup_once();
+    //     return -1;
+    // }
+    //
+    // battery_monitor.init();
+    // const float startup_voltage_v = battery_monitor.voltage_v();
+    // printf("[BATTERY] startup voltage=%.2fV threshold=%.2fV\r\n",
+    //        static_cast<double>(startup_voltage_v),
+    //        static_cast<double>(kStartupLowVoltageThresholdV));
+    //
+    // if (startup_voltage_v < kStartupLowVoltageThresholdV)
+    // {
+    //     handle_low_battery_startup_block(startup_voltage_v);
+    //     if (g_should_exit)
+    //     {
+    //         printf("收到Ctrl+C,程序即将退出\n");
+    //     }
+    //     cleanup_once();
+    //     return 0;
+    // }
+    //
+    // if (!imu_thread_init())
+    // {
+    //     cleanup();
+    //     return -1;
+    // }
 
     // 初始化逐飞助手独立 UDP 通道（不与网页端共用 IP/端口）。
     if (!config_http_thread_init())
@@ -269,30 +270,31 @@ int main(int, char**)
         return -1;
     }
 
-    // 利用这 2s 视觉预热窗口同步完成 IMU 静止零偏标定：
-    // 1) 不额外增加总启动时间；
-    // 2) 标定结束后再启动 IMU 后台采集线程，后续按 5ms 周期持续更新并发布 gyro_z。
-    brushless_driver.set_left_duty(0);
-    brushless_driver.set_right_duty(0);
-
-    if (!imu_thread_calibrate_and_start(pid_tuning::imu::kStartupCalibrateDurationMs))
-    {
-        cleanup();
-        return -1;
-    }
-    if (!line_follow_thread_init())
-    {
-        cleanup();
-        return -1;
-    }
-
-    if (!motor_thread_init())
-    {
-        cleanup();
-        return -1;
-    }
-    brushless_driver.set_left_duty(0);
-    brushless_driver.set_right_duty(0);
+    // [320x240 vision-only] 关闭 IMU/巡线/电机/无刷初始化。
+    // // 利用这 2s 视觉预热窗口同步完成 IMU 静止零偏标定：
+    // // 1) 不额外增加总启动时间；
+    // // 2) 标定结束后再启动 IMU 后台采集线程，后续按 5ms 周期持续更新并发布 gyro_z。
+    // brushless_driver.set_left_duty(0);
+    // brushless_driver.set_right_duty(0);
+    //
+    // if (!imu_thread_calibrate_and_start(pid_tuning::imu::kStartupCalibrateDurationMs))
+    // {
+    //     cleanup();
+    //     return -1;
+    // }
+    // if (!line_follow_thread_init())
+    // {
+    //     cleanup();
+    //     return -1;
+    // }
+    //
+    // if (!motor_thread_init())
+    // {
+    //     cleanup();
+    //     return -1;
+    // }
+    // brushless_driver.set_left_duty(0);
+    // brushless_driver.set_right_duty(0);
 
     if (g_vision_runtime_config.screen_display_enabled && !screen_display_thread_init())
     {
@@ -371,38 +373,40 @@ int main(int, char**)
            g_vision_runtime_config.ipm_line_error_index_min,
            g_vision_runtime_config.ipm_line_error_index_max);
 
-    uart_thread_init();
+    // [320x240 vision-only] 关闭 UART/巡线/电机/蜂鸣器信息初始化与打印。
+    // uart_thread_init();
+    //
+    // // 巡线直道参考速度配置：
+    // // 这里默认与 NORMAL 档基础速度保持一致；若想整体统一提速/降速，可改 pid_tuning 中的全局倍率，
+    // // 或在这里把“期望直道参考速度”改成一个新的值，让所有状态按比例一起缩放。
+    // line_follow_thread_set_normal_speed_reference(pid_tuning::route_line_follow::kNormalProfile.base_speed);
+    //
+    // // 为motor_thread设置目标计数，单位 counts/5ms。
+    // // 固定左右轮目标值为 800，便于速度环调参。
+    // //motor_thread_set_target_count(600.0f, 600.0f);
+    //
+    // system_delay_ms(50);
+    // beep_thread_print_info();
+    // motor_thread_print_info();
+    // imu_thread_print_info();
+    // line_follow_thread_print_info();
 
-    // 巡线直道参考速度配置：
-    // 这里默认与 NORMAL 档基础速度保持一致；若想整体统一提速/降速，可改 pid_tuning 中的全局倍率，
-    // 或在这里把“期望直道参考速度”改成一个新的值，让所有状态按比例一起缩放。
-    line_follow_thread_set_normal_speed_reference(pid_tuning::route_line_follow::kNormalProfile.base_speed);
-    
-    // 为motor_thread设置目标计数，单位 counts/5ms。
-    // 固定左右轮目标值为 800，便于速度环调参。
-    //motor_thread_set_target_count(600.0f, 600.0f);
-    
-    system_delay_ms(50);
-    beep_thread_print_info();
-    motor_thread_print_info();
-    imu_thread_print_info();
-    line_follow_thread_print_info();
-
-    bool zebra_cross_stop_triggered = false;
     while(!g_should_exit)
     {
-        update_brushless_realtime_control();
+        // [320x240 vision-only] 关闭无刷实时控制。
+        // update_brushless_realtime_control();
 
-        if (!zebra_cross_stop_triggered &&
-            g_vision_runtime_config.zebra_cross_detection_enabled &&
-            vision_image_processor_zebra_cross_count() >= 1)
-        {
-            zebra_cross_stop_triggered = true;
-            printf("[ZEBRA] zebra_cross_count=%d -> requesting full process exit like Ctrl+C\r\n",
-                   vision_image_processor_zebra_cross_count());
-            stop_all_motion_immediately();
-            g_should_exit = 1;
-        }
+        // [320x240 vision-only] 关闭“斑马线触发整车停机”逻辑（依赖运动控制链路）。
+        // if (!zebra_cross_stop_triggered &&
+        //     g_vision_runtime_config.zebra_cross_detection_enabled &&
+        //     vision_image_processor_zebra_cross_count() >= 1)
+        // {
+        //     bool zebra_cross_stop_triggered = true;
+        //     printf("[ZEBRA] zebra_cross_count=%d -> requesting full process exit like Ctrl+C\r\n",
+        //            vision_image_processor_zebra_cross_count());
+        //     stop_all_motion_immediately();
+        //     g_should_exit = 1;
+        // }
 
         system_delay_ms(kMainLoopPeriodMs);
     }
