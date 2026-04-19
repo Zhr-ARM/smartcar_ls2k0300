@@ -37,8 +37,15 @@ function fmt(value) {
 }
 
 function renderRawStatus(status) {
+  const captureThreadFps = status.capture_thread_fps ?? status.capture_fps;
+  const visionProcessFps = status.vision_process_fps ?? status.process_fps;
+  const udpTxFps = status.udp_tx_fps ?? status.send_fps;
+
   const rows = [
     ['ts_ms', status.ts_ms],
+    ['capture_thread_fps', captureThreadFps],
+    ['vision_process_fps', visionProcessFps],
+    ['udp_tx_fps', udpTxFps],
     ['left_current_count', status.left_current_count],
     ['right_current_count', status.right_current_count],
     ['left_filtered_count', status.left_filtered_count],

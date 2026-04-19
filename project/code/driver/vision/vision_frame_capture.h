@@ -26,4 +26,8 @@ void vision_frame_capture_cleanup();
 // 是否调用：是，每帧调用（由 vision_image_processor_process_step 调用）。
 bool vision_frame_capture_wait_next_bgr(uint8 *out_bgr, size_t out_bgr_bytes, uint32 timeout_ms, uint32 *wait_us);
 
+// 作用：读取采图线程最近 1 秒窗口统计得到的采图帧率。
+// 返回：frames per second（整数，0 表示当前无有效统计）。
+uint32 vision_frame_capture_fps();
+
 #endif

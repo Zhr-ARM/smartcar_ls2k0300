@@ -22,11 +22,17 @@ static std::array<uint8, UVC_HEIGHT * UVC_WIDTH * 3> g_capture_frame{};
 // 生产序号（采图线程递增）与消费序号（处理线程递增）。
 static uint32 g_capture_seq = 0;
 static uint32 g_processed_seq = 0;
+// 采图线程 FPS（1 秒滑动窗口近似，整数）。
+static std::atomic<uint32> g_capture_fps(0);
 
 // 作用：采图线程主循环。
 // 调用关系：仅由 vision_frame_capture_init 创建线程后调用。
 static void capture_loop()
 {
+    constexpr uint64_t kWindowUs = 1000000ULL;
+    uint32 window_frames = 0;
+    auto window_start = std::chrono::steady_clock::now();
+
     while (g_capture_running.load())
     {
         if (wait_image_refresh() < 0 || bgr_image == nullptr)
@@ -40,7 +46,20 @@ static void capture_loop()
             std::memcpy(g_capture_frame.data(), bgr_image, g_capture_frame.size());
             ++g_capture_seq;
         }
+        ++window_frames;
         g_capture_cv.notify_one();
+
+        const auto now = std::chrono::steady_clock::now();
+        const uint64_t elapsed_us = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(now - window_start).count());
+        if (elapsed_us >= kWindowUs)
+        {
+            const uint32 fps = static_cast<uint32>(
+                (static_cast<uint64_t>(window_frames) * 1000000ULL + elapsed_us / 2ULL) / elapsed_us);
+            g_capture_fps.store(fps);
+            window_frames = 0;
+            window_start = now;
+        }
     }
 }
 
@@ -69,6 +88,7 @@ bool vision_frame_capture_init(const char *camera_path)
         g_capture_seq = 0;
         g_processed_seq = 0;
     }
+    g_capture_fps.store(0);
 
     g_capture_running.store(true);
     g_capture_thread = std::thread(capture_loop);
@@ -128,4 +148,9 @@ bool vision_frame_capture_wait_next_bgr(uint8 *out_bgr, size_t out_bgr_bytes, ui
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count());
     }
     return true;
+}
+
+uint32 vision_frame_capture_fps()
+{
+    return g_capture_fps.load();
 }

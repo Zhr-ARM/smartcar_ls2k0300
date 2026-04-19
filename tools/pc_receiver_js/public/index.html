@@ -2422,6 +2422,9 @@
       addSection('速度环链路', motorRows);
 
       const perfRows = [];
+      push(perfRows, 'capture_thread_fps', status.capture_thread_fps);
+      push(perfRows, 'vision_process_fps', status.vision_process_fps);
+      push(perfRows, 'udp_tx_fps', status.udp_tx_fps);
       push(perfRows, 'capture_wait_us', status.capture_wait_us);
       push(perfRows, 'preprocess_us', status.preprocess_us);
       push(perfRows, 'otsu_us', status.otsu_us);
@@ -4274,10 +4277,14 @@
       transportRateValueEl.textContent = fmtHumanRateMbps(status.rx_udp_mbps);
       transportRateSubEl.textContent = fmtHumanRateKiB(status.rx_udp_kib_per_sec);
       transportFpsValueEl.textContent = receiverCore.hasValue(status.rx_udp_frames_per_sec) ? `${status.rx_udp_frames_per_sec} fps` : '-- fps';
+      const captureThreadFps = receiverCore.hasValue(status.capture_thread_fps) ? status.capture_thread_fps : '--';
+      const visionProcessFps = receiverCore.hasValue(status.vision_process_fps) ? status.vision_process_fps : '--';
+      const udpTxFps = receiverCore.hasValue(status.udp_tx_fps) ? status.udp_tx_fps : '--';
       transportFpsSubEl.textContent =
-        `gray ${receiverCore.hasValue(status.rx_udp_gray_fps) ? status.rx_udp_gray_fps : '--'} / `
+        `rx gray ${receiverCore.hasValue(status.rx_udp_gray_fps) ? status.rx_udp_gray_fps : '--'} / `
         + `rgb ${receiverCore.hasValue(status.rx_udp_rgb_fps) ? status.rx_udp_rgb_fps : '--'} / `
-        + `binary ${receiverCore.hasValue(status.rx_udp_binary_fps) ? status.rx_udp_binary_fps : '--'}`;
+        + `binary ${receiverCore.hasValue(status.rx_udp_binary_fps) ? status.rx_udp_binary_fps : '--'} | `
+        + `board cap ${captureThreadFps} / proc ${visionProcessFps} / tx ${udpTxFps}`;
       transportModeValueEl.textContent = buildTransportModeSummary(status);
       transportModeSubEl.textContent = receiverCore.hasValue(status.udp_web_max_fps)
         ? `max fps ${status.udp_web_max_fps}`

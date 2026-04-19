@@ -3,8 +3,10 @@
 #include "motor_thread.h"
 #include "line_follow_thread.h"
 #include "driver/vision/vision_config.h"
+#include "driver/vision/vision_frame_capture.h"
 #include "driver/vision/vision_infer_async.h"
 #include "driver/vision/vision_image_processor.h"
+#include "vision_thread.h"
 
 #include "zf_driver_tcp_client.h"
 #include "zf_driver_udp.h"
@@ -74,6 +76,7 @@ std::atomic<bool> g_tcp_enabled(true);             // TCP 状态发送开关。
 std::atomic<uint32> g_udp_max_fps(kUdpDefaultMaxFps); // UDP 图像限频。
 std::atomic<uint64> g_udp_last_send_tick_us(0);    // UDP 限频时间戳。
 std::atomic<uint32> g_udp_frame_id(0);             // UDP 分片帧号。
+std::atomic<uint32> g_udp_tx_fps(0);               // UDP 发送帧率（mode 0/1/2 合计，不含 ROI64）。
 
 std::mutex g_init_mutex;      // UDP/TCP 初始化锁。
 bool g_udp_ready = false;     // UDP 初始化是否成功。
@@ -560,6 +563,28 @@ static void send_udp_frame(const std::vector<uint8> &image_bytes,
         return;
     }
 
+    // UDP 图像发送 FPS（1 秒窗口）统计，不含 ROI64(mode=3)。
+    static uint32 window_frames = 0;
+    static uint64 window_start_us = 0;
+    const uint64 now = now_us();
+    if (window_start_us == 0)
+    {
+        window_start_us = now;
+    }
+    if (mode <= 2)
+    {
+        ++window_frames;
+    }
+    const uint64 elapsed_us = now - window_start_us;
+    if (elapsed_us >= 1000000ULL)
+    {
+        const uint32 fps = static_cast<uint32>(
+            (static_cast<uint64>(window_frames) * 1000000ULL + elapsed_us / 2ULL) / elapsed_us);
+        g_udp_tx_fps.store(fps);
+        window_frames = 0;
+        window_start_us = now;
+    }
+
     const uint32 frame_id = g_udp_frame_id.fetch_add(1);
     const uint32 max_chunk_data = kMaxUdpPayload - kUdpHeaderSize;
     const uint32 chunk_total = (static_cast<uint32>(image_bytes.size()) + max_chunk_data - 1U) / max_chunk_data;
@@ -606,6 +631,9 @@ static void send_tcp_status()
     uint32 total_us = 0;
     vision_image_processor_get_last_perf_us(&capture_wait_us, &preprocess_us, &otsu_us, &maze_us, &total_us);
     const uint8 otsu_threshold = vision_image_processor_get_last_otsu_threshold();
+    const uint32 capture_thread_fps = vision_frame_capture_fps();
+    const uint32 vision_process_fps = vision_thread_process_fps();
+    const uint32 udp_tx_fps = g_udp_tx_fps.load();
     const int data_profile = g_vision_runtime_config.udp_web_data_profile;
     const bool send_full_debug = (data_profile == static_cast<int>(VISION_WEB_DATA_PROFILE_FULL));
 
@@ -1198,6 +1226,9 @@ static void send_tcp_status()
     append_int(true, "web_data_profile", data_profile);
     append_int(true, "web_full_debug", send_full_debug ? 1 : 0);
     append_int(true, "udp_web_max_fps", g_vision_runtime_config.udp_web_max_fps);
+    append_int(true, "capture_thread_fps", capture_thread_fps);
+    append_int(true, "vision_process_fps", vision_process_fps);
+    append_int(true, "udp_tx_fps", udp_tx_fps);
     append_bool(true, "udp_web_send_gray", g_vision_runtime_config.udp_web_send_gray_jpeg);
     append_bool(true, "udp_web_send_binary", g_vision_runtime_config.udp_web_send_binary_jpeg);
     append_bool(true, "udp_web_send_rgb", g_vision_runtime_config.udp_web_send_rgb_jpeg);

@@ -31,4 +31,7 @@ bool vision_thread_infer_enabled();
 void vision_thread_set_ncnn_enabled(bool enabled);
 bool vision_thread_ncnn_enabled();
 
+// 读取视觉处理线程最近 1 秒窗口统计得到的处理帧率。
+uint32 vision_thread_process_fps();
+
 #endif
