@@ -1084,35 +1084,55 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_route_yaw_rate_kp_enable_error_threshold_px",
                      line_follow_pid_debug.route_yaw_rate_kp_enable_error_threshold_px);
         append_float(enabled, "pid_common_mean_abs_path_error", line_follow_pid_debug.mean_abs_path_error);
-        append_float(enabled, "pid_common_front_preview_weighted_abs_error_sum",
-                     line_follow_pid_debug.front_preview_weighted_abs_error_sum);
-        append_float(enabled, "pid_common_error_speed_scale", line_follow_pid_debug.error_speed_scale);
-        append_float(enabled, "pid_common_preview_speed_scale", line_follow_pid_debug.preview_speed_scale);
-        append_float(enabled, "pid_common_front_preview_speed_scale", line_follow_pid_debug.front_preview_speed_scale);
-        append_float(enabled, "pid_common_error_slowdown_start_px", line_follow_pid_debug.error_slowdown_start_px);
-        append_float(enabled, "pid_common_error_slowdown_full_px", line_follow_pid_debug.error_slowdown_full_px);
-        append_bool(enabled, "pid_common_error_slowdown_ready", line_follow_pid_debug.error_slowdown_ready);
-        append_bool(enabled, "pid_common_error_slowdown_triggered", line_follow_pid_debug.error_slowdown_triggered);
-        append_float(enabled, "pid_common_preview_slowdown_start_dps", line_follow_pid_debug.preview_slowdown_start_dps);
-        append_float(enabled, "pid_common_preview_slowdown_full_dps", line_follow_pid_debug.preview_slowdown_full_dps);
-        append_bool(enabled, "pid_common_preview_slowdown_ready", line_follow_pid_debug.preview_slowdown_ready);
-        append_bool(enabled, "pid_common_preview_slowdown_triggered", line_follow_pid_debug.preview_slowdown_triggered);
-        append_int(enabled, "pid_common_front_preview_slowdown_point_count",
-                   line_follow_pid_debug.front_preview_slowdown_point_count);
-        append_float(enabled, "pid_common_front_preview_slowdown_start_abs_error_sum",
-                     line_follow_pid_debug.front_preview_slowdown_start_abs_error_sum);
-        append_float(enabled, "pid_common_front_preview_slowdown_full_abs_error_sum",
-                     line_follow_pid_debug.front_preview_slowdown_full_abs_error_sum);
-        append_float(enabled, "pid_common_front_preview_slowdown_min_speed_scale",
-                     line_follow_pid_debug.front_preview_slowdown_min_speed_scale);
-        append_float(enabled, "pid_common_front_preview_slowdown_max_speed_scale",
-                     line_follow_pid_debug.front_preview_slowdown_max_speed_scale);
-        append_bool(enabled, "pid_common_front_preview_slowdown_ready",
-                    line_follow_pid_debug.front_preview_slowdown_ready);
-        append_bool(enabled, "pid_common_front_preview_slowdown_triggered",
-                    line_follow_pid_debug.front_preview_slowdown_triggered);
-        append_int(enabled, "pid_common_speed_slowdown_winner_branch",
-                   line_follow_pid_debug.speed_slowdown_winner_branch);
+        append_float(enabled, "pid_common_speed_scheme_blended_abs_error_sum",
+                     line_follow_pid_debug.speed_scheme_blended_abs_error_sum);
+        append_float(enabled, "pid_common_speed_scheme_error_scale_raw",
+                     line_follow_pid_debug.speed_scheme_error_scale_raw);
+        append_float(enabled, "pid_common_speed_scheme_final_speed_scale",
+                     line_follow_pid_debug.speed_scheme_final_speed_scale);
+        append_float(enabled, "pid_common_speed_scheme_split_ratio", line_follow_pid_debug.speed_scheme_split_ratio);
+        append_float(enabled, "pid_common_speed_scheme_front_weight", line_follow_pid_debug.speed_scheme_front_weight);
+        append_float(enabled, "pid_common_speed_scheme_rear_weight", line_follow_pid_debug.speed_scheme_rear_weight);
+        append_float(enabled, "pid_common_speed_scheme_slowdown_start",
+                     line_follow_pid_debug.speed_scheme_slowdown_start);
+        append_float(enabled, "pid_common_speed_scheme_slowdown_full",
+                     line_follow_pid_debug.speed_scheme_slowdown_full);
+        append_float(enabled, "pid_common_speed_scheme_min_speed_scale",
+                     line_follow_pid_debug.speed_scheme_min_speed_scale);
+        append_float(enabled, "pid_common_speed_scheme_max_speed_scale",
+                     line_follow_pid_debug.speed_scheme_max_speed_scale);
+        append_int(enabled, "pid_common_speed_scheme_point_count",
+                   line_follow_pid_debug.speed_scheme_point_count);
+        append_bool(enabled, "pid_common_speed_scheme_ready",
+                    line_follow_pid_debug.speed_scheme_ready);
+        append_bool(enabled, "pid_common_speed_scheme_triggered",
+                    line_follow_pid_debug.speed_scheme_triggered);
+        append_int(enabled, "pid_common_speed_scheme_winner_branch",
+                   line_follow_pid_debug.speed_scheme_winner_branch);
+        append_float(enabled, "pid_common_speed_scheme_max_drop_ratio_per_cycle",
+                     line_follow_pid_debug.speed_scheme_max_drop_ratio_per_cycle);
+        append_float(enabled, "pid_common_speed_scheme_max_rise_ratio_per_cycle",
+                     line_follow_pid_debug.speed_scheme_max_rise_ratio_per_cycle);
+        append_int(enabled, "pid_common_speed_scheme_centerline_count_full_n",
+                   line_follow_pid_debug.speed_scheme_centerline_count_full_n);
+        append_float(enabled, "pid_common_speed_scheme_centerline_ratio_floor",
+                     line_follow_pid_debug.speed_scheme_centerline_ratio_floor);
+        append_float(enabled, "pid_common_speed_scheme_centerline_ratio_weight",
+                     line_follow_pid_debug.speed_scheme_centerline_ratio_weight);
+        append_float(enabled, "pid_common_speed_scheme_centerline_ratio_current",
+                     line_follow_pid_debug.speed_scheme_centerline_ratio_current);
+        append_int(enabled, "pid_common_speed_scheme_force_full_min_centerline_count",
+                   line_follow_pid_debug.speed_scheme_force_full_min_centerline_count);
+        append_float(enabled, "pid_common_speed_scheme_force_full_abs_error_sum_per_point",
+                     line_follow_pid_debug.speed_scheme_force_full_abs_error_sum_per_point);
+        append_float(enabled, "pid_common_speed_scheme_force_full_abs_error_sum_current",
+                     line_follow_pid_debug.speed_scheme_force_full_abs_error_sum_current);
+        append_float(enabled, "pid_common_speed_scheme_force_full_abs_error_sum_threshold",
+                     line_follow_pid_debug.speed_scheme_force_full_abs_error_sum_threshold);
+        append_bool(enabled, "pid_common_speed_scheme_force_full_centerline_ready",
+                    line_follow_pid_debug.speed_scheme_force_full_centerline_ready);
+        append_bool(enabled, "pid_common_speed_scheme_force_full_error_ready",
+                    line_follow_pid_debug.speed_scheme_force_full_error_ready);
         append_bool(enabled, "pid_common_force_full_speed", line_follow_pid_debug.force_full_speed);
         append_float(enabled, "pid_common_raw_steering_output", line_follow_pid_debug.raw_steering_output);
         append_float(enabled, "pid_common_clamped_steering_output", line_follow_pid_debug.clamped_steering_output);

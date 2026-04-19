@@ -84,7 +84,6 @@ namespace route_line_follow
 struct Profile
 {
     float base_speed;
-    float straight_full_speed_error_threshold_px;
 
     float position_dynamic_kp_quad_a;
     float position_dynamic_kp_base;
@@ -117,28 +116,33 @@ struct Profile
     float yaw_rate_max_integral;
     float yaw_rate_max_output;
 
-    float turn_slowdown_start_px;
-    float turn_slowdown_full_px;
-    float yaw_rate_ref_slowdown_start_dps;
-    float yaw_rate_ref_slowdown_full_dps;
-    int front_preview_slowdown_point_count;
-    float front_preview_slowdown_start_abs_error_sum;
-    float front_preview_slowdown_full_abs_error_sum;
-    float front_preview_slowdown_min_speed_scale;
-    float front_preview_slowdown_max_speed_scale;
-    float turn_min_speed_scale;
-    float turn_slowdown_max_drop_ratio_per_cycle;
-    float turn_slowdown_max_rise_ratio_per_cycle;
+    // line_error 前缀线性加权参数（新方案，按状态独立）。
+    float line_error_prefix_ratio;
+    float line_error_linear_base_b;
+
+    // base_speed 分段混合降速参数（新方案，按状态独立）。
+    float speed_scheme_front_weight;
+    float speed_scheme_rear_weight;
+    float speed_scheme_slowdown_start;
+    float speed_scheme_slowdown_full;
+    float speed_scheme_min_speed_scale;
+    float speed_scheme_max_speed_scale;
+    int speed_scheme_centerline_count_full_n;
+    float speed_scheme_centerline_ratio_floor;
+    float speed_scheme_centerline_ratio_weight;
+    int speed_scheme_force_full_min_centerline_count;
+    float speed_scheme_force_full_abs_error_sum_per_point;
+    float speed_scheme_max_drop_ratio_per_cycle;
+    float speed_scheme_max_rise_ratio_per_cycle;
 };
 
 extern float kGlobalBaseSpeedScale;
 
 bool is_dynamic_kp_range_valid(const Profile &profile);
-bool is_preview_slowdown_range_valid(const Profile &profile);
-bool is_front_preview_slowdown_range_valid(const Profile &profile);
-bool is_front_preview_speed_scale_range_valid(const Profile &profile);
 bool is_dynamic_position_kd_range_valid(const Profile &profile);
 bool is_position_kp_piecewise_range_valid(const Profile &profile);
+bool is_line_error_prefix_linear_valid(const Profile &profile);
+bool is_speed_scheme_range_valid(const Profile &profile);
 
 extern Profile kNormalProfile;
 extern Profile kStraightProfile;

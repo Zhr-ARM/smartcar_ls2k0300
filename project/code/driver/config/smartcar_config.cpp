@@ -254,6 +254,16 @@ bool take_raw(const RawMap &values,
     return true;
 }
 
+void consume_optional_key_if_present(const RawMap &values,
+                                     std::set<std::string> *consumed,
+                                     const std::string &key)
+{
+    if (values.find(key) != values.end())
+    {
+        consumed->insert(key);
+    }
+}
+
 bool parse_bool_value(const std::string &raw, bool *value)
 {
     if (raw == "true")
@@ -616,11 +626,11 @@ bool require_string_array(const RawMap &values,
     return true;
 }
 
-bool load_weighted_profile(const RawMap &values,
-                           std::set<std::string> *consumed,
-                           const std::string &prefix,
-                           pid_tuning::line_error_preview::WeightedProfile *profile,
-                           std::string *error_message)
+[[maybe_unused]] bool load_weighted_profile(const RawMap &values,
+                                            std::set<std::string> *consumed,
+                                            const std::string &prefix,
+                                            pid_tuning::line_error_preview::WeightedProfile *profile,
+                                            std::string *error_message)
 {
     if (!require_size_t(values, consumed, prefix + ".weighted_point_count", &profile->weighted_point_count, error_message))
     {
@@ -676,7 +686,6 @@ bool load_route_profile(const RawMap &values,
                         std::string *error_message)
 {
     return require_float(values, consumed, prefix + ".base_speed", &profile->base_speed, error_message) &&
-           require_float(values, consumed, prefix + ".straight_full_speed_error_threshold_px", &profile->straight_full_speed_error_threshold_px, error_message) &&
            require_float(values, consumed, prefix + ".position_dynamic_kp_quad_a", &profile->position_dynamic_kp_quad_a, error_message) &&
            require_float(values, consumed, prefix + ".position_dynamic_kp_base", &profile->position_dynamic_kp_base, error_message) &&
            require_float(values, consumed, prefix + ".position_dynamic_kp_min", &profile->position_dynamic_kp_min, error_message) &&
@@ -706,18 +715,21 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".yaw_rate_kd", &profile->yaw_rate_kd, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_max_integral", &profile->yaw_rate_max_integral, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_max_output", &profile->yaw_rate_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".turn_slowdown_start_px", &profile->turn_slowdown_start_px, error_message) &&
-           require_float(values, consumed, prefix + ".turn_slowdown_full_px", &profile->turn_slowdown_full_px, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_slowdown_start_dps", &profile->yaw_rate_ref_slowdown_start_dps, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_slowdown_full_dps", &profile->yaw_rate_ref_slowdown_full_dps, error_message) &&
-           require_int(values, consumed, prefix + ".front_preview_slowdown_point_count", &profile->front_preview_slowdown_point_count, error_message) &&
-           require_float(values, consumed, prefix + ".front_preview_slowdown_start_abs_error_sum", &profile->front_preview_slowdown_start_abs_error_sum, error_message) &&
-           require_float(values, consumed, prefix + ".front_preview_slowdown_full_abs_error_sum", &profile->front_preview_slowdown_full_abs_error_sum, error_message) &&
-           require_float(values, consumed, prefix + ".front_preview_slowdown_min_speed_scale", &profile->front_preview_slowdown_min_speed_scale, error_message) &&
-           require_float(values, consumed, prefix + ".front_preview_slowdown_max_speed_scale", &profile->front_preview_slowdown_max_speed_scale, error_message) &&
-           require_float(values, consumed, prefix + ".turn_min_speed_scale", &profile->turn_min_speed_scale, error_message) &&
-           require_float(values, consumed, prefix + ".turn_slowdown_max_drop_ratio_per_cycle", &profile->turn_slowdown_max_drop_ratio_per_cycle, error_message) &&
-           require_float(values, consumed, prefix + ".turn_slowdown_max_rise_ratio_per_cycle", &profile->turn_slowdown_max_rise_ratio_per_cycle, error_message);
+           require_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message) &&
+           require_float(values, consumed, prefix + ".line_error_linear_base_b", &profile->line_error_linear_base_b, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_front_weight", &profile->speed_scheme_front_weight, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_rear_weight", &profile->speed_scheme_rear_weight, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_slowdown_start", &profile->speed_scheme_slowdown_start, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_slowdown_full", &profile->speed_scheme_slowdown_full, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_min_speed_scale", &profile->speed_scheme_min_speed_scale, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_max_speed_scale", &profile->speed_scheme_max_speed_scale, error_message) &&
+           require_int(values, consumed, prefix + ".speed_scheme_centerline_count_full_n", &profile->speed_scheme_centerline_count_full_n, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_centerline_ratio_floor", &profile->speed_scheme_centerline_ratio_floor, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_centerline_ratio_weight", &profile->speed_scheme_centerline_ratio_weight, error_message) &&
+           require_int(values, consumed, prefix + ".speed_scheme_force_full_min_centerline_count", &profile->speed_scheme_force_full_min_centerline_count, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_force_full_abs_error_sum_per_point", &profile->speed_scheme_force_full_abs_error_sum_per_point, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_max_drop_ratio_per_cycle", &profile->speed_scheme_max_drop_ratio_per_cycle, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_max_rise_ratio_per_cycle", &profile->speed_scheme_max_rise_ratio_per_cycle, error_message);
 }
 
 PidSnapshot capture_pid_snapshot()
@@ -1149,17 +1161,18 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_INT(cross_upper_dir6_post_run_len);
     REQUIRE_RUNTIME_INT(ipm_line_error_source);
     REQUIRE_RUNTIME_INT(ipm_line_error_method);
-    REQUIRE_RUNTIME_INT(ipm_line_error_fixed_index);
-    REQUIRE_RUNTIME_SIZE_T(ipm_line_error_weighted_point_count);
-    if (!require_int_array(values, &consumed, "vision.runtime.ipm_line_error_point_indices", g_vision_runtime_config.ipm_line_error_point_indices, error_message) ||
-        !require_float_array(values, &consumed, "vision.runtime.ipm_line_error_weights", g_vision_runtime_config.ipm_line_error_weights, error_message))
-    {
-        return false;
-    }
-    REQUIRE_RUNTIME_FLOAT(ipm_line_error_speed_k);
-    REQUIRE_RUNTIME_FLOAT(ipm_line_error_speed_b);
-    REQUIRE_RUNTIME_INT(ipm_line_error_index_min);
-    REQUIRE_RUNTIME_INT(ipm_line_error_index_max);
+
+    // 兼容旧版本配置：以下键已弃用，若存在则仅消费避免触发 unknown-keys。
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_fixed_index");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_weighted_point_count");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_point_indices");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_weights");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_speed_k");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_speed_b");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_index_min");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_index_max");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_prefix_ratio");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_linear_base_b");
 
 #undef REQUIRE_RUNTIME_INT
 #undef REQUIRE_RUNTIME_BOOL
@@ -1249,13 +1262,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
 #undef REQUIRE_PID_FLOAT
 #undef REQUIRE_PID_INT
 
-    if (!load_weighted_profile(values, &consumed, "pid.line_error_preview.normal", &pid_tuning::line_error_preview::kNormalWeightedProfile, error_message) ||
-        !load_weighted_profile(values, &consumed, "pid.line_error_preview.straight", &pid_tuning::line_error_preview::kStraightWeightedProfile, error_message) ||
-        !load_weighted_profile(values, &consumed, "pid.line_error_preview.cross", &pid_tuning::line_error_preview::kCrossWeightedProfile, error_message) ||
-        !load_weighted_profile(values, &consumed, "pid.line_error_preview.circle_enter", &pid_tuning::line_error_preview::kCircleEnterWeightedProfile, error_message) ||
-        !load_weighted_profile(values, &consumed, "pid.line_error_preview.circle_inside", &pid_tuning::line_error_preview::kCircleInsideWeightedProfile, error_message) ||
-        !load_weighted_profile(values, &consumed, "pid.line_error_preview.circle_exit", &pid_tuning::line_error_preview::kCircleExitWeightedProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.normal", &pid_tuning::route_line_follow::kNormalProfile, error_message) ||
+    if (!load_route_profile(values, &consumed, "pid.route_line_follow.normal", &pid_tuning::route_line_follow::kNormalProfile, error_message) ||
         !load_route_profile(values, &consumed, "pid.route_line_follow.straight", &pid_tuning::route_line_follow::kStraightProfile, error_message) ||
         !load_route_profile(values, &consumed, "pid.route_line_follow.cross", &pid_tuning::route_line_follow::kCrossProfile, error_message) ||
         !load_route_profile(values, &consumed, "pid.route_line_follow.circle_enter", &pid_tuning::route_line_follow::kCircleEnterProfile, error_message) ||
@@ -1270,32 +1277,13 @@ bool load_from_path(const std::string &path, std::string *error_message)
         *error_message = "vision.runtime.ncnn.label_count exceeds max";
         return false;
     }
-    if (g_vision_runtime_config.ipm_line_error_weighted_point_count > VISION_LINE_ERROR_MAX_WEIGHTED_POINTS)
-    {
-        *error_message = "vision.runtime.ipm_line_error_weighted_point_count exceeds max";
-        return false;
-    }
-
-    const auto weighted_valid = pid_tuning::line_error_preview::is_weighted_profile_valid;
-    if (!weighted_valid(pid_tuning::line_error_preview::kNormalWeightedProfile) ||
-        !weighted_valid(pid_tuning::line_error_preview::kStraightWeightedProfile) ||
-        !weighted_valid(pid_tuning::line_error_preview::kCrossWeightedProfile) ||
-        !weighted_valid(pid_tuning::line_error_preview::kCircleEnterWeightedProfile) ||
-        !weighted_valid(pid_tuning::line_error_preview::kCircleInsideWeightedProfile) ||
-        !weighted_valid(pid_tuning::line_error_preview::kCircleExitWeightedProfile))
-    {
-        *error_message = "pid.line_error_preview contains invalid profile";
-        return false;
-    }
 
     const auto route_valid = [](const pid_tuning::route_line_follow::Profile &profile) {
         return pid_tuning::route_line_follow::is_dynamic_kp_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_preview_slowdown_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_front_preview_slowdown_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_front_preview_speed_scale_range_valid(profile) &&
                pid_tuning::route_line_follow::is_dynamic_position_kd_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile) &&
-               (profile.front_preview_slowdown_point_count >= 0);
+               pid_tuning::route_line_follow::is_line_error_prefix_linear_valid(profile) &&
+               pid_tuning::route_line_follow::is_speed_scheme_range_valid(profile);
     };
     if (!route_valid(pid_tuning::route_line_follow::kNormalProfile) ||
         !route_valid(pid_tuning::route_line_follow::kStraightProfile) ||

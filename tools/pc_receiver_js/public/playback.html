@@ -531,6 +531,74 @@
       font-size: 13px;
       line-height: 1.6;
     }
+    .pid-slowdown-wrap {
+      margin-top: 12px;
+      border: 1px solid rgba(71, 85, 105, 0.9);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(5, 12, 26, 0.88);
+    }
+    .pid-slowdown-title {
+      color: #e2e8f0;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 0.02em;
+    }
+    .pid-slowdown-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .pid-slowdown-card {
+      border: 1px solid rgba(71, 85, 105, 0.9);
+      border-radius: 10px;
+      padding: 8px;
+      background: rgba(15, 23, 42, 0.82);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+    .pid-slowdown-card.active {
+      border-color: rgba(56, 189, 248, 0.9);
+      background: rgba(12, 29, 46, 0.92);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.22);
+      transform: translateY(-1px);
+    }
+    .pid-slowdown-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .pid-slowdown-name {
+      color: #f8fafc;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .pid-slowdown-chip {
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: #cbd5e1;
+      border: 1px solid rgba(100, 116, 139, 0.9);
+      background: rgba(30, 41, 59, 0.88);
+      white-space: nowrap;
+    }
+    .pid-slowdown-chip.active {
+      color: #dbeafe;
+      border-color: rgba(56, 189, 248, 0.88);
+      background: rgba(12, 74, 110, 0.6);
+    }
+    .pid-slowdown-lines {
+      display: grid;
+      gap: 4px;
+      color: #cbd5e1;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .pid-slowdown-lines span {
+      color: #7dd3fc;
+    }
     .raw-status {
       margin: 0;
       max-height: 260px;
@@ -576,7 +644,8 @@
       .pid-panel,
       .overview-grid,
       .route-top,
-      .route-grid {
+      .route-grid,
+      .pid-slowdown-grid {
         grid-template-columns: minmax(0, 1fr);
       }
       .page-title {
@@ -719,6 +788,31 @@
             </div>
             <div class="straight-focus-detail" id="crossFocusDetail">等待十字判定数据...</div>
           </div>
+          <div class="straight-focus-panel" id="speedFocusPanel">
+            <div class="straight-focus-head">
+              <div class="straight-focus-title">加减速状态高亮</div>
+              <div class="straight-focus-badge" id="speedFocusBadge">等待数据</div>
+            </div>
+            <div class="straight-focus-grid">
+              <div class="straight-focus-stat">
+                <div class="straight-focus-label">中线点数</div>
+                <div class="straight-focus-value" id="speedFocusCenterlineCount">--</div>
+              </div>
+              <div class="straight-focus-stat">
+                <div class="straight-focus-label">满速点数阈值 n</div>
+                <div class="straight-focus-value" id="speedFocusMinCount">--</div>
+              </div>
+              <div class="straight-focus-stat">
+                <div class="straight-focus-label">绝对误差和</div>
+                <div class="straight-focus-value" id="speedFocusErrorSum">--</div>
+              </div>
+              <div class="straight-focus-stat">
+                <div class="straight-focus-label">满速误差阈值</div>
+                <div class="straight-focus-value" id="speedFocusErrorThreshold">--</div>
+              </div>
+            </div>
+            <div class="straight-focus-detail" id="speedFocusDetail">等待加减速数据...</div>
+          </div>
           <div class="route-judgment" id="routeStateJudgment">等待状态机数据...</div>
           <div class="route-grid">
             <div class="route-block">
@@ -729,6 +823,16 @@
             <div class="route-block">
               <div class="route-block-title">关键判定条件</div>
               <div class="route-lines" id="routeConditionLines"></div>
+            </div>
+          </div>
+          <div class="route-grid">
+            <div class="route-block">
+              <div class="route-block-title">原图标志层（当前值）</div>
+              <div class="route-lines" id="routeRawFlagLines"></div>
+            </div>
+            <div class="route-block">
+              <div class="route-block-title">状态判断（实际 / 标准）</div>
+              <div class="route-lines" id="routeJudgeMetricLines"></div>
             </div>
           </div>
           <div class="route-grid">
@@ -749,6 +853,10 @@
             <div class="pid-column">
               <div class="pid-column-title">共同部分</div>
               <div class="pid-list" id="pidCommonList"></div>
+              <div class="pid-slowdown-wrap">
+                <div class="pid-slowdown-title">速度方案判定（分段混合）</div>
+                <div class="pid-slowdown-grid" id="pidSlowdownCards"></div>
+              </div>
             </div>
             <div class="pid-column">
               <div class="pid-column-title">左侧 PID 与执行链</div>

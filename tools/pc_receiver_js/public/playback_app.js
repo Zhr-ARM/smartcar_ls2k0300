@@ -33,15 +33,25 @@
   const crossFocusGap = document.getElementById('crossFocusGap');
   const crossFocusAux = document.getElementById('crossFocusAux');
   const crossFocusDetail = document.getElementById('crossFocusDetail');
+  const speedFocusPanel = document.getElementById('speedFocusPanel');
+  const speedFocusBadge = document.getElementById('speedFocusBadge');
+  const speedFocusCenterlineCount = document.getElementById('speedFocusCenterlineCount');
+  const speedFocusMinCount = document.getElementById('speedFocusMinCount');
+  const speedFocusErrorSum = document.getElementById('speedFocusErrorSum');
+  const speedFocusErrorThreshold = document.getElementById('speedFocusErrorThreshold');
+  const speedFocusDetail = document.getElementById('speedFocusDetail');
   const routeStateJudgment = document.getElementById('routeStateJudgment');
   const routeNextStateValue = document.getElementById('routeNextStateValue');
   const routeNextReason = document.getElementById('routeNextReason');
   const routeConditionLines = document.getElementById('routeConditionLines');
+  const routeRawFlagLines = document.getElementById('routeRawFlagLines');
+  const routeJudgeMetricLines = document.getElementById('routeJudgeMetricLines');
   const routeStateClues = document.getElementById('routeStateClues');
   const routeStateCounters = document.getElementById('routeStateCounters');
   const pidCommonList = document.getElementById('pidCommonList');
   const pidLeftList = document.getElementById('pidLeftList');
   const pidRightList = document.getElementById('pidRightList');
+  const pidSlowdownCards = document.getElementById('pidSlowdownCards');
 
   let playbackVideoEntries = [];
   let playbackPrimaryKey = '';
@@ -50,6 +60,12 @@
   let transferChannel = null;
   const playbackRates = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5];
   let playbackRate = 1.0;
+  const SPEED_SCHEME_FRONT_WEIGHT = 0.3;
+  const SPEED_SCHEME_REAR_WEIGHT = 0.7;
+  const SPEED_SCHEME_CENTERLINE_COUNT_FULL_N = 30;
+  const SPEED_SCHEME_CENTERLINE_RATIO_FLOOR = 0.1;
+  const SPEED_SCHEME_CENTERLINE_RATIO_WEIGHT = 0.4;
+  const SPEED_SCHEME_MODE = 'segmented_blend_only';
 
   function hasValue(value) {
     return value !== undefined && value !== null;
@@ -76,6 +92,113 @@
     if (Array.isArray(value)) return receiverCore.formatArrayInline(value);
     if (value === undefined || value === null || value === '') return 'N/A';
     return String(value);
+  }
+
+  function slowdownWinnerLabel(winner) {
+    if (winner === 1) return 'speed_scheme_branch';
+    return 'none_or_force_full_speed';
+  }
+
+  function getSpeedSchemeFrontWeight(status) {
+    const raw = Number(status && status.pid_common_speed_scheme_front_weight);
+    if (Number.isFinite(raw)) return raw;
+    return SPEED_SCHEME_FRONT_WEIGHT;
+  }
+
+  function getSpeedSchemeRearWeight(status) {
+    const raw = Number(status && status.pid_common_speed_scheme_rear_weight);
+    if (Number.isFinite(raw)) return raw;
+    return SPEED_SCHEME_REAR_WEIGHT;
+  }
+
+  function getSpeedSchemeSplitRatio(status) {
+    const raw = Number(status && status.pid_common_speed_scheme_split_ratio);
+    if (Number.isFinite(raw)) return raw;
+    return 0.6;
+  }
+
+  function getSpeedSchemeCenterlineCountFullN(status) {
+    const raw = Number(status && status.pid_common_speed_scheme_centerline_count_full_n);
+    return Number.isFinite(raw) ? raw : SPEED_SCHEME_CENTERLINE_COUNT_FULL_N;
+  }
+
+  function getSpeedSchemeCenterlineRatioFloor(status) {
+    const raw = Number(status && status.pid_common_speed_scheme_centerline_ratio_floor);
+    return Number.isFinite(raw) ? raw : SPEED_SCHEME_CENTERLINE_RATIO_FLOOR;
+  }
+
+  function getSpeedSchemeCenterlineRatioWeight(status) {
+    const raw = Number(status && status.pid_common_speed_scheme_centerline_ratio_weight);
+    return Number.isFinite(raw) ? raw : SPEED_SCHEME_CENTERLINE_RATIO_WEIGHT;
+  }
+
+  function getSpeedSchemeCenterlineRatioCurrent(status) {
+    const raw = Number(status && status.pid_common_speed_scheme_centerline_ratio_current);
+    return Number.isFinite(raw) ? raw : null;
+  }
+
+  function getSpeedSchemeErrorScaleRaw(status) {
+    const raw = Number(status && status.pid_common_speed_scheme_error_scale_raw);
+    return Number.isFinite(raw) ? raw : null;
+  }
+
+  function renderSlowdownCards(status, container) {
+    if (!container) return;
+    const winner = Number(status && status.pid_common_speed_scheme_winner_branch) || 0;
+    const splitRatio = getSpeedSchemeSplitRatio(status);
+    const frontWeight = getSpeedSchemeFrontWeight(status);
+    const rearWeight = getSpeedSchemeRearWeight(status);
+    const centerlineCountFullN = getSpeedSchemeCenterlineCountFullN(status);
+    const centerlineRatioFloor = getSpeedSchemeCenterlineRatioFloor(status);
+    const centerlineRatioWeight = getSpeedSchemeCenterlineRatioWeight(status);
+    const errorWeight = 1.0 - centerlineRatioWeight;
+    const centerlineRatioCurrent = getSpeedSchemeCenterlineRatioCurrent(status);
+    const errorScaleRaw = getSpeedSchemeErrorScaleRaw(status);
+    const forceFull = Number(status && status.pid_common_force_full_speed) === 1 || (status && status.pid_common_force_full_speed) === true;
+    const branches = [
+      {
+        id: 1,
+        name: 'Segmented Blend',
+        lines: [
+          `模式: <span>${SPEED_SCHEME_MODE}</span>`,
+          `split_ratio: <span>${fmtPidValue(splitRatio)}</span>（前段 0~split，后段 split~1）`,
+          `权重(front/rear): <span>${fmtPidValue(frontWeight)} / ${fmtPidValue(rearWeight)}</span>`,
+          `混合误差: <span>${fmtPidValue(status && status.pid_common_speed_scheme_blended_abs_error_sum)}</span>`,
+          `中线长度参数(n/floor/w): <span>${fmtPidValue(centerlineCountFullN)} / ${fmtPidValue(centerlineRatioFloor)} / ${fmtPidValue(centerlineRatioWeight)}</span>`,
+          `中线点数 current: <span>${fmtPidValue(status && status.pid_common_speed_scheme_point_count)}</span>`,
+          `中线长度比例 current: <span>${fmtPidValue(centerlineRatioCurrent)}</span>（由 selected_count / n 限幅）`,
+          `最终比例合成: <span>${fmtPidValue(errorWeight)}</span>*error_scale + <span>${fmtPidValue(centerlineRatioWeight)}</span>*centerline_ratio`,
+          `阈值(start/full): <span>${fmtPidValue(status && status.pid_common_speed_scheme_slowdown_start)} / ${fmtPidValue(status && status.pid_common_speed_scheme_slowdown_full)}</span>`,
+          `比例(min/max/error/current): <span>${fmtPidValue(status && status.pid_common_speed_scheme_min_speed_scale)} / ${fmtPidValue(status && status.pid_common_speed_scheme_max_speed_scale)} / ${fmtPidValue(errorScaleRaw)} / ${fmtPidValue(status && status.pid_common_speed_scheme_final_speed_scale)}</span>`,
+          `单周期升降速(rise/drop): <span>${fmtPidValue(status && status.pid_common_speed_scheme_max_rise_ratio_per_cycle)} / ${fmtPidValue(status && status.pid_common_speed_scheme_max_drop_ratio_per_cycle)}</span>`,
+          `判定(ready/triggered): <span>${fmtPidValue(status && status.pid_common_speed_scheme_ready)} / ${fmtPidValue(status && status.pid_common_speed_scheme_triggered)}</span>`
+        ]
+      },
+      {
+        id: 4,
+        name: 'Force Full Override',
+        lines: [
+          `force_full_speed: <span>${fmtPidValue(status && status.pid_common_force_full_speed)}</span>`,
+          `profile_base_speed: <span>${fmtPidValue(status && status.pid_common_profile_base_speed)}</span>`,
+          `desired_base_speed: <span>${fmtPidValue(status && status.pid_common_desired_base_speed)}</span>`,
+          `applied_base_speed: <span>${fmtPidValue(status && status.pid_common_applied_base_speed)}</span>`,
+          `当前赢家: <span>${slowdownWinnerLabel(winner)}</span>`
+        ]
+      }
+    ];
+    container.innerHTML = branches.map((branch) => {
+      const active = (branch.id === 1 && winner === 1 && !forceFull) || (branch.id === 4 && forceFull);
+      const chip = active ? '选中支路' : '未选中';
+      return `
+        <div class="pid-slowdown-card${active ? ' active' : ''}">
+          <div class="pid-slowdown-card-head">
+            <div class="pid-slowdown-name">${branch.name}</div>
+            <div class="pid-slowdown-chip${active ? ' active' : ''}">${chip}</div>
+          </div>
+          <div class="pid-slowdown-lines">${branch.lines.map((line) => `<div>${line}</div>`).join('')}</div>
+        </div>
+      `;
+    }).join('');
   }
 
   function renderStraightFocus(status) {
@@ -177,6 +300,64 @@
     crossFocusDetail.textContent = details.join('；');
   }
 
+  function renderSpeedFocus(status) {
+    if (!speedFocusPanel) return;
+    const centerlineCount = Number(status && status.straight_selected_centerline_count);
+    const minCount = Number(status && status.pid_common_speed_scheme_force_full_min_centerline_count);
+    const absErrorSumCurrent = Number(status && status.pid_common_speed_scheme_force_full_abs_error_sum_current);
+    const absErrorSumThreshold = Number(status && status.pid_common_speed_scheme_force_full_abs_error_sum_threshold);
+    const forceFull = Number(status && status.pid_common_force_full_speed) === 1 || (status && status.pid_common_force_full_speed) === true;
+    const centerlineReady = Number(status && status.pid_common_speed_scheme_force_full_centerline_ready) === 1 ||
+      (status && status.pid_common_speed_scheme_force_full_centerline_ready) === true;
+    const errorReady = Number(status && status.pid_common_speed_scheme_force_full_error_ready) === 1 ||
+      (status && status.pid_common_speed_scheme_force_full_error_ready) === true;
+    const profileBaseSpeed = Number(status && status.pid_common_profile_base_speed);
+    const desiredBaseSpeed = Number(status && status.pid_common_desired_base_speed);
+    const appliedBaseSpeed = Number(status && status.pid_common_applied_base_speed);
+    const hasData = Number.isFinite(centerlineCount) ||
+      Number.isFinite(minCount) ||
+      Number.isFinite(absErrorSumCurrent) ||
+      Number.isFinite(absErrorSumThreshold);
+
+    speedFocusPanel.classList.remove('ready', 'not-ready');
+    speedFocusPanel.classList.add(forceFull ? 'ready' : 'not-ready');
+
+    let modeLabel = '等待数据';
+    if (hasData) {
+      if (forceFull) {
+        modeLabel = '满速直通';
+      } else if (Number.isFinite(desiredBaseSpeed) && Number.isFinite(appliedBaseSpeed)) {
+        const speedDelta = desiredBaseSpeed - appliedBaseSpeed;
+        if (speedDelta > 1.0) modeLabel = '加速中';
+        else if (speedDelta < -1.0) modeLabel = '减速中';
+        else modeLabel = '速度持平';
+      } else {
+        modeLabel = '条件评估中';
+      }
+    }
+
+    speedFocusBadge.textContent = modeLabel;
+    speedFocusCenterlineCount.textContent = Number.isFinite(centerlineCount) ? String(centerlineCount) : '--';
+    speedFocusMinCount.textContent = Number.isFinite(minCount) ? String(minCount) : '--';
+    speedFocusErrorSum.textContent = Number.isFinite(absErrorSumCurrent) ? absErrorSumCurrent.toFixed(1) : '--';
+    speedFocusErrorThreshold.textContent = Number.isFinite(absErrorSumThreshold) ? absErrorSumThreshold.toFixed(1) : '--';
+
+    if (!hasData) {
+      speedFocusDetail.textContent = '等待加减速数据...';
+      return;
+    }
+
+    const details = [];
+    details.push(`点数条件：${centerlineReady ? '满足' : '未满足'}（count > n）`);
+    details.push(`误差条件：${errorReady ? '满足' : '未满足'}（abs_sum < count*k）`);
+    if (Number.isFinite(profileBaseSpeed) && Number.isFinite(desiredBaseSpeed) && Number.isFinite(appliedBaseSpeed)) {
+      const speedDelta = desiredBaseSpeed - appliedBaseSpeed;
+      details.push(`速度(profile/desired/applied)=${profileBaseSpeed.toFixed(1)}/${desiredBaseSpeed.toFixed(1)}/${appliedBaseSpeed.toFixed(1)}`);
+      details.push(`速度差(目标-当前)=${speedDelta.toFixed(1)}`);
+    }
+    speedFocusDetail.textContent = details.join('；');
+  }
+
   function renderMetaPills(recording) {
     const pills = [];
     if (recording && recording.folder) pills.push(`目录: ${recording.folder}`);
@@ -197,6 +378,7 @@
     const route = receiverCore.buildRouteStateSummary(status || {});
     renderStraightFocus(status);
     renderCrossFocus(status);
+    renderSpeedFocus(status);
     routeMainStateValue.textContent = route.mainStateLabel || '--';
     routeSubStateValue.textContent = route.subStateLabel || '--';
     routePreferredSourceValue.textContent = route.preferredSourceLabel || '--';
@@ -223,6 +405,32 @@
       div.innerHTML = `<strong>${item.label}</strong>${item.value}${item.detail ? ` | ${item.detail}` : ''}`;
       routeConditionLines.appendChild(div);
     });
+
+    if (routeRawFlagLines) {
+      routeRawFlagLines.innerHTML = '';
+      const rawLines = Array.isArray(route.rawFlagLines) && route.rawFlagLines.length > 0
+        ? route.rawFlagLines
+        : [{ label: '原图标志层', value: '--', detail: '等待状态机输入层数据...' }];
+      rawLines.forEach((item) => {
+        const div = document.createElement('div');
+        div.className = 'route-line';
+        div.innerHTML = `<strong>${item.label}</strong>${item.value}${item.detail ? ` | ${item.detail}` : ''}`;
+        routeRawFlagLines.appendChild(div);
+      });
+    }
+
+    if (routeJudgeMetricLines) {
+      routeJudgeMetricLines.innerHTML = '';
+      const judgeLines = Array.isArray(route.judgeMetricLines) && route.judgeMetricLines.length > 0
+        ? route.judgeMetricLines
+        : [{ label: '状态判断', value: '--', detail: '等待状态机输入层数据...' }];
+      judgeLines.forEach((item) => {
+        const div = document.createElement('div');
+        div.className = 'route-line';
+        div.innerHTML = `<strong>${item.label}</strong>${item.value}${item.detail ? ` | ${item.detail}` : ''}`;
+        routeJudgeMetricLines.appendChild(div);
+      });
+    }
 
     routeStateClues.innerHTML = '';
     const clues = route.clues.length > 0 ? route.clues : ['暂无可用判定线索'];
@@ -254,12 +462,8 @@
   }
 
   function renderPidStatusPanel(status) {
-    const slowdownWinnerLabel = (winner) => {
-      if (winner === 1) return 'error_branch';
-      if (winner === 2) return 'preview_branch';
-      if (winner === 3) return 'front_preview_branch';
-      return 'none_or_force_full_speed';
-    };
+    const speedSchemeFrontWeight = getSpeedSchemeFrontWeight(status);
+    const speedSchemeRearWeight = getSpeedSchemeRearWeight(status);
     const commonRows = [
       ['vision_updated', status.pid_common_vision_updated],
       ['imu_updated', status.pid_common_imu_updated],
@@ -291,14 +495,21 @@
       ['route(yaw_gain/ref_limit/steer_max)', [status.pid_common_route_yaw_rate_ref_gain, status.pid_common_route_yaw_rate_ref_limit, status.pid_common_route_steering_max_output]],
       ['yaw_kp_enable_error_threshold_px', status.pid_common_route_yaw_rate_kp_enable_error_threshold_px],
       ['mean_abs_path_error', status.pid_common_mean_abs_path_error],
-      ['slowdown_winner_branch', slowdownWinnerLabel(status.pid_common_speed_slowdown_winner_branch)],
-      ['slowdown.error(value/start/full)', [status.pid_common_abs_filtered_error_px, status.pid_common_error_slowdown_start_px, status.pid_common_error_slowdown_full_px]],
-      ['slowdown.error(ready/triggered/scale)', [status.pid_common_error_slowdown_ready, status.pid_common_error_slowdown_triggered, status.pid_common_error_speed_scale]],
-      ['slowdown.preview(value/start/full)', [Math.abs(Number(status.pid_common_yaw_rate_ref_dps) || 0), status.pid_common_preview_slowdown_start_dps, status.pid_common_preview_slowdown_full_dps]],
-      ['slowdown.preview(ready/triggered/scale)', [status.pid_common_preview_slowdown_ready, status.pid_common_preview_slowdown_triggered, status.pid_common_preview_speed_scale]],
-      ['slowdown.front_preview(n/value/start/full)', [status.pid_common_front_preview_slowdown_point_count, status.pid_common_front_preview_weighted_abs_error_sum, status.pid_common_front_preview_slowdown_start_abs_error_sum, status.pid_common_front_preview_slowdown_full_abs_error_sum]],
-      ['slowdown.front_preview(min/max_scale)', [status.pid_common_front_preview_slowdown_min_speed_scale, status.pid_common_front_preview_slowdown_max_speed_scale]],
-      ['slowdown.front_preview(ready/triggered/scale)', [status.pid_common_front_preview_slowdown_ready, status.pid_common_front_preview_slowdown_triggered, status.pid_common_front_preview_speed_scale]],
+      ['speed_scheme_mode', SPEED_SCHEME_MODE],
+      ['speed_scheme_split_ratio', getSpeedSchemeSplitRatio(status)],
+      ['speed_scheme_weights(front/rear)', [speedSchemeFrontWeight, speedSchemeRearWeight]],
+      ['speed_scheme_centerline(n/floor/w)', [getSpeedSchemeCenterlineCountFullN(status), getSpeedSchemeCenterlineRatioFloor(status), getSpeedSchemeCenterlineRatioWeight(status)]],
+      ['speed_scheme_centerline_ratio_current', getSpeedSchemeCenterlineRatioCurrent(status)],
+      ['speed_scheme_blended_error', status.pid_common_speed_scheme_blended_abs_error_sum],
+      ['speed_scheme_error_scale_raw', getSpeedSchemeErrorScaleRaw(status)],
+      ['speed_scheme_force_full(n/k)', [status.pid_common_speed_scheme_force_full_min_centerline_count, status.pid_common_speed_scheme_force_full_abs_error_sum_per_point]],
+      ['speed_scheme_force_full(abs_sum/threshold)', [status.pid_common_speed_scheme_force_full_abs_error_sum_current, status.pid_common_speed_scheme_force_full_abs_error_sum_threshold]],
+      ['speed_scheme_force_full_ready(centerline/error)', [status.pid_common_speed_scheme_force_full_centerline_ready, status.pid_common_speed_scheme_force_full_error_ready]],
+      ['speed_scheme_threshold(start/full)', [status.pid_common_speed_scheme_slowdown_start, status.pid_common_speed_scheme_slowdown_full]],
+      ['speed_scheme_scale(min/max/current)', [status.pid_common_speed_scheme_min_speed_scale, status.pid_common_speed_scheme_max_speed_scale, status.pid_common_speed_scheme_final_speed_scale]],
+      ['speed_scheme_point_count', status.pid_common_speed_scheme_point_count],
+      ['speed_scheme_ramp(rise/drop)', [status.pid_common_speed_scheme_max_rise_ratio_per_cycle, status.pid_common_speed_scheme_max_drop_ratio_per_cycle]],
+      ['speed_scheme_state(ready/triggered/winner)', [status.pid_common_speed_scheme_ready, status.pid_common_speed_scheme_triggered, slowdownWinnerLabel(status.pid_common_speed_scheme_winner_branch)]],
       ['force_full_speed', status.pid_common_force_full_speed],
       ['steering(raw/clamped/applied)', [status.pid_common_raw_steering_output, status.pid_common_clamped_steering_output, status.pid_common_applied_steering_output]],
       ['line_follow_targets(L/R)', [status.pid_common_left_target_count_from_line_follow, status.pid_common_right_target_count_from_line_follow]],
@@ -346,13 +557,31 @@
     renderPidColumn(pidCommonList, commonRows);
     renderPidColumn(pidLeftList, leftRows);
     renderPidColumn(pidRightList, rightRows);
+    renderSlowdownCards(status, pidSlowdownCards);
   }
 
   function renderOverview(status, video, duration) {
+    const splitRatio = getSpeedSchemeSplitRatio(status);
+    const splitRatioText = Number.isFinite(splitRatio) ? fmtPidValue(splitRatio) : 'N/A';
+    const speedSchemeFrontWeight = getSpeedSchemeFrontWeight(status);
+    const speedSchemeRearWeight = getSpeedSchemeRearWeight(status);
+    const speedSchemeCenterlineCountN = getSpeedSchemeCenterlineCountFullN(status);
+    const speedSchemeCenterlineFloor = getSpeedSchemeCenterlineRatioFloor(status);
+    const speedSchemeCenterlineWeight = getSpeedSchemeCenterlineRatioWeight(status);
+    const speedSchemeCenterlineRatioCurrent = getSpeedSchemeCenterlineRatioCurrent(status);
+    const speedSchemeErrorScaleRaw = getSpeedSchemeErrorScaleRaw(status);
     const rows = [
       ['当前时间', `${fmtPlaybackTime(video ? (video.currentTime || 0) : 0)} / ${fmtPlaybackTime(duration || 0)}`],
       ['主时间轴', playbackPrimaryKey || '--'],
       ['line_error', hasValue(status.line_error) ? fmtPidValue(status.line_error) : 'N/A'],
+      ['速度方案', SPEED_SCHEME_MODE],
+      ['分段比例/权重', `split=${splitRatioText}, w=${fmtPidValue(speedSchemeFrontWeight)}/${fmtPidValue(speedSchemeRearWeight)}`],
+      ['中线长度参数', `n=${fmtPidValue(speedSchemeCenterlineCountN)}, floor=${fmtPidValue(speedSchemeCenterlineFloor)}, w=${fmtPidValue(speedSchemeCenterlineWeight)}`],
+      ['中线长度比例', hasValue(speedSchemeCenterlineRatioCurrent) ? fmtPidValue(speedSchemeCenterlineRatioCurrent) : 'N/A'],
+      ['中线点数', hasValue(status.pid_common_speed_scheme_point_count) ? fmtPidValue(status.pid_common_speed_scheme_point_count) : 'N/A'],
+      ['混合误差/error_scale/current', `${hasValue(status.pid_common_speed_scheme_blended_abs_error_sum) ? fmtPidValue(status.pid_common_speed_scheme_blended_abs_error_sum) : 'N/A'} / ${hasValue(speedSchemeErrorScaleRaw) ? fmtPidValue(speedSchemeErrorScaleRaw) : 'N/A'} / ${hasValue(status.pid_common_speed_scheme_final_speed_scale) ? fmtPidValue(status.pid_common_speed_scheme_final_speed_scale) : 'N/A'}`],
+      ['阈值(start/full)', `${hasValue(status.pid_common_speed_scheme_slowdown_start) ? fmtPidValue(status.pid_common_speed_scheme_slowdown_start) : 'N/A'} / ${hasValue(status.pid_common_speed_scheme_slowdown_full) ? fmtPidValue(status.pid_common_speed_scheme_slowdown_full) : 'N/A'}`],
+      ['单周期升降速', `${hasValue(status.pid_common_speed_scheme_max_rise_ratio_per_cycle) ? fmtPidValue(status.pid_common_speed_scheme_max_rise_ratio_per_cycle) : 'N/A'} / ${hasValue(status.pid_common_speed_scheme_max_drop_ratio_per_cycle) ? fmtPidValue(status.pid_common_speed_scheme_max_drop_ratio_per_cycle) : 'N/A'} (rise/drop)`],
       ['巡线输出', hasValue(status.pid_common_applied_steering_output) ? fmtPidValue(status.pid_common_applied_steering_output) : 'N/A'],
       ['基础速度', hasValue(status.pid_common_applied_base_speed) ? fmtPidValue(status.pid_common_applied_base_speed) : 'N/A'],
       ['状态机', [status.route_main_state, status.route_sub_state].filter(hasValue).join(' / ') || 'N/A'],

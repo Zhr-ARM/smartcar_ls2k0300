@@ -319,7 +319,7 @@ static int g_last_applied_line_error_profile_id = -1;
 int line_error = 0;
 float line_sample_ratio = g_vision_processor_config.default_line_sample_ratio;
 
-static const pid_tuning::line_error_preview::WeightedProfile *select_line_error_weighted_profile_by_route(
+static const pid_tuning::route_line_follow::Profile *select_route_line_follow_profile_by_route(
     const vision_route_state_snapshot_t &route_snapshot,
     int *profile_id)
 {
@@ -332,11 +332,11 @@ static const pid_tuning::line_error_preview::WeightedProfile *select_line_error_
     {
         case VISION_ROUTE_MAIN_STRAIGHT:
             if (profile_id) *profile_id = kLineErrorProfileStraight;
-            return &pid_tuning::line_error_preview::kStraightWeightedProfile;
+            return &pid_tuning::route_line_follow::kStraightProfile;
 
         case VISION_ROUTE_MAIN_CROSS:
             if (profile_id) *profile_id = kLineErrorProfileCross;
-            return &pid_tuning::line_error_preview::kCrossWeightedProfile;
+            return &pid_tuning::route_line_follow::kCrossProfile;
 
         case VISION_ROUTE_MAIN_CIRCLE_LEFT:
         case VISION_ROUTE_MAIN_CIRCLE_RIGHT:
@@ -345,7 +345,7 @@ static const pid_tuning::line_error_preview::WeightedProfile *select_line_error_
                 case VISION_ROUTE_SUB_CIRCLE_LEFT_1:
                 case VISION_ROUTE_SUB_CIRCLE_RIGHT_1:
                     if (profile_id) *profile_id = kLineErrorProfileCircleEnter;
-                    return &pid_tuning::line_error_preview::kCircleEnterWeightedProfile;
+                    return &pid_tuning::route_line_follow::kCircleEnterProfile;
 
                 case VISION_ROUTE_SUB_CIRCLE_LEFT_2:
                 case VISION_ROUTE_SUB_CIRCLE_LEFT_3:
@@ -354,39 +354,32 @@ static const pid_tuning::line_error_preview::WeightedProfile *select_line_error_
                 case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:
                 case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:
                     if (profile_id) *profile_id = kLineErrorProfileCircleInside;
-                    return &pid_tuning::line_error_preview::kCircleInsideWeightedProfile;
+                    return &pid_tuning::route_line_follow::kCircleInsideProfile;
 
                 case VISION_ROUTE_SUB_CIRCLE_LEFT_5:
                 case VISION_ROUTE_SUB_CIRCLE_LEFT_6:
                 case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:
                 case VISION_ROUTE_SUB_CIRCLE_RIGHT_6:
                     if (profile_id) *profile_id = kLineErrorProfileCircleExit;
-                    return &pid_tuning::line_error_preview::kCircleExitWeightedProfile;
+                    return &pid_tuning::route_line_follow::kCircleExitProfile;
 
                 default:
                     if (profile_id) *profile_id = kLineErrorProfileCircleEnter;
-                    return &pid_tuning::line_error_preview::kCircleEnterWeightedProfile;
+                    return &pid_tuning::route_line_follow::kCircleEnterProfile;
             }
 
         case VISION_ROUTE_MAIN_NORMAL:
         default:
             if (profile_id) *profile_id = kLineErrorProfileNormal;
-            return &pid_tuning::line_error_preview::kNormalWeightedProfile;
+            return &pid_tuning::route_line_follow::kNormalProfile;
     }
 }
 
-static void apply_line_error_weighted_profile_if_needed(const vision_route_state_snapshot_t &route_snapshot)
+static void apply_line_error_profile_if_needed(const vision_route_state_snapshot_t &route_snapshot)
 {
-    const int method = g_vision_runtime_config.ipm_line_error_method;
-    if (method != VISION_IPM_LINE_ERROR_WEIGHTED_INDEX &&
-        method != VISION_IPM_LINE_ERROR_WEIGHTED_SPEED_DELTA)
-    {
-        return;
-    }
-
     int profile_id = kLineErrorProfileNormal;
-    const pid_tuning::line_error_preview::WeightedProfile *profile =
-        select_line_error_weighted_profile_by_route(route_snapshot, &profile_id);
+    const pid_tuning::route_line_follow::Profile *profile =
+        select_route_line_follow_profile_by_route(route_snapshot, &profile_id);
     if (profile == nullptr)
     {
         return;
@@ -397,9 +390,8 @@ static void apply_line_error_weighted_profile_if_needed(const vision_route_state
         return;
     }
 
-    vision_line_error_layer_set_weighted_points(profile->point_indices,
-                                                profile->weights,
-                                                profile->weighted_point_count);
+    vision_line_error_layer_set_prefix_linear_params(profile->line_error_prefix_ratio,
+                                                     profile->line_error_linear_base_b);
     g_last_applied_line_error_profile_id = profile_id;
 }
 
@@ -4806,7 +4798,7 @@ bool vision_image_processor_process_step()
     route_input.frame_encoder_delta = static_cast<uint32>(std::lround((std::fabs(motor_thread_left_count()) + std::fabs(motor_thread_right_count())) * 0.5f));
     vision_route_state_machine_update(&route_input);
     const vision_route_state_snapshot_t route_snapshot = vision_route_state_machine_snapshot();
-    apply_line_error_weighted_profile_if_needed(route_snapshot);
+    apply_line_error_profile_if_needed(route_snapshot);
 
     const bool cross2_entered_this_frame =
         (route_snapshot.main_state == VISION_ROUTE_MAIN_CROSS) &&
@@ -5910,6 +5902,13 @@ float vision_image_processor_ipm_mean_abs_offset_error()
 float vision_image_processor_ipm_front_weighted_abs_error_sum(int point_count)
 {
     return vision_line_error_layer_front_weighted_abs_error_sum(point_count);
+}
+
+float vision_image_processor_ipm_segmented_blended_abs_error(float split_ratio,
+                                                             float front_weight,
+                                                             float rear_weight)
+{
+    return vision_line_error_layer_segmented_blended_abs_error(split_ratio, front_weight, rear_weight);
 }
 
 int vision_image_processor_ipm_line_error_track_index()

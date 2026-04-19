@@ -129,7 +129,7 @@ zebra_cross_detection_enabled = true
 # 双边都丢线时是否保留上一帧平移中线。
 keep_last_centerline_on_double_loss = true
 # 十字状态识别开关。
-route_cross_detection_enabled = true
+route_cross_detection_enabled = false
 # normal/straight 进入 cross 所需的角点后沿边框连续行数最小值。
 route_cross_entry_corner_post_frame_wall_rows_min = 5
 # cross_1 进入 cross_2 的起始贴边连续行数阈值。
@@ -149,7 +149,7 @@ route_cross_stage3_left_anchor_y = 100
 route_cross_stage3_right_anchor_x = 145
 route_cross_stage3_right_anchor_y = 100
 # 圆环状态识别开关。
-route_circle_detection_enabled = true
+route_circle_detection_enabled = false
 # 圆环入口判定中对侧边界最少点数要求。
 route_circle_entry_min_boundary_count = 20
 # 圆环入口判定中角点距离对侧边界尾部的最小保留余量。
@@ -200,27 +200,8 @@ cross_upper_dir6_post_run_len = 3
 # 0=左平移，1=右平移，2=自动。
 ipm_line_error_source = 2
 # line_error 计算方法。
-# 0=固定索引，1=加权索引，2=随速度索引。
+# 0=固定索引，1=前缀线性加权索引，2=随速度索引，3=兼容模式(行为同1)。
 ipm_line_error_method = 3
-# 固定索引模式下使用的中线点索引。
-ipm_line_error_fixed_index = 1
-# 加权索引模式下实际参与计算的点数。
-ipm_line_error_weighted_point_count = 3
-# 加权索引模式使用的点索引数组。
-# 当前解析器要求显式写满固定容量，多余部分填 0。
-ipm_line_error_point_indices = [8, 16, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-# 加权索引模式使用的权重数组。
-# 当前解析器要求显式写满固定容量，多余部分填 0。
-ipm_line_error_weights = [0.5, 0.3, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-# 随速度索引公式中的速度系数 k。
-# 公式：index = k * speed + b。
-ipm_line_error_speed_k = 0.018
-# 随速度索引公式中的常数项 b。
-ipm_line_error_speed_b = -4.5
-# 随速度索引模式允许的最小索引。
-ipm_line_error_index_min = 0
-# 随速度索引模式允许的最大索引。
-ipm_line_error_index_max = 30
 
 [vision.runtime.ncnn]
 # ncnn 模型输入宽度。
@@ -473,9 +454,9 @@ feedback_low_pass_alpha = 0.95
 # 是否启用主循环实时无刷控制。
 realtime_enabled = true
 # 左侧无刷目标占空比，单位百分比 [0, 100]。
-left_duty_percent = 0.0
+left_duty_percent = 50.0
 # 右侧无刷目标占空比，单位百分比 [0, 100]。
-right_duty_percent = 0.0
+right_duty_percent = 50.0
 
 [pid.yaw_rate_loop]
 # 视觉曲率滤波 alpha。
@@ -497,54 +478,6 @@ error_low_gain_limit_px = 3.0
 # 小误差区间降增益倍率。
 error_low_gain = 0.7
 
-[pid.line_error_preview.normal]
-# NORMAL 状态下参与加权预瞄的点数。
-weighted_point_count = 3
-# NORMAL 状态下参与加权预瞄的点索引。
-point_indices = [14, 18, 24]
-# NORMAL 状态下各预瞄点权重。
-weights = [0.5, 0.25, 0.25]
-
-[pid.line_error_preview.straight]
-# STRAIGHT 状态下参与加权预瞄的点数。
-weighted_point_count = 3
-# STRAIGHT 状态下参与加权预瞄的点索引。
-point_indices = [16, 24, 29]
-# STRAIGHT 状态下各预瞄点权重。
-weights = [0.45, 0.35, 0.2]
-
-[pid.line_error_preview.cross]
-# CROSS 状态下参与加权预瞄的点数。
-weighted_point_count = 3
-# CROSS 状态下参与加权预瞄的点索引。
-point_indices = [4, 8, 12]
-# CROSS 状态下各预瞄点权重。
-weights = [0.5, 0.4, 0.1]
-
-[pid.line_error_preview.circle_enter]
-# CIRCLE_ENTER 状态下参与加权预瞄的点数。
-weighted_point_count = 3
-# CIRCLE_ENTER 状态下参与加权预瞄的点索引。
-point_indices = [0, 2, 4]
-# CIRCLE_ENTER 状态下各预瞄点权重。
-weights = [0.5, 0.3, 0.2]
-
-[pid.line_error_preview.circle_inside]
-# CIRCLE_INSIDE 状态下参与加权预瞄的点数。
-weighted_point_count = 3
-# CIRCLE_INSIDE 状态下参与加权预瞄的点索引。
-point_indices = [0, 2, 4]
-# CIRCLE_INSIDE 状态下各预瞄点权重。
-weights = [0.5, 0.3, 0.2]
-
-[pid.line_error_preview.circle_exit]
-# CIRCLE_EXIT 状态下参与加权预瞄的点数。
-weighted_point_count = 3
-# CIRCLE_EXIT 状态下参与加权预瞄的点索引。
-point_indices = [0, 2, 4]
-# CIRCLE_EXIT 状态下各预瞄点权重。
-weights = [0.5, 0.3, 0.2]
-
 [pid.route_line_follow.global]
 # 全局基础速度倍率。
 # 用于整体提速或降速，不改变各状态之间的相对比例。
@@ -552,10 +485,7 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 320.0
-# NORMAL 档直道满速误差阈值。
-# 小于等于 0 表示关闭该逻辑。
-straight_full_speed_error_threshold_px = 0.0
+base_speed = 400.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # NORMAL 档位置环动态 Kp 基础值。
@@ -614,37 +544,37 @@ yaw_rate_kd = 0.0
 yaw_rate_max_integral = 0.0
 # NORMAL 档角速度环输出限幅。
 yaw_rate_max_output = 200.0
-# NORMAL 档按误差降速的起始点。
-turn_slowdown_start_px = 50.0
-# NORMAL 档按误差降速的满量程点。
-turn_slowdown_full_px = 60.0
-# NORMAL 档按目标横摆角速度降速的起始点。
-yaw_rate_ref_slowdown_start_dps = 35.0
-# NORMAL 档按目标横摆角速度降速的满量程点。
-yaw_rate_ref_slowdown_full_dps = 140.0
-# NORMAL 档按前 n 点衰减绝对误差和降速的点数。
-# 小于等于 0 表示关闭这一路减速。
-front_preview_slowdown_point_count = 0
-# NORMAL 档按前 n 点衰减绝对误差和降速的起始点。
-front_preview_slowdown_start_abs_error_sum = 1.0
-# NORMAL 档按前 n 点衰减绝对误差和降速的满量程点。
-front_preview_slowdown_full_abs_error_sum = 10.0
-# NORMAL 档前瞻降速比例下限。
-front_preview_slowdown_min_speed_scale = 0.5
-# NORMAL 档前瞻降速比例上限。
-front_preview_slowdown_max_speed_scale = 1.0
-# NORMAL 档最低保速比例。
-turn_min_speed_scale = 0.80
-# NORMAL 档单周期最大降速比例。
-turn_slowdown_max_drop_ratio_per_cycle = 0.82
-# NORMAL 档单周期最大升速比例。
-turn_slowdown_max_rise_ratio_per_cycle = 0.01
+# NORMAL 档 line_error 前缀比例（0,1]。
+line_error_prefix_ratio = 0.4
+# NORMAL 档 line_error 线性权重基值 b（[0,1]）。
+line_error_linear_base_b = 0.1
+# NORMAL 档速度方案前后段权重。
+speed_scheme_front_weight = 0.3
+speed_scheme_rear_weight = 0.7
+# NORMAL 档速度方案阈值（start/full）。
+speed_scheme_slowdown_start = 2.0
+speed_scheme_slowdown_full = 25.0
+# NORMAL 档速度方案比例（min/max）。
+speed_scheme_min_speed_scale = 0.8
+speed_scheme_max_speed_scale = 1.0
+# 速度方案中线长度满量程点数 n（count>=n 时长度比例按 1 计）。
+speed_scheme_centerline_count_full_n = 20
+# 速度方案中线长度比例下限（避免短时丢线导致比例过低）。
+speed_scheme_centerline_ratio_floor = 0.1
+# 速度方案中线长度比例权重（error 权重 = 1 - 此值）。
+speed_scheme_centerline_ratio_weight = 0.4
+# 满速直通：中线点数需严格大于该阈值 n。
+speed_scheme_force_full_min_centerline_count = 25
+# 满速直通：绝对误差和阈值系数 k，条件为 abs_sum < count * k。
+speed_scheme_force_full_abs_error_sum_per_point = 4.0
+# 速度方案单周期最大降速比例。
+speed_scheme_max_drop_ratio_per_cycle = 0.82
+# 速度方案单周期最大升速比例。
+speed_scheme_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.straight]
 # STRAIGHT 档基础速度。
-base_speed = 400.0
-# STRAIGHT 档直道满速误差阈值。
-straight_full_speed_error_threshold_px = 0.0
+base_speed = 600.0
 # STRAIGHT 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # STRAIGHT 档位置环动态 Kp 基础值。
@@ -703,37 +633,37 @@ yaw_rate_kd = 0.0
 yaw_rate_max_integral = 0.0
 # STRAIGHT 档角速度环输出限幅。
 yaw_rate_max_output = 160.0
-# STRAIGHT 档按误差降速的起始点。
-turn_slowdown_start_px = 1.0
-# STRAIGHT 档按误差降速的满量程点。
-turn_slowdown_full_px = 10.0
-# STRAIGHT 档按目标横摆角速度降速的起始点。
-yaw_rate_ref_slowdown_start_dps = 0.0
-# STRAIGHT 档按目标横摆角速度降速的满量程点。
-yaw_rate_ref_slowdown_full_dps = 0.0
-# STRAIGHT 档按前 n 点衰减绝对误差和降速的点数。
-# 小于等于 0 表示关闭这一路减速。
-front_preview_slowdown_point_count = 0
-# STRAIGHT 档按前 n 点衰减绝对误差和降速的起始点。
-front_preview_slowdown_start_abs_error_sum = 2.0
-# STRAIGHT 档按前 n 点衰减绝对误差和降速的满量程点。
-front_preview_slowdown_full_abs_error_sum = 15.0
-# STRAIGHT 档前瞻降速比例下限。
-front_preview_slowdown_min_speed_scale = 0.5
-# STRAIGHT 档前瞻降速比例上限。
-front_preview_slowdown_max_speed_scale = 1.0
-# STRAIGHT 档最低保速比例。
-turn_min_speed_scale = 0.2
-# STRAIGHT 档单周期最大降速比例。
-turn_slowdown_max_drop_ratio_per_cycle = 0.95
-# STRAIGHT 档单周期最大升速比例。
-turn_slowdown_max_rise_ratio_per_cycle = 0.5
+# STRAIGHT 档 line_error 前缀比例（0,1]。
+line_error_prefix_ratio = 0.4
+# STRAIGHT 档 line_error 线性权重基值 b（[0,1]）。
+line_error_linear_base_b = 0.1
+# STRAIGHT 档速度方案前后段权重。
+speed_scheme_front_weight = 0.3
+speed_scheme_rear_weight = 0.7
+# STRAIGHT 档速度方案阈值（start/full）。
+speed_scheme_slowdown_start = 2.0
+speed_scheme_slowdown_full = 25.0
+# STRAIGHT 档速度方案比例（min/max）。
+speed_scheme_min_speed_scale = 0.8
+speed_scheme_max_speed_scale = 1.0
+# 速度方案中线长度满量程点数 n（count>=n 时长度比例按 1 计）。
+speed_scheme_centerline_count_full_n = 30
+# 速度方案中线长度比例下限（避免短时丢线导致比例过低）。
+speed_scheme_centerline_ratio_floor = 0.1
+# 速度方案中线长度比例权重（error 权重 = 1 - 此值）。
+speed_scheme_centerline_ratio_weight = 0.4
+# 满速直通：中线点数需严格大于该阈值 n。
+speed_scheme_force_full_min_centerline_count = 30
+# 满速直通：绝对误差和阈值系数 k，条件为 abs_sum < count * k。
+speed_scheme_force_full_abs_error_sum_per_point = 2.0
+# 速度方案单周期最大降速比例。
+speed_scheme_max_drop_ratio_per_cycle = 0.95
+# 速度方案单周期最大升速比例。
+speed_scheme_max_rise_ratio_per_cycle = 0.5
 
 [pid.route_line_follow.cross]
 # CROSS 档基础速度。
 base_speed = 350.0
-# CROSS 档直道满速误差阈值。
-straight_full_speed_error_threshold_px = 0.0
 # CROSS 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 1.7
 # CROSS 档位置环动态 Kp 基础值。
@@ -792,37 +722,37 @@ yaw_rate_kd = 0.0
 yaw_rate_max_integral = 0.0
 # CROSS 档角速度环输出限幅。
 yaw_rate_max_output = 300.0
-# CROSS 档按误差降速的起始点。
-turn_slowdown_start_px = 1.0
-# CROSS 档按误差降速的满量程点。
-turn_slowdown_full_px = 25.0
-# CROSS 档按目标横摆角速度降速的起始点。
-yaw_rate_ref_slowdown_start_dps = 0.0
-# CROSS 档按目标横摆角速度降速的满量程点。
-yaw_rate_ref_slowdown_full_dps = 0.0
-# CROSS 档按前 n 点衰减绝对误差和降速的点数。
-# 小于等于 0 表示关闭这一路减速。
-front_preview_slowdown_point_count = 0
-# CROSS 档按前 n 点衰减绝对误差和降速的起始点。
-front_preview_slowdown_start_abs_error_sum = 0.0
-# CROSS 档按前 n 点衰减绝对误差和降速的满量程点。
-front_preview_slowdown_full_abs_error_sum = 0.0
-# CROSS 档前瞻降速比例下限。
-front_preview_slowdown_min_speed_scale = 1.0
-# CROSS 档前瞻降速比例上限。
-front_preview_slowdown_max_speed_scale = 1.0
-# CROSS 档最低保速比例。
-turn_min_speed_scale = 0.6
-# CROSS 档单周期最大降速比例。
-turn_slowdown_max_drop_ratio_per_cycle = 0.82
-# CROSS 档单周期最大升速比例。
-turn_slowdown_max_rise_ratio_per_cycle = 0.01
+# CROSS 档 line_error 前缀比例（0,1]。
+line_error_prefix_ratio = 0.4
+# CROSS 档 line_error 线性权重基值 b（[0,1]）。
+line_error_linear_base_b = 0.1
+# CROSS 档速度方案前后段权重。
+speed_scheme_front_weight = 0.3
+speed_scheme_rear_weight = 0.7
+# CROSS 档速度方案阈值（start/full）。
+speed_scheme_slowdown_start = 2.0
+speed_scheme_slowdown_full = 25.0
+# CROSS 档速度方案比例（min/max）。
+speed_scheme_min_speed_scale = 0.8
+speed_scheme_max_speed_scale = 1.0
+# 速度方案中线长度满量程点数 n（count>=n 时长度比例按 1 计）。
+speed_scheme_centerline_count_full_n = 30
+# 速度方案中线长度比例下限（避免短时丢线导致比例过低）。
+speed_scheme_centerline_ratio_floor = 0.1
+# 速度方案中线长度比例权重（error 权重 = 1 - 此值）。
+speed_scheme_centerline_ratio_weight = 0.4
+# 满速直通：中线点数需严格大于该阈值 n。
+speed_scheme_force_full_min_centerline_count = 30
+# 满速直通：绝对误差和阈值系数 k，条件为 abs_sum < count * k。
+speed_scheme_force_full_abs_error_sum_per_point = 2.0
+# 速度方案单周期最大降速比例。
+speed_scheme_max_drop_ratio_per_cycle = 0.82
+# 速度方案单周期最大升速比例。
+speed_scheme_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.circle_enter]
 # CIRCLE_ENTER 档基础速度。
 base_speed = 250.0
-# CIRCLE_ENTER 档直道满速误差阈值。
-straight_full_speed_error_threshold_px = 0.0
 # CIRCLE_ENTER 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 1.7
 # CIRCLE_ENTER 档位置环动态 Kp 基础值。
@@ -881,37 +811,37 @@ yaw_rate_kd = 0.0
 yaw_rate_max_integral = 0.0
 # CIRCLE_ENTER 档角速度环输出限幅。
 yaw_rate_max_output = 320.0
-# CIRCLE_ENTER 档按误差降速的起始点。
-turn_slowdown_start_px = 1.0
-# CIRCLE_ENTER 档按误差降速的满量程点。
-turn_slowdown_full_px = 25.0
-# CIRCLE_ENTER 档按目标横摆角速度降速的起始点。
-yaw_rate_ref_slowdown_start_dps = 0.0
-# CIRCLE_ENTER 档按目标横摆角速度降速的满量程点。
-yaw_rate_ref_slowdown_full_dps = 0.0
-# CIRCLE_ENTER 档按前 n 点衰减绝对误差和降速的点数。
-# 小于等于 0 表示关闭这一路减速。
-front_preview_slowdown_point_count = 0
-# CIRCLE_ENTER 档按前 n 点衰减绝对误差和降速的起始点。
-front_preview_slowdown_start_abs_error_sum = 0.0
-# CIRCLE_ENTER 档按前 n 点衰减绝对误差和降速的满量程点。
-front_preview_slowdown_full_abs_error_sum = 0.0
-# CIRCLE_ENTER 档前瞻降速比例下限。
-front_preview_slowdown_min_speed_scale = 1.0
-# CIRCLE_ENTER 档前瞻降速比例上限。
-front_preview_slowdown_max_speed_scale = 1.0
-# CIRCLE_ENTER 档最低保速比例。
-turn_min_speed_scale = 0.55
-# CIRCLE_ENTER 档单周期最大降速比例。
-turn_slowdown_max_drop_ratio_per_cycle = 0.75
-# CIRCLE_ENTER 档单周期最大升速比例。
-turn_slowdown_max_rise_ratio_per_cycle = 0.01
+# CIRCLE_ENTER 档 line_error 前缀比例（0,1]。
+line_error_prefix_ratio = 0.4
+# CIRCLE_ENTER 档 line_error 线性权重基值 b（[0,1]）。
+line_error_linear_base_b = 0.1
+# CIRCLE_ENTER 档速度方案前后段权重。
+speed_scheme_front_weight = 0.3
+speed_scheme_rear_weight = 0.7
+# CIRCLE_ENTER 档速度方案阈值（start/full）。
+speed_scheme_slowdown_start = 2.0
+speed_scheme_slowdown_full = 25.0
+# CIRCLE_ENTER 档速度方案比例（min/max）。
+speed_scheme_min_speed_scale = 0.8
+speed_scheme_max_speed_scale = 1.0
+# 速度方案中线长度满量程点数 n（count>=n 时长度比例按 1 计）。
+speed_scheme_centerline_count_full_n = 30
+# 速度方案中线长度比例下限（避免短时丢线导致比例过低）。
+speed_scheme_centerline_ratio_floor = 0.1
+# 速度方案中线长度比例权重（error 权重 = 1 - 此值）。
+speed_scheme_centerline_ratio_weight = 0.4
+# 满速直通：中线点数需严格大于该阈值 n。
+speed_scheme_force_full_min_centerline_count = 30
+# 满速直通：绝对误差和阈值系数 k，条件为 abs_sum < count * k。
+speed_scheme_force_full_abs_error_sum_per_point = 2.0
+# 速度方案单周期最大降速比例。
+speed_scheme_max_drop_ratio_per_cycle = 0.75
+# 速度方案单周期最大升速比例。
+speed_scheme_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.circle_inside]
 # CIRCLE_INSIDE 档基础速度。
 base_speed = 250.0
-# CIRCLE_INSIDE 档直道满速误差阈值。
-straight_full_speed_error_threshold_px = 0.0
 # CIRCLE_INSIDE 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 1.7
 # CIRCLE_INSIDE 档位置环动态 Kp 基础值。
@@ -970,37 +900,37 @@ yaw_rate_kd = 0.02
 yaw_rate_max_integral = 0.0
 # CIRCLE_INSIDE 档角速度环输出限幅。
 yaw_rate_max_output = 300.0
-# CIRCLE_INSIDE 档按误差降速的起始点。
-turn_slowdown_start_px = 1.0
-# CIRCLE_INSIDE 档按误差降速的满量程点。
-turn_slowdown_full_px = 25.0
-# CIRCLE_INSIDE 档按目标横摆角速度降速的起始点。
-yaw_rate_ref_slowdown_start_dps = 0.0
-# CIRCLE_INSIDE 档按目标横摆角速度降速的满量程点。
-yaw_rate_ref_slowdown_full_dps = 0.0
-# CIRCLE_INSIDE 档按前 n 点衰减绝对误差和降速的点数。
-# 小于等于 0 表示关闭这一路减速。
-front_preview_slowdown_point_count = 0
-# CIRCLE_INSIDE 档按前 n 点衰减绝对误差和降速的起始点。
-front_preview_slowdown_start_abs_error_sum = 0.0
-# CIRCLE_INSIDE 档按前 n 点衰减绝对误差和降速的满量程点。
-front_preview_slowdown_full_abs_error_sum = 0.0
-# CIRCLE_INSIDE 档前瞻降速比例下限。
-front_preview_slowdown_min_speed_scale = 1.0
-# CIRCLE_INSIDE 档前瞻降速比例上限。
-front_preview_slowdown_max_speed_scale = 1.0
-# CIRCLE_INSIDE 档最低保速比例。
-turn_min_speed_scale = 0.55
-# CIRCLE_INSIDE 档单周期最大降速比例。
-turn_slowdown_max_drop_ratio_per_cycle = 0.82
-# CIRCLE_INSIDE 档单周期最大升速比例。
-turn_slowdown_max_rise_ratio_per_cycle = 0.01
+# CIRCLE_INSIDE 档 line_error 前缀比例（0,1]。
+line_error_prefix_ratio = 0.4
+# CIRCLE_INSIDE 档 line_error 线性权重基值 b（[0,1]）。
+line_error_linear_base_b = 0.1
+# CIRCLE_INSIDE 档速度方案前后段权重。
+speed_scheme_front_weight = 0.3
+speed_scheme_rear_weight = 0.7
+# CIRCLE_INSIDE 档速度方案阈值（start/full）。
+speed_scheme_slowdown_start = 2.0
+speed_scheme_slowdown_full = 25.0
+# CIRCLE_INSIDE 档速度方案比例（min/max）。
+speed_scheme_min_speed_scale = 0.8
+speed_scheme_max_speed_scale = 1.0
+# 速度方案中线长度满量程点数 n（count>=n 时长度比例按 1 计）。
+speed_scheme_centerline_count_full_n = 30
+# 速度方案中线长度比例下限（避免短时丢线导致比例过低）。
+speed_scheme_centerline_ratio_floor = 0.1
+# 速度方案中线长度比例权重（error 权重 = 1 - 此值）。
+speed_scheme_centerline_ratio_weight = 0.4
+# 满速直通：中线点数需严格大于该阈值 n。
+speed_scheme_force_full_min_centerline_count = 30
+# 满速直通：绝对误差和阈值系数 k，条件为 abs_sum < count * k。
+speed_scheme_force_full_abs_error_sum_per_point = 2.0
+# 速度方案单周期最大降速比例。
+speed_scheme_max_drop_ratio_per_cycle = 0.82
+# 速度方案单周期最大升速比例。
+speed_scheme_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.circle_exit]
 # CIRCLE_EXIT 档基础速度。
 base_speed = 250.0
-# CIRCLE_EXIT 档直道满速误差阈值。
-straight_full_speed_error_threshold_px = 0.0
 # CIRCLE_EXIT 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 1.7
 # CIRCLE_EXIT 档位置环动态 Kp 基础值。
@@ -1059,28 +989,30 @@ yaw_rate_kd = 0.02
 yaw_rate_max_integral = 0.0
 # CIRCLE_EXIT 档角速度环输出限幅。
 yaw_rate_max_output = 300.0
-# CIRCLE_EXIT 档按误差降速的起始点。
-turn_slowdown_start_px = 1.0
-# CIRCLE_EXIT 档按误差降速的满量程点。
-turn_slowdown_full_px = 25.0
-# CIRCLE_EXIT 档按目标横摆角速度降速的起始点。
-yaw_rate_ref_slowdown_start_dps = 0.0
-# CIRCLE_EXIT 档按目标横摆角速度降速的满量程点。
-yaw_rate_ref_slowdown_full_dps = 0.0
-# CIRCLE_EXIT 档按前 n 点衰减绝对误差和降速的点数。
-# 小于等于 0 表示关闭这一路减速。
-front_preview_slowdown_point_count = 0
-# CIRCLE_EXIT 档按前 n 点衰减绝对误差和降速的起始点。
-front_preview_slowdown_start_abs_error_sum = 0.0
-# CIRCLE_EXIT 档按前 n 点衰减绝对误差和降速的满量程点。
-front_preview_slowdown_full_abs_error_sum = 0.0
-# CIRCLE_EXIT 档前瞻降速比例下限。
-front_preview_slowdown_min_speed_scale = 1.0
-# CIRCLE_EXIT 档前瞻降速比例上限。
-front_preview_slowdown_max_speed_scale = 1.0
-# CIRCLE_EXIT 档最低保速比例。
-turn_min_speed_scale = 0.6
-# CIRCLE_EXIT 档单周期最大降速比例。
-turn_slowdown_max_drop_ratio_per_cycle = 0.82
-# CIRCLE_EXIT 档单周期最大升速比例。
-turn_slowdown_max_rise_ratio_per_cycle = 0.01
+# CIRCLE_EXIT 档 line_error 前缀比例（0,1]。
+line_error_prefix_ratio = 0.4
+# CIRCLE_EXIT 档 line_error 线性权重基值 b（[0,1]）。
+line_error_linear_base_b = 0.1
+# CIRCLE_EXIT 档速度方案前后段权重。
+speed_scheme_front_weight = 0.3
+speed_scheme_rear_weight = 0.7
+# CIRCLE_EXIT 档速度方案阈值（start/full）。
+speed_scheme_slowdown_start = 2.0
+speed_scheme_slowdown_full = 25.0
+# CIRCLE_EXIT 档速度方案比例（min/max）。
+speed_scheme_min_speed_scale = 0.8
+speed_scheme_max_speed_scale = 1.0
+# 速度方案中线长度满量程点数 n（count>=n 时长度比例按 1 计）。
+speed_scheme_centerline_count_full_n = 30
+# 速度方案中线长度比例下限（避免短时丢线导致比例过低）。
+speed_scheme_centerline_ratio_floor = 0.1
+# 速度方案中线长度比例权重（error 权重 = 1 - 此值）。
+speed_scheme_centerline_ratio_weight = 0.4
+# 满速直通：中线点数需严格大于该阈值 n。
+speed_scheme_force_full_min_centerline_count = 25
+# 满速直通：绝对误差和阈值系数 k，条件为 abs_sum < count * k。
+speed_scheme_force_full_abs_error_sum_per_point = 4.0
+# 速度方案单周期最大降速比例。
+speed_scheme_max_drop_ratio_per_cycle = 0.82
+# 速度方案单周期最大升速比例。
+speed_scheme_max_rise_ratio_per_cycle = 0.01

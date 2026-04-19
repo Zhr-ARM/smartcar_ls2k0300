@@ -345,7 +345,7 @@ typedef struct
     // 包括 line_error 取点策略与索引范围约束参数。
     // line_error 使用哪条平移中线追踪：左平移或右平移。
     int ipm_line_error_source;
-    // line_error 计算方法：0=固定索引，1=加权索引，2=随速度索引，3=加权+速度增量。
+    // line_error 计算方法：0=固定索引，1=前缀线性加权索引，2=随速度索引，3=兼容模式(行为同1)。
     int ipm_line_error_method;
     // 固定索引模式下使用的中线点索引。
     int ipm_line_error_fixed_index;
@@ -355,14 +355,18 @@ typedef struct
     int ipm_line_error_point_indices[VISION_LINE_ERROR_MAX_WEIGHTED_POINTS];
     // line_error 各索引点对应权重。
     float ipm_line_error_weights[VISION_LINE_ERROR_MAX_WEIGHTED_POINTS];
-    // 随速度索引模式公式中的速度系数 k：idx = k * speed + b。
+    // 随速度索引模式公式中的速度系数 k：idx = k * speed + b（仅 method=2 生效）。
     float ipm_line_error_speed_k;
-    // 随速度索引模式公式中的常数项 b：idx = k * speed + b。
+    // 随速度索引模式公式中的常数项 b：idx = k * speed + b（仅 method=2 生效）。
     float ipm_line_error_speed_b;
-    // 随速度索引模式允许的最小索引。
+    // 随速度索引模式允许的最小索引（仅 method=2 生效）。
     int ipm_line_error_index_min;
-    // 随速度索引模式允许的最大索引。
+    // 随速度索引模式允许的最大索引（仅 method=2 生效）。
     int ipm_line_error_index_max;
+    // 比例前缀加权模式：参与 line_error 计算的中线前缀比例（0~1]。
+    float ipm_line_error_prefix_ratio;
+    // 比例前缀加权模式：线性权重基值 b（w(i)=k*i+b，k 由点数与 1-b 计算）。
+    float ipm_line_error_linear_base_b;
 } vision_runtime_config_t;
 
 typedef struct

@@ -35,6 +35,9 @@ void vision_line_error_layer_get_speed_formula(float *speed_k, float *speed_b);
 void vision_line_error_layer_set_index_range(int index_min, int index_max);
 void vision_line_error_layer_get_index_range(int *index_min, int *index_max);
 
+void vision_line_error_layer_set_prefix_linear_params(float prefix_ratio, float linear_base_b);
+void vision_line_error_layer_get_prefix_linear_params(float *prefix_ratio, float *linear_base_b);
+
 void vision_line_error_layer_get_track_point(bool *valid, int *x, int *y);
 int vision_line_error_layer_track_index();
 
@@ -47,5 +50,8 @@ int vision_line_error_layer_selected_centerline_count();
 int vision_line_error_layer_required_last_index_for_straight();
 float vision_line_error_layer_abs_error_sum_to_required_index();
 float vision_line_error_layer_front_weighted_abs_error_sum(int point_count);
+float vision_line_error_layer_segmented_blended_abs_error(float split_ratio,
+                                                          float front_weight,
+                                                          float rear_weight);
 
 #endif
