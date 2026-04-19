@@ -7,6 +7,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -pthread -Wall")  # 对于 C++ 编译器
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Wall")      # 对于 C 编译器
 
+# UVC 采图分辨率预设：
+# 0 -> 160x120（处理阶段不再额外降采样）
+# 1 -> 320x240（处理阶段会降采样到 160x120）
+set(UVC_RES_PRESET "1" CACHE STRING "UVC capture preset: 0=160x120, 1=320x240")
+set_property(CACHE UVC_RES_PRESET PROPERTY STRINGS "0" "1")
+if(NOT (UVC_RES_PRESET STREQUAL "0" OR UVC_RES_PRESET STREQUAL "1"))
+    message(FATAL_ERROR "Invalid UVC_RES_PRESET=${UVC_RES_PRESET}, expected 0 or 1")
+endif()
+add_compile_definitions(UVC_RES_PRESET=${UVC_RES_PRESET})
+message(STATUS "UVC_RES_PRESET=${UVC_RES_PRESET} (0=160x120, 1=320x240)")
+
 # 获取当前 CMakeLists.txt 文件所在目录的完整路径
 set(CURRENT_DIR ${CMAKE_CURRENT_LIST_DIR})
 
