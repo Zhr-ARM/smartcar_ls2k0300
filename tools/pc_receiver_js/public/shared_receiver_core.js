@@ -850,6 +850,9 @@
     push('right_dir_level', status.right_dir_level);
     push('otsu_threshold', status.otsu_threshold);
     push('capture_wait_us', status.capture_wait_us);
+    push('capture_thread_fps', status.capture_thread_fps);
+    push('vision_process_fps', status.vision_process_fps);
+    push('udp_tx_fps', status.udp_tx_fps);
     push('preprocess_us', status.preprocess_us);
     push('otsu_us', status.otsu_us);
     push('maze_us', status.maze_us);

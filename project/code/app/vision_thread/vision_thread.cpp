@@ -13,6 +13,7 @@ namespace
 {
 std::thread g_vision_thread;
 std::atomic<bool> g_vision_running(false);
+std::atomic<uint32> g_vision_process_fps(0);
 
 constexpr int64_t VISION_PERF_LOG_INTERVAL_US = 1000 * 1000;
 
@@ -51,11 +52,14 @@ static void vision_perf_print_and_reset(vision_perf_accum_t &acc, int64_t window
 {
     if (acc.frame_count == 0 || window_us <= 0)
     {
+        g_vision_process_fps.store(0);
         acc = vision_perf_accum_t{};
         return;
     }
 
-    (void)window_us;
+    const uint32 fps = static_cast<uint32>(
+        (acc.frame_count * 1000000ULL + static_cast<uint64>(window_us) / 2ULL) / static_cast<uint64>(window_us));
+    g_vision_process_fps.store(fps);
     acc = vision_perf_accum_t{};
 }
 
@@ -225,4 +229,9 @@ void vision_thread_set_ncnn_enabled(bool enabled)
 bool vision_thread_ncnn_enabled()
 {
     return vision_pipeline_ncnn_enabled();
+}
+
+uint32 vision_thread_process_fps()
+{
+    return g_vision_process_fps.load();
 }
