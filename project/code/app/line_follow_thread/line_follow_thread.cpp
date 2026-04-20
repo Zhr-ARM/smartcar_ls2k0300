@@ -39,14 +39,7 @@ struct SpeedSchemeRuntimeParams
 {
     float split_ratio;
     float rear_exp_lambda;
-    float slowdown_start;
-    float slowdown_full;
-    float min_speed_scale;
-    float max_speed_scale;
-    int centerline_count_lower;
-    int centerline_count_upper;
-    float centerline_scale_lower;
-    float centerline_scale_upper;
+    float friction_circle_n;
     float max_drop_ratio_per_cycle;
     float max_rise_ratio_per_cycle;
 };
@@ -56,21 +49,7 @@ SpeedSchemeRuntimeParams read_speed_scheme_runtime_params(const RouteProfile &pr
     SpeedSchemeRuntimeParams params{};
     params.split_ratio = std::clamp(profile.line_error_prefix_ratio, 0.01f, 1.0f);
     params.rear_exp_lambda = std::clamp(profile.speed_scheme_rear_exp_lambda, 0.0f, 20.0f);
-
-    params.slowdown_start = std::max(0.0f, profile.speed_scheme_slowdown_start);
-    params.slowdown_full = std::max(params.slowdown_start + 1.0e-3f,
-                                    profile.speed_scheme_slowdown_full);
-    params.min_speed_scale = std::clamp(profile.speed_scheme_min_speed_scale, 0.0f, 1.0f);
-    params.max_speed_scale = std::clamp(profile.speed_scheme_max_speed_scale,
-                                        params.min_speed_scale,
-                                        1.0f);
-    params.centerline_count_lower = std::max(0, profile.speed_scheme_centerline_count_lower);
-    params.centerline_count_upper = std::max(params.centerline_count_lower + 1,
-                                             profile.speed_scheme_centerline_count_upper);
-    params.centerline_scale_lower = std::clamp(profile.speed_scheme_centerline_scale_lower, 0.0f, 1.0f);
-    params.centerline_scale_upper = std::clamp(profile.speed_scheme_centerline_scale_upper,
-                                               params.centerline_scale_lower,
-                                               1.0f);
+    params.friction_circle_n = std::max(0.0f, profile.speed_scheme_friction_circle_n);
     params.max_drop_ratio_per_cycle =
         std::clamp(profile.speed_scheme_max_drop_ratio_per_cycle, 0.0f, 1.0f);
     params.max_rise_ratio_per_cycle =
@@ -442,48 +421,6 @@ float compute_profile_base_speed_from_normal_reference(float normal_speed_refere
                     runtime_scale_from_normal_speed);
 }
 
-float compute_speed_scheme_error_scale(float blended_abs_error_sum,
-                                       int point_count,
-                                       float slowdown_start_abs_error_sum,
-                                       float slowdown_full_abs_error_sum,
-                                       float min_speed_scale,
-                                       float max_speed_scale)
-{
-    if (point_count <= 0 || slowdown_full_abs_error_sum <= slowdown_start_abs_error_sum)
-    {
-        return 1.0f;
-    }
-
-    const float clamped_min_scale = std::clamp(min_speed_scale, 0.0f, 1.0f);
-    const float clamped_max_scale = std::clamp(max_speed_scale, clamped_min_scale, 1.0f);
-    if (blended_abs_error_sum <= slowdown_start_abs_error_sum)
-    {
-        return clamped_max_scale;
-    }
-
-    const float slowdown_ratio = std::clamp((blended_abs_error_sum - slowdown_start_abs_error_sum) /
-                                            (slowdown_full_abs_error_sum - slowdown_start_abs_error_sum),
-                                            0.0f,
-                                            1.0f);
-    return clamped_max_scale - slowdown_ratio * (clamped_max_scale - clamped_min_scale);
-}
-
-float compute_centerline_count_scale(int selected_centerline_count,
-                                     int count_lower,
-                                     int count_upper,
-                                     float scale_lower,
-                                     float scale_upper)
-{
-    const int clamped_count = std::max(0, selected_centerline_count);
-    const int safe_lower = std::max(0, count_lower);
-    const int safe_upper = std::max(safe_lower + 1, count_upper);
-    const float mapped_ratio = std::clamp((static_cast<float>(clamped_count) - static_cast<float>(safe_lower)) /
-                                              (static_cast<float>(safe_upper - safe_lower)),
-                                          0.0f,
-                                          1.0f);
-    return scale_lower + mapped_ratio * (scale_upper - scale_lower);
-}
-
 float compute_abs_track_point_angle_deg(bool track_valid, int track_x, int track_y)
 {
     if (!track_valid)
@@ -506,52 +443,37 @@ float compute_desired_base_speed(float profile_base_speed,
                                  int speed_target_x,
                                  int speed_target_y,
                                  const SpeedSchemeRuntimeParams &speed_scheme,
+                                 float realtime_speed,
                                  float &speed_scheme_error_scale_raw,
-                                 float &speed_scheme_centerline_ratio,
                                  float &speed_scheme_final_speed_scale,
-                                 float &force_full_abs_error_sum_current,
-                                 float &force_full_abs_error_sum_threshold,
-                                 bool &force_full_centerline_ready,
-                                 bool &force_full_error_ready,
                                  bool &force_full_speed)
 {
     (void)profile;
     (void)abs_filtered_error_px;
     (void)abs_yaw_rate_ref_dps;
     (void)mean_abs_path_error;
-    force_full_abs_error_sum_current = 0.0f;
-    force_full_abs_error_sum_threshold = 0.0f;
-    force_full_centerline_ready = false;
-    force_full_error_ready = false;
+    (void)selected_centerline_count;
     force_full_speed = false;
     speed_scheme_error_scale_raw = 1.0f;
-    speed_scheme_centerline_ratio = 1.0f;
     speed_scheme_final_speed_scale = 1.0f;
-    // 新方案：
-    // 1) 用后段点指数权重（参数 lambda）求目标点坐标；
-    // 2) 目标点夹角只取绝对值；
-    // 3) 按夹角阈值映射速度比例，再叠加中线点数比例。
+    // 摩擦圆方案：
+    // v_target^2 + (angle_target_rad * v_real)^2 = n
+    // => v_target = sqrt(max(0, n - (angle_target * v_real)^2))
     const float target_abs_angle_deg =
         compute_abs_track_point_angle_deg(speed_target_valid, speed_target_x, speed_target_y);
-    speed_scheme_error_scale_raw =
-        compute_speed_scheme_error_scale(target_abs_angle_deg,
-                                         1,
-                                         speed_scheme.slowdown_start,
-                                         speed_scheme.slowdown_full,
-                                         speed_scheme.min_speed_scale,
-                                         speed_scheme.max_speed_scale);
-    speed_scheme_centerline_ratio =
-        compute_centerline_count_scale(selected_centerline_count,
-                                       speed_scheme.centerline_count_lower,
-                                       speed_scheme.centerline_count_upper,
-                                       speed_scheme.centerline_scale_lower,
-                                       speed_scheme.centerline_scale_upper);
-    // 夹角比例与中线点数比例相乘，再夹到本状态 min/max 区间。
-    speed_scheme_final_speed_scale = std::clamp(speed_scheme_error_scale_raw *
-                                                speed_scheme_centerline_ratio,
-                                                speed_scheme.min_speed_scale,
-                                                speed_scheme.max_speed_scale);
-    return profile_base_speed * speed_scheme_final_speed_scale;
+    const float target_abs_angle_rad = target_abs_angle_deg / RAD_TO_DEG;
+    const float safe_realtime_speed = std::max(0.0f, realtime_speed);
+    const float coupling = target_abs_angle_rad * safe_realtime_speed;
+    const float target_speed_squared =
+        std::max(0.0f, speed_scheme.friction_circle_n - coupling * coupling);
+    const float friction_target_speed = std::sqrt(target_speed_squared);
+    const float desired_speed = std::clamp(friction_target_speed, 0.0f, profile_base_speed);
+    if (profile_base_speed > 1.0e-3f)
+    {
+        speed_scheme_error_scale_raw = std::clamp(desired_speed / profile_base_speed, 0.0f, 1.0f);
+    }
+    speed_scheme_final_speed_scale = speed_scheme_error_scale_raw;
+    return desired_speed;
 }
 
 float clamp_valid_dt_seconds(float dt_seconds, float fallback_dt_seconds, float max_dt_seconds)
@@ -948,16 +870,16 @@ void line_follow_loop()
         const int selected_centerline_count = vision_image_processor_ipm_selected_centerline_count();
         const float speed_scheme_target_abs_angle_deg =
             compute_abs_track_point_angle_deg(speed_target_valid, speed_target_x, speed_target_y);
+        const float speed_scheme_target_abs_angle_rad = speed_scheme_target_abs_angle_deg / RAD_TO_DEG;
+        const float realtime_speed =
+            0.5f * (std::fabs(motor_thread_left_filtered_count()) +
+                    std::fabs(motor_thread_right_filtered_count()));
+        const float friction_coupling = speed_scheme_target_abs_angle_rad * realtime_speed;
         float speed_scheme_error_scale_raw = 1.0f;
-        float speed_scheme_centerline_ratio = 1.0f;
         float speed_scheme_final_speed_scale = 1.0f;
-        float force_full_abs_error_sum_current = 0.0f;
-        float force_full_abs_error_sum_threshold = 0.0f;
-        bool force_full_centerline_ready = false;
-        bool force_full_error_ready = false;
         const bool speed_scheme_ready =
-            (selected_centerline_count > 0) &&
-            (speed_scheme.slowdown_full > speed_scheme.slowdown_start);
+            speed_target_valid &&
+            (speed_scheme.friction_circle_n > 0.0f);
         const float desired_base_speed = compute_desired_base_speed(profile_base_speed,
                                                                     route_profile,
                                                                     error_state.abs_filtered_error_px,
@@ -968,26 +890,22 @@ void line_follow_loop()
                                                                     speed_target_x,
                                                                     speed_target_y,
                                                                     speed_scheme,
+                                                                    realtime_speed,
                                                                     speed_scheme_error_scale_raw,
-                                                                    speed_scheme_centerline_ratio,
                                                                     speed_scheme_final_speed_scale,
-                                                                    force_full_abs_error_sum_current,
-                                                                    force_full_abs_error_sum_threshold,
-                                                                    force_full_centerline_ready,
-                                                                    force_full_error_ready,
                                                                     force_full_speed);
         const bool speed_scheme_triggered =
             speed_scheme_ready &&
-            (speed_scheme_error_scale_raw < speed_scheme.max_speed_scale);
+            (desired_base_speed < profile_base_speed);
         int speed_scheme_winner_branch = 0; // 0: none/full-speed, 1: speed_scheme
         if (!force_full_speed && speed_scheme_triggered)
         {
             speed_scheme_winner_branch = 1;
         }
-        // 速度规划新链路：
-        // 1) 先按后段点数量与指数 lambda 计算权重并加权得到目标点坐标；
-        // 2) 目标点夹角取绝对值映射到速度比例；
-        // 3) 再乘以中线点数比例。
+        // 速度规划摩擦圆链路：
+        // 1) 用后段指数加权点得到目标角度 angle_target；
+        // 2) 读取实时速度 v_real；
+        // 3) 用 v_target^2 + (angle_target * v_real)^2 = n 反解 v_target。
         g_applied_base_speed_state = update_applied_base_speed(g_applied_base_speed_state,
                                                                profile_base_speed,
                                                                desired_base_speed,
@@ -1074,33 +992,19 @@ void line_follow_loop()
                 route_profile.yaw_rate_kp_enable_error_threshold_px;
             g_pid_debug_status.mean_abs_path_error = mean_abs_path_error;
             g_pid_debug_status.speed_scheme_blended_abs_error_sum = speed_scheme_target_abs_angle_deg;
+            g_pid_debug_status.speed_scheme_friction_circle_n = speed_scheme.friction_circle_n;
+            g_pid_debug_status.speed_scheme_realtime_speed = realtime_speed;
+            g_pid_debug_status.speed_scheme_friction_coupling = friction_coupling;
             g_pid_debug_status.speed_scheme_error_scale_raw = speed_scheme_error_scale_raw;
             g_pid_debug_status.speed_scheme_final_speed_scale = speed_scheme_final_speed_scale;
             g_pid_debug_status.speed_scheme_split_ratio = speed_scheme.split_ratio;
             g_pid_debug_status.speed_scheme_rear_exp_lambda = speed_scheme.rear_exp_lambda;
-            g_pid_debug_status.speed_scheme_slowdown_start = speed_scheme.slowdown_start;
-            g_pid_debug_status.speed_scheme_slowdown_full = speed_scheme.slowdown_full;
-            g_pid_debug_status.speed_scheme_min_speed_scale = speed_scheme.min_speed_scale;
-            g_pid_debug_status.speed_scheme_max_speed_scale = speed_scheme.max_speed_scale;
             g_pid_debug_status.speed_scheme_point_count = selected_centerline_count;
             g_pid_debug_status.speed_scheme_ready = speed_scheme_ready;
             g_pid_debug_status.speed_scheme_triggered = speed_scheme_triggered;
             g_pid_debug_status.speed_scheme_winner_branch = speed_scheme_winner_branch;
             g_pid_debug_status.speed_scheme_max_drop_ratio_per_cycle = speed_scheme.max_drop_ratio_per_cycle;
             g_pid_debug_status.speed_scheme_max_rise_ratio_per_cycle = speed_scheme.max_rise_ratio_per_cycle;
-            g_pid_debug_status.speed_scheme_centerline_count_lower = speed_scheme.centerline_count_lower;
-            g_pid_debug_status.speed_scheme_centerline_count_upper = speed_scheme.centerline_count_upper;
-            g_pid_debug_status.speed_scheme_centerline_scale_lower = speed_scheme.centerline_scale_lower;
-            g_pid_debug_status.speed_scheme_centerline_scale_upper = speed_scheme.centerline_scale_upper;
-            g_pid_debug_status.speed_scheme_centerline_scale_current = speed_scheme_centerline_ratio;
-            g_pid_debug_status.speed_scheme_force_full_min_centerline_count = 0;
-            g_pid_debug_status.speed_scheme_force_full_abs_error_sum_per_point = 0.0f;
-            g_pid_debug_status.speed_scheme_force_full_abs_error_sum_current =
-                force_full_abs_error_sum_current;
-            g_pid_debug_status.speed_scheme_force_full_abs_error_sum_threshold =
-                force_full_abs_error_sum_threshold;
-            g_pid_debug_status.speed_scheme_force_full_centerline_ready = force_full_centerline_ready;
-            g_pid_debug_status.speed_scheme_force_full_error_ready = force_full_error_ready;
             g_pid_debug_status.force_full_speed = force_full_speed;
             g_pid_debug_status.raw_steering_output = raw_steering_output;
             g_pid_debug_status.clamped_steering_output = steering_output;

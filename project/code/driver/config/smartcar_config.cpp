@@ -718,16 +718,7 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message) &&
            require_float(values, consumed, prefix + ".line_error_exp_lambda", &profile->line_error_exp_lambda, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_rear_exp_lambda", &profile->speed_scheme_rear_exp_lambda, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_slowdown_start", &profile->speed_scheme_slowdown_start, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_slowdown_full", &profile->speed_scheme_slowdown_full, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_min_speed_scale", &profile->speed_scheme_min_speed_scale, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_max_speed_scale", &profile->speed_scheme_max_speed_scale, error_message) &&
-           require_int(values, consumed, prefix + ".speed_scheme_centerline_count_lower", &profile->speed_scheme_centerline_count_lower, error_message) &&
-           require_int(values, consumed, prefix + ".speed_scheme_centerline_count_upper", &profile->speed_scheme_centerline_count_upper, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_centerline_scale_lower", &profile->speed_scheme_centerline_scale_lower, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_centerline_scale_upper", &profile->speed_scheme_centerline_scale_upper, error_message) &&
-           require_int(values, consumed, prefix + ".speed_scheme_force_full_min_centerline_count", &profile->speed_scheme_force_full_min_centerline_count, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_force_full_abs_error_sum_per_point", &profile->speed_scheme_force_full_abs_error_sum_per_point, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_friction_circle_n", &profile->speed_scheme_friction_circle_n, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_drop_ratio_per_cycle", &profile->speed_scheme_max_drop_ratio_per_cycle, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_rise_ratio_per_cycle", &profile->speed_scheme_max_rise_ratio_per_cycle, error_message);
 }

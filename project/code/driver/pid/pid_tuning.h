@@ -124,17 +124,9 @@ struct Profile
     // 速度方案后段目标点指数权重参数 lambda（>=0）：
     // 后段点按指数权重加权（权重和归一化为 1），用于生成速度决策目标点坐标。
     float speed_scheme_rear_exp_lambda;
-    float speed_scheme_slowdown_start;
-    float speed_scheme_slowdown_full;
-    float speed_scheme_min_speed_scale;
-    float speed_scheme_max_speed_scale;
-    // 中线点数映射区间：[count_lower, count_upper] -> [scale_lower, scale_upper]
-    int speed_scheme_centerline_count_lower;
-    int speed_scheme_centerline_count_upper;
-    float speed_scheme_centerline_scale_lower;
-    float speed_scheme_centerline_scale_upper;
-    int speed_scheme_force_full_min_centerline_count;
-    float speed_scheme_force_full_abs_error_sum_per_point;
+    // 速度方案摩擦圆参数 n（>0）：
+    // 速度决策公式为 v_target^2 + (angle_target * v_real)^2 = n。
+    float speed_scheme_friction_circle_n;
     float speed_scheme_max_drop_ratio_per_cycle;
     float speed_scheme_max_rise_ratio_per_cycle;
 };

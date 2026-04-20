@@ -790,7 +790,7 @@
           </div>
           <div class="straight-focus-panel" id="speedFocusPanel">
             <div class="straight-focus-head">
-              <div class="straight-focus-title">加减速状态高亮</div>
+              <div class="straight-focus-title">速度决策状态高亮（摩擦圆）</div>
               <div class="straight-focus-badge" id="speedFocusBadge">等待数据</div>
             </div>
             <div class="straight-focus-grid">
@@ -803,7 +803,7 @@
                 <div class="straight-focus-value" id="speedFocusDesiredSpeed">--</div>
               </div>
               <div class="straight-focus-stat">
-                <div class="straight-focus-label">满速点数阈值 n</div>
+                <div class="straight-focus-label">摩擦圆常数 n</div>
                 <div class="straight-focus-value" id="speedFocusMinCount">--</div>
               </div>
               <div class="straight-focus-stat">
@@ -811,7 +811,7 @@
                 <div class="straight-focus-value" id="speedFocusErrorSum">--</div>
               </div>
               <div class="straight-focus-stat">
-                <div class="straight-focus-label">满速误差阈值</div>
+                <div class="straight-focus-label">耦合项 (角度*实时速度)</div>
                 <div class="straight-focus-value" id="speedFocusErrorThreshold">--</div>
               </div>
             </div>
@@ -858,7 +858,7 @@
               <div class="pid-column-title">共同部分</div>
               <div class="pid-list" id="pidCommonList"></div>
               <div class="pid-slowdown-wrap">
-                <div class="pid-slowdown-title">速度方案判定（分段混合）</div>
+                <div class="pid-slowdown-title">速度方案判定（摩擦圆）</div>
                 <div class="pid-slowdown-grid" id="pidSlowdownCards"></div>
               </div>
             </div>
