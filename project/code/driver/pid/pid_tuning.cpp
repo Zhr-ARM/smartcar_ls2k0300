@@ -168,6 +168,10 @@ bool is_speed_scheme_range_valid(const Profile &profile)
     {
         return false;
     }
+    if (profile.speed_scheme_min_base_speed < 0.0f)
+    {
+        return false;
+    }
     return true;
 }
 
@@ -177,7 +181,7 @@ Profile kNormalProfile = {
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 200.0f,
     0.6f, 2.303f,
     1.609f, 122500.0f,
-    0.82f, 0.01f
+    0.82f, 0.01f, 270.0f
 };
 
 Profile kStraightProfile = {
@@ -186,7 +190,7 @@ Profile kStraightProfile = {
     0.0f, 0.0f, 4.0f, 360.0f, 0.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 160.0f,
     0.6f, 2.303f,
     1.609f, 136900.0f,
-    0.95f, 0.5f
+    0.95f, 0.5f, 270.0f
 };
 
 Profile kCrossProfile = {
@@ -195,7 +199,7 @@ Profile kCrossProfile = {
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 300.0f,
     0.6f, 2.303f,
     1.609f, 122500.0f,
-    0.82f, 0.01f
+    0.82f, 0.01f, 270.0f
 };
 
 Profile kCircleEnterProfile = {
@@ -204,7 +208,7 @@ Profile kCircleEnterProfile = {
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 320.0f,
     0.6f, 2.303f,
     1.609f, 102400.0f,
-    0.75f, 0.01f
+    0.75f, 0.01f, 270.0f
 };
 
 Profile kCircleInsideProfile = {
@@ -213,7 +217,7 @@ Profile kCircleInsideProfile = {
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
     0.6f, 2.303f,
     1.609f, 102400.0f,
-    0.82f, 0.01f
+    0.82f, 0.01f, 270.0f
 };
 
 Profile kCircleExitProfile = {
@@ -222,7 +226,7 @@ Profile kCircleExitProfile = {
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
     0.6f, 2.303f,
     1.609f, 102400.0f,
-    0.82f, 0.01f
+    0.82f, 0.01f, 270.0f
 };
 } // namespace route_line_follow
 } // namespace pid_tuning

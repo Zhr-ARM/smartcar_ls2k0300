@@ -129,6 +129,7 @@ struct Profile
     float speed_scheme_friction_circle_n;
     float speed_scheme_max_drop_ratio_per_cycle;
     float speed_scheme_max_rise_ratio_per_cycle;
+    float speed_scheme_min_base_speed;
 };
 
 extern float kGlobalBaseSpeedScale;

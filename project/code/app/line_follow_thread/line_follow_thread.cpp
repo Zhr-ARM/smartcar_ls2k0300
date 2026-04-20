@@ -42,6 +42,7 @@ struct SpeedSchemeRuntimeParams
     float friction_circle_n;
     float max_drop_ratio_per_cycle;
     float max_rise_ratio_per_cycle;
+    float min_base_speed;
 };
 
 SpeedSchemeRuntimeParams read_speed_scheme_runtime_params(const RouteProfile &profile)
@@ -54,6 +55,7 @@ SpeedSchemeRuntimeParams read_speed_scheme_runtime_params(const RouteProfile &pr
         std::clamp(profile.speed_scheme_max_drop_ratio_per_cycle, 0.0f, 1.0f);
     params.max_rise_ratio_per_cycle =
         std::clamp(profile.speed_scheme_max_rise_ratio_per_cycle, 0.0f, 1.0f);
+    params.min_base_speed = std::max(0.0f, profile.speed_scheme_min_base_speed);
     return params;
 }
 
@@ -467,7 +469,8 @@ float compute_desired_base_speed(float profile_base_speed,
     const float target_speed_squared =
         std::max(0.0f, speed_scheme.friction_circle_n - coupling * coupling);
     const float friction_target_speed = std::sqrt(target_speed_squared);
-    const float desired_speed = std::clamp(friction_target_speed, 0.0f, profile_base_speed);
+    const float min_base_speed = std::clamp(speed_scheme.min_base_speed, 0.0f, profile_base_speed);
+    const float desired_speed = std::clamp(friction_target_speed, min_base_speed, profile_base_speed);
     if (profile_base_speed > 1.0e-3f)
     {
         speed_scheme_error_scale_raw = std::clamp(desired_speed / profile_base_speed, 0.0f, 1.0f);

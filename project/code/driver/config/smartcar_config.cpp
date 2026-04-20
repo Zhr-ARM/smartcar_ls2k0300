@@ -720,7 +720,8 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".speed_scheme_rear_exp_lambda", &profile->speed_scheme_rear_exp_lambda, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_friction_circle_n", &profile->speed_scheme_friction_circle_n, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_drop_ratio_per_cycle", &profile->speed_scheme_max_drop_ratio_per_cycle, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_max_rise_ratio_per_cycle", &profile->speed_scheme_max_rise_ratio_per_cycle, error_message);
+           require_float(values, consumed, prefix + ".speed_scheme_max_rise_ratio_per_cycle", &profile->speed_scheme_max_rise_ratio_per_cycle, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_min_base_speed", &profile->speed_scheme_min_base_speed, error_message);
 }
 
 PidSnapshot capture_pid_snapshot()
