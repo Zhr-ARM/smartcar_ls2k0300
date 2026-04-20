@@ -220,7 +220,7 @@ labels = ["supplies", "vehicles", "weapons"]
 enabled = true
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
-max_fps = 30
+max_fps = 10
 # 是否发送灰度图。
 send_gray_jpeg = true
 # 灰度图发送格式。
@@ -372,7 +372,7 @@ maze_trace_max_points = 180
 maze_lower_region_percent = 85
 # OTSU 策略开关。
 # true=按需 OTSU，false=先生成整图二值图。
-demand_otsu_enable = true
+demand_otsu_enable = false
 # 按需 OTSU 时是否保留全图二值缓存。
 demand_otsu_keep_full_binary_cache = true
 # 是否启用逆透视流程。
@@ -454,9 +454,9 @@ feedback_low_pass_alpha = 0.95
 # 是否启用主循环实时无刷控制。
 realtime_enabled = true
 # 左侧无刷目标占空比，单位百分比 [0, 100]。
-left_duty_percent = 30.0
+left_duty_percent = 0.0
 # 右侧无刷目标占空比，单位百分比 [0, 100]。
-right_duty_percent = 30.0
+right_duty_percent = 0.0
 
 [pid.yaw_rate_loop]
 # 视觉曲率滤波 alpha。
@@ -485,7 +485,7 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 380.0
+base_speed = 330.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # NORMAL 档位置环动态 Kp 基础值。
@@ -574,7 +574,7 @@ speed_scheme_max_rise_ratio_per_cycle = 0.01
 
 [pid.route_line_follow.straight]
 # STRAIGHT 档基础速度。
-base_speed = 600.0
+base_speed = 400.0
 # STRAIGHT 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # STRAIGHT 档位置环动态 Kp 基础值。
