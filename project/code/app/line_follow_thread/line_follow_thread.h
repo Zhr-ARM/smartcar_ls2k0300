@@ -55,8 +55,7 @@ struct LineFollowPidDebugStatus
     float speed_scheme_error_scale_raw;
     float speed_scheme_final_speed_scale;
     float speed_scheme_split_ratio;
-    float speed_scheme_front_weight;
-    float speed_scheme_rear_weight;
+    float speed_scheme_rear_exp_lambda;
     float speed_scheme_slowdown_start;
     float speed_scheme_slowdown_full;
     float speed_scheme_min_speed_scale;
@@ -67,10 +66,11 @@ struct LineFollowPidDebugStatus
     int speed_scheme_winner_branch;
     float speed_scheme_max_drop_ratio_per_cycle;
     float speed_scheme_max_rise_ratio_per_cycle;
-    int speed_scheme_centerline_count_full_n;
-    float speed_scheme_centerline_ratio_floor;
-    float speed_scheme_centerline_ratio_weight;
-    float speed_scheme_centerline_ratio_current;
+    int speed_scheme_centerline_count_lower;
+    int speed_scheme_centerline_count_upper;
+    float speed_scheme_centerline_scale_lower;
+    float speed_scheme_centerline_scale_upper;
+    float speed_scheme_centerline_scale_current;
     int speed_scheme_force_full_min_centerline_count;
     float speed_scheme_force_full_abs_error_sum_per_point;
     float speed_scheme_force_full_abs_error_sum_current;

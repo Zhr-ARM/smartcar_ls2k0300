@@ -345,7 +345,7 @@ typedef struct
     // 包括 line_error 取点策略与索引范围约束参数。
     // line_error 使用哪条平移中线追踪：左平移或右平移。
     int ipm_line_error_source;
-    // line_error 计算方法：0=固定索引，1=前缀线性加权索引，2=随速度索引，3=兼容模式(行为同1)。
+    // line_error 计算方法：0=固定索引，1=前缀指数加权索引，2=随速度索引，3=兼容模式(行为同1)。
     int ipm_line_error_method;
     // 固定索引模式下使用的中线点索引。
     int ipm_line_error_fixed_index;
@@ -365,8 +365,8 @@ typedef struct
     int ipm_line_error_index_max;
     // 比例前缀加权模式：参与 line_error 计算的中线前缀比例（0~1]。
     float ipm_line_error_prefix_ratio;
-    // 比例前缀加权模式：线性权重基值 b（w(i)=k*i+b，k 由点数与 1-b 计算）。
-    float ipm_line_error_linear_base_b;
+    // 比例前缀加权模式：指数权重参数 lambda（w(i)=exp(-lambda*t), t=i/(n-1)）。
+    float ipm_line_error_exp_lambda;
 } vision_runtime_config_t;
 
 typedef struct

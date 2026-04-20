@@ -390,8 +390,8 @@ static void apply_line_error_profile_if_needed(const vision_route_state_snapshot
         return;
     }
 
-    vision_line_error_layer_set_prefix_linear_params(profile->line_error_prefix_ratio,
-                                                     profile->line_error_linear_base_b);
+    vision_line_error_layer_set_prefix_exp_params(profile->line_error_prefix_ratio,
+                                                  profile->line_error_exp_lambda);
     g_last_applied_line_error_profile_id = profile_id;
 }
 
@@ -5909,6 +5909,15 @@ float vision_image_processor_ipm_segmented_blended_abs_error(float split_ratio,
                                                              float rear_weight)
 {
     return vision_line_error_layer_segmented_blended_abs_error(split_ratio, front_weight, rear_weight);
+}
+
+void vision_image_processor_ipm_rear_exp_weighted_target_point(float split_ratio,
+                                                               float exp_lambda,
+                                                               bool *valid,
+                                                               int *x,
+                                                               int *y)
+{
+    vision_line_error_layer_rear_exp_weighted_target_point(split_ratio, exp_lambda, valid, x, y);
 }
 
 int vision_image_processor_ipm_line_error_track_index()

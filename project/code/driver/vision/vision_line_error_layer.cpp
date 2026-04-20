@@ -30,7 +30,7 @@ std::atomic<float> g_ipm_line_error_speed_b(g_vision_runtime_config.ipm_line_err
 std::atomic<int> g_ipm_line_error_index_min(g_vision_runtime_config.ipm_line_error_index_min);
 std::atomic<int> g_ipm_line_error_index_max(g_vision_runtime_config.ipm_line_error_index_max);
 std::atomic<float> g_ipm_line_error_prefix_ratio(g_vision_runtime_config.ipm_line_error_prefix_ratio);
-std::atomic<float> g_ipm_line_error_linear_base_b(g_vision_runtime_config.ipm_line_error_linear_base_b);
+std::atomic<float> g_ipm_line_error_exp_lambda(g_vision_runtime_config.ipm_line_error_exp_lambda);
 
 std::mutex g_ipm_line_error_weighted_points_mutex;
 std::array<int, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> g_ipm_line_error_point_indices = {
@@ -56,6 +56,8 @@ int g_selected_centerline_count = 0;
 int g_required_last_index_for_straight = 19;
 float g_abs_error_sum_to_required_index = 0.0f;
 std::array<float, VISION_DOWNSAMPLED_HEIGHT * 2> g_front_abs_errors = {};
+std::array<uint16, VISION_DOWNSAMPLED_HEIGHT * 2> g_centerline_xs = {};
+std::array<uint16, VISION_DOWNSAMPLED_HEIGHT * 2> g_centerline_ys = {};
 
 static void reset_ipm_line_error_weighted_points_to_default()
 {
@@ -82,7 +84,7 @@ void vision_line_error_layer_reset()
     g_ipm_line_error_index_min.store(g_vision_runtime_config.ipm_line_error_index_min);
     g_ipm_line_error_index_max.store(g_vision_runtime_config.ipm_line_error_index_max);
     g_ipm_line_error_prefix_ratio.store(g_vision_runtime_config.ipm_line_error_prefix_ratio);
-    g_ipm_line_error_linear_base_b.store(g_vision_runtime_config.ipm_line_error_linear_base_b);
+    g_ipm_line_error_exp_lambda.store(g_vision_runtime_config.ipm_line_error_exp_lambda);
     reset_ipm_line_error_weighted_points_to_default();
     g_centerline_curvature_step.store(std::max(1, g_vision_runtime_config.ipm_centerline_curvature_step));
     g_ipm_line_error_track_valid = false;
@@ -94,6 +96,8 @@ void vision_line_error_layer_reset()
     g_required_last_index_for_straight = straight_judge_last_index();
     g_abs_error_sum_to_required_index = 0.0f;
     g_front_abs_errors.fill(0.0f);
+    g_centerline_xs.fill(0);
+    g_centerline_ys.fill(0);
 }
 
 int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ipm_center_x,
@@ -115,6 +119,8 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     g_required_last_index_for_straight = straight_judge_last_index();
     g_abs_error_sum_to_required_index = 0.0f;
     g_front_abs_errors.fill(0.0f);
+    g_centerline_xs.fill(0);
+    g_centerline_ys.fill(0);
 
     const int center_count = std::clamp(ipm_center_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2));
     if (center_count <= 0)
@@ -132,6 +138,8 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         g_required_last_index_for_straight = straight_judge_last_index();
         g_abs_error_sum_to_required_index = 0.0f;
         g_front_abs_errors.fill(0.0f);
+        g_centerline_xs.fill(0);
+        g_centerline_ys.fill(0);
         return 0;
     }
 
@@ -143,10 +151,14 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
                 static_cast<float>(std::fabs(static_cast<double>(xs[i]) - static_cast<double>(ipm_center_x_ref)));
             sum_abs += abs_error;
             g_front_abs_errors[static_cast<size_t>(i)] = abs_error;
+            g_centerline_xs[static_cast<size_t>(i)] = xs[i];
+            g_centerline_ys[static_cast<size_t>(i)] = ys[i];
         }
         for (int i = count; i < static_cast<int>(g_front_abs_errors.size()); ++i)
         {
             g_front_abs_errors[static_cast<size_t>(i)] = 0.0f;
+            g_centerline_xs[static_cast<size_t>(i)] = 0;
+            g_centerline_ys[static_cast<size_t>(i)] = 0;
         }
         g_mean_abs_offset = (count > 0) ? static_cast<float>(sum_abs / static_cast<double>(count)) : 0.0f;
     }
@@ -181,30 +193,30 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     }
     else
     {
-        // 统一按“前缀比例 + 线性权重”计算：
+        // 统一按“前缀比例 + 指数权重”计算：
         // 1) 仅使用中线前 effective_count 个点；
-        // 2) 权重函数 w(i)=k*i+b，k 由 (1-b)/(effective_count-1) 计算；
-        // 3) 最终按权重归一化，保证总权重为 1。
+        // 2) 权重函数 w(i)=exp(-lambda*t), t=i/(effective_count-1)；
+        // 3) i 越小（更近端）权重越大，最终按权重归一化，保证总权重为 1。
         const float prefix_ratio =
             std::clamp(g_ipm_line_error_prefix_ratio.load(), 0.01f, 1.0f);
         const int effective_count =
             std::clamp(static_cast<int>(std::floor(static_cast<float>(count) * prefix_ratio)), 1, count);
-        const float base_b =
-            std::clamp(g_ipm_line_error_linear_base_b.load(), 0.0f, 1.0f);
+        const float exp_lambda =
+            std::clamp(g_ipm_line_error_exp_lambda.load(), 0.0f, 20.0f);
 
         int weighted_track_index = effective_count - 1;
         float weighted_x = static_cast<float>(xs[weighted_track_index]);
         float weighted_y = static_cast<float>(ys[weighted_track_index]);
         if (effective_count > 1)
         {
-            const float k = (1.0f - base_b) / static_cast<float>(effective_count - 1);
             double weight_sum = 0.0;
             double weighted_index_sum = 0.0;
             double weighted_x_sum = 0.0;
             double weighted_y_sum = 0.0;
             for (int i = 0; i < effective_count; ++i)
             {
-                const double weight = static_cast<double>(base_b + k * static_cast<float>(i));
+                const float t = static_cast<float>(i) / static_cast<float>(effective_count - 1);
+                const double weight = static_cast<double>(std::exp(-exp_lambda * t));
                 weight_sum += weight;
                 weighted_index_sum += static_cast<double>(i) * weight;
                 weighted_x_sum += static_cast<double>(xs[i]) * weight;
@@ -341,16 +353,16 @@ void vision_line_error_layer_get_index_range(int *index_min, int *index_max)
     if (index_max) *index_max = g_ipm_line_error_index_max.load();
 }
 
-void vision_line_error_layer_set_prefix_linear_params(float prefix_ratio, float linear_base_b)
+void vision_line_error_layer_set_prefix_exp_params(float prefix_ratio, float exp_lambda)
 {
     g_ipm_line_error_prefix_ratio.store(std::clamp(prefix_ratio, 0.01f, 1.0f));
-    g_ipm_line_error_linear_base_b.store(std::clamp(linear_base_b, 0.0f, 1.0f));
+    g_ipm_line_error_exp_lambda.store(std::clamp(exp_lambda, 0.0f, 20.0f));
 }
 
-void vision_line_error_layer_get_prefix_linear_params(float *prefix_ratio, float *linear_base_b)
+void vision_line_error_layer_get_prefix_exp_params(float *prefix_ratio, float *exp_lambda)
 {
     if (prefix_ratio) *prefix_ratio = g_ipm_line_error_prefix_ratio.load();
-    if (linear_base_b) *linear_base_b = g_ipm_line_error_linear_base_b.load();
+    if (exp_lambda) *exp_lambda = g_ipm_line_error_exp_lambda.load();
 }
 
 void vision_line_error_layer_get_track_point(bool *valid, int *x, int *y)
@@ -487,4 +499,66 @@ float vision_line_error_layer_segmented_blended_abs_error(float split_ratio,
 
     return (front_mean * clamped_front_weight + rear_mean * clamped_rear_weight) /
            (clamped_front_weight + clamped_rear_weight);
+}
+
+void vision_line_error_layer_rear_exp_weighted_target_point(float split_ratio,
+                                                             float exp_lambda,
+                                                             bool *valid,
+                                                             int *x,
+                                                             int *y)
+{
+    if (valid) *valid = false;
+    if (x) *x = 0;
+    if (y) *y = 0;
+    if (g_selected_centerline_count <= 0)
+    {
+        return;
+    }
+
+    const int count = g_selected_centerline_count;
+    const float clamped_ratio = std::clamp(split_ratio, 0.01f, 1.0f);
+    const int front_count = std::clamp(static_cast<int>(std::floor(static_cast<float>(count) * clamped_ratio)),
+                                       1,
+                                       count);
+    int rear_start = front_count;
+    int rear_count = count - rear_start;
+    if (rear_count <= 0)
+    {
+        rear_start = count - 1;
+        rear_count = 1;
+    }
+
+    const float clamped_lambda = std::clamp(exp_lambda, 0.0f, 20.0f);
+    double weight_sum = 0.0;
+    double weighted_x_sum = 0.0;
+    double weighted_y_sum = 0.0;
+    if (rear_count == 1)
+    {
+        weight_sum = 1.0;
+        weighted_x_sum = static_cast<double>(g_centerline_xs[static_cast<size_t>(rear_start)]);
+        weighted_y_sum = static_cast<double>(g_centerline_ys[static_cast<size_t>(rear_start)]);
+    }
+    else
+    {
+        // 指数权重：w(i)=exp(-lambda*t), t=i/(n-1)。
+        // i=0 权重最大(近端)，i=n-1 权重最小(远端)。
+        for (int i = 0; i < rear_count; ++i)
+        {
+            const float t = static_cast<float>(i) / static_cast<float>(rear_count - 1);
+            const float weight = std::exp(-clamped_lambda * t);
+            const int idx = rear_start + i;
+            weight_sum += static_cast<double>(weight);
+            weighted_x_sum += static_cast<double>(g_centerline_xs[static_cast<size_t>(idx)]) * static_cast<double>(weight);
+            weighted_y_sum += static_cast<double>(g_centerline_ys[static_cast<size_t>(idx)]) * static_cast<double>(weight);
+        }
+    }
+
+    if (weight_sum <= 1.0e-9)
+    {
+        return;
+    }
+
+    if (x) *x = static_cast<int>(std::lround(weighted_x_sum / weight_sum));
+    if (y) *y = static_cast<int>(std::lround(weighted_y_sum / weight_sum));
+    if (valid) *valid = true;
 }

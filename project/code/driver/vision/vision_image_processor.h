@@ -135,7 +135,7 @@ void vision_image_processor_set_ipm_centerline_curvature_enabled(bool enabled);
 bool vision_image_processor_ipm_centerline_curvature_enabled();
 // line_error 跟踪点配置：
 // - source: 偏好左/偏好右/无偏好自动（按边界点数择优）；
-// - method: 固定索引 / 前缀线性加权索引 / 随速度索引 / 兼容模式(行为同前缀线性加权)；
+// - method: 固定索引 / 前缀指数加权索引 / 随速度索引 / 兼容模式(行为同前缀指数加权)；
 // - fixed_index: 固定索引模式下使用的点索引；
 // - point_indices/weights: 加权索引模式下使用的索引与权重；
 // - speed_k/speed_b: 随速度索引模式公式 idx = k * speed + b（仅 method=2）；
@@ -171,6 +171,11 @@ float vision_image_processor_ipm_front_weighted_abs_error_sum(int point_count);
 float vision_image_processor_ipm_segmented_blended_abs_error(float split_ratio,
                                                              float front_weight,
                                                              float rear_weight);
+void vision_image_processor_ipm_rear_exp_weighted_target_point(float split_ratio,
+                                                                float exp_lambda,
+                                                                bool *valid,
+                                                                int *x,
+                                                                int *y);
 
 // 读取最近一帧处理耗时（单位：us）
 // capture_wait_us: 等待相机新帧

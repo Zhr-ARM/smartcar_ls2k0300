@@ -139,19 +139,18 @@ bool is_position_kp_piecewise_range_valid(const Profile &profile)
             profile.position_dynamic_kp_mid_error_threshold_px);
 }
 
-bool is_line_error_prefix_linear_valid(const Profile &profile)
+bool is_line_error_prefix_exp_valid(const Profile &profile)
 {
     return (profile.line_error_prefix_ratio > 0.0f) &&
            (profile.line_error_prefix_ratio <= 1.0f) &&
-           (profile.line_error_linear_base_b >= 0.0f) &&
-           (profile.line_error_linear_base_b <= 1.0f);
+           (profile.line_error_exp_lambda >= 0.0f) &&
+           (profile.line_error_exp_lambda <= 20.0f);
 }
 
 bool is_speed_scheme_range_valid(const Profile &profile)
 {
-    if (profile.speed_scheme_front_weight < 0.0f ||
-        profile.speed_scheme_rear_weight < 0.0f ||
-        (profile.speed_scheme_front_weight + profile.speed_scheme_rear_weight) <= 0.0f)
+    if (profile.speed_scheme_rear_exp_lambda < 0.0f ||
+        profile.speed_scheme_rear_exp_lambda > 20.0f)
     {
         return false;
     }
@@ -169,17 +168,17 @@ bool is_speed_scheme_range_valid(const Profile &profile)
     {
         return false;
     }
-    if (profile.speed_scheme_centerline_count_full_n <= 0)
+    if (profile.speed_scheme_centerline_count_upper <= profile.speed_scheme_centerline_count_lower)
     {
         return false;
     }
-    if (profile.speed_scheme_centerline_ratio_floor < 0.0f ||
-        profile.speed_scheme_centerline_ratio_floor > 1.0f)
+    if (profile.speed_scheme_centerline_scale_lower < 0.0f ||
+        profile.speed_scheme_centerline_scale_lower > 1.0f)
     {
         return false;
     }
-    if (profile.speed_scheme_centerline_ratio_weight < 0.0f ||
-        profile.speed_scheme_centerline_ratio_weight > 1.0f)
+    if (profile.speed_scheme_centerline_scale_upper < profile.speed_scheme_centerline_scale_lower ||
+        profile.speed_scheme_centerline_scale_upper > 1.0f)
     {
         return false;
     }
@@ -208,9 +207,9 @@ Profile kNormalProfile = {
     350.0f,
     3.0f, 2.1f, 0.0f, 50.0f, 3.0f, 4.6f, 10.0f, 5.6f, 0.0f, 0.15f, 0.0f, 0.0f, 2.0f, 0.0f, 210.0f, 210.0f,
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 200.0f,
-    0.6f, 0.1f,
-    0.3f, 0.7f, 1.0f, 40.0f, 0.7f, 1.0f,
-    30, 0.1f, 0.4f,
+    0.6f, 2.303f,
+    1.609f, 1.0f, 40.0f, 0.7f, 1.0f,
+    0, 30, 0.1f, 1.0f,
     30, 2.0f,
     0.82f, 0.01f
 };
@@ -219,9 +218,9 @@ Profile kStraightProfile = {
     370.0f,
     0.0f, 1.0f, 0.0f, 30.0f, 3.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f, 300.0f, 600.0f,
     0.0f, 0.0f, 4.0f, 360.0f, 0.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 160.0f,
-    0.6f, 0.1f,
-    0.3f, 0.7f, 1.0f, 40.0f, 0.7f, 1.0f,
-    30, 0.1f, 0.4f,
+    0.6f, 2.303f,
+    1.609f, 1.0f, 40.0f, 0.7f, 1.0f,
+    0, 30, 0.1f, 1.0f,
     30, 2.0f,
     0.95f, 0.5f
 };
@@ -230,9 +229,9 @@ Profile kCrossProfile = {
     350.0f,
     1.7f, 0.4f, 0.0f, 110.0f, 3.0f, 3.6f, 10.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 0.0f, 260.0f, 360.0f,
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 300.0f,
-    0.6f, 0.1f,
-    0.3f, 0.7f, 1.0f, 40.0f, 0.7f, 1.0f,
-    30, 0.1f, 0.4f,
+    0.6f, 2.303f,
+    1.609f, 1.0f, 40.0f, 0.7f, 1.0f,
+    0, 30, 0.1f, 1.0f,
     30, 2.0f,
     0.82f, 0.01f
 };
@@ -241,9 +240,9 @@ Profile kCircleEnterProfile = {
     320.0f,
     1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 9.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 0.0f, 400.0f, 720.0f,
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 320.0f,
-    0.6f, 0.1f,
-    0.3f, 0.7f, 1.0f, 40.0f, 0.7f, 1.0f,
-    30, 0.1f, 0.4f,
+    0.6f, 2.303f,
+    1.609f, 1.0f, 40.0f, 0.7f, 1.0f,
+    0, 30, 0.1f, 1.0f,
     30, 2.0f,
     0.75f, 0.01f
 };
@@ -252,9 +251,9 @@ Profile kCircleInsideProfile = {
     320.0f,
     1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 9.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f, 400.0f, 660.0f,
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
-    0.6f, 0.1f,
-    0.3f, 0.7f, 1.0f, 40.0f, 0.7f, 1.0f,
-    30, 0.1f, 0.4f,
+    0.6f, 2.303f,
+    1.609f, 1.0f, 40.0f, 0.7f, 1.0f,
+    0, 30, 0.1f, 1.0f,
     30, 2.0f,
     0.82f, 0.01f
 };
@@ -263,9 +262,9 @@ Profile kCircleExitProfile = {
     320.0f,
     1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 10.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 0.0f, 400.0f, 660.0f,
     0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
-    0.6f, 0.1f,
-    0.3f, 0.7f, 1.0f, 40.0f, 0.7f, 1.0f,
-    30, 0.1f, 0.4f,
+    0.6f, 2.303f,
+    1.609f, 1.0f, 40.0f, 0.7f, 1.0f,
+    0, 30, 0.1f, 1.0f,
     30, 2.0f,
     0.82f, 0.01f
 };

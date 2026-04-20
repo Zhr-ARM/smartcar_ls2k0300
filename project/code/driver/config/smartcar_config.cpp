@@ -716,16 +716,16 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".yaw_rate_max_integral", &profile->yaw_rate_max_integral, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_max_output", &profile->yaw_rate_max_output, error_message) &&
            require_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message) &&
-           require_float(values, consumed, prefix + ".line_error_linear_base_b", &profile->line_error_linear_base_b, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_front_weight", &profile->speed_scheme_front_weight, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_rear_weight", &profile->speed_scheme_rear_weight, error_message) &&
+           require_float(values, consumed, prefix + ".line_error_exp_lambda", &profile->line_error_exp_lambda, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_rear_exp_lambda", &profile->speed_scheme_rear_exp_lambda, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_slowdown_start", &profile->speed_scheme_slowdown_start, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_slowdown_full", &profile->speed_scheme_slowdown_full, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_min_speed_scale", &profile->speed_scheme_min_speed_scale, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_speed_scale", &profile->speed_scheme_max_speed_scale, error_message) &&
-           require_int(values, consumed, prefix + ".speed_scheme_centerline_count_full_n", &profile->speed_scheme_centerline_count_full_n, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_centerline_ratio_floor", &profile->speed_scheme_centerline_ratio_floor, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_centerline_ratio_weight", &profile->speed_scheme_centerline_ratio_weight, error_message) &&
+           require_int(values, consumed, prefix + ".speed_scheme_centerline_count_lower", &profile->speed_scheme_centerline_count_lower, error_message) &&
+           require_int(values, consumed, prefix + ".speed_scheme_centerline_count_upper", &profile->speed_scheme_centerline_count_upper, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_centerline_scale_lower", &profile->speed_scheme_centerline_scale_lower, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_centerline_scale_upper", &profile->speed_scheme_centerline_scale_upper, error_message) &&
            require_int(values, consumed, prefix + ".speed_scheme_force_full_min_centerline_count", &profile->speed_scheme_force_full_min_centerline_count, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_force_full_abs_error_sum_per_point", &profile->speed_scheme_force_full_abs_error_sum_per_point, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_drop_ratio_per_cycle", &profile->speed_scheme_max_drop_ratio_per_cycle, error_message) &&
@@ -1172,6 +1172,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_index_min");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_index_max");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_prefix_ratio");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_exp_lambda");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_linear_base_b");
 
 #undef REQUIRE_RUNTIME_INT
@@ -1282,7 +1283,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
         return pid_tuning::route_line_follow::is_dynamic_kp_range_valid(profile) &&
                pid_tuning::route_line_follow::is_dynamic_position_kd_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_line_error_prefix_linear_valid(profile) &&
+               pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile) &&
                pid_tuning::route_line_follow::is_speed_scheme_range_valid(profile);
     };
     if (!route_valid(pid_tuning::route_line_follow::kNormalProfile) ||

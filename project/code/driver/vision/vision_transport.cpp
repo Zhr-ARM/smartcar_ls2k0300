@@ -1119,8 +1119,8 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_speed_scheme_final_speed_scale",
                      line_follow_pid_debug.speed_scheme_final_speed_scale);
         append_float(enabled, "pid_common_speed_scheme_split_ratio", line_follow_pid_debug.speed_scheme_split_ratio);
-        append_float(enabled, "pid_common_speed_scheme_front_weight", line_follow_pid_debug.speed_scheme_front_weight);
-        append_float(enabled, "pid_common_speed_scheme_rear_weight", line_follow_pid_debug.speed_scheme_rear_weight);
+        append_float(enabled, "pid_common_speed_scheme_rear_exp_lambda",
+                     line_follow_pid_debug.speed_scheme_rear_exp_lambda);
         append_float(enabled, "pid_common_speed_scheme_slowdown_start",
                      line_follow_pid_debug.speed_scheme_slowdown_start);
         append_float(enabled, "pid_common_speed_scheme_slowdown_full",
@@ -1141,14 +1141,16 @@ static void send_tcp_status()
                      line_follow_pid_debug.speed_scheme_max_drop_ratio_per_cycle);
         append_float(enabled, "pid_common_speed_scheme_max_rise_ratio_per_cycle",
                      line_follow_pid_debug.speed_scheme_max_rise_ratio_per_cycle);
-        append_int(enabled, "pid_common_speed_scheme_centerline_count_full_n",
-                   line_follow_pid_debug.speed_scheme_centerline_count_full_n);
-        append_float(enabled, "pid_common_speed_scheme_centerline_ratio_floor",
-                     line_follow_pid_debug.speed_scheme_centerline_ratio_floor);
-        append_float(enabled, "pid_common_speed_scheme_centerline_ratio_weight",
-                     line_follow_pid_debug.speed_scheme_centerline_ratio_weight);
-        append_float(enabled, "pid_common_speed_scheme_centerline_ratio_current",
-                     line_follow_pid_debug.speed_scheme_centerline_ratio_current);
+        append_int(enabled, "pid_common_speed_scheme_centerline_count_lower",
+                   line_follow_pid_debug.speed_scheme_centerline_count_lower);
+        append_int(enabled, "pid_common_speed_scheme_centerline_count_upper",
+                   line_follow_pid_debug.speed_scheme_centerline_count_upper);
+        append_float(enabled, "pid_common_speed_scheme_centerline_scale_lower",
+                     line_follow_pid_debug.speed_scheme_centerline_scale_lower);
+        append_float(enabled, "pid_common_speed_scheme_centerline_scale_upper",
+                     line_follow_pid_debug.speed_scheme_centerline_scale_upper);
+        append_float(enabled, "pid_common_speed_scheme_centerline_scale_current",
+                     line_follow_pid_debug.speed_scheme_centerline_scale_current);
         append_int(enabled, "pid_common_speed_scheme_force_full_min_centerline_count",
                    line_follow_pid_debug.speed_scheme_force_full_min_centerline_count);
         append_float(enabled, "pid_common_speed_scheme_force_full_abs_error_sum_per_point",

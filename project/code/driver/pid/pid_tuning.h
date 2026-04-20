@@ -116,20 +116,23 @@ struct Profile
     float yaw_rate_max_integral;
     float yaw_rate_max_output;
 
-    // line_error 前缀线性加权参数（新方案，按状态独立）。
+    // line_error 前缀指数加权参数（新方案，按状态独立）。
     float line_error_prefix_ratio;
-    float line_error_linear_base_b;
+    float line_error_exp_lambda;
 
-    // base_speed 分段混合降速参数（新方案，按状态独立）。
-    float speed_scheme_front_weight;
-    float speed_scheme_rear_weight;
+    // base_speed 速度方案参数（新方案，按状态独立）。
+    // 速度方案后段目标点指数权重参数 lambda（>=0）：
+    // 后段点按指数权重加权（权重和归一化为 1），用于生成速度决策目标点坐标。
+    float speed_scheme_rear_exp_lambda;
     float speed_scheme_slowdown_start;
     float speed_scheme_slowdown_full;
     float speed_scheme_min_speed_scale;
     float speed_scheme_max_speed_scale;
-    int speed_scheme_centerline_count_full_n;
-    float speed_scheme_centerline_ratio_floor;
-    float speed_scheme_centerline_ratio_weight;
+    // 中线点数映射区间：[count_lower, count_upper] -> [scale_lower, scale_upper]
+    int speed_scheme_centerline_count_lower;
+    int speed_scheme_centerline_count_upper;
+    float speed_scheme_centerline_scale_lower;
+    float speed_scheme_centerline_scale_upper;
     int speed_scheme_force_full_min_centerline_count;
     float speed_scheme_force_full_abs_error_sum_per_point;
     float speed_scheme_max_drop_ratio_per_cycle;
@@ -141,7 +144,7 @@ extern float kGlobalBaseSpeedScale;
 bool is_dynamic_kp_range_valid(const Profile &profile);
 bool is_dynamic_position_kd_range_valid(const Profile &profile);
 bool is_position_kp_piecewise_range_valid(const Profile &profile);
-bool is_line_error_prefix_linear_valid(const Profile &profile);
+bool is_line_error_prefix_exp_valid(const Profile &profile);
 bool is_speed_scheme_range_valid(const Profile &profile);
 
 extern Profile kNormalProfile;
