@@ -4082,8 +4082,9 @@ bool vision_image_processor_process_step()
 
     auto t_pre_start = t1;
 
-    // 固定160x120，处理分辨率与采图分辨率一致，无需降采样。
-    // 当前先做去畸变（含配置中的 undistort_move_x/y 平移补偿），再进入后续灰度/二值/巡线流程。
+    // 处理分辨率固定为 kProcWidth x kProcHeight（当前为 160x120）。
+    // 当采图分辨率与处理分辨率不一致（如 320x240 -> 160x120）时，
+    // 在“未开启去畸变”路径也需要先正确缩放，再进入灰度/二值/巡线流程。
     cv::Mat bgr_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr_full);
     cv::Mat bgr(kProcHeight, kProcWidth, CV_8UC3, g_image_bgr);
     if (g_undistort_enabled.load() && init_undistort_remap_table())
@@ -4092,7 +4093,14 @@ bool vision_image_processor_process_step()
     }
     else
     {
-        std::memcpy(g_image_bgr, g_image_bgr_full, sizeof(g_image_bgr));
+        if (UVC_WIDTH == kProcWidth && UVC_HEIGHT == kProcHeight)
+        {
+            std::memcpy(g_image_bgr, g_image_bgr_full, sizeof(g_image_bgr));
+        }
+        else
+        {
+            cv::resize(bgr_full, bgr, cv::Size(kProcWidth, kProcHeight), 0.0, 0.0, cv::INTER_AREA);
+        }
     }
     cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
