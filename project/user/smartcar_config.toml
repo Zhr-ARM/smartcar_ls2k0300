@@ -179,11 +179,11 @@ circle_guide_anchor_offset_stage5 = 0
 # 圆环送 IPM 前触边判定边距（像素）。
 route_circle_apply_touch_margin_px = 2
 # straight 判定固定窗口最少中线点数。
-route_straight_min_centerline_points = 20
+route_straight_min_centerline_points = 25
 # 进入 straight 状态所需的连续满足帧数。
 route_straight_enter_consecutive_frames = 2
 # straight 判定中固定窗口（前 N 点）绝对误差和上限。
-route_straight_abs_error_sum_max = 20.0
+route_straight_abs_error_sum_max = 100.0
 # cross_1 中辅助点同 x 向上扫描白黑转变的最大行数。
 cross_aux_vertical_scan_max_rows = 75
 # cross_1 辅助八邻域边界允许的最大点数。
@@ -454,9 +454,9 @@ feedback_low_pass_alpha = 0.95
 # 是否启用主循环实时无刷控制。
 realtime_enabled = true
 # 左侧无刷目标占空比，单位百分比 [0, 100]。
-left_duty_percent = 50.0
+left_duty_percent = 0.0
 # 右侧无刷目标占空比，单位百分比 [0, 100]。
-right_duty_percent = 50.0
+right_duty_percent = 0.0
 
 [pid.yaw_rate_loop]
 # 视觉曲率滤波 alpha。
@@ -546,12 +546,12 @@ yaw_rate_max_integral = 0.0
 yaw_rate_max_output = 200.0
 # NORMAL 档 line_error 前缀比例（0,1]。
 line_error_prefix_ratio = 0.6
-# NORMAL 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# NORMAL 档速度方案后段指数权重参数 lambda（>=0）。
+# NORMAL 档 line_error 指数权重参数 lambda（>=0） 越大越偏向近端点。。
+line_error_exp_lambda = 1.5
+# NORMAL 档速度方案后段指数权重参数 lambda（>=0） 越大越偏向近端点。。
 speed_scheme_rear_exp_lambda = 1
 # NORMAL 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
-speed_scheme_friction_circle_n = 250000.0
+speed_scheme_friction_circle_n = 120000.0
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95
 # 速度方案单周期最大升速比例。
@@ -591,9 +591,9 @@ position_dynamic_kd_max = 2.0
 # STRAIGHT 档位置环积分限幅。
 position_max_integral = 0.0
 # STRAIGHT 档位置环输出限幅。
-position_max_output = 300.0
+position_max_output = 270.0
 # STRAIGHT 档总转向输出限幅。
-steering_max_output = 600.0
+steering_max_output = 270.0
 # STRAIGHT 档由横向误差生成目标横摆角速度的增益。
 yaw_rate_ref_from_error_gain_dps = 0.0
 # STRAIGHT 档由曲率生成目标横摆角速度的增益。
@@ -621,17 +621,17 @@ yaw_rate_max_integral = 0.0
 # STRAIGHT 档角速度环输出限幅。
 yaw_rate_max_output = 160.0
 # STRAIGHT 档 line_error 前缀比例（0,1]。
-line_error_prefix_ratio = 0.7
+line_error_prefix_ratio = 0.8
 # STRAIGHT 档 line_error 指数权重参数 lambda（>=0）。
 line_error_exp_lambda = 1
 # 状态速度方案后段指数权重参数 lambda（>=0）。
 speed_scheme_rear_exp_lambda = 1
 # STRAIGHT 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
-speed_scheme_friction_circle_n = 300000.0
+speed_scheme_friction_circle_n = 160000.0
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95
 # 速度方案单周期最大升速比例。
-speed_scheme_max_rise_ratio_per_cycle = 1.0
+speed_scheme_max_rise_ratio_per_cycle = 0.01
 # 速度方案基础速度下限（摩擦圆决策后再次下限裁剪）。
 speed_scheme_min_base_speed = 270.0
 
