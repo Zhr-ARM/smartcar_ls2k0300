@@ -53,6 +53,14 @@ float kTargetCountMax = 1550.0f;
 float kErrorDeadzonePx = 0.6f;
 float kErrorLowGainLimitPx = 3.0f;
 float kErrorLowGain = 0.70f;
+float kFrictionCircleAngleOnDeg = 7.0f;
+float kFrictionCircleAngleOffDeg = 3.5f;
+float kFrictionCircleErrorOnPx = 8.0f;
+float kFrictionCircleErrorOffPx = 4.0f;
+float kFrictionCircleYawRateOnDps = 50.0f;
+float kFrictionCircleYawRateOffDps = 25.0f;
+int32 kFrictionCircleEnterConsecutiveFrames = 3;
+int32 kFrictionCircleExitConsecutiveFrames = 3;
 } // namespace line_follow
 
 namespace line_error_preview

@@ -56,6 +56,14 @@ extern float kTargetCountMax;
 extern float kErrorDeadzonePx;
 extern float kErrorLowGainLimitPx;
 extern float kErrorLowGain;
+extern float kFrictionCircleAngleOnDeg;
+extern float kFrictionCircleAngleOffDeg;
+extern float kFrictionCircleErrorOnPx;
+extern float kFrictionCircleErrorOffPx;
+extern float kFrictionCircleYawRateOnDps;
+extern float kFrictionCircleYawRateOffDps;
+extern int32 kFrictionCircleEnterConsecutiveFrames;
+extern int32 kFrictionCircleExitConsecutiveFrames;
 } // namespace line_follow
 
 namespace line_error_preview

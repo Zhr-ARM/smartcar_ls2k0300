@@ -75,6 +75,14 @@ struct PidSnapshot
     float line_follow_error_deadzone_px = 0.0f;
     float line_follow_error_low_gain_limit_px = 0.0f;
     float line_follow_error_low_gain = 0.0f;
+    float line_follow_friction_circle_angle_on_deg = 0.0f;
+    float line_follow_friction_circle_angle_off_deg = 0.0f;
+    float line_follow_friction_circle_error_on_px = 0.0f;
+    float line_follow_friction_circle_error_off_px = 0.0f;
+    float line_follow_friction_circle_yaw_rate_on_dps = 0.0f;
+    float line_follow_friction_circle_yaw_rate_off_dps = 0.0f;
+    int32 line_follow_friction_circle_enter_consecutive_frames = 0;
+    int32 line_follow_friction_circle_exit_consecutive_frames = 0;
 
     pid_tuning::line_error_preview::WeightedProfile normal_weighted_profile{};
     pid_tuning::line_error_preview::WeightedProfile straight_weighted_profile{};
@@ -763,6 +771,16 @@ PidSnapshot capture_pid_snapshot()
     snapshot.line_follow_error_deadzone_px = pid_tuning::line_follow::kErrorDeadzonePx;
     snapshot.line_follow_error_low_gain_limit_px = pid_tuning::line_follow::kErrorLowGainLimitPx;
     snapshot.line_follow_error_low_gain = pid_tuning::line_follow::kErrorLowGain;
+    snapshot.line_follow_friction_circle_angle_on_deg = pid_tuning::line_follow::kFrictionCircleAngleOnDeg;
+    snapshot.line_follow_friction_circle_angle_off_deg = pid_tuning::line_follow::kFrictionCircleAngleOffDeg;
+    snapshot.line_follow_friction_circle_error_on_px = pid_tuning::line_follow::kFrictionCircleErrorOnPx;
+    snapshot.line_follow_friction_circle_error_off_px = pid_tuning::line_follow::kFrictionCircleErrorOffPx;
+    snapshot.line_follow_friction_circle_yaw_rate_on_dps = pid_tuning::line_follow::kFrictionCircleYawRateOnDps;
+    snapshot.line_follow_friction_circle_yaw_rate_off_dps = pid_tuning::line_follow::kFrictionCircleYawRateOffDps;
+    snapshot.line_follow_friction_circle_enter_consecutive_frames =
+        pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames;
+    snapshot.line_follow_friction_circle_exit_consecutive_frames =
+        pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames;
 
     snapshot.normal_weighted_profile = pid_tuning::line_error_preview::kNormalWeightedProfile;
     snapshot.straight_weighted_profile = pid_tuning::line_error_preview::kStraightWeightedProfile;
@@ -819,6 +837,16 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
     pid_tuning::line_follow::kErrorDeadzonePx = snapshot.line_follow_error_deadzone_px;
     pid_tuning::line_follow::kErrorLowGainLimitPx = snapshot.line_follow_error_low_gain_limit_px;
     pid_tuning::line_follow::kErrorLowGain = snapshot.line_follow_error_low_gain;
+    pid_tuning::line_follow::kFrictionCircleAngleOnDeg = snapshot.line_follow_friction_circle_angle_on_deg;
+    pid_tuning::line_follow::kFrictionCircleAngleOffDeg = snapshot.line_follow_friction_circle_angle_off_deg;
+    pid_tuning::line_follow::kFrictionCircleErrorOnPx = snapshot.line_follow_friction_circle_error_on_px;
+    pid_tuning::line_follow::kFrictionCircleErrorOffPx = snapshot.line_follow_friction_circle_error_off_px;
+    pid_tuning::line_follow::kFrictionCircleYawRateOnDps = snapshot.line_follow_friction_circle_yaw_rate_on_dps;
+    pid_tuning::line_follow::kFrictionCircleYawRateOffDps = snapshot.line_follow_friction_circle_yaw_rate_off_dps;
+    pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames =
+        snapshot.line_follow_friction_circle_enter_consecutive_frames;
+    pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames =
+        snapshot.line_follow_friction_circle_exit_consecutive_frames;
 
     pid_tuning::line_error_preview::kNormalWeightedProfile = snapshot.normal_weighted_profile;
     pid_tuning::line_error_preview::kStraightWeightedProfile = snapshot.straight_weighted_profile;
@@ -1250,6 +1278,16 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_PID_FLOAT("pid.line_follow.error_deadzone_px", pid_tuning::line_follow::kErrorDeadzonePx);
     REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain_limit_px", pid_tuning::line_follow::kErrorLowGainLimitPx);
     REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain", pid_tuning::line_follow::kErrorLowGain);
+    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_angle_on_deg", pid_tuning::line_follow::kFrictionCircleAngleOnDeg);
+    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_angle_off_deg", pid_tuning::line_follow::kFrictionCircleAngleOffDeg);
+    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_error_on_px", pid_tuning::line_follow::kFrictionCircleErrorOnPx);
+    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_error_off_px", pid_tuning::line_follow::kFrictionCircleErrorOffPx);
+    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_yaw_rate_on_dps", pid_tuning::line_follow::kFrictionCircleYawRateOnDps);
+    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_yaw_rate_off_dps", pid_tuning::line_follow::kFrictionCircleYawRateOffDps);
+    REQUIRE_PID_INT("pid.line_follow.friction_circle_enter_consecutive_frames",
+                    pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames);
+    REQUIRE_PID_INT("pid.line_follow.friction_circle_exit_consecutive_frames",
+                    pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames);
     REQUIRE_PID_FLOAT("pid.route_line_follow.global.base_speed_scale", pid_tuning::route_line_follow::kGlobalBaseSpeedScale);
 
 #undef REQUIRE_PID_FLOAT
@@ -1286,6 +1324,22 @@ bool load_from_path(const std::string &path, std::string *error_message)
         !route_valid(pid_tuning::route_line_follow::kCircleExitProfile))
     {
         *error_message = "pid.route_line_follow contains invalid profile";
+        return false;
+    }
+    if (pid_tuning::line_follow::kFrictionCircleAngleOnDeg < 0.0f ||
+        pid_tuning::line_follow::kFrictionCircleAngleOffDeg < 0.0f ||
+        pid_tuning::line_follow::kFrictionCircleErrorOnPx < 0.0f ||
+        pid_tuning::line_follow::kFrictionCircleErrorOffPx < 0.0f ||
+        pid_tuning::line_follow::kFrictionCircleYawRateOnDps < 0.0f ||
+        pid_tuning::line_follow::kFrictionCircleYawRateOffDps < 0.0f)
+    {
+        *error_message = "pid.line_follow friction_circle thresholds must be >= 0";
+        return false;
+    }
+    if (pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames <= 0 ||
+        pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames <= 0)
+    {
+        *error_message = "pid.line_follow friction_circle consecutive_frames must be > 0";
         return false;
     }
     if (g_vision_runtime_config.route_straight_min_centerline_points < 1)

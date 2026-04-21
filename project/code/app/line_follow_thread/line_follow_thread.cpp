@@ -68,6 +68,9 @@ std::atomic<float> g_normal_speed_reference(pid_tuning::route_line_follow::kNorm
 std::atomic<float> g_line_error_px(0.0f);
 std::atomic<float> g_turn_output(0.0f);
 std::atomic<bool> g_reload_from_globals_requested(false);
+bool g_friction_circle_gate_enabled = false;
+int g_friction_circle_enter_count = 0;
+int g_friction_circle_exit_count = 0;
 
 // 滤波后的归一化误差状态，跨周期保留。
 // 这里刻意保留“状态记忆”，因为巡线不是单次运算，而是连续控制。
@@ -236,6 +239,9 @@ void reset_line_follow_runtime_state()
     g_has_last_logged_route_state = false;
     g_last_logged_route_main_state = VISION_ROUTE_MAIN_NORMAL;
     g_last_logged_route_sub_state = VISION_ROUTE_SUB_NONE;
+    g_friction_circle_gate_enabled = false;
+    g_friction_circle_enter_count = 0;
+    g_friction_circle_exit_count = 0;
     std::lock_guard<std::mutex> lock(g_pid_debug_mutex);
     g_pid_debug_status = {};
 }
@@ -610,6 +616,84 @@ float clamp_steering_to_wheel_room(float applied_base_speed, float raw_steering_
                       available_steering_limit);
 }
 
+bool update_friction_circle_gate_if_needed(bool vision_updated,
+                                           int route_main_state,
+                                           float abs_target_angle_deg,
+                                           float abs_filtered_error_px,
+                                           float abs_yaw_rate_ref_dps)
+{
+    if (route_main_state == VISION_ROUTE_MAIN_STRAIGHT)
+    {
+        g_friction_circle_gate_enabled = false;
+        g_friction_circle_enter_count = 0;
+        g_friction_circle_exit_count = 0;
+        return false;
+    }
+
+    if (!vision_updated)
+    {
+        return g_friction_circle_gate_enabled;
+    }
+
+    const float angle_on = std::max(0.0f, pid_tuning::line_follow::kFrictionCircleAngleOnDeg);
+    const float error_on = std::max(0.0f, pid_tuning::line_follow::kFrictionCircleErrorOnPx);
+    const float yaw_rate_on = std::max(0.0f, pid_tuning::line_follow::kFrictionCircleYawRateOnDps);
+    const float angle_off =
+        std::clamp(pid_tuning::line_follow::kFrictionCircleAngleOffDeg, 0.0f, angle_on);
+    const float error_off =
+        std::clamp(pid_tuning::line_follow::kFrictionCircleErrorOffPx, 0.0f, error_on);
+    const float yaw_rate_off =
+        std::clamp(pid_tuning::line_follow::kFrictionCircleYawRateOffDps, 0.0f, yaw_rate_on);
+    const int enter_frames = std::max(1, pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames);
+    const int exit_frames = std::max(1, pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames);
+
+    const bool turn_demand_on =
+        (abs_target_angle_deg > angle_on) ||
+        (abs_filtered_error_px > error_on) ||
+        (abs_yaw_rate_ref_dps > yaw_rate_on);
+    const bool turn_demand_off =
+        (abs_target_angle_deg < angle_off) &&
+        (abs_filtered_error_px < error_off) &&
+        (abs_yaw_rate_ref_dps < yaw_rate_off);
+
+    if (!g_friction_circle_gate_enabled)
+    {
+        g_friction_circle_exit_count = 0;
+        if (turn_demand_on)
+        {
+            ++g_friction_circle_enter_count;
+            if (g_friction_circle_enter_count >= enter_frames)
+            {
+                g_friction_circle_gate_enabled = true;
+                g_friction_circle_enter_count = 0;
+            }
+        }
+        else
+        {
+            g_friction_circle_enter_count = 0;
+        }
+    }
+    else
+    {
+        g_friction_circle_enter_count = 0;
+        if (turn_demand_off)
+        {
+            ++g_friction_circle_exit_count;
+            if (g_friction_circle_exit_count >= exit_frames)
+            {
+                g_friction_circle_gate_enabled = false;
+                g_friction_circle_exit_count = 0;
+            }
+        }
+        else
+        {
+            g_friction_circle_exit_count = 0;
+        }
+    }
+
+    return g_friction_circle_gate_enabled;
+}
+
 bool update_filtered_yaw_rate_if_new_sample(float *sample_dt_seconds_out)
 {
     const uint32 imu_sample_seq = imu_thread_gyro_z_sample_seq();
@@ -747,6 +831,9 @@ void line_follow_loop()
             position_pid1.reset();
             position_pid2.reset();
             g_normal_speed_reference.store(std::max(0.0f, pid_tuning::route_line_follow::kNormalProfile.base_speed));
+            g_friction_circle_gate_enabled = false;
+            g_friction_circle_enter_count = 0;
+            g_friction_circle_exit_count = 0;
         }
 
         // 这里的 normal_speed_reference 表示“当前希望的 NORMAL 档直道参考速度”。
@@ -855,7 +942,7 @@ void line_follow_loop()
                                                      route_profile.steering_max_output);
         const float abs_yaw_rate_ref_dps = std::fabs(yaw_rate_ref_dps);
 
-        bool force_full_speed = false; // 新方案中固定关闭“强制满速直通”。
+        bool force_full_speed = false;
         const float mean_abs_path_error = vision_image_processor_ipm_mean_abs_offset_error(); // 视觉给出的整条分析路径平均绝对偏差像素
         bool track_point_valid = false;
         int track_point_x = 0;
@@ -883,21 +970,39 @@ void line_follow_loop()
         const bool speed_scheme_ready =
             speed_target_valid &&
             (speed_scheme.friction_circle_n > 0.0f);
-        const float desired_base_speed = compute_desired_base_speed(profile_base_speed,
-                                                                    route_profile,
-                                                                    error_state.abs_filtered_error_px,
-                                                                    abs_yaw_rate_ref_dps,
-                                                                    mean_abs_path_error,
-                                                                    selected_centerline_count,
-                                                                    speed_target_valid,
-                                                                    speed_target_x,
-                                                                    speed_target_y,
-                                                                    speed_scheme,
-                                                                    realtime_speed,
-                                                                    speed_scheme_error_scale_raw,
-                                                                    speed_scheme_final_speed_scale,
-                                                                    force_full_speed);
+        const bool friction_circle_enabled =
+            (std::strcmp(route_selection.name, "CIRCLE_INSIDE") == 0) ?
+                true :
+                update_friction_circle_gate_if_needed(
+                    vision_updated,
+                    route_main_state,
+                    speed_scheme_target_abs_angle_deg,
+                    error_state.abs_filtered_error_px,
+                    abs_yaw_rate_ref_dps);
+        const float desired_base_speed = friction_circle_enabled ?
+            compute_desired_base_speed(profile_base_speed,
+                                       route_profile,
+                                       error_state.abs_filtered_error_px,
+                                       abs_yaw_rate_ref_dps,
+                                       mean_abs_path_error,
+                                       selected_centerline_count,
+                                       speed_target_valid,
+                                       speed_target_x,
+                                       speed_target_y,
+                                       speed_scheme,
+                                       realtime_speed,
+                                       speed_scheme_error_scale_raw,
+                                       speed_scheme_final_speed_scale,
+                                       force_full_speed) :
+            profile_base_speed;
+        if (!friction_circle_enabled)
+        {
+            force_full_speed = true;
+            speed_scheme_error_scale_raw = 1.0f;
+            speed_scheme_final_speed_scale = 1.0f;
+        }
         const bool speed_scheme_triggered =
+            friction_circle_enabled &&
             speed_scheme_ready &&
             (desired_base_speed < profile_base_speed);
         int speed_scheme_winner_branch = 0; // 0: none/full-speed, 1: speed_scheme
