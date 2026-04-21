@@ -125,7 +125,7 @@ ipm_centerline_curvature_enabled = true
 # IPM 中线曲率计算步长。
 ipm_centerline_curvature_step = 3
 # 斑马线检测总开关。
-zebra_cross_detection_enabled = true
+zebra_cross_detection_enabled = false
 # 双边都丢线时是否保留上一帧平移中线。
 keep_last_centerline_on_double_loss = true
 # 十字状态识别开关。
@@ -179,11 +179,11 @@ circle_guide_anchor_offset_stage5 = 0
 # 圆环送 IPM 前触边判定边距（像素）。
 route_circle_apply_touch_margin_px = 2
 # straight 判定固定窗口最少中线点数。
-route_straight_min_centerline_points = 25
+route_straight_min_centerline_points = 35
 # 进入 straight 状态所需的连续满足帧数。
 route_straight_enter_consecutive_frames = 2
 # straight 判定中固定窗口（前 N 点）绝对误差和上限。
-route_straight_abs_error_sum_max = 100.0
+route_straight_abs_error_sum_max = 50.0
 # cross_1 中辅助点同 x 向上扫描白黑转变的最大行数。
 cross_aux_vertical_scan_max_rows = 75
 # cross_1 辅助八邻域边界允许的最大点数。
@@ -200,8 +200,8 @@ cross_upper_dir6_post_run_len = 3
 # 0=左平移，1=右平移，2=自动。
 ipm_line_error_source = 2
 # line_error 计算方法。
-# 0=固定索引，1=前缀指数加权索引，2=随速度索引，3=兼容模式(行为同1)。
-ipm_line_error_method = 3
+# 0=固定索引，1=离散点位加权索引，2=随速度索引，3=前缀指数加权索引。
+ipm_line_error_method = 0
 
 [vision.runtime.ncnn]
 # ncnn 模型输入宽度。
@@ -527,7 +527,7 @@ yaw_rate_ref_from_track_point_gain_dps = 7.0
 # NORMAL 档目标横摆角速度限幅。
 yaw_rate_ref_limit_dps = 360.0
 # NORMAL 档角速度环 Kp。
-yaw_rate_kp = 1.0
+yaw_rate_kp = 3.0
 # NORMAL 档角速度环动态 Kp 一次项系数。
 yaw_rate_dynamic_kp_quad_a = 0.0
 # NORMAL 档角速度环动态 Kp 下限。
@@ -545,9 +545,9 @@ yaw_rate_max_integral = 0.0
 # NORMAL 档角速度环输出限幅。
 yaw_rate_max_output = 200.0
 # NORMAL 档 line_error 前缀比例（0,1]。
-line_error_prefix_ratio = 0.6
+line_error_prefix_ratio = 0.4
 # NORMAL 档 line_error 指数权重参数 lambda（>=0） 越大越偏向近端点。。
-line_error_exp_lambda = 1.5
+line_error_exp_lambda = 1
 # NORMAL 档速度方案后段指数权重参数 lambda（>=0） 越大越偏向近端点。。
 speed_scheme_rear_exp_lambda = 1
 # NORMAL 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
@@ -621,7 +621,7 @@ yaw_rate_max_integral = 0.0
 # STRAIGHT 档角速度环输出限幅。
 yaw_rate_max_output = 160.0
 # STRAIGHT 档 line_error 前缀比例（0,1]。
-line_error_prefix_ratio = 0.8
+line_error_prefix_ratio = 0.6
 # STRAIGHT 档 line_error 指数权重参数 lambda（>=0）。
 line_error_exp_lambda = 1
 # 状态速度方案后段指数权重参数 lambda（>=0）。

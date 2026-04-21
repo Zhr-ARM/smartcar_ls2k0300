@@ -401,10 +401,10 @@ vision_runtime_config_t g_vision_runtime_config = {
     // 说明：line_error 取点参数集中在这里。
     // line_error 平移中线偏好源：0=偏好左，1=偏好右，2=无偏好(自动按边界点数)。
     .ipm_line_error_source = VISION_IPM_LINE_ERROR_FROM_AUTO,
-    // line_error 计算方法：0=固定索引，1=前缀指数加权索引，2=随速度索引，3=兼容模式(行为同1)。
-    .ipm_line_error_method = 1,
+    // line_error 计算方法：0=固定索引，1=离散点位加权索引，2=随速度索引，3=前缀指数加权索引。
+    .ipm_line_error_method = 2,
     // 固定索引模式下默认使用的中线点索引。
-    .ipm_line_error_fixed_index = 1,
+    .ipm_line_error_fixed_index = 8,
     // line_error 加权点数量。
     .ipm_line_error_weighted_point_count = 3,
     // line_error 加权索引点（0-based）。

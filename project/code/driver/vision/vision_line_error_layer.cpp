@@ -191,12 +191,72 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         x = static_cast<float>(xs[idx]);
         y = static_cast<float>(ys[idx]);
     }
+    else if (method == VISION_IPM_LINE_ERROR_WEIGHTED_INDEX)
+    {
+        // method=1: 恢复旧版“离散点位加权”行为：
+        // 由 point_indices/weights 指定若干采样点，并按权重归一得到 track_x/track_y。
+        std::array<int, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> point_indices = {};
+        std::array<float, VISION_LINE_ERROR_MAX_WEIGHTED_POINTS> weights = {};
+        size_t point_count = 0;
+        {
+            const std::lock_guard<std::mutex> lock(g_ipm_line_error_weighted_points_mutex);
+            point_indices = g_ipm_line_error_point_indices;
+            weights = g_ipm_line_error_weights;
+            point_count = g_ipm_line_error_weighted_point_count;
+        }
+
+        float total_weight = 0.0f;
+        float valid_weight = 0.0f;
+        for (size_t i = 0; i < point_count; ++i)
+        {
+            total_weight += weights[i];
+            if (point_indices[i] >= 0 && point_indices[i] < count)
+            {
+                valid_weight += weights[i];
+            }
+        }
+        if (point_count == 0)
+        {
+            g_abs_error_sum_to_required_index = 0.0f;
+            return 0;
+        }
+
+        int weighted_track_index = count - 1;
+        float weighted_x = static_cast<float>(xs[weighted_track_index]);
+        float weighted_y = static_cast<float>(ys[weighted_track_index]);
+        if (std::fabs(valid_weight) > 1.0e-6f)
+        {
+            const float weight_scale = total_weight / valid_weight;
+            float weighted_index = 0.0f;
+            weighted_x = 0.0f;
+            weighted_y = 0.0f;
+            for (size_t i = 0; i < point_count; ++i)
+            {
+                const int idx = point_indices[i];
+                if (idx < 0 || idx >= count)
+                {
+                    continue;
+                }
+                const float effective_weight = weights[i] * weight_scale;
+                weighted_index += static_cast<float>(idx) * effective_weight;
+                weighted_x += static_cast<float>(xs[idx]) * effective_weight;
+                weighted_y += static_cast<float>(ys[idx]) * effective_weight;
+            }
+            weighted_track_index = std::clamp(static_cast<int>(std::lround(weighted_index)), 0, count - 1);
+        }
+
+        g_ipm_line_error_track_index = weighted_track_index;
+        x = weighted_x;
+        y = weighted_y;
+    }
     else
     {
-        // 统一按“前缀比例 + 指数权重”计算：
+        // method=3: 前缀指数加权
         // 1) 仅使用中线前 effective_count 个点；
         // 2) 权重函数 w(i)=exp(-lambda*t), t=i/(effective_count-1)；
-        // 3) i 越小（更近端）权重越大，最终按权重归一化，保证总权重为 1。
+        // 3) i 越小（更近端）权重越大，最终按权重归一化。
+        //
+        // 注意：这里保留当前 method=3 的行为；method=1 已恢复为离散点位加权。
         const float prefix_ratio =
             std::clamp(g_ipm_line_error_prefix_ratio.load(), 0.01f, 1.0f);
         const int effective_count =
@@ -233,7 +293,7 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
             }
         }
 
-        // method=1/3 统一使用纯加权索引，不再叠加速度索引增量。
+        // method=3 使用纯加权索引，不叠加速度索引增量。
         g_ipm_line_error_track_index = weighted_track_index;
         x = weighted_x;
         y = weighted_y;

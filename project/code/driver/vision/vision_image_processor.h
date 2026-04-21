@@ -32,7 +32,7 @@ typedef enum
     VISION_IPM_LINE_ERROR_FIXED_INDEX = 0,
     VISION_IPM_LINE_ERROR_WEIGHTED_INDEX = 1,
     VISION_IPM_LINE_ERROR_SPEED_INDEX = 2,
-    // 兼容保留值：当前行为与 VISION_IPM_LINE_ERROR_WEIGHTED_INDEX 相同。
+    // method=3：前缀指数加权（prefix_ratio + exp_lambda）。
     VISION_IPM_LINE_ERROR_WEIGHTED_SPEED_DELTA = 3
 } vision_ipm_line_error_method_enum;
 
