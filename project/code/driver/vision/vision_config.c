@@ -331,6 +331,8 @@ vision_runtime_config_t g_vision_runtime_config = {
     .ipm_centerline_curvature_enabled = true,
     // 所选偏移中线曲率计算步长（索引步长）。
     .ipm_centerline_curvature_step = 3,
+    // IPM 映射完成后，对输出边界/中线整体追加的 y 偏移（正值向下）。
+    .ipm_post_boundary_y_offset = 80,
     // 斑马线检测开关。
     .zebra_cross_detection_enabled = false,
     // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。
@@ -412,7 +414,7 @@ vision_runtime_config_t g_vision_runtime_config = {
     // line_error 各索引点对应权重。
     .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b（仅 method=2 生效）。
-    .ipm_line_error_speed_k = 0.02f,
+    .ipm_line_error_speed_k = 0.04f,
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b（仅 method=2 生效）。
     .ipm_line_error_speed_b = 2.0f,
     // 随速度索引模式允许的最小索引（仅 method=2 生效）。

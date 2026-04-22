@@ -130,10 +130,13 @@ struct Profile
 
     // base_speed 速度方案参数（新方案，按状态独立）。
     // 速度方案后段目标点指数权重参数 lambda（>=0）：
-    // 后段点按指数权重加权（权重和归一化为 1），用于生成速度决策目标点坐标。
+    // 兼容保留字段，当前“速度索引到尾点均值”目标点策略不再使用该参数。
     float speed_scheme_rear_exp_lambda;
+    // 速度方案目标点起始索引独立偏移 b：
+    // start_idx = round(speed_idx + b)。
+    float speed_scheme_start_index_offset_b;
     // 速度方案摩擦圆参数 n（>0）：
-    // 速度决策公式为 v_target^2 + (angle_target * v_real)^2 = n。
+    // 速度决策公式为 v_target^2 + (angle_target * v_target)^2 = n。
     float speed_scheme_friction_circle_n;
     float speed_scheme_max_drop_ratio_per_cycle;
     float speed_scheme_max_rise_ratio_per_cycle;

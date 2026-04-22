@@ -171,11 +171,16 @@ float vision_image_processor_ipm_front_weighted_abs_error_sum(int point_count);
 float vision_image_processor_ipm_segmented_blended_abs_error(float split_ratio,
                                                              float front_weight,
                                                              float rear_weight);
-void vision_image_processor_ipm_rear_exp_weighted_target_point(float split_ratio,
-                                                                float exp_lambda,
-                                                                bool *valid,
-                                                                int *x,
-                                                                int *y);
+// 速度方案目标点：
+// - 起点：速度索引公式 idx = k * speed + b；
+// - 再追加独立偏移 b_offset：start_idx = idx + b_offset；
+// - 终点：中线尾点；
+// - 目标：对 [start_idx, tail] 区间做简单均值；
+// - 若 start_idx 超出中线尾点，则退化为尾点本身。
+void vision_image_processor_ipm_speed_index_tail_mean_target_point(float start_index_offset_b,
+                                                                   bool *valid,
+                                                                   int *x,
+                                                                   int *y);
 
 // 读取最近一帧处理耗时（单位：us）
 // capture_wait_us: 等待相机新帧

@@ -485,6 +485,19 @@ bool require_float(const RawMap &values, std::set<std::string> *consumed, const 
     return true;
 }
 
+bool require_optional_float(const RawMap &values,
+                            std::set<std::string> *consumed,
+                            const std::string &key,
+                            float *target,
+                            std::string *error_message)
+{
+    if (values.find(key) == values.end())
+    {
+        return true;
+    }
+    return require_float(values, consumed, key, target, error_message);
+}
+
 bool require_string(const RawMap &values,
                     std::set<std::string> *consumed,
                     const std::string &key,
@@ -723,9 +736,10 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".yaw_rate_kd", &profile->yaw_rate_kd, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_max_integral", &profile->yaw_rate_max_integral, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_max_output", &profile->yaw_rate_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message) &&
-           require_float(values, consumed, prefix + ".line_error_exp_lambda", &profile->line_error_exp_lambda, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_rear_exp_lambda", &profile->speed_scheme_rear_exp_lambda, error_message) &&
+           require_optional_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message) &&
+           require_optional_float(values, consumed, prefix + ".line_error_exp_lambda", &profile->line_error_exp_lambda, error_message) &&
+           require_optional_float(values, consumed, prefix + ".speed_scheme_rear_exp_lambda", &profile->speed_scheme_rear_exp_lambda, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_start_index_offset_b", &profile->speed_scheme_start_index_offset_b, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_friction_circle_n", &profile->speed_scheme_friction_circle_n, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_drop_ratio_per_cycle", &profile->speed_scheme_max_drop_ratio_per_cycle, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_rise_ratio_per_cycle", &profile->speed_scheme_max_rise_ratio_per_cycle, error_message) &&
@@ -1142,6 +1156,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_FLOAT(ipm_centerline_resample_step_px);
     REQUIRE_RUNTIME_BOOL(ipm_centerline_curvature_enabled);
     REQUIRE_RUNTIME_INT(ipm_centerline_curvature_step);
+    REQUIRE_RUNTIME_INT(ipm_post_boundary_y_offset);
     REQUIRE_RUNTIME_BOOL(zebra_cross_detection_enabled);
     REQUIRE_RUNTIME_BOOL(keep_last_centerline_on_double_loss);
     REQUIRE_RUNTIME_BOOL(route_cross_detection_enabled);
@@ -1181,16 +1196,16 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_INT(cross_upper_dir6_post_run_len);
     REQUIRE_RUNTIME_INT(ipm_line_error_source);
     REQUIRE_RUNTIME_INT(ipm_line_error_method);
+    REQUIRE_RUNTIME_FLOAT(ipm_line_error_speed_k);
+    REQUIRE_RUNTIME_FLOAT(ipm_line_error_speed_b);
+    REQUIRE_RUNTIME_INT(ipm_line_error_index_min);
+    REQUIRE_RUNTIME_INT(ipm_line_error_index_max);
 
     // 兼容旧版本配置：以下键已弃用，若存在则仅消费避免触发 unknown-keys。
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_fixed_index");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_weighted_point_count");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_point_indices");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_weights");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_speed_k");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_speed_b");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_index_min");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_index_max");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_prefix_ratio");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_exp_lambda");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_linear_base_b");

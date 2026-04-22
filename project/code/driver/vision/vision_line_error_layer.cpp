@@ -561,11 +561,10 @@ float vision_line_error_layer_segmented_blended_abs_error(float split_ratio,
            (clamped_front_weight + clamped_rear_weight);
 }
 
-void vision_line_error_layer_rear_exp_weighted_target_point(float split_ratio,
-                                                             float exp_lambda,
-                                                             bool *valid,
-                                                             int *x,
-                                                             int *y)
+void vision_line_error_layer_speed_index_tail_mean_target_point(float start_index_offset_b,
+                                                                bool *valid,
+                                                                int *x,
+                                                                int *y)
 {
     if (valid) *valid = false;
     if (x) *x = 0;
@@ -576,49 +575,39 @@ void vision_line_error_layer_rear_exp_weighted_target_point(float split_ratio,
     }
 
     const int count = g_selected_centerline_count;
-    const float clamped_ratio = std::clamp(split_ratio, 0.01f, 1.0f);
-    const int front_count = std::clamp(static_cast<int>(std::floor(static_cast<float>(count) * clamped_ratio)),
-                                       1,
-                                       count);
-    int rear_start = front_count;
-    int rear_count = count - rear_start;
-    if (rear_count <= 0)
+    const float speed_k = g_ipm_line_error_speed_k.load();
+    const float speed_b = g_ipm_line_error_speed_b.load();
+    const float current_speed = std::max(0.0f, line_follow_thread_applied_base_speed());
+    const float start_idx_by_speed = speed_k * current_speed + speed_b + start_index_offset_b;
+    int start_idx = static_cast<int>(std::lround(start_idx_by_speed));
+    if (start_idx < 0)
     {
-        rear_start = count - 1;
-        rear_count = 1;
+        start_idx = 0;
     }
 
-    const float clamped_lambda = std::clamp(exp_lambda, 0.0f, 20.0f);
-    double weight_sum = 0.0;
-    double weighted_x_sum = 0.0;
-    double weighted_y_sum = 0.0;
-    if (rear_count == 1)
+    const int last_idx = count - 1;
+    if (start_idx > last_idx)
     {
-        weight_sum = 1.0;
-        weighted_x_sum = static_cast<double>(g_centerline_xs[static_cast<size_t>(rear_start)]);
-        weighted_y_sum = static_cast<double>(g_centerline_ys[static_cast<size_t>(rear_start)]);
-    }
-    else
-    {
-        // 指数权重：w(i)=exp(-lambda*t), t=i/(n-1)。
-        // i=0 权重最大(近端)，i=n-1 权重最小(远端)。
-        for (int i = 0; i < rear_count; ++i)
-        {
-            const float t = static_cast<float>(i) / static_cast<float>(rear_count - 1);
-            const float weight = std::exp(-clamped_lambda * t);
-            const int idx = rear_start + i;
-            weight_sum += static_cast<double>(weight);
-            weighted_x_sum += static_cast<double>(g_centerline_xs[static_cast<size_t>(idx)]) * static_cast<double>(weight);
-            weighted_y_sum += static_cast<double>(g_centerline_ys[static_cast<size_t>(idx)]) * static_cast<double>(weight);
-        }
+        start_idx = last_idx;
     }
 
-    if (weight_sum <= 1.0e-9)
+    const int end_idx = last_idx;
+    const int segment_count = end_idx - start_idx + 1;
+    if (segment_count <= 0)
     {
         return;
     }
 
-    if (x) *x = static_cast<int>(std::lround(weighted_x_sum / weight_sum));
-    if (y) *y = static_cast<int>(std::lround(weighted_y_sum / weight_sum));
+    double x_sum = 0.0;
+    double y_sum = 0.0;
+    for (int i = start_idx; i <= end_idx; ++i)
+    {
+        x_sum += static_cast<double>(g_centerline_xs[static_cast<size_t>(i)]);
+        y_sum += static_cast<double>(g_centerline_ys[static_cast<size_t>(i)]);
+    }
+
+    const double inv_count = 1.0 / static_cast<double>(segment_count);
+    if (x) *x = static_cast<int>(std::lround(x_sum * inv_count));
+    if (y) *y = static_cast<int>(std::lround(y_sum * inv_count));
     if (valid) *valid = true;
 }

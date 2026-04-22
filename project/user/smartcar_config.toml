@@ -29,7 +29,7 @@ client_sender_enabled = false
 screen_display_enabled = false
 # 迷宫法起始搜索行。
 # 值越大越靠近图像底部。
-maze_start_row = 100
+maze_start_row = 70
 # 原图巡线方法。
 # 0=迷宫法，1=八邻域法。
 maze_trace_method = 1
@@ -100,7 +100,7 @@ ipm_boundary_straight_check_count = 20
 # IPM 直边检测要求的最小 cos 阈值。
 ipm_boundary_straight_min_cos = 0.95
 # IPM 赛道宽度像素。
-ipm_track_width_px = 28.0
+ipm_track_width_px = 30.0
 # 默认目标中线距离左边界的偏移像素。
 ipm_center_target_offset_from_left_px = 14.0
 # weapons 类别命中后采用的左偏目标中线偏移。
@@ -124,12 +124,14 @@ ipm_centerline_resample_step_px = 3.0
 ipm_centerline_curvature_enabled = true
 # IPM 中线曲率计算步长。
 ipm_centerline_curvature_step = 3
+# IPM 映射完成后，对输出边界/中线整体追加的 y 偏移（像素，正值向下）。
+ipm_post_boundary_y_offset = 80
 # 斑马线检测总开关。
 zebra_cross_detection_enabled = false
 # 双边都丢线时是否保留上一帧平移中线。
 keep_last_centerline_on_double_loss = true
 # 十字状态识别开关。
-route_cross_detection_enabled = true
+route_cross_detection_enabled = false
 # normal/straight 进入 cross 所需的角点后沿边框连续行数最小值。
 route_cross_entry_corner_post_frame_wall_rows_min = 5
 # cross_1 进入 cross_2 的起始贴边连续行数阈值。
@@ -149,7 +151,7 @@ route_cross_stage3_left_anchor_y = 100
 route_cross_stage3_right_anchor_x = 145
 route_cross_stage3_right_anchor_y = 100
 # 圆环状态识别开关。
-route_circle_detection_enabled = true
+route_circle_detection_enabled = false
 # 圆环入口判定中对侧边界最少点数要求。
 route_circle_entry_min_boundary_count = 20
 # 圆环入口判定中角点距离对侧边界尾部的最小保留余量。
@@ -167,7 +169,7 @@ route_circle_stage_frame_wall_rows_enter = 30
 # 圆环状态 3 进入下一阶段的对侧起始贴边连续行数阈值。
 route_circle_stage3_frame_wall_rows_trigger = 70
 # 圆环状态 6 抬高迷宫法搜线起始行的上限（行号越小越靠上）。
-route_circle_stage6_maze_start_row = 80
+route_circle_stage6_maze_start_row = 50
 # 圆环状态 circle4/5 的目标中线相对左边界偏移。
 route_circle_center_target_offset_from_left_px = 14.0
 # 圆环补线中贴边连续段的最小长度阈值。
@@ -201,7 +203,15 @@ cross_upper_dir6_post_run_len = 3
 ipm_line_error_source = 2
 # line_error 计算方法。
 # 0=固定索引，1=离散点位加权索引，2=随速度索引，3=前缀指数加权索引。
-ipm_line_error_method = 0
+ipm_line_error_method = 2
+# line_error 速度索引公式参数 k：idx = k * speed + b（仅 method=2 生效）。
+ipm_line_error_speed_k = 0.04
+# line_error 速度索引公式参数 b：idx = k * speed + b（仅 method=2 生效）。
+ipm_line_error_speed_b = 2.0
+# line_error 速度索引最小限制（仅 method=2 生效）。
+ipm_line_error_index_min = 4
+# line_error 速度索引最大限制（仅 method=2 生效）。
+ipm_line_error_index_max = 40
 
 [vision.runtime.ncnn]
 # ncnn 模型输入宽度。
@@ -383,7 +393,7 @@ ipm_output_width = 280
 ipm_output_height = 140
 # 逆透视矩阵。
 # 按 3x3 展平写入，顺序为行优先。
-change_un_mat = [0.02963, -0.024954, -0.117149, 0.0, 0.000207, 0.607059, 0.0, -0.000323, 0.051471]
+change_un_mat = [-0.613333, 0.761799, 26.443915, -0.000000, 0.111958, -20.176720, -0.000000, 0.009735, -0.754497]
 # 相机内参矩阵。
 # 按 3x3 展平写入，顺序为行优先。
 camera_matrix = [88.352003, 0.0, 76.039402, 0.0, 88.094982, 60.149306, 0.0, 0.0, 1.0]
@@ -501,11 +511,11 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 400.0
+base_speed = 300.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # NORMAL 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 4
+position_dynamic_kp_base = 15
 # NORMAL 档位置环动态 Kp 下限。
 position_dynamic_kp_min = 0.0
 # NORMAL 档位置环动态 Kp 上限。
@@ -531,42 +541,38 @@ position_dynamic_kd_max = 2.0
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
-position_max_output = 270.0
+position_max_output = 50.0
 # NORMAL 档总转向输出限幅。
-steering_max_output = 270.0
+steering_max_output = 200.0
 # NORMAL 档由横向误差生成目标横摆角速度的增益。
 yaw_rate_ref_from_error_gain_dps = 0.0
 # NORMAL 档由曲率生成目标横摆角速度的增益。
 yaw_rate_ref_from_curvature_gain_dps = 0.0
 # NORMAL 档由跟踪点夹角生成目标横摆角速度的增益。
-yaw_rate_ref_from_track_point_gain_dps = 7.0
+yaw_rate_ref_from_track_point_gain_dps = 10.0
 # NORMAL 档目标横摆角速度限幅。
 yaw_rate_ref_limit_dps = 360.0
 # NORMAL 档角速度环 Kp。
-yaw_rate_kp = 1
+yaw_rate_kp = 1.3
 # NORMAL 档角速度环动态 Kp 一次项系数。
 yaw_rate_dynamic_kp_quad_a = 0.0
 # NORMAL 档角速度环动态 Kp 下限。
 yaw_rate_dynamic_kp_min = 0.0
 # NORMAL 档角速度环动态 Kp 上限。
-yaw_rate_dynamic_kp_max = 10.0
+yaw_rate_dynamic_kp_max = 100.0
 # NORMAL 档角速度环启用阈值。
 yaw_rate_kp_enable_error_threshold_px = 0.0
 # NORMAL 档角速度环 Ki。
 yaw_rate_ki = 0.0
 # NORMAL 档角速度环 Kd。
-yaw_rate_kd = 0.0
+yaw_rate_kd = 0.01
 # NORMAL 档角速度环积分限幅。
 yaw_rate_max_integral = 0.0
 # NORMAL 档角速度环输出限幅。
-yaw_rate_max_output = 200.0
-# NORMAL 档 line_error 前缀比例（0,1]。
-line_error_prefix_ratio = 0.4
-# NORMAL 档 line_error 指数权重参数 lambda（>=0） 越大越偏向近端点。。
-line_error_exp_lambda = 1
-# NORMAL 档速度方案后段指数权重参数 lambda（>=0） 越大越偏向近端点。。
-speed_scheme_rear_exp_lambda = 1
-# NORMAL 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
+yaw_rate_max_output = 170.0
+# 状态速度方案目标点起始索引独立偏移 b（在速度索引基础上追加）。
+speed_scheme_start_index_offset_b = 4.0
+# NORMAL 档摩擦圆参数 n：v_target^2 + (angle_target * v_target)^2 = n。
 speed_scheme_friction_circle_n = 100000.0
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95
@@ -577,7 +583,7 @@ speed_scheme_min_base_speed = 270.0
 
 [pid.route_line_follow.straight]
 # STRAIGHT 档基础速度。
-base_speed = 500.0
+base_speed = 300.0
 # STRAIGHT 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # STRAIGHT 档位置环动态 Kp 基础值。
@@ -636,13 +642,9 @@ yaw_rate_kd = 0.0
 yaw_rate_max_integral = 0.0
 # STRAIGHT 档角速度环输出限幅。
 yaw_rate_max_output = 160.0
-# STRAIGHT 档 line_error 前缀比例（0,1]。
-line_error_prefix_ratio = 0.6
-# STRAIGHT 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# 状态速度方案后段指数权重参数 lambda（>=0）。
-speed_scheme_rear_exp_lambda = 1
-# STRAIGHT 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
+# 状态速度方案目标点起始索引独立偏移 b（在速度索引基础上追加）。
+speed_scheme_start_index_offset_b = 0.0
+# STRAIGHT 档摩擦圆参数 n：v_target^2 + (angle_target * v_target)^2 = n。
 speed_scheme_friction_circle_n = 160000.0
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95
@@ -653,11 +655,11 @@ speed_scheme_min_base_speed = 270.0
 
 [pid.route_line_follow.cross]
 # CROSS 档基础速度。
-base_speed = 400.0
+base_speed = 300.0
 # CROSS 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # CROSS 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 4
+position_dynamic_kp_base = 15
 # CROSS 档位置环动态 Kp 下限。
 position_dynamic_kp_min = 0.0
 # CROSS 档位置环动态 Kp 上限。
@@ -683,42 +685,38 @@ position_dynamic_kd_max = 2.0
 # CROSS 档位置环积分限幅。
 position_max_integral = 0.0
 # CROSS 档位置环输出限幅。
-position_max_output = 270.0
+position_max_output = 50.0
 # CROSS 档总转向输出限幅。
-steering_max_output = 270.0
+steering_max_output = 200.0
 # CROSS 档由横向误差生成目标横摆角速度的增益。
 yaw_rate_ref_from_error_gain_dps = 0.0
 # CROSS 档由曲率生成目标横摆角速度的增益。
 yaw_rate_ref_from_curvature_gain_dps = 0.0
 # CROSS 档由跟踪点夹角生成目标横摆角速度的增益。
-yaw_rate_ref_from_track_point_gain_dps = 7.0
+yaw_rate_ref_from_track_point_gain_dps = 10.0
 # CROSS 档目标横摆角速度限幅。
 yaw_rate_ref_limit_dps = 360.0
 # CROSS 档角速度环 Kp。
-yaw_rate_kp = 1
+yaw_rate_kp = 1.3
 # CROSS 档角速度环动态 Kp 一次项系数。
 yaw_rate_dynamic_kp_quad_a = 0.0
 # CROSS 档角速度环动态 Kp 下限。
 yaw_rate_dynamic_kp_min = 0.0
 # CROSS 档角速度环动态 Kp 上限。
-yaw_rate_dynamic_kp_max = 10.0
+yaw_rate_dynamic_kp_max = 100.0
 # CROSS 档角速度环启用阈值。
 yaw_rate_kp_enable_error_threshold_px = 0.0
 # CROSS 档角速度环 Ki。
 yaw_rate_ki = 0.0
 # CROSS 档角速度环 Kd。
-yaw_rate_kd = 0.0
+yaw_rate_kd = 0.01
 # CROSS 档角速度环积分限幅。
 yaw_rate_max_integral = 0.0
 # CROSS 档角速度环输出限幅。
-yaw_rate_max_output = 200.0
-# CROSS 档 line_error 前缀比例（0,1]。
-line_error_prefix_ratio = 0.4
-# CROSS 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# 状态速度方案后段指数权重参数 lambda（>=0）。
-speed_scheme_rear_exp_lambda = 1
-# CROSS 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
+yaw_rate_max_output = 170.0
+# 状态速度方案目标点起始索引独立偏移 b（在速度索引基础上追加）。
+speed_scheme_start_index_offset_b = 4.0
+# CROSS 档摩擦圆参数 n：v_target^2 + (angle_target * v_target)^2 = n。
 speed_scheme_friction_circle_n = 100000.0
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95
@@ -729,7 +727,7 @@ speed_scheme_min_base_speed = 270.0
 
 [pid.route_line_follow.circle_enter]
 # CIRCLE_ENTER 档基础速度。
-base_speed = 400.0
+base_speed = 300.0
 # CIRCLE_ENTER 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # CIRCLE_ENTER 档位置环动态 Kp 基础值。
@@ -788,13 +786,9 @@ yaw_rate_kd = 0.0
 yaw_rate_max_integral = 0.0
 # CIRCLE_ENTER 档角速度环输出限幅。
 yaw_rate_max_output = 200.0
-# CIRCLE_ENTER 档 line_error 前缀比例（0,1]。
-line_error_prefix_ratio = 0.4
-# CIRCLE_ENTER 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# 状态速度方案后段指数权重参数 lambda（>=0）。
-speed_scheme_rear_exp_lambda = 1
-# CIRCLE_ENTER 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
+# 状态速度方案目标点起始索引独立偏移 b（在速度索引基础上追加）。
+speed_scheme_start_index_offset_b = 0.0
+# CIRCLE_ENTER 档摩擦圆参数 n：v_target^2 + (angle_target * v_target)^2 = n。
 speed_scheme_friction_circle_n = 100000.0
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95
@@ -805,7 +799,7 @@ speed_scheme_min_base_speed = 270.0
 
 [pid.route_line_follow.circle_inside]
 # CIRCLE_INSIDE 档基础速度。
-base_speed = 400.0
+base_speed = 300.0
 # CIRCLE_INSIDE 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # CIRCLE_INSIDE 档位置环动态 Kp 基础值。
@@ -864,13 +858,9 @@ yaw_rate_kd = 0.0
 yaw_rate_max_integral = 0.0
 # CIRCLE_INSIDE 档角速度环输出限幅。
 yaw_rate_max_output = 200.0
-# CIRCLE_INSIDE 档 line_error 前缀比例（0,1）。
-line_error_prefix_ratio = 0.4
-# CIRCLE_INSIDE 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# 状态速度方案后段指数权重参数 lambda（>=0）。
-speed_scheme_rear_exp_lambda = 1
-# CIRCLE_INSIDE 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
+# 状态速度方案目标点起始索引独立偏移 b（在速度索引基础上追加）。
+speed_scheme_start_index_offset_b = 0.0
+# CIRCLE_INSIDE 档摩擦圆参数 n：v_target^2 + (angle_target * v_target)^2 = n。
 speed_scheme_friction_circle_n = 100000.0
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95
@@ -881,7 +871,7 @@ speed_scheme_min_base_speed = 270.0
 
 [pid.route_line_follow.circle_exit]
 # CIRCLE_EXIT 档基础速度。
-base_speed = 400.0
+base_speed = 300.0
 # CIRCLE_EXIT 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # CIRCLE_EXIT 档位置环动态 Kp 基础值。
@@ -940,13 +930,9 @@ yaw_rate_kd = 0.0
 yaw_rate_max_integral = 0.0
 # CIRCLE_EXIT 档角速度环输出限幅。
 yaw_rate_max_output = 200.0
-# CIRCLE_EXIT 档 line_error 前缀比例（0,1）。
-line_error_prefix_ratio = 0.4
-# CIRCLE_EXIT 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# 状态速度方案后段指数权重参数 lambda（>=0）。
-speed_scheme_rear_exp_lambda = 1
-# CIRCLE_EXIT 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
+# 状态速度方案目标点起始索引独立偏移 b（在速度索引基础上追加）。
+speed_scheme_start_index_offset_b = 0.0
+# CIRCLE_EXIT 档摩擦圆参数 n：v_target^2 + (angle_target * v_target)^2 = n。
 speed_scheme_friction_circle_n = 100000.0
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95

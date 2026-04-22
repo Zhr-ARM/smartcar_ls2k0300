@@ -310,6 +310,7 @@ static std::atomic<bool> g_ipm_centerline_triangle_filter_enabled(g_vision_runti
 static std::atomic<bool> g_ipm_centerline_resample_enabled(g_vision_runtime_config.ipm_centerline_resample_enabled);
 static std::atomic<float> g_ipm_centerline_resample_step_px(g_vision_runtime_config.ipm_centerline_resample_step_px);
 static std::atomic<bool> g_ipm_centerline_curvature_enabled(g_vision_runtime_config.ipm_centerline_curvature_enabled);
+static std::atomic<int> g_ipm_post_boundary_y_offset(g_vision_runtime_config.ipm_post_boundary_y_offset);
 static std::atomic<bool> g_keep_last_centerline_on_double_loss(g_vision_runtime_config.keep_last_centerline_on_double_loss);
 // 平移中线偏好源（左/右/无偏好自动），用于每帧选边。
 static std::atomic<int> g_ipm_line_error_preferred_source(static_cast<int>(g_vision_runtime_config.ipm_line_error_source));
@@ -727,6 +728,34 @@ static void clear_ipm_saved_arrays()
     g_ipm_boundary_right_count = 0;
     g_ipm_shift_left_center_count = 0;
     g_ipm_shift_right_center_count = 0;
+}
+
+static void shift_ipm_y_array_inplace(uint16 *ys, int count, int y_offset)
+{
+    if (ys == nullptr || count <= 0 || y_offset == 0)
+    {
+        return;
+    }
+    const int n = std::clamp(count, 0, VISION_BOUNDARY_NUM);
+    for (int i = 0; i < n; ++i)
+    {
+        const int y = static_cast<int>(ys[i]);
+        ys[i] = static_cast<uint16>(std::clamp(y + y_offset, 0, kIpmOutputHeight - 1));
+    }
+}
+
+static void apply_ipm_post_boundary_y_offset_inplace(int y_offset)
+{
+    if (y_offset == 0)
+    {
+        return;
+    }
+
+    shift_ipm_y_array_inplace(g_ipm_xy_y1_boundary, g_ipm_boundary_count, y_offset);
+    shift_ipm_y_array_inplace(g_ipm_xy_y2_boundary, g_ipm_boundary_count, y_offset);
+    shift_ipm_y_array_inplace(g_ipm_xy_y3_boundary, g_ipm_boundary_count, y_offset);
+    shift_ipm_y_array_inplace(g_ipm_shift_left_center_y, g_ipm_shift_left_center_count, y_offset);
+    shift_ipm_y_array_inplace(g_ipm_shift_right_center_y, g_ipm_shift_right_center_count, y_offset);
 }
 
 static uint8 compute_global_otsu_threshold_u8(const uint8 *gray_img)
@@ -5469,6 +5498,7 @@ bool vision_image_processor_process_step()
                                                         maze_trace_x_min,
                                                         maze_trace_x_max,
                                                         route_snapshot.preferred_source);
+        apply_ipm_post_boundary_y_offset_inplace(g_ipm_post_boundary_y_offset.load());
         const bool selected_is_right =
             (vision_line_error_layer_source() == static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT));
         const uint16 *sel_ipm_x = selected_is_right ? g_ipm_shift_right_center_x : g_ipm_shift_left_center_x;
@@ -5572,6 +5602,7 @@ void vision_image_processor_reload_config_from_globals()
     g_ipm_centerline_resample_enabled.store(g_vision_runtime_config.ipm_centerline_resample_enabled);
     g_ipm_centerline_resample_step_px.store(g_vision_runtime_config.ipm_centerline_resample_step_px);
     g_ipm_centerline_curvature_enabled.store(g_vision_runtime_config.ipm_centerline_curvature_enabled);
+    g_ipm_post_boundary_y_offset.store(g_vision_runtime_config.ipm_post_boundary_y_offset);
     g_keep_last_centerline_on_double_loss.store(g_vision_runtime_config.keep_last_centerline_on_double_loss);
     g_ipm_line_error_preferred_source.store(g_vision_runtime_config.ipm_line_error_source);
 
@@ -5919,13 +5950,12 @@ float vision_image_processor_ipm_segmented_blended_abs_error(float split_ratio,
     return vision_line_error_layer_segmented_blended_abs_error(split_ratio, front_weight, rear_weight);
 }
 
-void vision_image_processor_ipm_rear_exp_weighted_target_point(float split_ratio,
-                                                               float exp_lambda,
-                                                               bool *valid,
-                                                               int *x,
-                                                               int *y)
+void vision_image_processor_ipm_speed_index_tail_mean_target_point(float start_index_offset_b,
+                                                                   bool *valid,
+                                                                   int *x,
+                                                                   int *y)
 {
-    vision_line_error_layer_rear_exp_weighted_target_point(split_ratio, exp_lambda, valid, x, y);
+    vision_line_error_layer_speed_index_tail_mean_target_point(start_index_offset_b, valid, x, y);
 }
 
 int vision_image_processor_ipm_line_error_track_index()

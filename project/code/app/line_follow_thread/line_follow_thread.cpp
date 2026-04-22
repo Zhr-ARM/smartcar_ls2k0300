@@ -37,9 +37,8 @@ using RouteProfile = pid_tuning::route_line_follow::Profile;
 
 struct SpeedSchemeRuntimeParams
 {
-    float split_ratio;
-    float rear_exp_lambda;
     float friction_circle_n;
+    float start_index_offset_b;
     float max_drop_ratio_per_cycle;
     float max_rise_ratio_per_cycle;
     float min_base_speed;
@@ -48,9 +47,8 @@ struct SpeedSchemeRuntimeParams
 SpeedSchemeRuntimeParams read_speed_scheme_runtime_params(const RouteProfile &profile)
 {
     SpeedSchemeRuntimeParams params{};
-    params.split_ratio = std::clamp(profile.line_error_prefix_ratio, 0.01f, 1.0f);
-    params.rear_exp_lambda = std::clamp(profile.speed_scheme_rear_exp_lambda, 0.0f, 20.0f);
     params.friction_circle_n = std::max(0.0f, profile.speed_scheme_friction_circle_n);
+    params.start_index_offset_b = profile.speed_scheme_start_index_offset_b;
     params.max_drop_ratio_per_cycle =
         std::clamp(profile.speed_scheme_max_drop_ratio_per_cycle, 0.0f, 1.0f);
     params.max_rise_ratio_per_cycle =
@@ -461,20 +459,18 @@ float compute_desired_base_speed(float profile_base_speed,
     (void)abs_yaw_rate_ref_dps;
     (void)mean_abs_path_error;
     (void)selected_centerline_count;
+    (void)realtime_speed;
     force_full_speed = false;
     speed_scheme_error_scale_raw = 1.0f;
     speed_scheme_final_speed_scale = 1.0f;
-    // 摩擦圆方案：
-    // v_target^2 + (angle_target_rad * v_real)^2 = n
-    // => v_target = sqrt(max(0, n - (angle_target * v_real)^2))
+    // 摩擦圆方案（统一使用 v_target）：
+    // v_target^2 + (angle_target_rad * v_target)^2 = n
+    // => v_target = sqrt(n / (1 + angle_target_rad^2))
     const float target_abs_angle_deg =
         compute_abs_track_point_angle_deg(speed_target_valid, speed_target_x, speed_target_y);
     const float target_abs_angle_rad = target_abs_angle_deg / RAD_TO_DEG;
-    const float safe_realtime_speed = std::max(0.0f, realtime_speed);
-    const float coupling = target_abs_angle_rad * safe_realtime_speed;
-    const float target_speed_squared =
-        std::max(0.0f, speed_scheme.friction_circle_n - coupling * coupling);
-    const float friction_target_speed = std::sqrt(target_speed_squared);
+    const float target_speed_denom = std::max(1.0e-6f, 1.0f + target_abs_angle_rad * target_abs_angle_rad);
+    const float friction_target_speed = std::sqrt(std::max(0.0f, speed_scheme.friction_circle_n / target_speed_denom));
     const float min_base_speed = std::clamp(speed_scheme.min_base_speed, 0.0f, profile_base_speed);
     const float desired_speed = std::clamp(friction_target_speed, min_base_speed, profile_base_speed);
     if (profile_base_speed > 1.0e-3f)
@@ -952,11 +948,10 @@ void line_follow_loop()
         bool speed_target_valid = false;
         int speed_target_x = 0;
         int speed_target_y = 0;
-        vision_image_processor_ipm_rear_exp_weighted_target_point(speed_scheme.split_ratio,
-                                                                  speed_scheme.rear_exp_lambda,
-                                                                  &speed_target_valid,
-                                                                  &speed_target_x,
-                                                                  &speed_target_y);
+        vision_image_processor_ipm_speed_index_tail_mean_target_point(speed_scheme.start_index_offset_b,
+                                                                      &speed_target_valid,
+                                                                      &speed_target_x,
+                                                                      &speed_target_y);
         const int selected_centerline_count = vision_image_processor_ipm_selected_centerline_count();
         const float speed_scheme_target_abs_angle_deg =
             compute_abs_track_point_angle_deg(speed_target_valid, speed_target_x, speed_target_y);
@@ -964,7 +959,7 @@ void line_follow_loop()
         const float realtime_speed =
             0.5f * (std::fabs(motor_thread_left_filtered_count()) +
                     std::fabs(motor_thread_right_filtered_count()));
-        const float friction_coupling = speed_scheme_target_abs_angle_rad * realtime_speed;
+        float friction_coupling = 0.0f;
         float speed_scheme_error_scale_raw = 1.0f;
         float speed_scheme_final_speed_scale = 1.0f;
         const bool speed_scheme_ready =
@@ -995,6 +990,7 @@ void line_follow_loop()
                                        speed_scheme_final_speed_scale,
                                        force_full_speed) :
             profile_base_speed;
+        friction_coupling = speed_scheme_target_abs_angle_rad * desired_base_speed;
         if (!friction_circle_enabled)
         {
             force_full_speed = true;
@@ -1011,9 +1007,8 @@ void line_follow_loop()
             speed_scheme_winner_branch = 1;
         }
         // 速度规划摩擦圆链路：
-        // 1) 用后段指数加权点得到目标角度 angle_target；
-        // 2) 读取实时速度 v_real；
-        // 3) 用 v_target^2 + (angle_target * v_real)^2 = n 反解 v_target。
+        // 1) 用“速度索引到尾点均值”得到目标角度 angle_target；
+        // 2) 用 v_target^2 + (angle_target * v_target)^2 = n 反解 v_target。
         g_applied_base_speed_state = update_applied_base_speed(g_applied_base_speed_state,
                                                                profile_base_speed,
                                                                desired_base_speed,
@@ -1105,8 +1100,8 @@ void line_follow_loop()
             g_pid_debug_status.speed_scheme_friction_coupling = friction_coupling;
             g_pid_debug_status.speed_scheme_error_scale_raw = speed_scheme_error_scale_raw;
             g_pid_debug_status.speed_scheme_final_speed_scale = speed_scheme_final_speed_scale;
-            g_pid_debug_status.speed_scheme_split_ratio = speed_scheme.split_ratio;
-            g_pid_debug_status.speed_scheme_rear_exp_lambda = speed_scheme.rear_exp_lambda;
+            g_pid_debug_status.speed_scheme_split_ratio = 0.0f;
+            g_pid_debug_status.speed_scheme_rear_exp_lambda = 0.0f;
             g_pid_debug_status.speed_scheme_point_count = selected_centerline_count;
             g_pid_debug_status.speed_scheme_ready = speed_scheme_ready;
             g_pid_debug_status.speed_scheme_triggered = speed_scheme_triggered;

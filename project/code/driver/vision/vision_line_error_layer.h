@@ -53,10 +53,9 @@ float vision_line_error_layer_front_weighted_abs_error_sum(int point_count);
 float vision_line_error_layer_segmented_blended_abs_error(float split_ratio,
                                                           float front_weight,
                                                           float rear_weight);
-void vision_line_error_layer_rear_exp_weighted_target_point(float split_ratio,
-                                                            float exp_lambda,
-                                                            bool *valid,
-                                                            int *x,
-                                                            int *y);
+void vision_line_error_layer_speed_index_tail_mean_target_point(float start_index_offset_b,
+                                                                bool *valid,
+                                                                int *x,
+                                                                int *y);
 
 #endif

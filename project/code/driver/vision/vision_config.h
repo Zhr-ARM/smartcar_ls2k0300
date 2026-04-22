@@ -265,6 +265,8 @@ typedef struct
     bool ipm_centerline_curvature_enabled;
     // 所选偏移中线曲率计算步长（索引步长，默认3）。
     int ipm_centerline_curvature_step;
+    // IPM 映射完成后，对输出边界/中线整体追加的 y 偏移（单位 px，正值向下）。
+    int ipm_post_boundary_y_offset;
     // 斑马线检测总开关：true=执行计数，false=关闭斑马线检测。
     bool zebra_cross_detection_enabled;
     // 双边都丢线时是否保持上一帧平移中线数组。
