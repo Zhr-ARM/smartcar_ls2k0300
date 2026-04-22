@@ -904,6 +904,10 @@ function startHttpServer() {
       serveFile(res, path.join(PUBLIC_DIR, 'local_compute.html'), 'text/html; charset=utf-8');
       return;
     }
+    if (pathname === '/pid_tune.html') {
+      serveFile(res, path.join(PUBLIC_DIR, 'pid_tune.html'), 'text/html; charset=utf-8');
+      return;
+    }
     if (pathname === '/playback_app.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'playback_app.js'), 'application/javascript; charset=utf-8');
       return;
@@ -914,6 +918,10 @@ function startHttpServer() {
     }
     if (pathname === '/local_compute_app.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'local_compute_app.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/pid_tune_app.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'pid_tune_app.js'), 'application/javascript; charset=utf-8');
       return;
     }
     if (pathname === '/shared_receiver_core.js') {

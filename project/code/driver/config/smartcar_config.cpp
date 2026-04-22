@@ -707,31 +707,30 @@ bool load_route_profile(const RawMap &values,
                         std::string *error_message)
 {
     return require_float(values, consumed, prefix + ".base_speed", &profile->base_speed, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_quad_a", &profile->position_dynamic_kp_quad_a, error_message) &&
+           require_optional_float(values, consumed, prefix + ".position_dynamic_kp_quad_a", &profile->position_dynamic_kp_quad_a, error_message) &&
            require_float(values, consumed, prefix + ".position_dynamic_kp_base", &profile->position_dynamic_kp_base, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_min", &profile->position_dynamic_kp_min, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_max", &profile->position_dynamic_kp_max, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_low_error_threshold_px", &profile->position_dynamic_kp_low_error_threshold_px, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_mid_a", &profile->position_dynamic_kp_mid_a, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_mid_error_threshold_px", &profile->position_dynamic_kp_mid_error_threshold_px, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_high_a", &profile->position_dynamic_kp_high_a, error_message) &&
+           require_optional_float(values, consumed, prefix + ".position_dynamic_kp_min", &profile->position_dynamic_kp_min, error_message) &&
+           require_optional_float(values, consumed, prefix + ".position_dynamic_kp_max", &profile->position_dynamic_kp_max, error_message) &&
+           require_optional_float(values, consumed, prefix + ".position_dynamic_kp_low_error_threshold_px", &profile->position_dynamic_kp_low_error_threshold_px, error_message) &&
+           require_optional_float(values, consumed, prefix + ".position_dynamic_kp_mid_a", &profile->position_dynamic_kp_mid_a, error_message) &&
+           require_optional_float(values, consumed, prefix + ".position_dynamic_kp_mid_error_threshold_px", &profile->position_dynamic_kp_mid_error_threshold_px, error_message) &&
+           require_optional_float(values, consumed, prefix + ".position_dynamic_kp_high_a", &profile->position_dynamic_kp_high_a, error_message) &&
            require_float(values, consumed, prefix + ".position_ki", &profile->position_ki, error_message) &&
            require_float(values, consumed, prefix + ".position_kd", &profile->position_kd, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kd_quad_a", &profile->position_dynamic_kd_quad_a, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kd_min", &profile->position_dynamic_kd_min, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kd_max", &profile->position_dynamic_kd_max, error_message) &&
+           require_optional_float(values, consumed, prefix + ".position_dynamic_kd_quad_a", &profile->position_dynamic_kd_quad_a, error_message) &&
+           require_optional_float(values, consumed, prefix + ".position_dynamic_kd_min", &profile->position_dynamic_kd_min, error_message) &&
+           require_optional_float(values, consumed, prefix + ".position_dynamic_kd_max", &profile->position_dynamic_kd_max, error_message) &&
            require_float(values, consumed, prefix + ".position_max_integral", &profile->position_max_integral, error_message) &&
            require_float(values, consumed, prefix + ".position_max_output", &profile->position_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".steering_max_output", &profile->steering_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_from_error_gain_dps", &profile->yaw_rate_ref_from_error_gain_dps, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_from_curvature_gain_dps", &profile->yaw_rate_ref_from_curvature_gain_dps, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_from_track_point_gain_dps", &profile->yaw_rate_ref_from_track_point_gain_dps, error_message) &&
+           require_optional_float(values, consumed, prefix + ".yaw_rate_ref_from_error_gain_dps", &profile->yaw_rate_ref_from_error_gain_dps, error_message) &&
+           require_optional_float(values, consumed, prefix + ".yaw_rate_ref_from_curvature_gain_dps", &profile->yaw_rate_ref_from_curvature_gain_dps, error_message) &&
+           require_optional_float(values, consumed, prefix + ".yaw_rate_ref_from_track_point_gain_dps", &profile->yaw_rate_ref_from_track_point_gain_dps, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_limit_dps", &profile->yaw_rate_ref_limit_dps, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_kp", &profile->yaw_rate_kp, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_quad_a", &profile->yaw_rate_dynamic_kp_quad_a, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_min", &profile->yaw_rate_dynamic_kp_min, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_max", &profile->yaw_rate_dynamic_kp_max, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_kp_enable_error_threshold_px", &profile->yaw_rate_kp_enable_error_threshold_px, error_message) &&
+           require_optional_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_quad_a", &profile->yaw_rate_dynamic_kp_quad_a, error_message) &&
+           require_optional_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_min", &profile->yaw_rate_dynamic_kp_min, error_message) &&
+           require_optional_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_max", &profile->yaw_rate_dynamic_kp_max, error_message) &&
+           require_optional_float(values, consumed, prefix + ".yaw_rate_kp_enable_error_threshold_px", &profile->yaw_rate_kp_enable_error_threshold_px, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ki", &profile->yaw_rate_ki, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_kd", &profile->yaw_rate_kd, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_max_integral", &profile->yaw_rate_max_integral, error_message) &&

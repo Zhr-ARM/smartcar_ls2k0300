@@ -21,7 +21,7 @@
 namespace
 {
 // 控制周期：1ms(1000Hz)。巡线环频率高于电机速度环(5ms)的整数倍，能持续给出平滑转向目标。
-constexpr int32 LINE_FOLLOW_PERIOD_MS = 20;
+constexpr int32 LINE_FOLLOW_PERIOD_MS = 10;
 // 调度优先级：巡线线程作为中高优先级实时任务执行。
 constexpr int32 LINE_FOLLOW_THREAD_PRIORITY = 8;
 constexpr int32 LINE_FOLLOW_MAIN_STATE_SWITCH_BEEP_MS = 200;
@@ -148,11 +148,11 @@ float apply_iir_filter(float previous_value, float current_value, float alpha)
  * - 增益随 |e| 线性上升，调参更直观；
  * - clamp 是最后一道保护，确保结果始终落在调参可接受区间。
  */
-float compute_linear_abs_gain(float base_gain,
-                              float linear_a,
-                              float min_gain,
-                              float max_gain,
-                              float error_value)
+[[maybe_unused]] float compute_linear_abs_gain(float base_gain,
+                                               float linear_a,
+                                               float min_gain,
+                                               float max_gain,
+                                               float error_value)
 {
     // 误差绝对值项：只关心误差大小，不区分正负方向。
     const float abs_error = std::fabs(error_value);
@@ -170,15 +170,15 @@ float compute_linear_abs_gain(float base_gain,
  *      + a2 * clamp(|e|-t1, 0, t2-t1)
  *      + a3 * max(|e|-t2, 0)
  */
-float compute_piecewise_linear_abs_gain(float base_gain,
-                                        float low_a,
-                                        float low_threshold,
-                                        float mid_a,
-                                        float mid_threshold,
-                                        float high_a,
-                                        float min_gain,
-                                        float max_gain,
-                                        float error_value)
+[[maybe_unused]] float compute_piecewise_linear_abs_gain(float base_gain,
+                                                         float low_a,
+                                                         float low_threshold,
+                                                         float mid_a,
+                                                         float mid_threshold,
+                                                         float high_a,
+                                                         float min_gain,
+                                                         float max_gain,
+                                                         float error_value)
 {
     const float abs_error = std::fabs(error_value);
     const float clamped_low_threshold = std::max(low_threshold, 0.0f);
@@ -507,9 +507,9 @@ float compute_sample_dt_seconds(std::chrono::steady_clock::time_point now,
     return clamp_valid_dt_seconds(dt_seconds, fallback_dt_seconds, max_dt_seconds);
 }
 
-float update_position_error_rate_if_needed(bool vision_updated,
-                                           float control_error_px,
-                                           float fallback_dt_seconds)
+[[maybe_unused]] float update_position_error_rate_if_needed(bool vision_updated,
+                                                            float control_error_px,
+                                                            float fallback_dt_seconds)
 {
     if (!vision_updated)
     {
@@ -806,8 +806,8 @@ void refresh_thread_info()
  * 1) 视觉模块先给出采样行处的赛道中线偏差 line_error（像素）；
  * 2) 巡线线程只在“拿到新视觉帧 / 新 IMU 样本”时推进各自滤波状态；
  * 3) 再统一方向约定，并通过归一化、死区、小误差降增益把视觉噪声整形成“可控误差”；
- * 4) 位置环 PID 负责“回中线”，角速度环 PID 负责“按视觉期望横摆率转过去”；
- * 5) 两个环并级叠加成最终差速，再叠加基础速度与视觉弯道降速后下发左右轮目标。
+ * 4) 位置环 PID 先输出目标横摆角速度，角速度环 PID 再输出最终差速；
+ * 5) 差速与基础速度合成左右轮目标，交由电机速度环闭环执行。
  */
 void line_follow_loop()
 {
@@ -857,66 +857,31 @@ void line_follow_loop()
         // 位置环当前也直接在像素量纲下工作。
         const ControlErrorState error_state = compute_control_error_state(g_filtered_error);
 
-        // 动态 Kp：误差越大，比例增益越强。
-        // 这里不再对动态 Kp 的输入额外归一化，直接用经过死区/低增益处理后的像素误差。
-        const float dynamic_kp =
-            compute_piecewise_linear_abs_gain(route_profile.position_dynamic_kp_base,
-                                              route_profile.position_dynamic_kp_quad_a,
-                                              route_profile.position_dynamic_kp_low_error_threshold_px,
-                                              route_profile.position_dynamic_kp_mid_a,
-                                              route_profile.position_dynamic_kp_mid_error_threshold_px,
-                                              route_profile.position_dynamic_kp_high_a,
-                                              route_profile.position_dynamic_kp_min,
-                                              route_profile.position_dynamic_kp_max,
-                                              error_state.control_error_px);
-        const float position_error_rate_px_per_second =
-            update_position_error_rate_if_needed(vision_updated,
-                                                 error_state.control_error_px,
-                                                 vision_frame_dt_seconds);
-        const float dynamic_position_kd = compute_linear_abs_gain(route_profile.position_kd,
-                                                                  route_profile.position_dynamic_kd_quad_a,
-                                                                  route_profile.position_dynamic_kd_min,
-                                                                  route_profile.position_dynamic_kd_max,
-                                                                  position_error_rate_px_per_second);
-
-        // 第二条支路：角速度环 PID。
-        // 当前固定采用“跟踪点夹角 -> 目标横摆角速度”的路线：
-        // 1) 跟踪点偏角负责告诉车头“该往哪边、该多快转”；
-        // 2) IMU 负责反馈“车身现在实际转了多少”；
-        // 3) 角速度环去逼近这个由夹角生成的目标横摆角速度。
-        // 这样位置环和角速度环职责更清楚：位置环回中线，角速度环管车头朝向。
-        const float yaw_rate_ref_dps = std::clamp(
-            g_filtered_track_point_angle_deg * route_profile.yaw_rate_ref_from_track_point_gain_dps,
-            -route_profile.yaw_rate_ref_limit_dps,
-            route_profile.yaw_rate_ref_limit_dps);
-        //角速度的差
-        const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 目标角速度与实际角速度之差
-        const float dynamic_yaw_rate_kp = compute_linear_abs_gain(route_profile.yaw_rate_kp,
-                                                                  route_profile.yaw_rate_dynamic_kp_quad_a,
-                                                                  route_profile.yaw_rate_dynamic_kp_min,
-                                                                  route_profile.yaw_rate_dynamic_kp_max,
-                                                                  yaw_rate_error_dps);
-        const bool enable_yaw_rate_kp =
-            (route_profile.yaw_rate_kp_enable_error_threshold_px <= 0.0f) ||
-            (error_state.abs_filtered_error_px >= route_profile.yaw_rate_kp_enable_error_threshold_px);
-        const float applied_yaw_rate_kp = enable_yaw_rate_kp ? dynamic_yaw_rate_kp : 0.0f;
+        // 三串控制：
+        // 1) 位置环：误差 -> 目标角速度 yaw_rate_ref；
+        // 2) 角速度环：yaw_rate_ref - yaw_rate_meas -> 差速 steering。
+        // 本模式下停用动态 Kp/Kd 与阈值门控，只使用固定 KPID。
+        const float fixed_position_kp = route_profile.position_dynamic_kp_base;
+        const float fixed_position_kd = route_profile.position_kd;
+        const float fixed_yaw_rate_kp = route_profile.yaw_rate_kp;
         configure_line_follow_controllers_for_profile(route_profile,
-                                                      dynamic_kp,
-                                                      dynamic_position_kd,
-                                                      applied_yaw_rate_kp);
+                                                      fixed_position_kp,
+                                                      fixed_position_kd,
+                                                      fixed_yaw_rate_kp);
 
-        // ---------------- 并级控制核心 ----------------
-        // 第一条支路：位置环 PID，只负责“把车拉回中线”。
-        // 它盯的是横向误差 e，输出一份差速量。
+        // 串级第 1 级：位置环输出“目标角速度（dps）”。
         g_position_output_state = update_pid_output_state_if_needed(vision_updated,
                                                                     error_state.control_error_px,
                                                                     vision_frame_dt_seconds,
                                                                     g_last_position_pid_time,
                                                                     g_has_last_position_pid_time,
-                                                                    route_profile.position_max_output,
+                                                                    route_profile.yaw_rate_ref_limit_dps,
                                                                     position_pid1,
                                                                     g_position_output_state);
-        const float position_output = g_position_output_state;
+        const float yaw_rate_ref_dps = std::clamp(g_position_output_state,
+                                                  -route_profile.yaw_rate_ref_limit_dps,
+                                                  route_profile.yaw_rate_ref_limit_dps);
+        const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps;
 
         const float yaw_rate_pid_dt_fallback =
             vision_updated ? vision_frame_dt_seconds : imu_sample_dt_seconds;
@@ -928,14 +893,9 @@ void line_follow_loop()
                                                                     route_profile.yaw_rate_max_output,
                                                                     position_pid2,
                                                                     g_yaw_rate_output_state);
-        const float yaw_rate_output = g_yaw_rate_output_state;
-
-        // 并级的意思，就是两条支路独立算完后再直接相加：
-        // - position_output 管“位置偏了多少”；
-        // - yaw_rate_output 管“车身现在转得对不对”。
-        const float raw_steering_output = std::clamp(position_output + yaw_rate_output,
-                                                     -route_profile.steering_max_output,
-                                                     route_profile.steering_max_output);
+        const float raw_steering_output = std::clamp(g_yaw_rate_output_state,
+                                                     -route_profile.yaw_rate_max_output,
+                                                     route_profile.yaw_rate_max_output);
         const float abs_yaw_rate_ref_dps = std::fabs(yaw_rate_ref_dps);
 
         bool force_full_speed = false;
@@ -1067,9 +1027,9 @@ void line_follow_loop()
             g_pid_debug_status.measured_yaw_rate_dps = measured_yaw_rate_dps;
             g_pid_debug_status.yaw_rate_ref_dps = yaw_rate_ref_dps;
             g_pid_debug_status.yaw_rate_error_dps = yaw_rate_error_dps;
-            g_pid_debug_status.dynamic_position_kp = dynamic_kp;
-            g_pid_debug_status.dynamic_yaw_rate_kp = dynamic_yaw_rate_kp;
-            g_pid_debug_status.applied_yaw_rate_kp = applied_yaw_rate_kp;
+            g_pid_debug_status.dynamic_position_kp = fixed_position_kp;
+            g_pid_debug_status.dynamic_yaw_rate_kp = fixed_yaw_rate_kp;
+            g_pid_debug_status.applied_yaw_rate_kp = fixed_yaw_rate_kp;
             g_pid_debug_status.position_pid_kp = position_pid1.kp();
             g_pid_debug_status.position_pid_ki = position_pid1.ki();
             g_pid_debug_status.position_pid_kd = position_pid1.kd();
@@ -1088,11 +1048,9 @@ void line_follow_loop()
             g_pid_debug_status.yaw_pid_output = position_pid2.get_output();
             g_pid_debug_status.yaw_pid_max_integral = position_pid2.max_integral();
             g_pid_debug_status.yaw_pid_max_output = position_pid2.max_output();
-            g_pid_debug_status.route_yaw_rate_ref_gain = route_profile.yaw_rate_ref_from_track_point_gain_dps;
+            g_pid_debug_status.route_yaw_rate_ref_gain = 0.0f;
             g_pid_debug_status.route_yaw_rate_ref_limit = route_profile.yaw_rate_ref_limit_dps;
-            g_pid_debug_status.route_steering_max_output = route_profile.steering_max_output;
-            g_pid_debug_status.route_yaw_rate_kp_enable_error_threshold_px =
-                route_profile.yaw_rate_kp_enable_error_threshold_px;
+            g_pid_debug_status.route_yaw_rate_kp_enable_error_threshold_px = 0.0f;
             g_pid_debug_status.mean_abs_path_error = mean_abs_path_error;
             g_pid_debug_status.speed_scheme_blended_abs_error_sum = speed_scheme_target_abs_angle_deg;
             g_pid_debug_status.speed_scheme_friction_circle_n = speed_scheme.friction_circle_n;

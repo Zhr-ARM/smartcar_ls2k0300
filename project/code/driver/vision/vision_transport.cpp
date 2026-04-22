@@ -1108,7 +1108,6 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_yaw_pid_max_output", line_follow_pid_debug.yaw_pid_max_output);
         append_float(enabled, "pid_common_route_yaw_rate_ref_gain", line_follow_pid_debug.route_yaw_rate_ref_gain);
         append_float(enabled, "pid_common_route_yaw_rate_ref_limit", line_follow_pid_debug.route_yaw_rate_ref_limit);
-        append_float(enabled, "pid_common_route_steering_max_output", line_follow_pid_debug.route_steering_max_output);
         append_float(enabled, "pid_common_route_yaw_rate_kp_enable_error_threshold_px",
                      line_follow_pid_debug.route_yaw_rate_kp_enable_error_threshold_px);
         append_float(enabled, "pid_common_mean_abs_path_error", line_follow_pid_debug.mean_abs_path_error);

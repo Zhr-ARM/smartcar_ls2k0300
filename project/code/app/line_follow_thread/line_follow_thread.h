@@ -48,7 +48,6 @@ struct LineFollowPidDebugStatus
     float yaw_pid_max_output;
     float route_yaw_rate_ref_gain;
     float route_yaw_rate_ref_limit;
-    float route_steering_max_output;
     float route_yaw_rate_kp_enable_error_threshold_px;
     float mean_abs_path_error;
     float speed_scheme_blended_abs_error_sum;

@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PID 三环调试</title>
+  <style>
+    :root {
+      --bg: #050b14;
+      --panel: #0d1726;
+      --panel-2: #111f33;
+      --text: #e5edf7;
+      --muted: #97aac3;
+      --accent: #46d4ff;
+      --ok: #31d08e;
+      --warn: #ffb85c;
+      --danger: #ff6f7f;
+      --border: rgba(148, 163, 184, 0.22);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 5% 0%, rgba(70, 212, 255, 0.12), transparent 32%),
+        radial-gradient(circle at 100% 0%, rgba(56, 189, 248, 0.08), transparent 26%),
+        linear-gradient(180deg, #050b14 0%, #040912 100%);
+      color: var(--text);
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    }
+    .page {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .topbar,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 16px 30px rgba(2, 6, 23, 0.35);
+    }
+    .topbar {
+      padding: 16px 18px;
+      margin-bottom: 14px;
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .title {
+      margin: 0;
+      font-size: 23px;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+    }
+    .subtitle {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .btn:hover { border-color: rgba(70, 212, 255, 0.5); }
+    .btn-primary {
+      background: linear-gradient(180deg, #199ad1, #14779f);
+      border-color: rgba(70, 212, 255, 0.45);
+    }
+    .btn-danger {
+      background: linear-gradient(180deg, #a84f5b, #7f3541);
+      border-color: rgba(255, 111, 127, 0.45);
+    }
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.7);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .chip.ok { color: var(--ok); border-color: rgba(49, 208, 142, 0.4); }
+    .chip.warn { color: var(--warn); border-color: rgba(255, 184, 92, 0.4); }
+    .chip.error { color: var(--danger); border-color: rgba(255, 111, 127, 0.4); }
+    .panel { padding: 14px; margin-bottom: 14px; }
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 15px;
+      color: #d8e7f8;
+      letter-spacing: 0.01em;
+    }
+    .status-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .stat {
+      background: rgba(9, 16, 29, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .stat-label {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 4px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: #f1f7ff;
+    }
+    .content-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1.15fr 1fr;
+      align-items: start;
+    }
+    .form-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .form-card {
+      background: rgba(8, 14, 26, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .form-card h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: #f3f8ff;
+    }
+    .field {
+      margin-bottom: 8px;
+    }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .field input,
+    .field select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 7px 8px;
+      font-size: 13px;
+    }
+    .field-inline {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .chart-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+    .chart-card {
+      background: rgba(8, 14, 26, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .chart-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .chart-title {
+      font-size: 13px;
+      color: #d9e7f9;
+      font-weight: 700;
+    }
+    .chart-meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    canvas {
+      width: 100%;
+      height: 220px;
+      display: block;
+      background: #030913;
+      border-radius: 8px;
+      border: 1px solid rgba(100, 116, 139, 0.28);
+    }
+    .log {
+      white-space: pre-wrap;
+      min-height: 78px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(5, 11, 20, 0.95);
+      color: #9fb3cb;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .log.ok { color: var(--ok); }
+    .log.warn { color: var(--warn); }
+    .log.error { color: var(--danger); }
+    @media (max-width: 1200px) {
+      .content-grid { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 860px) {
+      .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="topbar">
+      <div>
+        <h1 class="title">PID 三环调试台</h1>
+        <div class="subtitle">独立页面调三环参数，实时观察位置环误差与角速度环误差（VOFA风格曲线）。</div>
+      </div>
+      <div class="row">
+        <span class="chip" id="chipConn">连接状态：检查中</span>
+        <a class="btn" href="/index.html">返回实时页</a>
+        <a class="btn" href="/config.html">完整配置页</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 class="section-title">实时状态</h2>
+      <div class="status-grid">
+        <div class="stat"><div class="stat-label">位置环误差 px</div><div class="stat-value" id="vPosErr">--</div></div>
+        <div class="stat"><div class="stat-label">角速度环误差 dps</div><div class="stat-value" id="vYawErr">--</div></div>
+        <div class="stat"><div class="stat-label">目标角速度 dps</div><div class="stat-value" id="vYawRef">--</div></div>
+        <div class="stat"><div class="stat-label">实测角速度 dps</div><div class="stat-value" id="vYawMeas">--</div></div>
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <div class="panel">
+        <h2 class="section-title">三环参数</h2>
+        <div class="row" style="margin-bottom:10px;">
+          <div class="field" style="min-width:260px; margin:0;">
+            <label for="routeStateSelect">巡线状态（位置环/角速度环参数）</label>
+            <select id="routeStateSelect">
+              <option value="normal">normal</option>
+              <option value="straight">straight</option>
+              <option value="cross">cross</option>
+              <option value="circle_enter">circle_enter</option>
+              <option value="circle_inside">circle_inside</option>
+              <option value="circle_exit">circle_exit</option>
+            </select>
+          </div>
+          <button class="btn" id="btnLoad">读取主板参数</button>
+          <button class="btn btn-primary" id="btnApply">应用当前页面参数</button>
+          <button class="btn btn-danger" id="btnResetCharts">清空曲线</button>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-card">
+            <h3>位置环 (route_line_follow.&lt;state&gt;)</h3>
+            <div class="field"><label>position_dynamic_kp_base</label><input id="position_dynamic_kp_base" type="text" /></div>
+            <div class="field"><label>position_ki</label><input id="position_ki" type="text" /></div>
+            <div class="field"><label>position_kd</label><input id="position_kd" type="text" /></div>
+            <div class="field"><label>position_max_integral</label><input id="position_max_integral" type="text" /></div>
+            <div class="field"><label>position_max_output</label><input id="position_max_output" type="text" /></div>
+          </div>
+
+          <div class="form-card">
+            <h3>角速度环 (route_line_follow.&lt;state&gt;)</h3>
+            <div class="field"><label>yaw_rate_kp</label><input id="yaw_rate_kp" type="text" /></div>
+            <div class="field"><label>yaw_rate_ki</label><input id="yaw_rate_ki" type="text" /></div>
+            <div class="field"><label>yaw_rate_kd</label><input id="yaw_rate_kd" type="text" /></div>
+            <div class="field"><label>yaw_rate_max_integral</label><input id="yaw_rate_max_integral" type="text" /></div>
+            <div class="field"><label>yaw_rate_max_output</label><input id="yaw_rate_max_output" type="text" /></div>
+            <div class="field"><label>yaw_rate_ref_limit_dps</label><input id="yaw_rate_ref_limit_dps" type="text" /></div>
+          </div>
+
+          <div class="form-card">
+            <h3>速度环 (pid.motor_speed)</h3>
+            <div class="field-inline">
+              <div class="field"><label>left_kp</label><input id="left_kp" type="text" /></div>
+              <div class="field"><label>right_kp</label><input id="right_kp" type="text" /></div>
+            </div>
+            <div class="field-inline">
+              <div class="field"><label>left_ki</label><input id="left_ki" type="text" /></div>
+              <div class="field"><label>right_ki</label><input id="right_ki" type="text" /></div>
+            </div>
+            <div class="field-inline">
+              <div class="field"><label>left_kd</label><input id="left_kd" type="text" /></div>
+              <div class="field"><label>right_kd</label><input id="right_kd" type="text" /></div>
+            </div>
+            <div class="field"><label>integral_limit</label><input id="motor_integral_limit" type="text" /></div>
+            <div class="field"><label>max_output_step</label><input id="motor_max_output_step" type="text" /></div>
+            <div class="field"><label>correction_limit</label><input id="motor_correction_limit" type="text" /></div>
+            <div class="field"><label>duty_limit</label><input id="motor_duty_limit" type="text" /></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title">实时误差曲线</h2>
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="chart-head">
+              <div class="chart-title">位置环误差曲线 (pid_common_position_pid_error)</div>
+              <div class="chart-meta" id="posMeta">--</div>
+            </div>
+            <canvas id="posErrChart" width="680" height="220"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-head">
+              <div class="chart-title">角速度环误差曲线 (pid_common_yaw_rate_error_dps)</div>
+              <div class="chart-meta" id="yawMeta">--</div>
+            </div>
+            <canvas id="yawErrChart" width="680" height="220"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 class="section-title">操作日志</h2>
+      <div class="log" id="logBox">初始化中...</div>
+    </div>
+  </div>
+
+  <script src="/shared_receiver_core.js"></script>
+  <script src="/pid_tune_app.js"></script>
+</body>
+</html>
