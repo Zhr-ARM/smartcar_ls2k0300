@@ -33,10 +33,14 @@ message("Parent parent folder name: ${PARENT_PARENT_FOLDER_NAME}")
 # 定义项目名称和版本，并指定使用C和C++语言
 project(${PARENT_PARENT_FOLDER_NAME} VERSION 0.1.0 LANGUAGES C CXX)
 
-# 统一视觉主链：始终启用 ncnn 相关模块（pipeline/client_sender/ncnn）。
+# 统一视觉主链：支持编译期开关关闭 ncnn（仅巡线时可关闭）。
+option(ENABLE_NCNN "Enable NCNN inference support" ON)
+message(STATUS "ENABLE_NCNN=${ENABLE_NCNN}")
+
 set(_local_ncnn_root "${CMAKE_CURRENT_LIST_DIR}/../../lib-ncnn")
 set(_ncnn_install_root "${_local_ncnn_root}/tools/LQ_Dep_libs/ncnn_install")
 
+if(ENABLE_NCNN)
     find_package(ncnn CONFIG QUIET
         HINTS "${_ncnn_install_root}"
         PATH_SUFFIXES lib/cmake/ncnn ncnn/cmake)
@@ -79,14 +83,19 @@ set(_ncnn_install_root "${_local_ncnn_root}/tools/LQ_Dep_libs/ncnn_install")
             set(NCNN_LIBRARIES ${NCNN_LIBRARY})
         endif()
     endif()
+endif()
 
-if(NCNN_FOUND)
+if(ENABLE_NCNN AND NCNN_FOUND)
+    message(STATUS "NCNN enabled")
     include_directories(${NCNN_INCLUDE_DIRS})
     link_directories(${NCNN_LIBRARY_DIRS})
     message(STATUS "NCNN_INCLUDE_DIRS: ${NCNN_INCLUDE_DIRS}")
     message(STATUS "NCNN_LIBRARIES: ${NCNN_LIBRARIES}")
+elseif(ENABLE_NCNN AND NOT NCNN_FOUND)
+    message(WARNING "NCNN not found under ${_local_ncnn_root}; fall back to no-NCNN build.")
+    set(ENABLE_NCNN OFF)
 else()
-    message(FATAL_ERROR "NCNN not found under ${_local_ncnn_root}. Unified vision stack requires ncnn.")
+    message(STATUS "NCNN disabled: build will run line-follow only path.")
 endif()
 
 
@@ -150,4 +159,7 @@ add_executable(${PROJECT_NAME}
 # 链接OpenCV库到可执行文件
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
 
-target_link_libraries(${PROJECT_NAME} ${NCNN_LIBRARIES})
+if(ENABLE_NCNN)
+    target_link_libraries(${PROJECT_NAME} ${NCNN_LIBRARIES})
+    target_compile_definitions(${PROJECT_NAME} PRIVATE VISION_ENABLE_NCNN=1)
+endif()

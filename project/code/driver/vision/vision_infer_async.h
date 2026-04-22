@@ -4,7 +4,9 @@
 #include "zf_common_headfile.h"
 
 #include <opencv2/core.hpp>
+#ifdef VISION_ENABLE_NCNN
 #include <ncnn/net.h>
+#endif
 
 #include <string>
 #include <vector>
@@ -56,11 +58,15 @@ public:
     ~LQ_NCNN();
 
 private:
+#ifdef VISION_ENABLE_NCNN
     // 作用：输出向量取最大值索引（Top1）。
     int Argmax(const ncnn::Mat &logits);
+#endif
 
 private:
+#ifdef VISION_ENABLE_NCNN
     ncnn::Net m_net;
+#endif
     std::vector<std::string> m_labels;
     bool m_initialized;         // 是否已 Init 成功。
     std::string m_param_path;   // .param 路径。

@@ -17,6 +17,7 @@ TARGET_APP_PATH="/home/root/tst"
 TARGET_CONFIG_PATH="/home/root/tst/smartcar_config.toml"
 MAKE_JOBS="12"
 CAMERA_CAPTURE_WIDTH="320"
+ENABLE_NCNN="1"
 
 print_usage() {
     cat <<EOF
@@ -43,6 +44,7 @@ print_usage() {
      app_path=$TARGET_APP_PATH
      config_path=$TARGET_CONFIG_PATH
      camera_width=$CAMERA_CAPTURE_WIDTH
+     enable_ncnn=$ENABLE_NCNN
 EOF
 }
 
@@ -154,6 +156,11 @@ if [ "$CAMERA_CAPTURE_WIDTH" != "160" ] && [ "$CAMERA_CAPTURE_WIDTH" != "320" ];
     exit 1
 fi
 
+if [ "$ENABLE_NCNN" != "0" ] && [ "$ENABLE_NCNN" != "1" ]; then
+    echo "ENABLE_NCNN 仅支持 0 或 1，当前: $ENABLE_NCNN"
+    exit 1
+fi
+
 UVC_RES_PRESET="1"
 if [ "$CAMERA_CAPTURE_WIDTH" = "160" ]; then
     UVC_RES_PRESET="0"
@@ -164,6 +171,7 @@ echo "[BUILD] 目标主板: ${TARGET_USER}@${TARGET_HOST}:${TARGET_PORT}"
 echo "[BUILD] APP 目标路径: ${TARGET_APP_PATH}"
 echo "[BUILD] 配置目标路径: ${TARGET_CONFIG_PATH}"
 echo "[BUILD] 摄像头采图宽度: ${CAMERA_CAPTURE_WIDTH} (UVC_RES_PRESET=${UVC_RES_PRESET})"
+echo "[BUILD] NCNN 编译开关: ${ENABLE_NCNN}"
 
 node "$SYNC_TOML_SCRIPT" "$CONNECTION_PRESETS_FILE" "$TARGET_PRESET" "$SCRIPT_DIR/smartcar_config.toml" || {
     echo "同步 smartcar_config.toml 中的电脑接收端 IP 失败。"
@@ -180,7 +188,7 @@ find . -mindepth 1 ! -name "本文件夹作用.txt" -exec rm -rf {} + || {
     exit 1
 }
 
-cmake ../user -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUVC_RES_PRESET="${UVC_RES_PRESET}" || {
+cmake ../user -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUVC_RES_PRESET="${UVC_RES_PRESET}" -DENABLE_NCNN="${ENABLE_NCNN}" || {
     echo "cmake 命令执行失败。"
     exit 1
 }

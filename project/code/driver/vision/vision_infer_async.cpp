@@ -18,6 +18,8 @@
 #include <stdexcept>
 #include <thread>
 
+#ifdef VISION_ENABLE_NCNN
+
 namespace
 {
 // 固定分辨率参数：当前工程推理 ROI 直接基于 160x120 处理图裁剪。
@@ -790,3 +792,161 @@ bool vision_infer_async_fetch_latest(vision_infer_async_result_t *out)
     }
     return true;
 }
+
+#else
+
+namespace
+{
+static std::atomic<bool> g_infer_enabled(false);
+static std::atomic<bool> g_ncnn_enabled(false);
+}
+
+LQ_NCNN::LQ_NCNN()
+    : m_initialized(false)
+    , m_input_width(96)
+    , m_input_height(96)
+    , m_input_name("in0")
+    , m_output_name("out0")
+{
+    m_mean_vals[0] = 123.675f;
+    m_mean_vals[1] = 116.28f;
+    m_mean_vals[2] = 103.53f;
+    m_norm_vals[0] = 0.01712475f;
+    m_norm_vals[1] = 0.017507f;
+    m_norm_vals[2] = 0.01742919f;
+}
+
+bool LQ_NCNN::Init()
+{
+    m_initialized = false;
+    return false;
+}
+
+std::string LQ_NCNN::Infer(const cv::Mat &)
+{
+    return std::string();
+}
+
+bool LQ_NCNN::InferWithProbs(const cv::Mat &,
+                             int *top_class_id,
+                             float *top_score,
+                             std::string *top_label,
+                             std::vector<std::string> *labels,
+                             std::vector<float> *probs,
+                             uint32 *infer_us)
+{
+    if (top_class_id)
+    {
+        *top_class_id = -1;
+    }
+    if (top_score)
+    {
+        *top_score = 0.0f;
+    }
+    if (top_label)
+    {
+        top_label->clear();
+    }
+    if (labels)
+    {
+        labels->clear();
+    }
+    if (probs)
+    {
+        probs->clear();
+    }
+    if (infer_us)
+    {
+        *infer_us = 0;
+    }
+    return false;
+}
+
+void LQ_NCNN::SetModelPath(const std::string &param_path, const std::string &bin_path)
+{
+    m_param_path = param_path;
+    m_bin_path = bin_path;
+}
+
+void LQ_NCNN::SetInputSize(int width, int height)
+{
+    m_input_width = width;
+    m_input_height = height;
+}
+
+void LQ_NCNN::SetLabels(const std::vector<std::string> &labels)
+{
+    m_labels = labels;
+}
+
+void LQ_NCNN::SetNormalize(const float mean_vals[3], const float norm_vals[3])
+{
+    m_mean_vals[0] = mean_vals[0];
+    m_mean_vals[1] = mean_vals[1];
+    m_mean_vals[2] = mean_vals[2];
+    m_norm_vals[0] = norm_vals[0];
+    m_norm_vals[1] = norm_vals[1];
+    m_norm_vals[2] = norm_vals[2];
+}
+
+LQ_NCNN::~LQ_NCNN() = default;
+
+bool vision_infer_init_default_model(LQ_NCNN &)
+{
+    printf("[NCNN] disabled at build time, skip model init\n");
+    return false;
+}
+
+bool vision_infer_async_init(LQ_NCNN *, bool)
+{
+    g_infer_enabled.store(false);
+    g_ncnn_enabled.store(false);
+    return true;
+}
+
+void vision_infer_async_cleanup()
+{
+    g_infer_enabled.store(false);
+    g_ncnn_enabled.store(false);
+}
+
+void vision_infer_async_set_enabled(bool)
+{
+    g_infer_enabled.store(false);
+}
+
+bool vision_infer_async_enabled()
+{
+    return g_infer_enabled.load();
+}
+
+void vision_infer_async_set_ncnn_enabled(bool)
+{
+    g_ncnn_enabled.store(false);
+}
+
+bool vision_infer_async_ncnn_enabled()
+{
+    return g_ncnn_enabled.load();
+}
+
+void vision_infer_async_submit_frame(const uint8 *,
+                                     int,
+                                     int,
+                                     const uint8 *,
+                                     int,
+                                     int)
+{
+}
+
+bool vision_infer_async_fetch_latest(vision_infer_async_result_t *out)
+{
+    if (out != nullptr)
+    {
+        std::memset(out, 0, sizeof(*out));
+        out->ncnn_top_class_id = -1;
+    }
+    return false;
+}
+
+#endif
