@@ -253,9 +253,16 @@ int main(int, char**)
            g_vision_runtime_config.udp_web_send_rgb_jpeg ? 1 : 0,
            g_vision_runtime_config.udp_web_data_profile);
 
-    // 初始化 ncnn 模型；后续是否真正执行推理由配置中的 infer_enabled 控制。
+    // 初始化 ncnn 模型；后续是否真正执行推理由配置中的 infer_enabled / ncnn_enabled 控制。
     LQ_NCNN ncnn;
     bool ncnn_ready = vision_infer_init_default_model(ncnn);
+#ifndef VISION_ENABLE_NCNN
+    if (g_vision_runtime_config.ncnn_enabled)
+    {
+        printf("[VISION CFG] build without NCNN, force ncnn_enabled=0\r\n");
+    }
+    g_vision_runtime_config.ncnn_enabled = false;
+#endif
     // 视觉线程初始化：统一主链（采集/处理/检测/推理/发送）。
     if (!vision_thread_init("/dev/video0", &ncnn, ncnn_ready))
     {

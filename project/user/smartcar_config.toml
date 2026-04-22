@@ -29,7 +29,7 @@ client_sender_enabled = false
 screen_display_enabled = false
 # 迷宫法起始搜索行。
 # 值越大越靠近图像底部。
-maze_start_row = 100
+maze_start_row = 90
 # 原图巡线方法。
 # 0=迷宫法，1=八邻域法。
 maze_trace_method = 1
@@ -501,7 +501,7 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 400.0
+base_speed = 350.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # NORMAL 档位置环动态 Kp 基础值。

@@ -402,6 +402,7 @@ LQ_NCNN::LQ_NCNN()
 
 bool LQ_NCNN::Init()
 {
+#ifdef VISION_ENABLE_NCNN
     m_net.opt.use_vulkan_compute = false;
     m_net.opt.num_threads = 1;
     if (m_param_path.empty() || m_net.load_param(m_param_path.c_str()) != 0)
@@ -416,6 +417,10 @@ bool LQ_NCNN::Init()
     }
     m_initialized = true;
     return true;
+#else
+    m_initialized = false;
+    return false;
+#endif
 }
 
 std::string LQ_NCNN::Infer(const cv::Mat &bgr_image)
@@ -441,6 +446,7 @@ bool LQ_NCNN::InferWithProbs(const cv::Mat &bgr_image,
                              std::vector<float> *probs,
                              uint32 *infer_us)
 {
+#ifdef VISION_ENABLE_NCNN
     if (!m_initialized)
     {
         throw std::runtime_error("NCNN not initialized");
@@ -548,6 +554,34 @@ bool LQ_NCNN::InferWithProbs(const cv::Mat &bgr_image,
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count());
     }
     return true;
+#else
+    (void)bgr_image;
+    if (top_class_id)
+    {
+        *top_class_id = -1;
+    }
+    if (top_score)
+    {
+        *top_score = 0.0f;
+    }
+    if (top_label)
+    {
+        top_label->clear();
+    }
+    if (labels)
+    {
+        labels->clear();
+    }
+    if (probs)
+    {
+        probs->clear();
+    }
+    if (infer_us)
+    {
+        *infer_us = 0;
+    }
+    return false;
+#endif
 }
 
 void LQ_NCNN::SetModelPath(const std::string &param_path, const std::string &bin_path)
@@ -577,6 +611,7 @@ void LQ_NCNN::SetNormalize(const float mean_vals[3], const float norm_vals[3])
     m_norm_vals[2] = norm_vals[2];
 }
 
+#ifdef VISION_ENABLE_NCNN
 int LQ_NCNN::Argmax(const ncnn::Mat &logits)
 {
     if (logits.w <= 0)
@@ -595,11 +630,17 @@ int LQ_NCNN::Argmax(const ncnn::Mat &logits)
     }
     return best_index;
 }
+#endif
 
 LQ_NCNN::~LQ_NCNN() = default;
 
 bool vision_infer_init_default_model(LQ_NCNN &ncnn)
 {
+#ifndef VISION_ENABLE_NCNN
+    (void)ncnn;
+    printf("[NCNN] disabled at build time, skip model init\n");
+    return false;
+#else
     // 默认模型配置：集中在此，替换模型时优先修改这里。
     const std::string model_param = "tiny_classifier_fp32.ncnn.param";
     const std::string model_bin = "tiny_classifier_fp32.ncnn.bin";
@@ -632,6 +673,7 @@ bool vision_infer_init_default_model(LQ_NCNN &ncnn)
     }
     printf("[NCNN] model init ok\n");
     return true;
+#endif
 }
 
 bool vision_infer_async_init(LQ_NCNN *ncnn, bool enabled)
