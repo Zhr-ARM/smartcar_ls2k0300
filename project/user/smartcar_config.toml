@@ -201,7 +201,7 @@ cross_upper_dir6_post_run_len = 3
 ipm_line_error_source = 2
 # line_error 计算方法。
 # 0=固定索引，1=离散点位加权索引，2=随速度索引，3=前缀指数加权索引。
-ipm_line_error_method = 0
+ipm_line_error_method = 2
 
 [vision.runtime.ncnn]
 # ncnn 模型输入宽度。
@@ -242,7 +242,7 @@ data_profile = 0
 # 网页端 TCP 状态发送总开关。
 tcp_enabled = true
 # PC 接收端 IP 地址。
-server_ip = "172.21.79.129"
+server_ip = "10.200.206.102"
 # PC 接收端 UDP 视频端口。
 video_port = 10000
 # PC 接收端 TCP 状态端口。
@@ -360,7 +360,7 @@ ipm_size = true
 # 逐飞助手 UDP 通道开关。
 enabled = false
 # 逐飞助手接收端 IP。
-server_ip = "172.21.79.129"
+server_ip = "10.200.206.102"
 # 逐飞助手接收端端口。
 server_port = 8899
 
@@ -501,11 +501,11 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 300.0
+base_speed = 320.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # NORMAL 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 4
+position_dynamic_kp_base = 6
 # NORMAL 档位置环动态 Kp 下限。
 position_dynamic_kp_min = 0.0
 # NORMAL 档位置环动态 Kp 上限。
@@ -531,7 +531,7 @@ position_dynamic_kd_max = 2.0
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
-position_max_output = 270.0
+position_max_output = 220.0
 # NORMAL 档位置环前馈开关（基于历史误差一阶/二阶差分）。
 position_feedforward_enabled = true
 # NORMAL 档位置环前馈一阶差分增益。
