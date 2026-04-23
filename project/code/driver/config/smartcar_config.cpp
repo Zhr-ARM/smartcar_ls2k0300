@@ -709,6 +709,12 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".position_dynamic_kd_max", &profile->position_dynamic_kd_max, error_message) &&
            require_float(values, consumed, prefix + ".position_max_integral", &profile->position_max_integral, error_message) &&
            require_float(values, consumed, prefix + ".position_max_output", &profile->position_max_output, error_message) &&
+           require_bool(values, consumed, prefix + ".position_feedforward_enabled", &profile->position_feedforward_enabled, error_message) &&
+           require_float(values, consumed, prefix + ".position_feedforward_first_diff_gain", &profile->position_feedforward_first_diff_gain, error_message) &&
+           require_float(values, consumed, prefix + ".position_feedforward_second_diff_gain", &profile->position_feedforward_second_diff_gain, error_message) &&
+           require_float(values, consumed, prefix + ".position_feedforward_speed_gain", &profile->position_feedforward_speed_gain, error_message) &&
+           require_float(values, consumed, prefix + ".position_feedforward_error_trend_gain", &profile->position_feedforward_error_trend_gain, error_message) &&
+           require_float(values, consumed, prefix + ".position_feedforward_max_output", &profile->position_feedforward_max_output, error_message) &&
            require_float(values, consumed, prefix + ".steering_max_output", &profile->steering_max_output, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_from_error_gain_dps", &profile->yaw_rate_ref_from_error_gain_dps, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_from_curvature_gain_dps", &profile->yaw_rate_ref_from_curvature_gain_dps, error_message) &&
@@ -1313,6 +1319,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
         return pid_tuning::route_line_follow::is_dynamic_kp_range_valid(profile) &&
                pid_tuning::route_line_follow::is_dynamic_position_kd_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile) &&
+               pid_tuning::route_line_follow::is_position_feedforward_range_valid(profile) &&
                pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile) &&
                pid_tuning::route_line_follow::is_speed_scheme_range_valid(profile);
     };

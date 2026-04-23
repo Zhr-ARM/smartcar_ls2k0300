@@ -1095,6 +1095,19 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_position_pid_error", line_follow_pid_debug.position_pid_error);
         append_float(enabled, "pid_common_position_pid_integral", line_follow_pid_debug.position_pid_integral);
         append_float(enabled, "pid_common_position_pid_output", line_follow_pid_debug.position_pid_output);
+        append_float(enabled, "pid_common_position_feedforward_output", line_follow_pid_debug.position_feedforward_output);
+        append_float(enabled, "pid_common_position_output_with_feedforward",
+                     line_follow_pid_debug.position_output_with_feedforward);
+        append_float(enabled, "pid_common_position_feedforward_first_diff_px",
+                     line_follow_pid_debug.position_feedforward_first_diff_px);
+        append_float(enabled, "pid_common_position_feedforward_second_diff_px",
+                     line_follow_pid_debug.position_feedforward_second_diff_px);
+        append_float(enabled, "pid_common_position_feedforward_speed_scale",
+                     line_follow_pid_debug.position_feedforward_speed_scale);
+        append_float(enabled, "pid_common_position_feedforward_trend_scale",
+                     line_follow_pid_debug.position_feedforward_trend_scale);
+        append_bool(enabled, "pid_common_position_feedforward_enabled",
+                    line_follow_pid_debug.position_feedforward_enabled);
         append_float(enabled, "pid_common_position_pid_max_integral", line_follow_pid_debug.position_pid_max_integral);
         append_float(enabled, "pid_common_position_pid_max_output", line_follow_pid_debug.position_pid_max_output);
         append_float(enabled, "pid_common_yaw_pid_kp", line_follow_pid_debug.yaw_pid_kp);

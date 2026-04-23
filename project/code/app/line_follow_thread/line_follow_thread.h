@@ -35,6 +35,13 @@ struct LineFollowPidDebugStatus
     float position_pid_error;
     float position_pid_integral;
     float position_pid_output;
+    float position_feedforward_output;
+    float position_output_with_feedforward;
+    float position_feedforward_first_diff_px;
+    float position_feedforward_second_diff_px;
+    float position_feedforward_speed_scale;
+    float position_feedforward_trend_scale;
+    bool position_feedforward_enabled;
     float position_pid_max_integral;
     float position_pid_max_output;
     float yaw_pid_kp;

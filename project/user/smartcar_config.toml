@@ -501,7 +501,7 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 350.0
+base_speed = 300.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # NORMAL 档位置环动态 Kp 基础值。
@@ -532,6 +532,18 @@ position_dynamic_kd_max = 2.0
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
 position_max_output = 270.0
+# NORMAL 档位置环前馈开关（基于历史误差一阶/二阶差分）。
+position_feedforward_enabled = true
+# NORMAL 档位置环前馈一阶差分增益。
+position_feedforward_first_diff_gain = 4.0
+# NORMAL 档位置环前馈二阶差分增益。
+position_feedforward_second_diff_gain = 8.0
+# NORMAL 档位置环前馈速度相关增益（按实时速度归一化放大）。
+position_feedforward_speed_gain = 0.0
+# NORMAL 档位置环前馈误差趋势增益（误差发散时加大前馈）。
+position_feedforward_error_trend_gain = 0.0
+# NORMAL 档位置环前馈输出限幅。
+position_feedforward_max_output = 200.0
 # NORMAL 档总转向输出限幅。
 steering_max_output = 270.0
 # NORMAL 档由横向误差生成目标横摆角速度的增益。
@@ -573,11 +585,11 @@ speed_scheme_max_drop_ratio_per_cycle = 0.95
 # 速度方案单周期最大升速比例。
 speed_scheme_max_rise_ratio_per_cycle = 0.01
 # 速度方案基础速度下限（摩擦圆决策后再次下限裁剪）。
-speed_scheme_min_base_speed = 270.0
+speed_scheme_min_base_speed = 300.0
 
 [pid.route_line_follow.straight]
 # STRAIGHT 档基础速度。
-base_speed = 500.0
+base_speed = 270.0
 # STRAIGHT 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # STRAIGHT 档位置环动态 Kp 基础值。
@@ -608,6 +620,18 @@ position_dynamic_kd_max = 2.0
 position_max_integral = 0.0
 # STRAIGHT 档位置环输出限幅。
 position_max_output = 270.0
+# STRAIGHT 档位置环前馈开关（基于历史误差一阶/二阶差分）。
+position_feedforward_enabled = false
+# STRAIGHT 档位置环前馈一阶差分增益。
+position_feedforward_first_diff_gain = 0.0
+# STRAIGHT 档位置环前馈二阶差分增益。
+position_feedforward_second_diff_gain = 0.0
+# STRAIGHT 档位置环前馈速度相关增益（按实时速度归一化放大）。
+position_feedforward_speed_gain = 0.0
+# STRAIGHT 档位置环前馈误差趋势增益（误差发散时加大前馈）。
+position_feedforward_error_trend_gain = 0.0
+# STRAIGHT 档位置环前馈输出限幅。
+position_feedforward_max_output = 0.0
 # STRAIGHT 档总转向输出限幅。
 steering_max_output = 270.0
 # STRAIGHT 档由横向误差生成目标横摆角速度的增益。
@@ -653,7 +677,7 @@ speed_scheme_min_base_speed = 270.0
 
 [pid.route_line_follow.cross]
 # CROSS 档基础速度。
-base_speed = 400.0
+base_speed = 270.0
 # CROSS 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # CROSS 档位置环动态 Kp 基础值。
@@ -684,6 +708,18 @@ position_dynamic_kd_max = 2.0
 position_max_integral = 0.0
 # CROSS 档位置环输出限幅。
 position_max_output = 270.0
+# CROSS 档位置环前馈开关（基于历史误差一阶/二阶差分）。
+position_feedforward_enabled = false
+# CROSS 档位置环前馈一阶差分增益。
+position_feedforward_first_diff_gain = 0.0
+# CROSS 档位置环前馈二阶差分增益。
+position_feedforward_second_diff_gain = 0.0
+# CROSS 档位置环前馈速度相关增益（按实时速度归一化放大）。
+position_feedforward_speed_gain = 0.0
+# CROSS 档位置环前馈误差趋势增益（误差发散时加大前馈）。
+position_feedforward_error_trend_gain = 0.0
+# CROSS 档位置环前馈输出限幅。
+position_feedforward_max_output = 0.0
 # CROSS 档总转向输出限幅。
 steering_max_output = 270.0
 # CROSS 档由横向误差生成目标横摆角速度的增益。
@@ -729,7 +765,7 @@ speed_scheme_min_base_speed = 270.0
 
 [pid.route_line_follow.circle_enter]
 # CIRCLE_ENTER 档基础速度。
-base_speed = 400.0
+base_speed = 270.0
 # CIRCLE_ENTER 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # CIRCLE_ENTER 档位置环动态 Kp 基础值。
@@ -760,6 +796,18 @@ position_dynamic_kd_max = 2.0
 position_max_integral = 0.0
 # CIRCLE_ENTER 档位置环输出限幅。
 position_max_output = 270.0
+# CIRCLE_ENTER 档位置环前馈开关（基于历史误差一阶/二阶差分）。
+position_feedforward_enabled = false
+# CIRCLE_ENTER 档位置环前馈一阶差分增益。
+position_feedforward_first_diff_gain = 0.0
+# CIRCLE_ENTER 档位置环前馈二阶差分增益。
+position_feedforward_second_diff_gain = 0.0
+# CIRCLE_ENTER 档位置环前馈速度相关增益（按实时速度归一化放大）。
+position_feedforward_speed_gain = 0.0
+# CIRCLE_ENTER 档位置环前馈误差趋势增益（误差发散时加大前馈）。
+position_feedforward_error_trend_gain = 0.0
+# CIRCLE_ENTER 档位置环前馈输出限幅。
+position_feedforward_max_output = 0.0
 # CIRCLE_ENTER 档总转向输出限幅。
 steering_max_output = 270.0
 # CIRCLE_ENTER 档由横向误差生成目标横摆角速度的增益。
@@ -805,7 +853,7 @@ speed_scheme_min_base_speed = 270.0
 
 [pid.route_line_follow.circle_inside]
 # CIRCLE_INSIDE 档基础速度。
-base_speed = 400.0
+base_speed = 270.0
 # CIRCLE_INSIDE 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # CIRCLE_INSIDE 档位置环动态 Kp 基础值。
@@ -836,6 +884,18 @@ position_dynamic_kd_max = 2.0
 position_max_integral = 0.0
 # CIRCLE_INSIDE 档位置环输出限幅。
 position_max_output = 270.0
+# CIRCLE_INSIDE 档位置环前馈开关（基于历史误差一阶/二阶差分）。
+position_feedforward_enabled = false
+# CIRCLE_INSIDE 档位置环前馈一阶差分增益。
+position_feedforward_first_diff_gain = 0.0
+# CIRCLE_INSIDE 档位置环前馈二阶差分增益。
+position_feedforward_second_diff_gain = 0.0
+# CIRCLE_INSIDE 档位置环前馈速度相关增益（按实时速度归一化放大）。
+position_feedforward_speed_gain = 0.0
+# CIRCLE_INSIDE 档位置环前馈误差趋势增益（误差发散时加大前馈）。
+position_feedforward_error_trend_gain = 0.0
+# CIRCLE_INSIDE 档位置环前馈输出限幅。
+position_feedforward_max_output = 0.0
 # CIRCLE_INSIDE 档总转向输出限幅。
 steering_max_output = 270.0
 # CIRCLE_INSIDE 档由横向误差生成目标横摆角速度的增益。
@@ -881,7 +941,7 @@ speed_scheme_min_base_speed = 270.0
 
 [pid.route_line_follow.circle_exit]
 # CIRCLE_EXIT 档基础速度。
-base_speed = 400.0
+base_speed = 270.0
 # CIRCLE_EXIT 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0
 # CIRCLE_EXIT 档位置环动态 Kp 基础值。
@@ -912,6 +972,18 @@ position_dynamic_kd_max = 2.0
 position_max_integral = 0.0
 # CIRCLE_EXIT 档位置环输出限幅。
 position_max_output = 270.0
+# CIRCLE_EXIT 档位置环前馈开关（基于历史误差一阶/二阶差分）。
+position_feedforward_enabled = false
+# CIRCLE_EXIT 档位置环前馈一阶差分增益。
+position_feedforward_first_diff_gain = 0.0
+# CIRCLE_EXIT 档位置环前馈二阶差分增益。
+position_feedforward_second_diff_gain = 0.0
+# CIRCLE_EXIT 档位置环前馈速度相关增益（按实时速度归一化放大）。
+position_feedforward_speed_gain = 0.0
+# CIRCLE_EXIT 档位置环前馈误差趋势增益（误差发散时加大前馈）。
+position_feedforward_error_trend_gain = 0.0
+# CIRCLE_EXIT 档位置环前馈输出限幅。
+position_feedforward_max_output = 0.0
 # CIRCLE_EXIT 档总转向输出限幅。
 steering_max_output = 270.0
 # CIRCLE_EXIT 档由横向误差生成目标横摆角速度的增益。

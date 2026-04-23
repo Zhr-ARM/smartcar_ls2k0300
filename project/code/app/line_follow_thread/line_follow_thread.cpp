@@ -87,6 +87,11 @@ float g_applied_base_speed_state = -1.0f;
 // 位置环与角速度环各自最近一次真实更新后的输出，样本未更新时沿用旧值。
 float g_position_output_state = 0.0f;
 float g_yaw_rate_output_state = 0.0f;
+float g_position_feedforward_output_state = 0.0f;
+float g_position_ff_last_error_px = 0.0f;
+float g_position_ff_prev_error_px = 0.0f;
+bool g_has_position_ff_last_error = false;
+bool g_has_position_ff_prev_error = false;
 // 位置环用于动态Kd调度的误差变化率状态：只在拿到新视觉帧时推进一次。
 float g_position_error_rate_px_per_second = 0.0f;
 float g_last_position_control_error_px = 0.0f;
@@ -119,6 +124,15 @@ struct ControlErrorState
     float filtered_error_px;
     float abs_filtered_error_px;
     float control_error_px;
+};
+
+struct PositionFeedforwardRuntime
+{
+    float output;
+    float first_diff_px;
+    float second_diff_px;
+    float speed_scale;
+    float trend_scale;
 };
 
 float apply_iir_filter(float previous_value, float current_value, float alpha)
@@ -227,6 +241,11 @@ void reset_line_follow_runtime_state()
     g_applied_base_speed_state = -1.0f;
     g_position_output_state = 0.0f;
     g_yaw_rate_output_state = 0.0f;
+    g_position_feedforward_output_state = 0.0f;
+    g_position_ff_last_error_px = 0.0f;
+    g_position_ff_prev_error_px = 0.0f;
+    g_has_position_ff_last_error = false;
+    g_has_position_ff_prev_error = false;
     g_position_error_rate_px_per_second = 0.0f;
     g_last_position_control_error_px = 0.0f;
     g_has_last_position_control_error = false;
@@ -563,6 +582,95 @@ float update_pid_output_state_if_needed(bool should_update,
                       output_limit);
 }
 
+PositionFeedforwardRuntime update_position_feedforward_if_needed(bool vision_updated,
+                                                                 float control_error_px,
+                                                                 float realtime_speed,
+                                                                 float profile_base_speed,
+                                                                 const RouteProfile &profile)
+{
+    PositionFeedforwardRuntime runtime{};
+    runtime.output = g_position_feedforward_output_state;
+    runtime.speed_scale = 1.0f;
+    runtime.trend_scale = 1.0f;
+
+    if (!vision_updated)
+    {
+        return runtime;
+    }
+
+    if (!profile.position_feedforward_enabled || profile.position_feedforward_max_output <= 1.0e-4f)
+    {
+        g_position_feedforward_output_state = 0.0f;
+        runtime.output = 0.0f;
+        runtime.first_diff_px = 0.0f;
+        runtime.second_diff_px = 0.0f;
+        runtime.speed_scale = 1.0f;
+        runtime.trend_scale = 1.0f;
+        g_position_ff_prev_error_px = g_position_ff_last_error_px;
+        g_position_ff_last_error_px = control_error_px;
+        g_has_position_ff_prev_error = g_has_position_ff_last_error;
+        g_has_position_ff_last_error = true;
+        return runtime;
+    }
+
+    if (!g_has_position_ff_last_error)
+    {
+        g_position_ff_last_error_px = control_error_px;
+        g_has_position_ff_last_error = true;
+        g_position_feedforward_output_state = 0.0f;
+        runtime.output = 0.0f;
+        return runtime;
+    }
+
+    if (!g_has_position_ff_prev_error)
+    {
+        g_position_ff_prev_error_px = g_position_ff_last_error_px;
+        g_position_ff_last_error_px = control_error_px;
+        g_has_position_ff_prev_error = true;
+        g_position_feedforward_output_state = 0.0f;
+        runtime.output = 0.0f;
+        return runtime;
+    }
+
+    const float previous_error = g_position_ff_last_error_px;
+    const float previous2_error = g_position_ff_prev_error_px;
+    const float first_diff_px = control_error_px - previous_error;
+    const float second_diff_px = control_error_px - 2.0f * previous_error + previous2_error;
+    const float safe_profile_base_speed = std::max(profile_base_speed, 1.0f);
+    const float speed_norm = std::clamp(realtime_speed / safe_profile_base_speed, 0.0f, 3.0f);
+    const float speed_scale = 1.0f + profile.position_feedforward_speed_gain * speed_norm;
+    const float error_abs = std::fabs(control_error_px);
+    const float signed_delta_along_error =
+        (control_error_px >= 0.0f) ? first_diff_px : (-first_diff_px);
+    const float trend_norm =
+        signed_delta_along_error / (error_abs + 1.0e-3f);
+    const float trend_scale = std::clamp(1.0f +
+                                         profile.position_feedforward_error_trend_gain *
+                                         std::clamp(trend_norm, -1.0f, 1.0f),
+                                         0.0f,
+                                         4.0f);
+    const float raw_output =
+        (profile.position_feedforward_first_diff_gain * first_diff_px +
+         profile.position_feedforward_second_diff_gain * second_diff_px) *
+        speed_scale * trend_scale;
+    const float output = std::clamp(raw_output,
+                                    -profile.position_feedforward_max_output,
+                                    profile.position_feedforward_max_output);
+
+    g_position_feedforward_output_state = output;
+    g_position_ff_prev_error_px = previous_error;
+    g_position_ff_last_error_px = control_error_px;
+    g_has_position_ff_prev_error = true;
+    g_has_position_ff_last_error = true;
+
+    runtime.output = output;
+    runtime.first_diff_px = first_diff_px;
+    runtime.second_diff_px = second_diff_px;
+    runtime.speed_scale = speed_scale;
+    runtime.trend_scale = trend_scale;
+    return runtime;
+}
+
 float alpha_to_time_constant_seconds(float alpha, float nominal_dt_seconds)
 {
     const float safe_alpha = std::clamp(alpha, 1.0e-3f, 0.999f);
@@ -831,6 +939,11 @@ void line_follow_loop()
             position_pid1.reset();
             position_pid2.reset();
             g_normal_speed_reference.store(std::max(0.0f, pid_tuning::route_line_follow::kNormalProfile.base_speed));
+            g_position_feedforward_output_state = 0.0f;
+            g_position_ff_last_error_px = 0.0f;
+            g_position_ff_prev_error_px = 0.0f;
+            g_has_position_ff_last_error = false;
+            g_has_position_ff_prev_error = false;
             g_friction_circle_gate_enabled = false;
             g_friction_circle_enter_count = 0;
             g_friction_circle_exit_count = 0;
@@ -920,7 +1033,19 @@ void line_follow_loop()
                                                                     route_profile.position_max_output,
                                                                     position_pid1,
                                                                     g_position_output_state);
-        const float position_output = g_position_output_state;
+        const float realtime_speed =
+            0.5f * (std::fabs(motor_thread_left_filtered_count()) +
+                    std::fabs(motor_thread_right_filtered_count()));
+        const float position_pid_output = g_position_output_state;
+        const PositionFeedforwardRuntime position_feedforward_runtime =
+            update_position_feedforward_if_needed(vision_updated,
+                                                  error_state.control_error_px,
+                                                  realtime_speed,
+                                                  profile_base_speed,
+                                                  route_profile);
+        const float position_output = std::clamp(position_pid_output + position_feedforward_runtime.output,
+                                                 -route_profile.position_max_output,
+                                                 route_profile.position_max_output);
 
         const float yaw_rate_pid_dt_fallback =
             vision_updated ? vision_frame_dt_seconds : imu_sample_dt_seconds;
@@ -961,9 +1086,6 @@ void line_follow_loop()
         const float speed_scheme_target_abs_angle_deg =
             compute_abs_track_point_angle_deg(speed_target_valid, speed_target_x, speed_target_y);
         const float speed_scheme_target_abs_angle_rad = speed_scheme_target_abs_angle_deg / RAD_TO_DEG;
-        const float realtime_speed =
-            0.5f * (std::fabs(motor_thread_left_filtered_count()) +
-                    std::fabs(motor_thread_right_filtered_count()));
         const float friction_coupling = speed_scheme_target_abs_angle_rad * realtime_speed;
         float speed_scheme_error_scale_raw = 1.0f;
         float speed_scheme_final_speed_scale = 1.0f;
@@ -1082,6 +1204,13 @@ void line_follow_loop()
             g_pid_debug_status.position_pid_error = position_pid1.get_error();
             g_pid_debug_status.position_pid_integral = position_pid1.integral();
             g_pid_debug_status.position_pid_output = position_pid1.get_output();
+            g_pid_debug_status.position_feedforward_output = position_feedforward_runtime.output;
+            g_pid_debug_status.position_output_with_feedforward = position_output;
+            g_pid_debug_status.position_feedforward_first_diff_px = position_feedforward_runtime.first_diff_px;
+            g_pid_debug_status.position_feedforward_second_diff_px = position_feedforward_runtime.second_diff_px;
+            g_pid_debug_status.position_feedforward_speed_scale = position_feedforward_runtime.speed_scale;
+            g_pid_debug_status.position_feedforward_trend_scale = position_feedforward_runtime.trend_scale;
+            g_pid_debug_status.position_feedforward_enabled = route_profile.position_feedforward_enabled;
             g_pid_debug_status.position_pid_max_integral = position_pid1.max_integral();
             g_pid_debug_status.position_pid_max_output = position_pid1.max_output();
             g_pid_debug_status.yaw_pid_kp = position_pid2.kp();
