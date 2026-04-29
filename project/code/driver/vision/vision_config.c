@@ -402,17 +402,17 @@ vision_runtime_config_t g_vision_runtime_config = {
     // line_error 平移中线偏好源：0=偏好左，1=偏好右，2=无偏好(自动按边界点数)。
     .ipm_line_error_source = VISION_IPM_LINE_ERROR_FROM_AUTO,
     // line_error 计算方法：0=固定索引，1=离散点位加权索引，2=随速度索引，3=前缀指数加权索引。
-    .ipm_line_error_method = 2,
+    .ipm_line_error_method = 1,
     // 固定索引模式下默认使用的中线点索引。
     .ipm_line_error_fixed_index = 8,
     // line_error 加权点数量。
     .ipm_line_error_weighted_point_count = 3,
     // line_error 加权索引点（0-based）。
-    .ipm_line_error_point_indices = {8, 16, 24},
+    .ipm_line_error_point_indices = {8, 12, 16},
     // line_error 各索引点对应权重。
     .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b（仅 method=2 生效）。
-    .ipm_line_error_speed_k = 0.02f,
+    .ipm_line_error_speed_k = 0.03f,
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b（仅 method=2 生效）。
     .ipm_line_error_speed_b = 2.0f,
     // 随速度索引模式允许的最小索引（仅 method=2 生效）。

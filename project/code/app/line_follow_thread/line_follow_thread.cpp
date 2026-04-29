@@ -82,6 +82,9 @@ float g_filtered_yaw_rate_dps = 0.0f;
 // 滤波后的目标点夹角：由跟踪点相对图像中垂线的偏转角得到。
 // 注意：状态只在“拿到新视觉帧”时推进一次。
 float g_filtered_track_point_angle_deg = 0.0f;
+// 滤波后的前馈预瞄点夹角：由更远的视觉预瞄点生成，专门用于提前打差速。
+// 注意：状态只在“拿到新视觉帧”时推进一次。
+float g_filtered_steering_feedforward_preview_angle_deg = 0.0f;
 // 当前真正参与左右轮目标合成的基础速度状态：把“理想基础速度”做成缓增缓降，避免一帧一跳。
 float g_applied_base_speed_state = -1.0f;
 // 位置环与角速度环各自最近一次真实更新后的输出，样本未更新时沿用旧值。
@@ -135,9 +138,34 @@ struct PositionFeedforwardRuntime
     float trend_scale;
 };
 
+struct SteeringFeedforwardRuntime
+{
+    bool enabled;
+    bool preview_valid;
+    int preview_x;
+    int preview_y;
+    float preview_angle_deg;
+    float filtered_preview_angle_deg;
+    float centerline_confidence;
+    float raw_output;
+    float base_limited_output;
+    float feedback_room_limit;
+    float output;
+};
+
 float apply_iir_filter(float previous_value, float current_value, float alpha)
 {
     return previous_value * (1.0f - alpha) + current_value * alpha;
+}
+
+float apply_signed_deadzone(float value, float deadzone)
+{
+    const float abs_value = std::fabs(value);
+    if (abs_value <= deadzone)
+    {
+        return 0.0f;
+    }
+    return std::copysign(abs_value - deadzone, value);
 }
 
 /**
@@ -238,6 +266,7 @@ void reset_line_follow_runtime_state()
     g_filtered_error = 0.0f;
     g_filtered_yaw_rate_dps = 0.0f;
     g_filtered_track_point_angle_deg = 0.0f;
+    g_filtered_steering_feedforward_preview_angle_deg = 0.0f;
     g_applied_base_speed_state = -1.0f;
     g_position_output_state = 0.0f;
     g_yaw_rate_output_state = 0.0f;
@@ -687,6 +716,83 @@ float compute_iir_alpha_from_dt(float dt_seconds, float time_constant_seconds)
     return std::clamp(dt_seconds / (time_constant_seconds + dt_seconds), 0.0f, 1.0f);
 }
 
+SteeringFeedforwardRuntime update_steering_feedforward_if_needed(bool vision_updated,
+                                                                 float frame_dt_seconds,
+                                                                 const RouteProfile &profile,
+                                                                 int selected_centerline_count,
+                                                                 float feedback_output)
+{
+    SteeringFeedforwardRuntime runtime{};
+    runtime.enabled = profile.steering_feedforward_enabled &&
+                      (profile.steering_feedforward_gain > 1.0e-4f) &&
+                      (profile.steering_feedforward_max_output > 1.0e-4f);
+
+    vision_image_processor_ipm_rear_exp_weighted_target_point(profile.steering_feedforward_preview_split_ratio,
+                                                              profile.steering_feedforward_preview_exp_lambda,
+                                                              &runtime.preview_valid,
+                                                              &runtime.preview_x,
+                                                              &runtime.preview_y);
+    runtime.preview_angle_deg =
+        compute_signed_track_point_angle_deg(runtime.preview_valid,
+                                             runtime.preview_x,
+                                             runtime.preview_y);
+
+    if (!runtime.enabled)
+    {
+        if (vision_updated)
+        {
+            g_filtered_steering_feedforward_preview_angle_deg = 0.0f;
+        }
+        runtime.filtered_preview_angle_deg = g_filtered_steering_feedforward_preview_angle_deg;
+        return runtime;
+    }
+
+    if (vision_updated)
+    {
+        const float preview_filter_tau_seconds =
+            alpha_to_time_constant_seconds(profile.steering_feedforward_filter_alpha,
+                                           VISION_NOMINAL_DT_SECONDS);
+        const float preview_filter_alpha =
+            compute_iir_alpha_from_dt(frame_dt_seconds, preview_filter_tau_seconds);
+        g_filtered_steering_feedforward_preview_angle_deg =
+            apply_iir_filter(g_filtered_steering_feedforward_preview_angle_deg,
+                             runtime.preview_angle_deg,
+                             preview_filter_alpha);
+    }
+    runtime.filtered_preview_angle_deg = g_filtered_steering_feedforward_preview_angle_deg;
+
+    const int safe_min_centerline_count = std::max(1, profile.steering_feedforward_min_centerline_count);
+    runtime.centerline_confidence =
+        std::clamp(static_cast<float>(std::max(selected_centerline_count, 0)) /
+                       static_cast<float>(safe_min_centerline_count),
+                   0.0f,
+                   1.0f);
+
+    const float preview_angle_after_deadzone =
+        apply_signed_deadzone(runtime.filtered_preview_angle_deg,
+                              std::max(0.0f, profile.steering_feedforward_deadzone_deg));
+    runtime.raw_output =
+        preview_angle_after_deadzone *
+        std::max(0.0f, profile.steering_feedforward_gain) *
+        runtime.centerline_confidence;
+    runtime.base_limited_output =
+        std::clamp(runtime.raw_output,
+                   -profile.steering_feedforward_max_output,
+                   profile.steering_feedforward_max_output);
+
+    runtime.feedback_room_limit =
+        std::clamp(profile.steering_max_output -
+                       std::fabs(feedback_output) -
+                       std::max(0.0f, profile.steering_feedforward_feedback_reserve_output),
+                   0.0f,
+                   profile.steering_feedforward_max_output);
+    runtime.output =
+        std::clamp(runtime.base_limited_output,
+                   -runtime.feedback_room_limit,
+                   runtime.feedback_room_limit);
+    return runtime;
+}
+
 float update_applied_base_speed(float current_base_speed,
                                 float profile_base_speed,
                                 float desired_base_speed,
@@ -919,7 +1025,8 @@ void refresh_thread_info()
  * 2) 巡线线程只在“拿到新视觉帧 / 新 IMU 样本”时推进各自滤波状态；
  * 3) 再统一方向约定，并通过归一化、死区、小误差降增益把视觉噪声整形成“可控误差”；
  * 4) 位置环 PID 负责“回中线”，角速度环 PID 负责“按视觉期望横摆率转过去”；
- * 5) 两个环并级叠加成最终差速，再叠加基础速度与视觉弯道降速后下发左右轮目标。
+ * 5) 视觉转向前馈根据更远的预瞄点夹角提前打一部分差速，并单独做限幅和留余量；
+ * 6) 三条支路并级叠加成最终差速，再叠加基础速度与视觉弯道降速后下发左右轮目标。
  */
 void line_follow_loop()
 {
@@ -944,6 +1051,7 @@ void line_follow_loop()
             g_position_ff_prev_error_px = 0.0f;
             g_has_position_ff_last_error = false;
             g_has_position_ff_prev_error = false;
+            g_filtered_steering_feedforward_preview_angle_deg = 0.0f;
             g_friction_circle_gate_enabled = false;
             g_friction_circle_enter_count = 0;
             g_friction_circle_exit_count = 0;
@@ -1059,12 +1167,22 @@ void line_follow_loop()
                                                                     g_yaw_rate_output_state);
         const float yaw_rate_output = g_yaw_rate_output_state;
 
-        // 并级的意思，就是两条支路独立算完后再直接相加：
+        // 并级的意思，就是三条支路独立算完后再直接相加：
         // - position_output 管“位置偏了多少”；
-        // - yaw_rate_output 管“车身现在转得对不对”。
-        const float raw_steering_output = std::clamp(position_output + yaw_rate_output,
-                                                     -route_profile.steering_max_output,
-                                                     route_profile.steering_max_output);
+        // - yaw_rate_output 管“车身现在转得对不对”；
+        // - steering_feedforward_output 管“视觉提前看到要转，先打一点差速”。
+        const int selected_centerline_count = vision_image_processor_ipm_selected_centerline_count();
+        const float feedback_output = position_output + yaw_rate_output;
+        const SteeringFeedforwardRuntime steering_feedforward_runtime =
+            update_steering_feedforward_if_needed(vision_updated,
+                                                  vision_frame_dt_seconds,
+                                                  route_profile,
+                                                  selected_centerline_count,
+                                                  feedback_output);
+        const float raw_steering_output =
+            std::clamp(feedback_output + steering_feedforward_runtime.output,
+                       -route_profile.steering_max_output,
+                       route_profile.steering_max_output);
         const float abs_yaw_rate_ref_dps = std::fabs(yaw_rate_ref_dps);
 
         bool force_full_speed = false;
@@ -1082,7 +1200,6 @@ void line_follow_loop()
                                                                   &speed_target_valid,
                                                                   &speed_target_x,
                                                                   &speed_target_y);
-        const int selected_centerline_count = vision_image_processor_ipm_selected_centerline_count();
         const float speed_scheme_target_abs_angle_deg =
             compute_abs_track_point_angle_deg(speed_target_valid, speed_target_x, speed_target_y);
         const float speed_scheme_target_abs_angle_rad = speed_scheme_target_abs_angle_deg / RAD_TO_DEG;
@@ -1213,6 +1330,38 @@ void line_follow_loop()
             g_pid_debug_status.position_feedforward_enabled = route_profile.position_feedforward_enabled;
             g_pid_debug_status.position_pid_max_integral = position_pid1.max_integral();
             g_pid_debug_status.position_pid_max_output = position_pid1.max_output();
+            g_pid_debug_status.steering_feedforward_enabled = steering_feedforward_runtime.enabled;
+            g_pid_debug_status.steering_feedforward_preview_valid = steering_feedforward_runtime.preview_valid;
+            g_pid_debug_status.steering_feedforward_preview_x = steering_feedforward_runtime.preview_x;
+            g_pid_debug_status.steering_feedforward_preview_y = steering_feedforward_runtime.preview_y;
+            g_pid_debug_status.steering_feedforward_preview_angle_deg =
+                steering_feedforward_runtime.preview_angle_deg;
+            g_pid_debug_status.steering_feedforward_filtered_preview_angle_deg =
+                steering_feedforward_runtime.filtered_preview_angle_deg;
+            g_pid_debug_status.steering_feedforward_preview_split_ratio =
+                route_profile.steering_feedforward_preview_split_ratio;
+            g_pid_debug_status.steering_feedforward_preview_exp_lambda =
+                route_profile.steering_feedforward_preview_exp_lambda;
+            g_pid_debug_status.steering_feedforward_min_centerline_count =
+                route_profile.steering_feedforward_min_centerline_count;
+            g_pid_debug_status.steering_feedforward_deadzone_deg =
+                route_profile.steering_feedforward_deadzone_deg;
+            g_pid_debug_status.steering_feedforward_gain =
+                route_profile.steering_feedforward_gain;
+            g_pid_debug_status.steering_feedforward_max_output =
+                route_profile.steering_feedforward_max_output;
+            g_pid_debug_status.steering_feedforward_feedback_reserve_output =
+                route_profile.steering_feedforward_feedback_reserve_output;
+            g_pid_debug_status.steering_feedforward_centerline_confidence =
+                steering_feedforward_runtime.centerline_confidence;
+            g_pid_debug_status.steering_feedforward_feedback_room_limit =
+                steering_feedforward_runtime.feedback_room_limit;
+            g_pid_debug_status.steering_feedforward_raw_output =
+                steering_feedforward_runtime.raw_output;
+            g_pid_debug_status.steering_feedforward_base_limited_output =
+                steering_feedforward_runtime.base_limited_output;
+            g_pid_debug_status.steering_feedforward_output =
+                steering_feedforward_runtime.output;
             g_pid_debug_status.yaw_pid_kp = position_pid2.kp();
             g_pid_debug_status.yaw_pid_ki = position_pid2.ki();
             g_pid_debug_status.yaw_pid_kd = position_pid2.kd();

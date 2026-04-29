@@ -1110,6 +1110,56 @@ static void send_tcp_status()
                     line_follow_pid_debug.position_feedforward_enabled);
         append_float(enabled, "pid_common_position_pid_max_integral", line_follow_pid_debug.position_pid_max_integral);
         append_float(enabled, "pid_common_position_pid_max_output", line_follow_pid_debug.position_pid_max_output);
+        append_bool(enabled, "pid_common_steering_feedforward_enabled",
+                    line_follow_pid_debug.steering_feedforward_enabled);
+        append_bool(enabled, "pid_common_steering_feedforward_preview_valid",
+                    line_follow_pid_debug.steering_feedforward_preview_valid);
+        append_int_array(enabled && line_follow_pid_debug.steering_feedforward_preview_valid,
+                         "pid_common_steering_feedforward_preview_point",
+                         {line_follow_pid_debug.steering_feedforward_preview_x,
+                          line_follow_pid_debug.steering_feedforward_preview_y});
+        append_float(enabled,
+                     "pid_common_steering_feedforward_preview_angle_deg",
+                     line_follow_pid_debug.steering_feedforward_preview_angle_deg);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_filtered_preview_angle_deg",
+                     line_follow_pid_debug.steering_feedforward_filtered_preview_angle_deg);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_preview_split_ratio",
+                     line_follow_pid_debug.steering_feedforward_preview_split_ratio);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_preview_exp_lambda",
+                     line_follow_pid_debug.steering_feedforward_preview_exp_lambda);
+        append_int(enabled,
+                   "pid_common_steering_feedforward_min_centerline_count",
+                   line_follow_pid_debug.steering_feedforward_min_centerline_count);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_deadzone_deg",
+                     line_follow_pid_debug.steering_feedforward_deadzone_deg);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_gain",
+                     line_follow_pid_debug.steering_feedforward_gain);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_max_output",
+                     line_follow_pid_debug.steering_feedforward_max_output);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_feedback_reserve_output",
+                     line_follow_pid_debug.steering_feedforward_feedback_reserve_output);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_centerline_confidence",
+                     line_follow_pid_debug.steering_feedforward_centerline_confidence);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_feedback_room_limit",
+                     line_follow_pid_debug.steering_feedforward_feedback_room_limit);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_raw_output",
+                     line_follow_pid_debug.steering_feedforward_raw_output);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_base_limited_output",
+                     line_follow_pid_debug.steering_feedforward_base_limited_output);
+        append_float(enabled,
+                     "pid_common_steering_feedforward_output",
+                     line_follow_pid_debug.steering_feedforward_output);
         append_float(enabled, "pid_common_yaw_pid_kp", line_follow_pid_debug.yaw_pid_kp);
         append_float(enabled, "pid_common_yaw_pid_ki", line_follow_pid_debug.yaw_pid_ki);
         append_float(enabled, "pid_common_yaw_pid_kd", line_follow_pid_debug.yaw_pid_kd);

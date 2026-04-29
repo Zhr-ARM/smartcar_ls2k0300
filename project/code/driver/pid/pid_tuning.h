@@ -115,6 +115,15 @@ struct Profile
     float position_feedforward_error_trend_gain;
     float position_feedforward_max_output;
     float steering_max_output;
+    bool steering_feedforward_enabled;
+    float steering_feedforward_preview_split_ratio;
+    float steering_feedforward_preview_exp_lambda;
+    int steering_feedforward_min_centerline_count;
+    float steering_feedforward_deadzone_deg;
+    float steering_feedforward_gain;
+    float steering_feedforward_max_output;
+    float steering_feedforward_filter_alpha;
+    float steering_feedforward_feedback_reserve_output;
 
     float yaw_rate_ref_from_error_gain_dps;
     float yaw_rate_ref_from_curvature_gain_dps;
@@ -152,6 +161,7 @@ bool is_dynamic_kp_range_valid(const Profile &profile);
 bool is_dynamic_position_kd_range_valid(const Profile &profile);
 bool is_position_kp_piecewise_range_valid(const Profile &profile);
 bool is_position_feedforward_range_valid(const Profile &profile);
+bool is_steering_feedforward_range_valid(const Profile &profile);
 bool is_line_error_prefix_exp_valid(const Profile &profile);
 bool is_speed_scheme_range_valid(const Profile &profile);
 

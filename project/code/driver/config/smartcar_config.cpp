@@ -716,6 +716,15 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".position_feedforward_error_trend_gain", &profile->position_feedforward_error_trend_gain, error_message) &&
            require_float(values, consumed, prefix + ".position_feedforward_max_output", &profile->position_feedforward_max_output, error_message) &&
            require_float(values, consumed, prefix + ".steering_max_output", &profile->steering_max_output, error_message) &&
+           require_bool(values, consumed, prefix + ".steering_feedforward_enabled", &profile->steering_feedforward_enabled, error_message) &&
+           require_float(values, consumed, prefix + ".steering_feedforward_preview_split_ratio", &profile->steering_feedforward_preview_split_ratio, error_message) &&
+           require_float(values, consumed, prefix + ".steering_feedforward_preview_exp_lambda", &profile->steering_feedforward_preview_exp_lambda, error_message) &&
+           require_int(values, consumed, prefix + ".steering_feedforward_min_centerline_count", &profile->steering_feedforward_min_centerline_count, error_message) &&
+           require_float(values, consumed, prefix + ".steering_feedforward_deadzone_deg", &profile->steering_feedforward_deadzone_deg, error_message) &&
+           require_float(values, consumed, prefix + ".steering_feedforward_gain", &profile->steering_feedforward_gain, error_message) &&
+           require_float(values, consumed, prefix + ".steering_feedforward_max_output", &profile->steering_feedforward_max_output, error_message) &&
+           require_float(values, consumed, prefix + ".steering_feedforward_filter_alpha", &profile->steering_feedforward_filter_alpha, error_message) &&
+           require_float(values, consumed, prefix + ".steering_feedforward_feedback_reserve_output", &profile->steering_feedforward_feedback_reserve_output, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_from_error_gain_dps", &profile->yaw_rate_ref_from_error_gain_dps, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_from_curvature_gain_dps", &profile->yaw_rate_ref_from_curvature_gain_dps, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_from_track_point_gain_dps", &profile->yaw_rate_ref_from_track_point_gain_dps, error_message) &&
@@ -1320,6 +1329,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
                pid_tuning::route_line_follow::is_dynamic_position_kd_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_feedforward_range_valid(profile) &&
+               pid_tuning::route_line_follow::is_steering_feedforward_range_valid(profile) &&
                pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile) &&
                pid_tuning::route_line_follow::is_speed_scheme_range_valid(profile);
     };
