@@ -21,7 +21,7 @@
 namespace
 {
 // 控制周期：1ms(1000Hz)。巡线环频率高于电机速度环(5ms)的整数倍，能持续给出平滑转向目标。
-constexpr int32 LINE_FOLLOW_PERIOD_MS = 20;
+constexpr int32 LINE_FOLLOW_PERIOD_MS = 10;
 // 调度优先级：巡线线程作为中高优先级实时任务执行。
 constexpr int32 LINE_FOLLOW_THREAD_PRIORITY = 8;
 constexpr int32 LINE_FOLLOW_MAIN_STATE_SWITCH_BEEP_MS = 200;
@@ -95,10 +95,6 @@ float g_position_ff_last_error_px = 0.0f;
 float g_position_ff_prev_error_px = 0.0f;
 bool g_has_position_ff_last_error = false;
 bool g_has_position_ff_prev_error = false;
-// 位置环用于动态Kd调度的误差变化率状态：只在拿到新视觉帧时推进一次。
-float g_position_error_rate_px_per_second = 0.0f;
-float g_last_position_control_error_px = 0.0f;
-bool g_has_last_position_control_error = false;
 // 最近一次已消费的 IMU / 视觉样本序号。
 uint32 g_last_imu_sample_seq = 0;
 uint32 g_last_vision_frame_seq = 0;
@@ -275,9 +271,6 @@ void reset_line_follow_runtime_state()
     g_position_ff_prev_error_px = 0.0f;
     g_has_position_ff_last_error = false;
     g_has_position_ff_prev_error = false;
-    g_position_error_rate_px_per_second = 0.0f;
-    g_last_position_control_error_px = 0.0f;
-    g_has_last_position_control_error = false;
     g_last_imu_sample_seq = 0;
     g_last_vision_frame_seq = 0;
     g_has_last_imu_update_time = false;
@@ -316,10 +309,9 @@ const char *route_main_state_name(int route_main_state)
     switch (route_main_state)
     {
         case VISION_ROUTE_MAIN_NORMAL:       return "NORMAL";
-        case VISION_ROUTE_MAIN_STRAIGHT:     return "STRAIGHT";
-        case VISION_ROUTE_MAIN_CIRCLE_LEFT:  return "CIRCLE_LEFT";
-        case VISION_ROUTE_MAIN_CIRCLE_RIGHT: return "CIRCLE_RIGHT";
-        case VISION_ROUTE_MAIN_CROSS:        return "CROSS";
+        case VISION_ROUTE_MAIN_CIRCLE:       return "CIRCLE";
+        case VISION_ROUTE_MAIN_STRAIGHT:     return "STRAIGHT_DISABLED";
+        case VISION_ROUTE_MAIN_CROSS:        return "CROSS_REPAIR";
         default:                             return "UNKNOWN_MAIN";
     }
 }
@@ -350,46 +342,14 @@ const char *route_sub_state_name(int route_sub_state)
 
 RouteProfileSelection select_route_profile_selection(int route_main_state, int route_sub_state)
 {
-    using pid_tuning::route_line_follow::kCircleEnterProfile;
-    using pid_tuning::route_line_follow::kCircleExitProfile;
-    using pid_tuning::route_line_follow::kCircleInsideProfile;
-    using pid_tuning::route_line_follow::kCrossProfile;
+    using pid_tuning::route_line_follow::kCircleProfile;
     using pid_tuning::route_line_follow::kNormalProfile;
-    using pid_tuning::route_line_follow::kStraightProfile;
 
     switch (route_main_state)
     {
-        case VISION_ROUTE_MAIN_STRAIGHT:
-            return {kStraightProfile, "STRAIGHT"};
-
-        case VISION_ROUTE_MAIN_CROSS:
-            return {kCrossProfile, "CROSS"};
-
-        case VISION_ROUTE_MAIN_CIRCLE_LEFT:
-        case VISION_ROUTE_MAIN_CIRCLE_RIGHT:
-            switch (route_sub_state)
-            {
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_1:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_1:
-                    return {kCircleEnterProfile, "CIRCLE_ENTER"};
-
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_2:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_3:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_4:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_2:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:
-                    return {kCircleInsideProfile, "CIRCLE_INSIDE"};
-
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_5:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_6:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_6:
-                    return {kCircleExitProfile, "CIRCLE_EXIT"};
-
-                default:
-                    return {kCircleEnterProfile, "CIRCLE_ENTER"};
-            }
+        case VISION_ROUTE_MAIN_CIRCLE:
+            (void)route_sub_state;
+            return {kCircleProfile, "CIRCLE"};
 
         default:
             return {kNormalProfile, "NORMAL"};
@@ -557,33 +517,6 @@ float compute_sample_dt_seconds(std::chrono::steady_clock::time_point now,
     last_time = now;
     has_last_time = true;
     return clamp_valid_dt_seconds(dt_seconds, fallback_dt_seconds, max_dt_seconds);
-}
-
-float update_position_error_rate_if_needed(bool vision_updated,
-                                           float control_error_px,
-                                           float fallback_dt_seconds)
-{
-    if (!vision_updated)
-    {
-        return g_position_error_rate_px_per_second;
-    }
-
-    const float safe_dt_seconds =
-        clamp_valid_dt_seconds(fallback_dt_seconds, VISION_NOMINAL_DT_SECONDS, VISION_MAX_DT_SECONDS);
-
-    if (!g_has_last_position_control_error)
-    {
-        g_position_error_rate_px_per_second = 0.0f;
-    }
-    else
-    {
-        g_position_error_rate_px_per_second =
-            (control_error_px - g_last_position_control_error_px) / safe_dt_seconds;
-    }
-
-    g_last_position_control_error_px = control_error_px;
-    g_has_last_position_control_error = true;
-    return g_position_error_rate_px_per_second;
 }
 
 float update_pid_output_state_if_needed(bool should_update,
@@ -836,13 +769,7 @@ bool update_friction_circle_gate_if_needed(bool vision_updated,
                                            float abs_filtered_error_px,
                                            float abs_yaw_rate_ref_dps)
 {
-    if (route_main_state == VISION_ROUTE_MAIN_STRAIGHT)
-    {
-        g_friction_circle_gate_enabled = false;
-        g_friction_circle_enter_count = 0;
-        g_friction_circle_exit_count = 0;
-        return false;
-    }
+    (void)route_main_state;
 
     if (!vision_updated)
     {
@@ -1094,15 +1021,6 @@ void line_follow_loop()
                                               route_profile.position_dynamic_kp_min,
                                               route_profile.position_dynamic_kp_max,
                                               error_state.control_error_px);
-        const float position_error_rate_px_per_second =
-            update_position_error_rate_if_needed(vision_updated,
-                                                 error_state.control_error_px,
-                                                 vision_frame_dt_seconds);
-        const float dynamic_position_kd = compute_linear_abs_gain(route_profile.position_kd,
-                                                                  route_profile.position_dynamic_kd_quad_a,
-                                                                  route_profile.position_dynamic_kd_min,
-                                                                  route_profile.position_dynamic_kd_max,
-                                                                  position_error_rate_px_per_second);
 
         // 第二条支路：角速度环 PID。
         // 当前固定采用“跟踪点夹角 -> 目标横摆角速度”的路线：
@@ -1127,7 +1045,7 @@ void line_follow_loop()
         const float applied_yaw_rate_kp = enable_yaw_rate_kp ? dynamic_yaw_rate_kp : 0.0f;
         configure_line_follow_controllers_for_profile(route_profile,
                                                       dynamic_kp,
-                                                      dynamic_position_kd,
+                                                      route_profile.position_kd,
                                                       applied_yaw_rate_kp);
 
         // ---------------- 并级控制核心 ----------------
@@ -1210,7 +1128,7 @@ void line_follow_loop()
             speed_target_valid &&
             (speed_scheme.friction_circle_n > 0.0f);
         const bool friction_circle_enabled =
-            (std::strcmp(route_selection.name, "CIRCLE_INSIDE") == 0) ?
+            (std::strcmp(route_selection.name, "CIRCLE") == 0) ?
                 true :
                 update_friction_circle_gate_if_needed(
                     vision_updated,

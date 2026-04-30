@@ -134,12 +134,6 @@ bool is_dynamic_kp_range_valid(const Profile &profile)
            (profile.yaw_rate_kp <= profile.yaw_rate_dynamic_kp_max);
 }
 
-bool is_dynamic_position_kd_range_valid(const Profile &profile)
-{
-    return (profile.position_dynamic_kd_min <= profile.position_kd) &&
-           (profile.position_kd <= profile.position_dynamic_kd_max);
-}
-
 bool is_position_kp_piecewise_range_valid(const Profile &profile)
 {
     return (profile.position_dynamic_kp_low_error_threshold_px >= 0.0f) &&
@@ -209,7 +203,7 @@ bool is_speed_scheme_range_valid(const Profile &profile)
 
 Profile kNormalProfile = {
     350.0f,
-    3.0f, 2.1f, 0.0f, 50.0f, 3.0f, 4.6f, 10.0f, 5.6f, 0.0f, 0.15f, 0.0f, 0.0f, 2.0f, 0.0f, 210.0f,
+    3.0f, 2.1f, 0.0f, 50.0f, 3.0f, 4.6f, 10.0f, 5.6f, 0.0f, 0.15f, 0.0f, 210.0f,
     false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
     210.0f,
     true, 0.40f, 1.0f, 18, 1.2f, 12.0f, 90.0f, 0.70f, 60.0f,
@@ -219,57 +213,9 @@ Profile kNormalProfile = {
     0.82f, 0.01f, 270.0f
 };
 
-Profile kStraightProfile = {
-    370.0f,
-    0.0f, 1.0f, 0.0f, 30.0f, 3.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f, 300.0f,
-    false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    600.0f,
-    true, 0.35f, 0.8f, 20, 1.0f, 9.0f, 70.0f, 0.75f, 70.0f,
-    0.0f, 0.0f, 4.0f, 360.0f, 0.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 160.0f,
-    0.6f, 2.303f,
-    1.609f, 136900.0f,
-    0.95f, 0.5f, 270.0f
-};
-
-Profile kCrossProfile = {
-    350.0f,
-    1.7f, 0.4f, 0.0f, 110.0f, 3.0f, 3.6f, 10.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 0.0f, 260.0f,
-    false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    360.0f,
-    false, 0.40f, 1.0f, 18, 1.2f, 0.0f, 0.0f, 0.70f, 60.0f,
-    0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 300.0f,
-    0.6f, 2.303f,
-    1.609f, 122500.0f,
-    0.82f, 0.01f, 270.0f
-};
-
-Profile kCircleEnterProfile = {
+Profile kCircleProfile = {
     320.0f,
-    1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 9.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 0.0f, 400.0f,
-    false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    720.0f,
-    false, 0.40f, 1.0f, 16, 1.2f, 0.0f, 0.0f, 0.70f, 80.0f,
-    0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 320.0f,
-    0.6f, 2.303f,
-    1.609f, 102400.0f,
-    0.75f, 0.01f, 270.0f
-};
-
-Profile kCircleInsideProfile = {
-    320.0f,
-    1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 9.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f, 400.0f,
-    false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-    660.0f,
-    false, 0.40f, 1.0f, 16, 1.2f, 0.0f, 0.0f, 0.70f, 80.0f,
-    0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
-    0.6f, 2.303f,
-    1.609f, 102400.0f,
-    0.82f, 0.01f, 270.0f
-};
-
-Profile kCircleExitProfile = {
-    320.0f,
-    1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 10.0f, 4.4f, 0.0f, 0.0f, 0.0f, 0.0f, 3.0f, 0.0f, 400.0f,
+    1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 9.0f, 4.4f, 0.0f, 0.0f, 0.0f, 400.0f,
     false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
     660.0f,
     false, 0.40f, 1.0f, 16, 1.2f, 0.0f, 0.0f, 0.70f, 80.0f,

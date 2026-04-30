@@ -93,11 +93,7 @@ struct PidSnapshot
 
     float route_global_base_speed_scale = 0.0f;
     pid_tuning::route_line_follow::Profile normal_profile{};
-    pid_tuning::route_line_follow::Profile straight_profile{};
-    pid_tuning::route_line_follow::Profile cross_profile{};
-    pid_tuning::route_line_follow::Profile circle_enter_profile{};
-    pid_tuning::route_line_follow::Profile circle_inside_profile{};
-    pid_tuning::route_line_follow::Profile circle_exit_profile{};
+    pid_tuning::route_line_follow::Profile circle_profile{};
 };
 
 struct ConfigSnapshot
@@ -704,9 +700,6 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".position_dynamic_kp_high_a", &profile->position_dynamic_kp_high_a, error_message) &&
            require_float(values, consumed, prefix + ".position_ki", &profile->position_ki, error_message) &&
            require_float(values, consumed, prefix + ".position_kd", &profile->position_kd, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kd_quad_a", &profile->position_dynamic_kd_quad_a, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kd_min", &profile->position_dynamic_kd_min, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kd_max", &profile->position_dynamic_kd_max, error_message) &&
            require_float(values, consumed, prefix + ".position_max_integral", &profile->position_max_integral, error_message) &&
            require_float(values, consumed, prefix + ".position_max_output", &profile->position_max_output, error_message) &&
            require_bool(values, consumed, prefix + ".position_feedforward_enabled", &profile->position_feedforward_enabled, error_message) &&
@@ -806,11 +799,7 @@ PidSnapshot capture_pid_snapshot()
 
     snapshot.route_global_base_speed_scale = pid_tuning::route_line_follow::kGlobalBaseSpeedScale;
     snapshot.normal_profile = pid_tuning::route_line_follow::kNormalProfile;
-    snapshot.straight_profile = pid_tuning::route_line_follow::kStraightProfile;
-    snapshot.cross_profile = pid_tuning::route_line_follow::kCrossProfile;
-    snapshot.circle_enter_profile = pid_tuning::route_line_follow::kCircleEnterProfile;
-    snapshot.circle_inside_profile = pid_tuning::route_line_follow::kCircleInsideProfile;
-    snapshot.circle_exit_profile = pid_tuning::route_line_follow::kCircleExitProfile;
+    snapshot.circle_profile = pid_tuning::route_line_follow::kCircleProfile;
     return snapshot;
 }
 
@@ -872,11 +861,7 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
 
     pid_tuning::route_line_follow::kGlobalBaseSpeedScale = snapshot.route_global_base_speed_scale;
     pid_tuning::route_line_follow::kNormalProfile = snapshot.normal_profile;
-    pid_tuning::route_line_follow::kStraightProfile = snapshot.straight_profile;
-    pid_tuning::route_line_follow::kCrossProfile = snapshot.cross_profile;
-    pid_tuning::route_line_follow::kCircleEnterProfile = snapshot.circle_enter_profile;
-    pid_tuning::route_line_follow::kCircleInsideProfile = snapshot.circle_inside_profile;
-    pid_tuning::route_line_follow::kCircleExitProfile = snapshot.circle_exit_profile;
+    pid_tuning::route_line_follow::kCircleProfile = snapshot.circle_profile;
 }
 
 ConfigSnapshot capture_config_snapshot()
@@ -1309,11 +1294,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
 #undef REQUIRE_PID_INT
 
     if (!load_route_profile(values, &consumed, "pid.route_line_follow.normal", &pid_tuning::route_line_follow::kNormalProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.straight", &pid_tuning::route_line_follow::kStraightProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.cross", &pid_tuning::route_line_follow::kCrossProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.circle_enter", &pid_tuning::route_line_follow::kCircleEnterProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.circle_inside", &pid_tuning::route_line_follow::kCircleInsideProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.circle_exit", &pid_tuning::route_line_follow::kCircleExitProfile, error_message))
+        !load_route_profile(values, &consumed, "pid.route_line_follow.circle", &pid_tuning::route_line_follow::kCircleProfile, error_message))
     {
         return false;
     }
@@ -1326,7 +1307,6 @@ bool load_from_path(const std::string &path, std::string *error_message)
 
     const auto route_valid = [](const pid_tuning::route_line_follow::Profile &profile) {
         return pid_tuning::route_line_follow::is_dynamic_kp_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_dynamic_position_kd_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_feedforward_range_valid(profile) &&
                pid_tuning::route_line_follow::is_steering_feedforward_range_valid(profile) &&
@@ -1334,11 +1314,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
                pid_tuning::route_line_follow::is_speed_scheme_range_valid(profile);
     };
     if (!route_valid(pid_tuning::route_line_follow::kNormalProfile) ||
-        !route_valid(pid_tuning::route_line_follow::kStraightProfile) ||
-        !route_valid(pid_tuning::route_line_follow::kCrossProfile) ||
-        !route_valid(pid_tuning::route_line_follow::kCircleEnterProfile) ||
-        !route_valid(pid_tuning::route_line_follow::kCircleInsideProfile) ||
-        !route_valid(pid_tuning::route_line_follow::kCircleExitProfile))
+        !route_valid(pid_tuning::route_line_follow::kCircleProfile))
     {
         *error_message = "pid.route_line_follow contains invalid profile";
         return false;

@@ -74,11 +74,7 @@ static constexpr int kInitialFrameWallKeepMaxYSpan = 15;
 static constexpr int kCrossLowerFitPointCount = 10;
 static constexpr int kCrossLowerFitMinPointCount = 2;
 static constexpr int kLineErrorProfileNormal = 0;
-static constexpr int kLineErrorProfileStraight = 1;
-static constexpr int kLineErrorProfileCross = 2;
-static constexpr int kLineErrorProfileCircleEnter = 3;
-static constexpr int kLineErrorProfileCircleInside = 4;
-static constexpr int kLineErrorProfileCircleExit = 5;
+static constexpr int kLineErrorProfileCircle = 1;
 static_assert(pid_tuning::line_error_preview::kWeightedPointCountMax ==
                   static_cast<size_t>(VISION_LINE_ERROR_MAX_WEIGHTED_POINTS),
               "line_error preview point count max must match vision config capacity");
@@ -319,6 +315,50 @@ static int g_last_applied_line_error_profile_id = -1;
 int line_error = 0;
 float line_sample_ratio = g_vision_processor_config.default_line_sample_ratio;
 
+static bool route_sub_state_is_left_circle(int sub_state)
+{
+    switch (sub_state)
+    {
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_1:
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_2:
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_3:
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_4:
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_5:
+        case VISION_ROUTE_SUB_CIRCLE_LEFT_6:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool route_sub_state_is_right_circle(int sub_state)
+{
+    switch (sub_state)
+    {
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_1:
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_2:
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:
+        case VISION_ROUTE_SUB_CIRCLE_RIGHT_6:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool route_snapshot_is_left_circle(const vision_route_state_snapshot_t &route_snapshot)
+{
+    return route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE &&
+           route_sub_state_is_left_circle(route_snapshot.sub_state);
+}
+
+static bool route_snapshot_is_right_circle(const vision_route_state_snapshot_t &route_snapshot)
+{
+    return route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE &&
+           route_sub_state_is_right_circle(route_snapshot.sub_state);
+}
+
 static const pid_tuning::route_line_follow::Profile *select_route_line_follow_profile_by_route(
     const vision_route_state_snapshot_t &route_snapshot,
     int *profile_id)
@@ -330,43 +370,9 @@ static const pid_tuning::route_line_follow::Profile *select_route_line_follow_pr
 
     switch (route_snapshot.main_state)
     {
-        case VISION_ROUTE_MAIN_STRAIGHT:
-            if (profile_id) *profile_id = kLineErrorProfileStraight;
-            return &pid_tuning::route_line_follow::kStraightProfile;
-
-        case VISION_ROUTE_MAIN_CROSS:
-            if (profile_id) *profile_id = kLineErrorProfileCross;
-            return &pid_tuning::route_line_follow::kCrossProfile;
-
-        case VISION_ROUTE_MAIN_CIRCLE_LEFT:
-        case VISION_ROUTE_MAIN_CIRCLE_RIGHT:
-            switch (route_snapshot.sub_state)
-            {
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_1:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_1:
-                    if (profile_id) *profile_id = kLineErrorProfileCircleEnter;
-                    return &pid_tuning::route_line_follow::kCircleEnterProfile;
-
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_2:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_3:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_4:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_2:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:
-                    if (profile_id) *profile_id = kLineErrorProfileCircleInside;
-                    return &pid_tuning::route_line_follow::kCircleInsideProfile;
-
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_5:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_6:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_6:
-                    if (profile_id) *profile_id = kLineErrorProfileCircleExit;
-                    return &pid_tuning::route_line_follow::kCircleExitProfile;
-
-                default:
-                    if (profile_id) *profile_id = kLineErrorProfileCircleEnter;
-                    return &pid_tuning::route_line_follow::kCircleEnterProfile;
-            }
+        case VISION_ROUTE_MAIN_CIRCLE:
+            if (profile_id) *profile_id = kLineErrorProfileCircle;
+            return &pid_tuning::route_line_follow::kCircleProfile;
 
         case VISION_ROUTE_MAIN_NORMAL:
         default:
@@ -2730,11 +2736,11 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                   0.0f,
                                                   track_width_px);
     const bool left_circle_offset_active =
-        (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE_LEFT) &&
+        (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE) &&
         (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_LEFT_4 ||
          route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_LEFT_5);
     const bool right_circle_offset_active =
-        (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE_RIGHT) &&
+        (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE) &&
         (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_4 ||
          route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_5);
     if (left_circle_offset_active)
@@ -4241,10 +4247,10 @@ bool vision_image_processor_process_step()
     int maze_start_row = std::clamp(g_maze_start_row.load(), 1, kProcHeight - 2);
     const vision_route_state_snapshot_t route_snapshot_before_trace = vision_route_state_machine_snapshot();
     const bool left_circle_stage6_active =
-        (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE_LEFT) &&
+        (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE) &&
         (route_snapshot_before_trace.sub_state == VISION_ROUTE_SUB_CIRCLE_LEFT_6);
     const bool right_circle_stage6_active =
-        (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE_RIGHT) &&
+        (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE) &&
         (route_snapshot_before_trace.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_6);
     const bool cross3_state_active_before_trace =
         (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CROSS) &&
@@ -4641,8 +4647,7 @@ bool vision_image_processor_process_step()
             (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CROSS);
         const bool cross1_state_active = cross1_state_active_before_trace;
         const bool circle_state_active_before_trace =
-            (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE_LEFT) ||
-            (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE_RIGHT);
+            (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE);
         const bool lower_corner_extrapolate_enabled =
             g_vision_runtime_config.cross_lower_corner_extrapolate_enabled &&
             !cross_state_active &&
@@ -5227,7 +5232,7 @@ bool vision_image_processor_process_step()
         }
     }
 
-    if (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE_LEFT)
+    if (route_snapshot_is_left_circle(route_snapshot))
     {
         if (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_LEFT_3)
         {
@@ -5323,7 +5328,7 @@ bool vision_image_processor_process_step()
             }
         }
     }
-    else if (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE_RIGHT)
+    else if (route_snapshot_is_right_circle(route_snapshot))
     {
         if (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_3)
         {
@@ -5423,8 +5428,7 @@ bool vision_image_processor_process_step()
     // Circle 送 IPM 前，执行“首次触边即截断”硬策略：
     // - 先删起始人工边框前缀；
     // - 再从第一处触碰人工边框的位置直接截断（不保留触边点）。
-    if (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE_LEFT ||
-        route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE_RIGHT)
+    if (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE)
     {
         trim_initial_artificial_frame_prefix_inplace(left_pts.data(),
                                                      nullptr,

@@ -169,7 +169,7 @@ route_circle_stage3_frame_wall_rows_trigger = 70
 # 圆环状态 6 抬高迷宫法搜线起始行的上限（行号越小越靠上）。
 route_circle_stage6_maze_start_row = 80
 # 圆环状态 circle4/5 的目标中线相对左边界偏移。
-route_circle_center_target_offset_from_left_px = 14.0
+route_circle_center_target_offset_from_left_px = 15.0
 # 圆环补线中贴边连续段的最小长度阈值。
 circle_guide_min_frame_wall_segment_len = 8
 # 圆环 state3 补线目标点向后偏移的索引数。
@@ -462,7 +462,7 @@ right_duty_percent = 0.0
 # 视觉曲率滤波 alpha。
 visual_curvature_filter_alpha = 0.25
 # 跟踪点夹角滤波 alpha。
-track_point_angle_filter_alpha = 0.6
+track_point_angle_filter_alpha = 0.75
 
 [pid.line_follow]
 # 视觉误差滤波 alpha。
@@ -501,11 +501,11 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 400.0
+base_speed = 440.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # NORMAL 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 6.0
+position_dynamic_kp_base = 4.5
 # NORMAL 档位置环动态 Kp 下限。
 position_dynamic_kp_min = 0.0
 # NORMAL 档位置环动态 Kp 上限。
@@ -513,27 +513,21 @@ position_dynamic_kp_max = 70.0
 # NORMAL 档位置环动态 Kp 低误差段结束阈值。
 position_dynamic_kp_low_error_threshold_px = 5.0
 # NORMAL 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 1.0
+position_dynamic_kp_mid_a = 0.0
 # NORMAL 档位置环动态 Kp 中误差段结束阈值。
 position_dynamic_kp_mid_error_threshold_px = 15.0
 # NORMAL 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 2.2
+position_dynamic_kp_high_a = 0.0
 # NORMAL 档位置环 Ki。
 position_ki = 0.0
 # NORMAL 档位置环 Kd 基础值。
-position_kd = 0.02
-# NORMAL 档位置环动态 Kd 一次项系数。
-position_dynamic_kd_quad_a = 0.0
-# NORMAL 档位置环动态 Kd 下限。
-position_dynamic_kd_min = 0.0
-# NORMAL 档位置环动态 Kd 上限。
-position_dynamic_kd_max = 2.0
+position_kd = 0.4
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
-position_max_output = 260.0
+position_max_output = 3500.0
 # NORMAL 档位置环前馈开关（基于历史误差一阶/二阶差分）。
-position_feedforward_enabled = true
+position_feedforward_enabled = false
 # NORMAL 档位置环前馈一阶差分增益。
 position_feedforward_first_diff_gain = 4.0
 # NORMAL 档位置环前馈二阶差分增益。
@@ -543,9 +537,9 @@ position_feedforward_speed_gain = 0.0
 # NORMAL 档位置环前馈误差趋势增益（误差发散时加大前馈）。
 position_feedforward_error_trend_gain = 0.0
 # NORMAL 档位置环前馈输出限幅。
-position_feedforward_max_output = 200.0
+position_feedforward_max_output = 0.0
 # NORMAL 档总转向输出限幅。
-steering_max_output = 280.0
+steering_max_output = 360.0
 # NORMAL 档视觉转向前馈开关。
 steering_feedforward_enabled = true
 # NORMAL 档视觉转向前馈预瞄后段起始比例（0,1](越小看的越远）。
@@ -555,13 +549,13 @@ steering_feedforward_preview_exp_lambda = 1.0
 # NORMAL 档视觉转向前馈达到满置信度所需的最小中线点数。
 steering_feedforward_min_centerline_count = 9
 # NORMAL 档视觉转向前馈角度死区（度）。
-steering_feedforward_deadzone_deg = 1.2
+steering_feedforward_deadzone_deg = 1.8
 # NORMAL 档视觉转向前馈增益（度 -> 差速）。
-steering_feedforward_gain = 40.0
+steering_feedforward_gain = 30.0
 # NORMAL 档视觉转向前馈单独输出限幅。
-steering_feedforward_max_output = 140.0
+steering_feedforward_max_output = 100.0
 # NORMAL 档视觉转向前馈角度滤波 alpha。
-steering_feedforward_filter_alpha = 0.5
+steering_feedforward_filter_alpha = 0.75
 # NORMAL 档视觉转向前馈给反馈环预留的输出余量。
 steering_feedforward_feedback_reserve_output = 100.0
 # NORMAL 档由横向误差生成目标横摆角速度的增益。
@@ -589,7 +583,7 @@ yaw_rate_kd = 0.02
 # NORMAL 档角速度环积分限幅。
 yaw_rate_max_integral = 0.0
 # NORMAL 档角速度环输出限幅。
-yaw_rate_max_output =100.0
+yaw_rate_max_output =3000.0
 # NORMAL 档 line_error 前缀比例（0,1]。
 line_error_prefix_ratio = 0.4
 # NORMAL 档 line_error 指数权重参数 lambda（>=0） 越大越偏向近端点。。
@@ -603,318 +597,100 @@ speed_scheme_max_drop_ratio_per_cycle = 0.95
 # 速度方案单周期最大升速比例。
 speed_scheme_max_rise_ratio_per_cycle = 0.01
 # 速度方案基础速度下限（摩擦圆决策后再次下限裁剪）。
-speed_scheme_min_base_speed = 400.0
+speed_scheme_min_base_speed = 440.0
 
-[pid.route_line_follow.straight]
-# STRAIGHT 档基础速度。
-base_speed = 370.0
-# STRAIGHT 档位置环动态 Kp 低误差段一次项系数。
+[pid.route_line_follow.circle]
+# CIRCLE 档基础速度。
+base_speed = 400.0
+# CIRCLE 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
-# STRAIGHT 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 1.0
-# STRAIGHT 档位置环动态 Kp 下限。
+# CIRCLE 档位置环动态 Kp 基础值。
+position_dynamic_kp_base = 10.0
+# CIRCLE 档位置环动态 Kp 下限。
 position_dynamic_kp_min = 0.0
-# STRAIGHT 档位置环动态 Kp 上限。
-position_dynamic_kp_max = 30.0
-# STRAIGHT 档位置环动态 Kp 低误差段结束阈值。
-position_dynamic_kp_low_error_threshold_px = 3.0
-# STRAIGHT 档位置环动态 Kp 中误差段一次项系数。
+# CIRCLE 档位置环动态 Kp 上限。
+position_dynamic_kp_max = 70.0
+# CIRCLE 档位置环动态 Kp 低误差段结束阈值。
+position_dynamic_kp_low_error_threshold_px = 5.0
+# CIRCLE 档位置环动态 Kp 中误差段一次项系数。
 position_dynamic_kp_mid_a = 0.0
-# STRAIGHT 档位置环动态 Kp 中误差段结束阈值。
-position_dynamic_kp_mid_error_threshold_px = 10.0
-# STRAIGHT 档位置环动态 Kp 高误差段一次项系数。
+# CIRCLE 档位置环动态 Kp 中误差段结束阈值。
+position_dynamic_kp_mid_error_threshold_px = 15.0
+# CIRCLE 档位置环动态 Kp 高误差段一次项系数。
 position_dynamic_kp_high_a = 0.0
-# STRAIGHT 档位置环 Ki。
+# CIRCLE 档位置环 Ki。
 position_ki = 0.0
-# STRAIGHT 档位置环 Kd。
-position_kd = 0.0
-# STRAIGHT 档位置环动态 Kd 一次项系数。
-position_dynamic_kd_quad_a = 0.0
-# STRAIGHT 档位置环动态 Kd 下限。
-position_dynamic_kd_min = 0.0
-# STRAIGHT 档位置环动态 Kd 上限。
-position_dynamic_kd_max = 2.0
-# STRAIGHT 档位置环积分限幅。
+# CIRCLE 档位置环 Kd。
+position_kd = 0.00
+# CIRCLE 档位置环积分限幅。
 position_max_integral = 0.0
-# STRAIGHT 档位置环输出限幅。
-position_max_output = 270.0
-# STRAIGHT 档位置环前馈开关（基于历史误差一阶/二阶差分）。
+# CIRCLE 档位置环输出限幅。
+position_max_output = 2600.0
+# CIRCLE 档位置环前馈开关（基于历史误差一阶/二阶差分）。
 position_feedforward_enabled = false
-# STRAIGHT 档位置环前馈一阶差分增益。
+# CIRCLE 档位置环前馈一阶差分增益。
 position_feedforward_first_diff_gain = 0.0
-# STRAIGHT 档位置环前馈二阶差分增益。
+# CIRCLE 档位置环前馈二阶差分增益。
 position_feedforward_second_diff_gain = 0.0
-# STRAIGHT 档位置环前馈速度相关增益（按实时速度归一化放大）。
+# CIRCLE 档位置环前馈速度相关增益（按实时速度归一化放大）。
 position_feedforward_speed_gain = 0.0
-# STRAIGHT 档位置环前馈误差趋势增益（误差发散时加大前馈）。
+# CIRCLE 档位置环前馈误差趋势增益（误差发散时加大前馈）。
 position_feedforward_error_trend_gain = 0.0
-# STRAIGHT 档位置环前馈输出限幅。
+# CIRCLE 档位置环前馈输出限幅。
 position_feedforward_max_output = 0.0
-# STRAIGHT 档总转向输出限幅。
-steering_max_output = 270.0
-# STRAIGHT 档视觉转向前馈开关。
-steering_feedforward_enabled = true
-# STRAIGHT 档视觉转向前馈预瞄后段起始比例（0,1]。
-steering_feedforward_preview_split_ratio = 0.35
-# STRAIGHT 档视觉转向前馈后段指数权重参数 lambda（>=0）。
-steering_feedforward_preview_exp_lambda = 0.8
-# STRAIGHT 档视觉转向前馈达到满置信度所需的最小中线点数。
-steering_feedforward_min_centerline_count = 20
-# STRAIGHT 档视觉转向前馈角度死区（度）。
-steering_feedforward_deadzone_deg = 1.0
-# STRAIGHT 档视觉转向前馈增益（度 -> 差速）。
-steering_feedforward_gain = 9.0
-# STRAIGHT 档视觉转向前馈单独输出限幅。
-steering_feedforward_max_output = 70.0
-# STRAIGHT 档视觉转向前馈角度滤波 alpha。
-steering_feedforward_filter_alpha = 0.75
-# STRAIGHT 档视觉转向前馈给反馈环预留的输出余量。
-steering_feedforward_feedback_reserve_output = 70.0
-# STRAIGHT 档由横向误差生成目标横摆角速度的增益。
-yaw_rate_ref_from_error_gain_dps = 0.0
-# STRAIGHT 档由曲率生成目标横摆角速度的增益。
-yaw_rate_ref_from_curvature_gain_dps = 0.0
-# STRAIGHT 档由跟踪点夹角生成目标横摆角速度的增益。
-yaw_rate_ref_from_track_point_gain_dps = 4.0
-# STRAIGHT 档目标横摆角速度限幅。
-yaw_rate_ref_limit_dps = 360.0
-# STRAIGHT 档角速度环 Kp。
-yaw_rate_kp = 0.0
-# STRAIGHT 档角速度环动态 Kp 一次项系数。
-yaw_rate_dynamic_kp_quad_a = 0.0
-# STRAIGHT 档角速度环动态 Kp 下限。
-yaw_rate_dynamic_kp_min = 0.0
-# STRAIGHT 档角速度环动态 Kp 上限。
-yaw_rate_dynamic_kp_max = 10.0
-# STRAIGHT 档角速度环启用阈值。
-yaw_rate_kp_enable_error_threshold_px = 0.0
-# STRAIGHT 档角速度环 Ki。
-yaw_rate_ki = 0.0
-# STRAIGHT 档角速度环 Kd。
-yaw_rate_kd = 0.0
-# STRAIGHT 档角速度环积分限幅。
-yaw_rate_max_integral = 0.0
-# STRAIGHT 档角速度环输出限幅。
-yaw_rate_max_output = 160.0
-# STRAIGHT 档 line_error 前缀比例（0,1]。
-line_error_prefix_ratio = 0.6
-# STRAIGHT 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# 状态速度方案后段指数权重参数 lambda（>=0）。
-speed_scheme_rear_exp_lambda = 1
-# STRAIGHT 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
-speed_scheme_friction_circle_n = 160000.0
-# 速度方案单周期最大降速比例。
-speed_scheme_max_drop_ratio_per_cycle = 0.95
-# 速度方案单周期最大升速比例。
-speed_scheme_max_rise_ratio_per_cycle = 0.01
-# 速度方案基础速度下限（摩擦圆决策后再次下限裁剪）。
-speed_scheme_min_base_speed = 270.0
-
-[pid.route_line_follow.cross]
-# CROSS 档基础速度。
-base_speed = 400.0
-# CROSS 档位置环动态 Kp 低误差段一次项系数。
-position_dynamic_kp_quad_a = 0
-# CROSS 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 4.0
-# CROSS 档位置环动态 Kp 下限。
-position_dynamic_kp_min = 0.0
-# CROSS 档位置环动态 Kp 上限。
-position_dynamic_kp_max = 70.0
-# CROSS 档位置环动态 Kp 低误差段结束阈值。
-position_dynamic_kp_low_error_threshold_px = 5.0
-# CROSS 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 0.4
-# CROSS 档位置环动态 Kp 中误差段结束阈值。
-position_dynamic_kp_mid_error_threshold_px = 15.0
-# CROSS 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 0.8
-# CROSS 档位置环 Ki。
-position_ki = 0.0
-# CROSS 档位置环 Kd。
-position_kd = 0.02
-# CROSS 档位置环动态 Kd 一次项系数。
-position_dynamic_kd_quad_a = 0.0
-# CROSS 档位置环动态 Kd 下限。
-position_dynamic_kd_min = 0.0
-# CROSS 档位置环动态 Kd 上限。
-position_dynamic_kd_max = 2.0
-# CROSS 档位置环积分限幅。
-position_max_integral = 0.0
-# CROSS 档位置环输出限幅。
-position_max_output = 220.0
-# CROSS 档位置环前馈开关（基于历史误差一阶/二阶差分）。
-position_feedforward_enabled = false
-# CROSS 档位置环前馈一阶差分增益。
-position_feedforward_first_diff_gain = 0.0
-# CROSS 档位置环前馈二阶差分增益。
-position_feedforward_second_diff_gain = 0.0
-# CROSS 档位置环前馈速度相关增益（按实时速度归一化放大）。
-position_feedforward_speed_gain = 0.0
-# CROSS 档位置环前馈误差趋势增益（误差发散时加大前馈）。
-position_feedforward_error_trend_gain = 0.0
-# CROSS 档位置环前馈输出限幅。
-position_feedforward_max_output = 0.0
-# CROSS 档总转向输出限幅。
-steering_max_output = 240.0
-# CROSS 档视觉转向前馈开关。
+# CIRCLE 档总转向输出限幅。
+steering_max_output = 400.0
+# CIRCLE 档视觉转向前馈开关。
 steering_feedforward_enabled = false
-# CROSS 档视觉转向前馈预瞄后段起始比例（0,1]。
+# CIRCLE 档视觉转向前馈预瞄后段起始比例（0,1]。
 steering_feedforward_preview_split_ratio = 0.4
-# CROSS 档视觉转向前馈后段指数权重参数 lambda（>=0）。
+# CIRCLE 档视觉转向前馈后段指数权重参数 lambda（>=0）。
 steering_feedforward_preview_exp_lambda = 1.0
-# CROSS 档视觉转向前馈达到满置信度所需的最小中线点数。
-steering_feedforward_min_centerline_count = 18
-# CROSS 档视觉转向前馈角度死区（度）。
-steering_feedforward_deadzone_deg = 1.2
-# CROSS 档视觉转向前馈增益（度 -> 差速）。
-steering_feedforward_gain = 0.0
-# CROSS 档视觉转向前馈单独输出限幅。
-steering_feedforward_max_output = 0.0
-# CROSS 档视觉转向前馈角度滤波 alpha。
-steering_feedforward_filter_alpha = 0.7
-# CROSS 档视觉转向前馈给反馈环预留的输出余量。
-steering_feedforward_feedback_reserve_output = 60.0
-# CROSS 档由横向误差生成目标横摆角速度的增益。
-yaw_rate_ref_from_error_gain_dps = 0.0
-# CROSS 档由曲率生成目标横摆角速度的增益。
-yaw_rate_ref_from_curvature_gain_dps = 0.0
-# CROSS 档由跟踪点夹角生成目标横摆角速度的增益。
-yaw_rate_ref_from_track_point_gain_dps = 7.0
-# CROSS 档目标横摆角速度限幅。
-yaw_rate_ref_limit_dps = 360.0
-# CROSS 档角速度环 Kp。
-yaw_rate_kp = 2.0
-# CROSS 档角速度环动态 Kp 一次项系数。
-yaw_rate_dynamic_kp_quad_a = 0.0
-# CROSS 档角速度环动态 Kp 下限。
-yaw_rate_dynamic_kp_min = 0.0
-# CROSS 档角速度环动态 Kp 上限。
-yaw_rate_dynamic_kp_max = 10.0
-# CROSS 档角速度环启用阈值。
-yaw_rate_kp_enable_error_threshold_px = 0.0
-# CROSS 档角速度环 Ki。
-yaw_rate_ki = 0.0
-# CROSS 档角速度环 Kd。
-yaw_rate_kd = 0.02
-# CROSS 档角速度环积分限幅。
-yaw_rate_max_integral = 0.0
-# CROSS 档角速度环输出限幅。
-yaw_rate_max_output = 150.0
-# CROSS 档 line_error 前缀比例（0,1]。
-line_error_prefix_ratio = 0.4
-# CROSS 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# 状态速度方案后段指数权重参数 lambda（>=0）。
-speed_scheme_rear_exp_lambda = 1
-# CROSS 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
-speed_scheme_friction_circle_n = 100000.0
-# 速度方案单周期最大降速比例。
-speed_scheme_max_drop_ratio_per_cycle = 0.95
-# 速度方案单周期最大升速比例。
-speed_scheme_max_rise_ratio_per_cycle = 0.01
-# 速度方案基础速度下限（摩擦圆决策后再次下限裁剪）。
-speed_scheme_min_base_speed = 380.0
-
-[pid.route_line_follow.circle_enter]
-# CIRCLE_ENTER 档基础速度。
-base_speed = 400.0
-# CIRCLE_ENTER 档位置环动态 Kp 低误差段一次项系数。
-position_dynamic_kp_quad_a = 0
-# CIRCLE_ENTER 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 5.5
-# CIRCLE_ENTER 档位置环动态 Kp 下限。
-position_dynamic_kp_min = 0.0
-# CIRCLE_ENTER 档位置环动态 Kp 上限。
-position_dynamic_kp_max = 70.0
-# CIRCLE_ENTER 档位置环动态 Kp 低误差段结束阈值。
-position_dynamic_kp_low_error_threshold_px = 5.0
-# CIRCLE_ENTER 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 1.3
-# CIRCLE_ENTER 档位置环动态 Kp 中误差段结束阈值。
-position_dynamic_kp_mid_error_threshold_px = 12.0
-# CIRCLE_ENTER 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 2.3
-# CIRCLE_ENTER 档位置环 Ki。
-position_ki = 0.0
-# CIRCLE_ENTER 档位置环 Kd。
-position_kd = 0.02
-# CIRCLE_ENTER 档位置环动态 Kd 一次项系数。
-position_dynamic_kd_quad_a = 0.0
-# CIRCLE_ENTER 档位置环动态 Kd 下限。
-position_dynamic_kd_min = 0.0
-# CIRCLE_ENTER 档位置环动态 Kd 上限。
-position_dynamic_kd_max = 2.0
-# CIRCLE_ENTER 档位置环积分限幅。
-position_max_integral = 0.0
-# CIRCLE_ENTER 档位置环输出限幅。
-position_max_output = 260.0
-# CIRCLE_ENTER 档位置环前馈开关（基于历史误差一阶/二阶差分）。
-position_feedforward_enabled = false
-# CIRCLE_ENTER 档位置环前馈一阶差分增益。
-position_feedforward_first_diff_gain = 0.0
-# CIRCLE_ENTER 档位置环前馈二阶差分增益。
-position_feedforward_second_diff_gain = 0.0
-# CIRCLE_ENTER 档位置环前馈速度相关增益（按实时速度归一化放大）。
-position_feedforward_speed_gain = 0.0
-# CIRCLE_ENTER 档位置环前馈误差趋势增益（误差发散时加大前馈）。
-position_feedforward_error_trend_gain = 0.0
-# CIRCLE_ENTER 档位置环前馈输出限幅。
-position_feedforward_max_output = 0.0
-# CIRCLE_ENTER 档总转向输出限幅。
-steering_max_output = 280.0
-# CIRCLE_ENTER 档视觉转向前馈开关。
-steering_feedforward_enabled = false
-# CIRCLE_ENTER 档视觉转向前馈预瞄后段起始比例（0,1]。
-steering_feedforward_preview_split_ratio = 0.4
-# CIRCLE_ENTER 档视觉转向前馈后段指数权重参数 lambda（>=0）。
-steering_feedforward_preview_exp_lambda = 1.0
-# CIRCLE_ENTER 档视觉转向前馈达到满置信度所需的最小中线点数。
+# CIRCLE 档视觉转向前馈达到满置信度所需的最小中线点数。
 steering_feedforward_min_centerline_count = 16
-# CIRCLE_ENTER 档视觉转向前馈角度死区（度）。
+# CIRCLE 档视觉转向前馈角度死区（度）。
 steering_feedforward_deadzone_deg = 1.2
-# CIRCLE_ENTER 档视觉转向前馈增益（度 -> 差速）。
+# CIRCLE 档视觉转向前馈增益（度 -> 差速）。
 steering_feedforward_gain = 0.0
-# CIRCLE_ENTER 档视觉转向前馈单独输出限幅。
+# CIRCLE 档视觉转向前馈单独输出限幅。
 steering_feedforward_max_output = 0.0
-# CIRCLE_ENTER 档视觉转向前馈角度滤波 alpha。
+# CIRCLE 档视觉转向前馈角度滤波 alpha。
 steering_feedforward_filter_alpha = 0.7
-# CIRCLE_ENTER 档视觉转向前馈给反馈环预留的输出余量。
+# CIRCLE 档视觉转向前馈给反馈环预留的输出余量。
 steering_feedforward_feedback_reserve_output = 80.0
-# CIRCLE_ENTER 档由横向误差生成目标横摆角速度的增益。
+# CIRCLE 档由横向误差生成目标横摆角速度的增益。
 yaw_rate_ref_from_error_gain_dps = 0.0
-# CIRCLE_ENTER 档由曲率生成目标横摆角速度的增益。
+# CIRCLE 档由曲率生成目标横摆角速度的增益。
 yaw_rate_ref_from_curvature_gain_dps = 0.0
-# CIRCLE_ENTER 档由跟踪点夹角生成目标横摆角速度的增益。
+# CIRCLE 档由跟踪点夹角生成目标横摆角速度的增益。
 yaw_rate_ref_from_track_point_gain_dps = 7.0
-# CIRCLE_ENTER 档目标横摆角速度限幅。
+# CIRCLE 档目标横摆角速度限幅。
 yaw_rate_ref_limit_dps = 360.0
-# CIRCLE_ENTER 档角速度环 Kp。
-yaw_rate_kp = 1.8
-# CIRCLE_ENTER 档角速度环动态 Kp 一次项系数。
+# CIRCLE 档角速度环 Kp。
+yaw_rate_kp = 2.2
+# CIRCLE 档角速度环动态 Kp 一次项系数。
 yaw_rate_dynamic_kp_quad_a = 0.0
-# CIRCLE_ENTER 档角速度环动态 Kp 下限。
+# CIRCLE 档角速度环动态 Kp 下限。
 yaw_rate_dynamic_kp_min = 0.0
-# CIRCLE_ENTER 档角速度环动态 Kp 上限。
+# CIRCLE 档角速度环动态 Kp 上限。
 yaw_rate_dynamic_kp_max = 10.0
-# CIRCLE_ENTER 档角速度环启用阈值。
+# CIRCLE 档角速度环启用阈值。
 yaw_rate_kp_enable_error_threshold_px = 0.0
-# CIRCLE_ENTER 档角速度环 Ki。
+# CIRCLE 档角速度环 Ki。
 yaw_rate_ki = 0.0
-# CIRCLE_ENTER 档角速度环 Kd。
+# CIRCLE 档角速度环 Kd。
 yaw_rate_kd = 0.02
-# CIRCLE_ENTER 档角速度环积分限幅。
+# CIRCLE 档角速度环积分限幅。
 yaw_rate_max_integral = 0.0
-# CIRCLE_ENTER 档角速度环输出限幅。
-yaw_rate_max_output = 200.0
-# CIRCLE_ENTER 档 line_error 前缀比例（0,1]。
+# CIRCLE 档角速度环输出限幅。
+yaw_rate_max_output = 2000.0
+# CIRCLE 档 line_error 前缀比例（0,1）。
 line_error_prefix_ratio = 0.4
-# CIRCLE_ENTER 档 line_error 指数权重参数 lambda（>=0）。
+# CIRCLE 档 line_error 指数权重参数 lambda（>=0）。
 line_error_exp_lambda = 1
 # 状态速度方案后段指数权重参数 lambda（>=0）。
 speed_scheme_rear_exp_lambda = 1
-# CIRCLE_ENTER 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
+# CIRCLE 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
 speed_scheme_friction_circle_n = 100000.0
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95
@@ -923,214 +699,3 @@ speed_scheme_max_rise_ratio_per_cycle = 0.01
 # 速度方案基础速度下限（摩擦圆决策后再次下限裁剪）。
 speed_scheme_min_base_speed = 400.0
 
-[pid.route_line_follow.circle_inside]
-# CIRCLE_INSIDE 档基础速度。
-base_speed = 400.0
-# CIRCLE_INSIDE 档位置环动态 Kp 低误差段一次项系数。
-position_dynamic_kp_quad_a = 0
-# CIRCLE_INSIDE 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 5.0
-# CIRCLE_INSIDE 档位置环动态 Kp 下限。
-position_dynamic_kp_min = 0.0
-# CIRCLE_INSIDE 档位置环动态 Kp 上限。
-position_dynamic_kp_max = 70.0
-# CIRCLE_INSIDE 档位置环动态 Kp 低误差段结束阈值。
-position_dynamic_kp_low_error_threshold_px = 5.0
-# CIRCLE_INSIDE 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 1.3
-# CIRCLE_INSIDE 档位置环动态 Kp 中误差段结束阈值。
-position_dynamic_kp_mid_error_threshold_px = 15.0
-# CIRCLE_INSIDE 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 2.3
-# CIRCLE_INSIDE 档位置环 Ki。
-position_ki = 0.0
-# CIRCLE_INSIDE 档位置环 Kd。
-position_kd = 0.02
-# CIRCLE_INSIDE 档位置环动态 Kd 一次项系数。
-position_dynamic_kd_quad_a = 0.0
-# CIRCLE_INSIDE 档位置环动态 Kd 下限。
-position_dynamic_kd_min = 0.0
-# CIRCLE_INSIDE 档位置环动态 Kd 上限。
-position_dynamic_kd_max = 2.0
-# CIRCLE_INSIDE 档位置环积分限幅。
-position_max_integral = 0.0
-# CIRCLE_INSIDE 档位置环输出限幅。
-position_max_output = 260.0
-# CIRCLE_INSIDE 档位置环前馈开关（基于历史误差一阶/二阶差分）。
-position_feedforward_enabled = false
-# CIRCLE_INSIDE 档位置环前馈一阶差分增益。
-position_feedforward_first_diff_gain = 0.0
-# CIRCLE_INSIDE 档位置环前馈二阶差分增益。
-position_feedforward_second_diff_gain = 0.0
-# CIRCLE_INSIDE 档位置环前馈速度相关增益（按实时速度归一化放大）。
-position_feedforward_speed_gain = 0.0
-# CIRCLE_INSIDE 档位置环前馈误差趋势增益（误差发散时加大前馈）。
-position_feedforward_error_trend_gain = 0.0
-# CIRCLE_INSIDE 档位置环前馈输出限幅。
-position_feedforward_max_output = 0.0
-# CIRCLE_INSIDE 档总转向输出限幅。
-steering_max_output = 280.0
-# CIRCLE_INSIDE 档视觉转向前馈开关。
-steering_feedforward_enabled = false
-# CIRCLE_INSIDE 档视觉转向前馈预瞄后段起始比例（0,1]。
-steering_feedforward_preview_split_ratio = 0.4
-# CIRCLE_INSIDE 档视觉转向前馈后段指数权重参数 lambda（>=0）。
-steering_feedforward_preview_exp_lambda = 1.0
-# CIRCLE_INSIDE 档视觉转向前馈达到满置信度所需的最小中线点数。
-steering_feedforward_min_centerline_count = 16
-# CIRCLE_INSIDE 档视觉转向前馈角度死区（度）。
-steering_feedforward_deadzone_deg = 1.2
-# CIRCLE_INSIDE 档视觉转向前馈增益（度 -> 差速）。
-steering_feedforward_gain = 0.0
-# CIRCLE_INSIDE 档视觉转向前馈单独输出限幅。
-steering_feedforward_max_output = 0.0
-# CIRCLE_INSIDE 档视觉转向前馈角度滤波 alpha。
-steering_feedforward_filter_alpha = 0.7
-# CIRCLE_INSIDE 档视觉转向前馈给反馈环预留的输出余量。
-steering_feedforward_feedback_reserve_output = 80.0
-# CIRCLE_INSIDE 档由横向误差生成目标横摆角速度的增益。
-yaw_rate_ref_from_error_gain_dps = 0.0
-# CIRCLE_INSIDE 档由曲率生成目标横摆角速度的增益。
-yaw_rate_ref_from_curvature_gain_dps = 0.0
-# CIRCLE_INSIDE 档由跟踪点夹角生成目标横摆角速度的增益。
-yaw_rate_ref_from_track_point_gain_dps = 7.0
-# CIRCLE_INSIDE 档目标横摆角速度限幅。
-yaw_rate_ref_limit_dps = 360.0
-# CIRCLE_INSIDE 档角速度环 Kp。
-yaw_rate_kp = 1.8
-# CIRCLE_INSIDE 档角速度环动态 Kp 一次项系数。
-yaw_rate_dynamic_kp_quad_a = 0.0
-# CIRCLE_INSIDE 档角速度环动态 Kp 下限。
-yaw_rate_dynamic_kp_min = 0.0
-# CIRCLE_INSIDE 档角速度环动态 Kp 上限。
-yaw_rate_dynamic_kp_max = 10.0
-# CIRCLE_INSIDE 档角速度环启用阈值。
-yaw_rate_kp_enable_error_threshold_px = 0.0
-# CIRCLE_INSIDE 档角速度环 Ki。
-yaw_rate_ki = 0.0
-# CIRCLE_INSIDE 档角速度环 Kd。
-yaw_rate_kd = 0.02
-# CIRCLE_INSIDE 档角速度环积分限幅。
-yaw_rate_max_integral = 0.0
-# CIRCLE_INSIDE 档角速度环输出限幅。
-yaw_rate_max_output = 200.0
-# CIRCLE_INSIDE 档 line_error 前缀比例（0,1）。
-line_error_prefix_ratio = 0.4
-# CIRCLE_INSIDE 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# 状态速度方案后段指数权重参数 lambda（>=0）。
-speed_scheme_rear_exp_lambda = 1
-# CIRCLE_INSIDE 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
-speed_scheme_friction_circle_n = 100000.0
-# 速度方案单周期最大降速比例。
-speed_scheme_max_drop_ratio_per_cycle = 0.95
-# 速度方案单周期最大升速比例。
-speed_scheme_max_rise_ratio_per_cycle = 0.01
-# 速度方案基础速度下限（摩擦圆决策后再次下限裁剪）。
-speed_scheme_min_base_speed = 400.0
-
-[pid.route_line_follow.circle_exit]
-# CIRCLE_EXIT 档基础速度。
-base_speed = 400.0
-# CIRCLE_EXIT 档位置环动态 Kp 低误差段一次项系数。
-position_dynamic_kp_quad_a = 0
-# CIRCLE_EXIT 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 5.0
-# CIRCLE_EXIT 档位置环动态 Kp 下限。
-position_dynamic_kp_min = 0.0
-# CIRCLE_EXIT 档位置环动态 Kp 上限。
-position_dynamic_kp_max = 70.0
-# CIRCLE_EXIT 档位置环动态 Kp 低误差段结束阈值。
-position_dynamic_kp_low_error_threshold_px = 5.0
-# CIRCLE_EXIT 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 1.2
-# CIRCLE_EXIT 档位置环动态 Kp 中误差段结束阈值。
-position_dynamic_kp_mid_error_threshold_px = 15.0
-# CIRCLE_EXIT 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 2.2
-# CIRCLE_EXIT 档位置环 Ki。
-position_ki = 0.0
-# CIRCLE_EXIT 档位置环 Kd。
-position_kd = 0.02
-# CIRCLE_EXIT 档位置环动态 Kd 一次项系数。
-position_dynamic_kd_quad_a = 0.0
-# CIRCLE_EXIT 档位置环动态 Kd 下限。
-position_dynamic_kd_min = 0.0
-# CIRCLE_EXIT 档位置环动态 Kd 上限。
-position_dynamic_kd_max = 2.0
-# CIRCLE_EXIT 档位置环积分限幅。
-position_max_integral = 0.0
-# CIRCLE_EXIT 档位置环输出限幅。
-position_max_output = 260.0
-# CIRCLE_EXIT 档位置环前馈开关（基于历史误差一阶/二阶差分）。
-position_feedforward_enabled = false
-# CIRCLE_EXIT 档位置环前馈一阶差分增益。
-position_feedforward_first_diff_gain = 0.0
-# CIRCLE_EXIT 档位置环前馈二阶差分增益。
-position_feedforward_second_diff_gain = 0.0
-# CIRCLE_EXIT 档位置环前馈速度相关增益（按实时速度归一化放大）。
-position_feedforward_speed_gain = 0.0
-# CIRCLE_EXIT 档位置环前馈误差趋势增益（误差发散时加大前馈）。
-position_feedforward_error_trend_gain = 0.0
-# CIRCLE_EXIT 档位置环前馈输出限幅。
-position_feedforward_max_output = 0.0
-# CIRCLE_EXIT 档总转向输出限幅。
-steering_max_output = 280.0
-# CIRCLE_EXIT 档视觉转向前馈开关。
-steering_feedforward_enabled = false
-# CIRCLE_EXIT 档视觉转向前馈预瞄后段起始比例（0,1]。
-steering_feedforward_preview_split_ratio = 0.4
-# CIRCLE_EXIT 档视觉转向前馈后段指数权重参数 lambda（>=0）。
-steering_feedforward_preview_exp_lambda = 1.0
-# CIRCLE_EXIT 档视觉转向前馈达到满置信度所需的最小中线点数。
-steering_feedforward_min_centerline_count = 16
-# CIRCLE_EXIT 档视觉转向前馈角度死区（度）。
-steering_feedforward_deadzone_deg = 1.2
-# CIRCLE_EXIT 档视觉转向前馈增益（度 -> 差速）。
-steering_feedforward_gain = 0.0
-# CIRCLE_EXIT 档视觉转向前馈单独输出限幅。
-steering_feedforward_max_output = 0.0
-# CIRCLE_EXIT 档视觉转向前馈角度滤波 alpha。
-steering_feedforward_filter_alpha = 0.7
-# CIRCLE_EXIT 档视觉转向前馈给反馈环预留的输出余量。
-steering_feedforward_feedback_reserve_output = 80.0
-# CIRCLE_EXIT 档由横向误差生成目标横摆角速度的增益。
-yaw_rate_ref_from_error_gain_dps = 0.0
-# CIRCLE_EXIT 档由曲率生成目标横摆角速度的增益。
-yaw_rate_ref_from_curvature_gain_dps = 0.0
-# CIRCLE_EXIT 档由跟踪点夹角生成目标横摆角速度的增益。
-yaw_rate_ref_from_track_point_gain_dps = 7.0
-# CIRCLE_EXIT 档目标横摆角速度限幅。
-yaw_rate_ref_limit_dps = 360.0
-# CIRCLE_EXIT 档角速度环 Kp。
-yaw_rate_kp = 1.8
-# CIRCLE_EXIT 档角速度环动态 Kp 一次项系数。
-yaw_rate_dynamic_kp_quad_a = 0.0
-# CIRCLE_EXIT 档角速度环动态 Kp 下限。
-yaw_rate_dynamic_kp_min = 0.0
-# CIRCLE_EXIT 档角速度环动态 Kp 上限。
-yaw_rate_dynamic_kp_max = 10.0
-# CIRCLE_EXIT 档角速度环启用阈值。
-yaw_rate_kp_enable_error_threshold_px = 0.0
-# CIRCLE_EXIT 档角速度环 Ki。
-yaw_rate_ki = 0.0
-# CIRCLE_EXIT 档角速度环 Kd。
-yaw_rate_kd = 0.0
-# CIRCLE_EXIT 档角速度环积分限幅。
-yaw_rate_max_integral = 0.0
-# CIRCLE_EXIT 档角速度环输出限幅。
-yaw_rate_max_output = 200.0
-# CIRCLE_EXIT 档 line_error 前缀比例（0,1）。
-line_error_prefix_ratio = 0.4
-# CIRCLE_EXIT 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# 状态速度方案后段指数权重参数 lambda（>=0）。
-speed_scheme_rear_exp_lambda = 1
-# CIRCLE_EXIT 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
-speed_scheme_friction_circle_n = 100000.0
-# 速度方案单周期最大降速比例。
-speed_scheme_max_drop_ratio_per_cycle = 0.95
-# 速度方案单周期最大升速比例。
-speed_scheme_max_rise_ratio_per_cycle = 0.01
-# 速度方案基础速度下限（摩擦圆决策后再次下限裁剪）。
-speed_scheme_min_base_speed = 400.0

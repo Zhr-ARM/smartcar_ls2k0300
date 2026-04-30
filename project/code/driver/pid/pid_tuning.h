@@ -103,9 +103,6 @@ struct Profile
     float position_dynamic_kp_high_a;
     float position_ki;
     float position_kd;
-    float position_dynamic_kd_quad_a;
-    float position_dynamic_kd_min;
-    float position_dynamic_kd_max;
     float position_max_integral;
     float position_max_output;
     bool position_feedforward_enabled;
@@ -158,7 +155,6 @@ struct Profile
 extern float kGlobalBaseSpeedScale;
 
 bool is_dynamic_kp_range_valid(const Profile &profile);
-bool is_dynamic_position_kd_range_valid(const Profile &profile);
 bool is_position_kp_piecewise_range_valid(const Profile &profile);
 bool is_position_feedforward_range_valid(const Profile &profile);
 bool is_steering_feedforward_range_valid(const Profile &profile);
@@ -166,11 +162,7 @@ bool is_line_error_prefix_exp_valid(const Profile &profile);
 bool is_speed_scheme_range_valid(const Profile &profile);
 
 extern Profile kNormalProfile;
-extern Profile kStraightProfile;
-extern Profile kCrossProfile;
-extern Profile kCircleEnterProfile;
-extern Profile kCircleInsideProfile;
-extern Profile kCircleExitProfile;
+extern Profile kCircleProfile;
 } // namespace route_line_follow
 } // namespace pid_tuning
 
