@@ -408,9 +408,9 @@ vision_runtime_config_t g_vision_runtime_config = {
     // line_error 加权点数量。
     .ipm_line_error_weighted_point_count = 3,
     // line_error 加权索引点（0-based）。
-    .ipm_line_error_point_indices = {6, 12, 18},
+    .ipm_line_error_point_indices = {8, 15, 21},
     // line_error 各索引点对应权重。
-    .ipm_line_error_weights = {0.5f, 0.3f, 0.2f},
+    .ipm_line_error_weights = {0.5f, 0.28f, 0.22f},
     // 随速度索引模式公式中的速度系数 k：idx = k * speed + b（仅 method=2 生效）。
     .ipm_line_error_speed_k = 0.03f,
     // 随速度索引模式公式中的常数项 b：idx = k * speed + b（仅 method=2 生效）。
