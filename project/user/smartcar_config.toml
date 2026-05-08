@@ -521,7 +521,7 @@ position_dynamic_kp_high_a = 1.0
 # NORMAL 档位置环 Ki。
 position_ki = 0.0
 # NORMAL 档位置环 Kd 基础值。
-position_kd = 1.0
+position_kd = 0.8
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
@@ -539,7 +539,7 @@ position_feedforward_error_trend_gain = 0.0
 # NORMAL 档位置环前馈输出限幅。
 position_feedforward_max_output = 0.0
 # NORMAL 档总转向输出限幅。
-steering_max_output = 350.0
+steering_max_output = 380.0
 # NORMAL 档视觉转向前馈开关。
 steering_feedforward_enabled = true
 # NORMAL 档视觉转向前馈预瞄后段起始比例（0,1](越小看的越远）。
