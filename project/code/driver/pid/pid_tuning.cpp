@@ -53,14 +53,6 @@ float kTargetCountMax = 1550.0f;
 float kErrorDeadzonePx = 0.6f;
 float kErrorLowGainLimitPx = 3.0f;
 float kErrorLowGain = 0.70f;
-float kFrictionCircleAngleOnDeg = 7.0f;
-float kFrictionCircleAngleOffDeg = 3.5f;
-float kFrictionCircleErrorOnPx = 8.0f;
-float kFrictionCircleErrorOffPx = 4.0f;
-float kFrictionCircleYawRateOnDps = 50.0f;
-float kFrictionCircleYawRateOffDps = 25.0f;
-int32 kFrictionCircleEnterConsecutiveFrames = 3;
-int32 kFrictionCircleExitConsecutiveFrames = 3;
 } // namespace line_follow
 
 namespace line_error_preview
@@ -150,40 +142,14 @@ bool is_position_feedforward_range_valid(const Profile &profile)
            (profile.position_feedforward_max_output >= 0.0f);
 }
 
-bool is_steering_feedforward_range_valid(const Profile &profile)
-{
-    return (profile.steering_feedforward_preview_split_ratio > 0.0f) &&
-           (profile.steering_feedforward_preview_split_ratio <= 1.0f) &&
-           (profile.steering_feedforward_preview_exp_lambda >= 0.0f) &&
-           (profile.steering_feedforward_preview_exp_lambda <= 20.0f) &&
-           (profile.steering_feedforward_min_centerline_count >= 1) &&
-           (profile.steering_feedforward_deadzone_deg >= 0.0f) &&
-           (profile.steering_feedforward_gain >= 0.0f) &&
-           (profile.steering_feedforward_max_output >= 0.0f) &&
-           (profile.steering_feedforward_filter_alpha > 0.0f) &&
-           (profile.steering_feedforward_filter_alpha <= 1.0f) &&
-           (profile.steering_feedforward_feedback_reserve_output >= 0.0f);
-}
-
 bool is_line_error_prefix_exp_valid(const Profile &profile)
 {
     return (profile.line_error_prefix_ratio > 0.0f) &&
-           (profile.line_error_prefix_ratio <= 1.0f) &&
-           (profile.line_error_exp_lambda >= 0.0f) &&
-           (profile.line_error_exp_lambda <= 20.0f);
+           (profile.line_error_prefix_ratio <= 1.0f);
 }
 
 bool is_speed_scheme_range_valid(const Profile &profile)
 {
-    if (profile.speed_scheme_rear_exp_lambda < 0.0f ||
-        profile.speed_scheme_rear_exp_lambda > 20.0f)
-    {
-        return false;
-    }
-    if (profile.speed_scheme_friction_circle_n <= 0.0f)
-    {
-        return false;
-    }
     if (profile.speed_scheme_max_drop_ratio_per_cycle < 0.0f ||
         profile.speed_scheme_max_drop_ratio_per_cycle > 1.0f)
     {
@@ -206,10 +172,8 @@ Profile kNormalProfile = {
     3.0f, 2.1f, 0.0f, 50.0f, 3.0f, 4.6f, 10.0f, 5.6f, 0.0f, 0.15f, 0.0f, 210.0f,
     false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
     210.0f,
-    true, 0.40f, 1.0f, 18, 1.2f, 12.0f, 90.0f, 0.70f, 60.0f,
-    0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 200.0f,
-    0.6f, 2.303f,
-    1.609f, 122500.0f,
+    0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 200.0f,
+    0.6f,
     0.82f, 0.01f, 270.0f
 };
 
@@ -218,10 +182,8 @@ Profile kCircleProfile = {
     1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 9.0f, 4.4f, 0.0f, 0.0f, 0.0f, 400.0f,
     false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
     660.0f,
-    false, 0.40f, 1.0f, 16, 1.2f, 0.0f, 0.0f, 0.70f, 80.0f,
-    0.0f, 0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
-    0.6f, 2.303f,
-    1.609f, 102400.0f,
+    0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
+    0.6f,
     0.82f, 0.01f, 270.0f
 };
 } // namespace route_line_follow

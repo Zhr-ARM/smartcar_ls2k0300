@@ -61,7 +61,7 @@
   let transferChannel = null;
   const playbackRates = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5];
   let playbackRate = 1.0;
-  const SPEED_SCHEME_MODE = 'friction_circle';
+  const SPEED_SCHEME_MODE = 'profile_base_speed';
 
   function hasValue(value) {
     return value !== undefined && value !== null;
@@ -111,18 +111,8 @@
     return Number.isFinite(raw) ? raw : null;
   }
 
-  function getSpeedSchemeFrictionCircleN(status) {
-    const raw = Number(status && status.pid_common_speed_scheme_friction_circle_n);
-    return Number.isFinite(raw) ? raw : null;
-  }
-
   function getSpeedSchemeRealtimeSpeed(status) {
     const raw = Number(status && status.pid_common_speed_scheme_realtime_speed);
-    return Number.isFinite(raw) ? raw : null;
-  }
-
-  function getSpeedSchemeFrictionCoupling(status) {
-    const raw = Number(status && status.pid_common_speed_scheme_friction_coupling);
     return Number.isFinite(raw) ? raw : null;
   }
 
@@ -132,21 +122,17 @@
     const splitRatio = getSpeedSchemeSplitRatio(status);
     const rearExpLambda = getSpeedSchemeRearExpLambda(status);
     const errorScaleRaw = getSpeedSchemeErrorScaleRaw(status);
-    const frictionCircleN = getSpeedSchemeFrictionCircleN(status);
     const realtimeSpeed = getSpeedSchemeRealtimeSpeed(status);
-    const frictionCoupling = getSpeedSchemeFrictionCoupling(status);
     const branches = [
       {
         id: 1,
-        name: 'Friction Circle',
+        name: 'Speed Scheme',
         lines: [
           `模式: <span>${SPEED_SCHEME_MODE}</span>`,
           `split_ratio: <span>${fmtPidValue(splitRatio)}</span>（前段 0~split，后段 split~1）`,
           `后段指数权重 lambda: <span>${fmtPidValue(rearExpLambda)}</span>`,
           `目标角度(abs deg): <span>${fmtPidValue(status && status.pid_common_speed_scheme_blended_abs_error_sum)}</span>`,
-          `摩擦圆常数 n: <span>${fmtPidValue(frictionCircleN)}</span>`,
-          `实时速度(用于耦合): <span>${fmtPidValue(realtimeSpeed)}</span>`,
-          `耦合项(角度*实时速度): <span>${fmtPidValue(frictionCoupling)}</span>`,
+          `实时速度: <span>${fmtPidValue(realtimeSpeed)}</span>`,
           `比例(raw/final): <span>${fmtPidValue(errorScaleRaw)} / ${fmtPidValue(status && status.pid_common_speed_scheme_final_speed_scale)}</span>`,
           `中线点数 current: <span>${fmtPidValue(status && status.pid_common_speed_scheme_point_count)}</span>`,
           `单周期升降速(rise/drop): <span>${fmtPidValue(status && status.pid_common_speed_scheme_max_rise_ratio_per_cycle)} / ${fmtPidValue(status && status.pid_common_speed_scheme_max_drop_ratio_per_cycle)}</span>`,
@@ -272,15 +258,11 @@
     if (!speedFocusPanel) return;
     const centerlineCount = Number(status && status.straight_selected_centerline_count);
     const targetAbsAngle = Number(status && status.pid_common_speed_scheme_blended_abs_error_sum);
-    const frictionCircleN = getSpeedSchemeFrictionCircleN(status);
-    const frictionCoupling = getSpeedSchemeFrictionCoupling(status);
     const profileBaseSpeed = Number(status && status.pid_common_profile_base_speed);
     const desiredBaseSpeed = Number(status && status.pid_common_desired_base_speed);
     const appliedBaseSpeed = Number(status && status.pid_common_applied_base_speed);
     const hasData = Number.isFinite(centerlineCount) ||
       Number.isFinite(targetAbsAngle) ||
-      Number.isFinite(frictionCircleN) ||
-      Number.isFinite(frictionCoupling) ||
       Number.isFinite(desiredBaseSpeed);
 
     speedFocusPanel.classList.remove('ready', 'not-ready');
@@ -303,9 +285,9 @@
     if (speedFocusDesiredSpeed) {
       speedFocusDesiredSpeed.textContent = Number.isFinite(desiredBaseSpeed) ? desiredBaseSpeed.toFixed(1) : '--';
     }
-    speedFocusMinCount.textContent = Number.isFinite(frictionCircleN) ? frictionCircleN.toFixed(3) : '--';
+    speedFocusMinCount.textContent = '--';
     speedFocusErrorSum.textContent = Number.isFinite(targetAbsAngle) ? targetAbsAngle.toFixed(1) : '--';
-    speedFocusErrorThreshold.textContent = Number.isFinite(frictionCoupling) ? frictionCoupling.toFixed(3) : '--';
+    speedFocusErrorThreshold.textContent = '--';
 
     if (!hasData) {
       speedFocusDetail.textContent = '等待加减速数据...';
@@ -313,12 +295,9 @@
     }
 
     const details = [];
-    details.push('速度依据：v_target^2 + (angle*realtime_speed)^2 = n');
+    details.push('速度依据：profile_base_speed（全速）');
     if (Number.isFinite(targetAbsAngle)) {
       details.push(`目标角度(abs deg)=${targetAbsAngle.toFixed(1)}`);
-    }
-    if (Number.isFinite(frictionCircleN) && Number.isFinite(frictionCoupling)) {
-      details.push(`摩擦圆输入: n=${frictionCircleN.toFixed(3)}, coupling=${frictionCoupling.toFixed(3)}`);
     }
     if (Number.isFinite(profileBaseSpeed) && Number.isFinite(desiredBaseSpeed) && Number.isFinite(appliedBaseSpeed)) {
       const speedDelta = desiredBaseSpeed - appliedBaseSpeed;
@@ -466,9 +445,7 @@
       ['speed_scheme_mode', SPEED_SCHEME_MODE],
       ['speed_scheme_split_ratio', getSpeedSchemeSplitRatio(status)],
       ['speed_scheme_rear_exp_lambda', getSpeedSchemeRearExpLambda(status)],
-      ['speed_scheme_friction_circle_n', getSpeedSchemeFrictionCircleN(status)],
       ['speed_scheme_realtime_speed', getSpeedSchemeRealtimeSpeed(status)],
-      ['speed_scheme_friction_coupling', getSpeedSchemeFrictionCoupling(status)],
       ['speed_scheme_target_abs_angle_deg', status.pid_common_speed_scheme_blended_abs_error_sum],
       ['speed_scheme_error_scale_raw', getSpeedSchemeErrorScaleRaw(status)],
       ['speed_scheme_scale(current)', status.pid_common_speed_scheme_final_speed_scale],
@@ -528,9 +505,7 @@
     const splitRatio = getSpeedSchemeSplitRatio(status);
     const splitRatioText = Number.isFinite(splitRatio) ? fmtPidValue(splitRatio) : 'N/A';
     const speedSchemeRearExpLambda = getSpeedSchemeRearExpLambda(status);
-    const speedSchemeFrictionCircleN = getSpeedSchemeFrictionCircleN(status);
     const speedSchemeRealtimeSpeed = getSpeedSchemeRealtimeSpeed(status);
-    const speedSchemeFrictionCoupling = getSpeedSchemeFrictionCoupling(status);
     const speedSchemeErrorScaleRaw = getSpeedSchemeErrorScaleRaw(status);
     const rows = [
       ['当前时间', `${fmtPlaybackTime(video ? (video.currentTime || 0) : 0)} / ${fmtPlaybackTime(duration || 0)}`],
@@ -538,10 +513,9 @@
       ['line_error', hasValue(status.line_error) ? fmtPidValue(status.line_error) : 'N/A'],
       ['速度方案', SPEED_SCHEME_MODE],
       ['分段比例/后段指数lambda', `split=${splitRatioText}, lambda=${fmtPidValue(speedSchemeRearExpLambda)}`],
-      ['摩擦圆参数', `n=${fmtPidValue(speedSchemeFrictionCircleN)}, v_rt=${fmtPidValue(speedSchemeRealtimeSpeed)}`],
+      ['实时速度', fmtPidValue(speedSchemeRealtimeSpeed)],
       ['中线点数', hasValue(status.pid_common_speed_scheme_point_count) ? fmtPidValue(status.pid_common_speed_scheme_point_count) : 'N/A'],
       ['目标夹角/error_scale/current', `${hasValue(status.pid_common_speed_scheme_blended_abs_error_sum) ? fmtPidValue(status.pid_common_speed_scheme_blended_abs_error_sum) : 'N/A'} / ${hasValue(speedSchemeErrorScaleRaw) ? fmtPidValue(speedSchemeErrorScaleRaw) : 'N/A'} / ${hasValue(status.pid_common_speed_scheme_final_speed_scale) ? fmtPidValue(status.pid_common_speed_scheme_final_speed_scale) : 'N/A'}`],
-      ['耦合项(角度*实时速度)', hasValue(speedSchemeFrictionCoupling) ? fmtPidValue(speedSchemeFrictionCoupling) : 'N/A'],
       ['单周期升降速', `${hasValue(status.pid_common_speed_scheme_max_rise_ratio_per_cycle) ? fmtPidValue(status.pid_common_speed_scheme_max_rise_ratio_per_cycle) : 'N/A'} / ${hasValue(status.pid_common_speed_scheme_max_drop_ratio_per_cycle) ? fmtPidValue(status.pid_common_speed_scheme_max_drop_ratio_per_cycle) : 'N/A'} (rise/drop)`],
       ['巡线输出', hasValue(status.pid_common_applied_steering_output) ? fmtPidValue(status.pid_common_applied_steering_output) : 'N/A'],
       ['基础速度', hasValue(status.pid_common_applied_base_speed) ? fmtPidValue(status.pid_common_applied_base_speed) : 'N/A'],

@@ -75,14 +75,6 @@ struct PidSnapshot
     float line_follow_error_deadzone_px = 0.0f;
     float line_follow_error_low_gain_limit_px = 0.0f;
     float line_follow_error_low_gain = 0.0f;
-    float line_follow_friction_circle_angle_on_deg = 0.0f;
-    float line_follow_friction_circle_angle_off_deg = 0.0f;
-    float line_follow_friction_circle_error_on_px = 0.0f;
-    float line_follow_friction_circle_error_off_px = 0.0f;
-    float line_follow_friction_circle_yaw_rate_on_dps = 0.0f;
-    float line_follow_friction_circle_yaw_rate_off_dps = 0.0f;
-    int32 line_follow_friction_circle_enter_consecutive_frames = 0;
-    int32 line_follow_friction_circle_exit_consecutive_frames = 0;
 
     pid_tuning::line_error_preview::WeightedProfile normal_weighted_profile{};
     pid_tuning::line_error_preview::WeightedProfile straight_weighted_profile{};
@@ -709,17 +701,7 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".position_feedforward_error_trend_gain", &profile->position_feedforward_error_trend_gain, error_message) &&
            require_float(values, consumed, prefix + ".position_feedforward_max_output", &profile->position_feedforward_max_output, error_message) &&
            require_float(values, consumed, prefix + ".steering_max_output", &profile->steering_max_output, error_message) &&
-           require_bool(values, consumed, prefix + ".steering_feedforward_enabled", &profile->steering_feedforward_enabled, error_message) &&
-           require_float(values, consumed, prefix + ".steering_feedforward_preview_split_ratio", &profile->steering_feedforward_preview_split_ratio, error_message) &&
-           require_float(values, consumed, prefix + ".steering_feedforward_preview_exp_lambda", &profile->steering_feedforward_preview_exp_lambda, error_message) &&
-           require_int(values, consumed, prefix + ".steering_feedforward_min_centerline_count", &profile->steering_feedforward_min_centerline_count, error_message) &&
-           require_float(values, consumed, prefix + ".steering_feedforward_deadzone_deg", &profile->steering_feedforward_deadzone_deg, error_message) &&
-           require_float(values, consumed, prefix + ".steering_feedforward_gain", &profile->steering_feedforward_gain, error_message) &&
-           require_float(values, consumed, prefix + ".steering_feedforward_max_output", &profile->steering_feedforward_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".steering_feedforward_filter_alpha", &profile->steering_feedforward_filter_alpha, error_message) &&
-           require_float(values, consumed, prefix + ".steering_feedforward_feedback_reserve_output", &profile->steering_feedforward_feedback_reserve_output, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_from_error_gain_dps", &profile->yaw_rate_ref_from_error_gain_dps, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_from_curvature_gain_dps", &profile->yaw_rate_ref_from_curvature_gain_dps, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_from_track_point_gain_dps", &profile->yaw_rate_ref_from_track_point_gain_dps, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ref_limit_dps", &profile->yaw_rate_ref_limit_dps, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_kp", &profile->yaw_rate_kp, error_message) &&
@@ -732,9 +714,6 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".yaw_rate_max_integral", &profile->yaw_rate_max_integral, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_max_output", &profile->yaw_rate_max_output, error_message) &&
            require_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message) &&
-           require_float(values, consumed, prefix + ".line_error_exp_lambda", &profile->line_error_exp_lambda, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_rear_exp_lambda", &profile->speed_scheme_rear_exp_lambda, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_friction_circle_n", &profile->speed_scheme_friction_circle_n, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_drop_ratio_per_cycle", &profile->speed_scheme_max_drop_ratio_per_cycle, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_rise_ratio_per_cycle", &profile->speed_scheme_max_rise_ratio_per_cycle, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_min_base_speed", &profile->speed_scheme_min_base_speed, error_message);
@@ -779,16 +758,6 @@ PidSnapshot capture_pid_snapshot()
     snapshot.line_follow_error_deadzone_px = pid_tuning::line_follow::kErrorDeadzonePx;
     snapshot.line_follow_error_low_gain_limit_px = pid_tuning::line_follow::kErrorLowGainLimitPx;
     snapshot.line_follow_error_low_gain = pid_tuning::line_follow::kErrorLowGain;
-    snapshot.line_follow_friction_circle_angle_on_deg = pid_tuning::line_follow::kFrictionCircleAngleOnDeg;
-    snapshot.line_follow_friction_circle_angle_off_deg = pid_tuning::line_follow::kFrictionCircleAngleOffDeg;
-    snapshot.line_follow_friction_circle_error_on_px = pid_tuning::line_follow::kFrictionCircleErrorOnPx;
-    snapshot.line_follow_friction_circle_error_off_px = pid_tuning::line_follow::kFrictionCircleErrorOffPx;
-    snapshot.line_follow_friction_circle_yaw_rate_on_dps = pid_tuning::line_follow::kFrictionCircleYawRateOnDps;
-    snapshot.line_follow_friction_circle_yaw_rate_off_dps = pid_tuning::line_follow::kFrictionCircleYawRateOffDps;
-    snapshot.line_follow_friction_circle_enter_consecutive_frames =
-        pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames;
-    snapshot.line_follow_friction_circle_exit_consecutive_frames =
-        pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames;
 
     snapshot.normal_weighted_profile = pid_tuning::line_error_preview::kNormalWeightedProfile;
     snapshot.straight_weighted_profile = pid_tuning::line_error_preview::kStraightWeightedProfile;
@@ -841,16 +810,6 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
     pid_tuning::line_follow::kErrorDeadzonePx = snapshot.line_follow_error_deadzone_px;
     pid_tuning::line_follow::kErrorLowGainLimitPx = snapshot.line_follow_error_low_gain_limit_px;
     pid_tuning::line_follow::kErrorLowGain = snapshot.line_follow_error_low_gain;
-    pid_tuning::line_follow::kFrictionCircleAngleOnDeg = snapshot.line_follow_friction_circle_angle_on_deg;
-    pid_tuning::line_follow::kFrictionCircleAngleOffDeg = snapshot.line_follow_friction_circle_angle_off_deg;
-    pid_tuning::line_follow::kFrictionCircleErrorOnPx = snapshot.line_follow_friction_circle_error_on_px;
-    pid_tuning::line_follow::kFrictionCircleErrorOffPx = snapshot.line_follow_friction_circle_error_off_px;
-    pid_tuning::line_follow::kFrictionCircleYawRateOnDps = snapshot.line_follow_friction_circle_yaw_rate_on_dps;
-    pid_tuning::line_follow::kFrictionCircleYawRateOffDps = snapshot.line_follow_friction_circle_yaw_rate_off_dps;
-    pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames =
-        snapshot.line_follow_friction_circle_enter_consecutive_frames;
-    pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames =
-        snapshot.line_follow_friction_circle_exit_consecutive_frames;
 
     pid_tuning::line_error_preview::kNormalWeightedProfile = snapshot.normal_weighted_profile;
     pid_tuning::line_error_preview::kStraightWeightedProfile = snapshot.straight_weighted_profile;
@@ -1278,16 +1237,6 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_PID_FLOAT("pid.line_follow.error_deadzone_px", pid_tuning::line_follow::kErrorDeadzonePx);
     REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain_limit_px", pid_tuning::line_follow::kErrorLowGainLimitPx);
     REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain", pid_tuning::line_follow::kErrorLowGain);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_angle_on_deg", pid_tuning::line_follow::kFrictionCircleAngleOnDeg);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_angle_off_deg", pid_tuning::line_follow::kFrictionCircleAngleOffDeg);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_error_on_px", pid_tuning::line_follow::kFrictionCircleErrorOnPx);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_error_off_px", pid_tuning::line_follow::kFrictionCircleErrorOffPx);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_yaw_rate_on_dps", pid_tuning::line_follow::kFrictionCircleYawRateOnDps);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_yaw_rate_off_dps", pid_tuning::line_follow::kFrictionCircleYawRateOffDps);
-    REQUIRE_PID_INT("pid.line_follow.friction_circle_enter_consecutive_frames",
-                    pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames);
-    REQUIRE_PID_INT("pid.line_follow.friction_circle_exit_consecutive_frames",
-                    pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames);
     REQUIRE_PID_FLOAT("pid.route_line_follow.global.base_speed_scale", pid_tuning::route_line_follow::kGlobalBaseSpeedScale);
 
 #undef REQUIRE_PID_FLOAT
@@ -1309,7 +1258,6 @@ bool load_from_path(const std::string &path, std::string *error_message)
         return pid_tuning::route_line_follow::is_dynamic_kp_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_feedforward_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_steering_feedforward_range_valid(profile) &&
                pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile) &&
                pid_tuning::route_line_follow::is_speed_scheme_range_valid(profile);
     };
@@ -1317,22 +1265,6 @@ bool load_from_path(const std::string &path, std::string *error_message)
         !route_valid(pid_tuning::route_line_follow::kCircleProfile))
     {
         *error_message = "pid.route_line_follow contains invalid profile";
-        return false;
-    }
-    if (pid_tuning::line_follow::kFrictionCircleAngleOnDeg < 0.0f ||
-        pid_tuning::line_follow::kFrictionCircleAngleOffDeg < 0.0f ||
-        pid_tuning::line_follow::kFrictionCircleErrorOnPx < 0.0f ||
-        pid_tuning::line_follow::kFrictionCircleErrorOffPx < 0.0f ||
-        pid_tuning::line_follow::kFrictionCircleYawRateOnDps < 0.0f ||
-        pid_tuning::line_follow::kFrictionCircleYawRateOffDps < 0.0f)
-    {
-        *error_message = "pid.line_follow friction_circle thresholds must be >= 0";
-        return false;
-    }
-    if (pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames <= 0 ||
-        pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames <= 0)
-    {
-        *error_message = "pid.line_follow friction_circle consecutive_frames must be > 0";
         return false;
     }
     if (g_vision_runtime_config.route_straight_min_centerline_points < 1)

@@ -396,8 +396,7 @@ static void apply_line_error_profile_if_needed(const vision_route_state_snapshot
         return;
     }
 
-    vision_line_error_layer_set_prefix_exp_params(profile->line_error_prefix_ratio,
-                                                  profile->line_error_exp_lambda);
+    vision_line_error_layer_set_prefix_exp_params(profile->line_error_prefix_ratio);
     g_last_applied_line_error_profile_id = profile_id;
 }
 

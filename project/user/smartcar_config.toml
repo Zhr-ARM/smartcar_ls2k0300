@@ -424,9 +424,9 @@ right_ki = 0.01
 # 右轮速度环 Kd。
 right_kd = 0.0
 # 速度环积分限幅。
-integral_limit = 300.0
+integral_limit = 500.0
 # 单周期 PID 修正项最大变化步长。
-max_output_step = 15.0
+max_output_step = 30.0
 # PID 修正项总限幅。
 correction_limit = 24.0
 # 左轮前馈斜率。
@@ -454,9 +454,9 @@ feedback_low_pass_alpha = 0.95
 # 是否启用主循环实时无刷控制。
 realtime_enabled = true
 # 左侧无刷目标占空比，单位百分比 [0, 100]。
-left_duty_percent = 50.0
+left_duty_percent = 70.0
 # 右侧无刷目标占空比，单位百分比 [0, 100]。
-right_duty_percent = 50.0
+right_duty_percent = 70.0
 
 [pid.yaw_rate_loop]
 # 视觉曲率滤波 alpha。
@@ -477,22 +477,6 @@ error_deadzone_px = 0.6
 error_low_gain_limit_px = 3.0
 # 小误差区间降增益倍率。
 error_low_gain = 0.7
-# 摩擦圆门控：开启角度阈值（度）。
-friction_circle_angle_on_deg = 7.0
-# 摩擦圆门控：关闭角度阈值（度）。
-friction_circle_angle_off_deg = 3.5
-# 摩擦圆门控：开启误差阈值（像素）。
-friction_circle_error_on_px = 8.0
-# 摩擦圆门控：关闭误差阈值（像素）。
-friction_circle_error_off_px = 3.0
-# 摩擦圆门控：开启目标横摆角速度阈值（dps）。
-friction_circle_yaw_rate_on_dps = 40.0
-# 摩擦圆门控：关闭目标横摆角速度阈值（dps）。
-friction_circle_yaw_rate_off_dps = 25.0
-# 摩擦圆门控：进入连续帧数（防抖）。
-friction_circle_enter_consecutive_frames = 3
-# 摩擦圆门控：退出连续帧数（防抖）。
-friction_circle_exit_consecutive_frames = 3
 
 [pid.route_line_follow.global]
 # 全局基础速度倍率。
@@ -540,28 +524,9 @@ position_feedforward_error_trend_gain = 0.0
 position_feedforward_max_output = 0.0
 # NORMAL 档总转向输出限幅。
 steering_max_output = 380.0
-# NORMAL 档视觉转向前馈开关。
-steering_feedforward_enabled = true
-# NORMAL 档视觉转向前馈预瞄后段起始比例（0,1](越小看的越远）。
-steering_feedforward_preview_split_ratio = 0.4
-# NORMAL 档视觉转向前馈后段指数权重参数 lambda（>=0）。
-steering_feedforward_preview_exp_lambda = 1.0
-# NORMAL 档视觉转向前馈达到满置信度所需的最小中线点数。
-steering_feedforward_min_centerline_count = 9
-# NORMAL 档视觉转向前馈角度死区（度）。
-steering_feedforward_deadzone_deg = 1.2
-# NORMAL 档视觉转向前馈增益（度 -> 差速）。
-steering_feedforward_gain = 150.0
-# NORMAL 档视觉转向前馈单独输出限幅。
-steering_feedforward_max_output = 400.0
-# NORMAL 档视觉转向前馈角度滤波 alpha。
-steering_feedforward_filter_alpha = 0.9
-# NORMAL 档视觉转向前馈给反馈环预留的输出余量。
-steering_feedforward_feedback_reserve_output = 200.0
+
 # NORMAL 档由横向误差生成目标横摆角速度的增益。
 yaw_rate_ref_from_error_gain_dps = 1.0
-# NORMAL 档由曲率生成目标横摆角速度的增益。
-yaw_rate_ref_from_curvature_gain_dps = 0.0
 # NORMAL 档由跟踪点夹角生成目标横摆角速度的增益。
 yaw_rate_ref_from_track_point_gain_dps = 9.0
 # NORMAL 档目标横摆角速度限幅。
@@ -586,17 +551,12 @@ yaw_rate_max_integral = 0.0
 yaw_rate_max_output =3000.0
 # NORMAL 档 line_error 前缀比例（0,1]。
 line_error_prefix_ratio = 0.4
-# NORMAL 档 line_error 指数权重参数 lambda（>=0） 越大越偏向近端点。。
-line_error_exp_lambda = 1
-# NORMAL 档速度方案后段指数权重参数 lambda（>=0） 越大越偏向近端点。。
-speed_scheme_rear_exp_lambda = 1
-# NORMAL 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
-speed_scheme_friction_circle_n = 180000.0
+
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95
 # 速度方案单周期最大升速比例。
 speed_scheme_max_rise_ratio_per_cycle = 0.01
-# 速度方案基础速度下限（摩擦圆决策后再次下限裁剪）。
+# 速度方案基础速度下限。
 speed_scheme_min_base_speed = 500.0
 
 [pid.route_line_follow.circle]
@@ -613,11 +573,11 @@ position_dynamic_kp_max = 70.0
 # CIRCLE 档位置环动态 Kp 低误差段结束阈值。
 position_dynamic_kp_low_error_threshold_px = 5.0
 # CIRCLE 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 0.2
+position_dynamic_kp_mid_a = 0.4
 # CIRCLE 档位置环动态 Kp 中误差段结束阈值。
 position_dynamic_kp_mid_error_threshold_px = 15.0
 # CIRCLE 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 0.4
+position_dynamic_kp_high_a = 0.8
 # CIRCLE 档位置环 Ki。
 position_ki = 0.0
 # CIRCLE 档位置环 Kd。
@@ -640,28 +600,9 @@ position_feedforward_error_trend_gain = 0.0
 position_feedforward_max_output = 0.0
 # CIRCLE 档总转向输出限幅。
 steering_max_output = 500.0
-# CIRCLE 档视觉转向前馈开关。
-steering_feedforward_enabled = false
-# CIRCLE 档视觉转向前馈预瞄后段起始比例（0,1]。
-steering_feedforward_preview_split_ratio = 0.4
-# CIRCLE 档视觉转向前馈后段指数权重参数 lambda（>=0）。
-steering_feedforward_preview_exp_lambda = 1.0
-# CIRCLE 档视觉转向前馈达到满置信度所需的最小中线点数。
-steering_feedforward_min_centerline_count = 16
-# CIRCLE 档视觉转向前馈角度死区（度）。
-steering_feedforward_deadzone_deg = 1.2
-# CIRCLE 档视觉转向前馈增益（度 -> 差速）。
-steering_feedforward_gain = 0.0
-# CIRCLE 档视觉转向前馈单独输出限幅。
-steering_feedforward_max_output = 0.0
-# CIRCLE 档视觉转向前馈角度滤波 alpha。
-steering_feedforward_filter_alpha = 0.7
-# CIRCLE 档视觉转向前馈给反馈环预留的输出余量。
-steering_feedforward_feedback_reserve_output = 80.0
+
 # CIRCLE 档由横向误差生成目标横摆角速度的增益。
 yaw_rate_ref_from_error_gain_dps = 0.0
-# CIRCLE 档由曲率生成目标横摆角速度的增益。
-yaw_rate_ref_from_curvature_gain_dps = 0.0
 # CIRCLE 档由跟踪点夹角生成目标横摆角速度的增益。
 yaw_rate_ref_from_track_point_gain_dps = 7.0
 # CIRCLE 档目标横摆角速度限幅。
@@ -686,16 +627,10 @@ yaw_rate_max_integral = 0.0
 yaw_rate_max_output = 2000.0
 # CIRCLE 档 line_error 前缀比例（0,1）。
 line_error_prefix_ratio = 0.4
-# CIRCLE 档 line_error 指数权重参数 lambda（>=0）。
-line_error_exp_lambda = 1
-# 状态速度方案后段指数权重参数 lambda（>=0）。
-speed_scheme_rear_exp_lambda = 1
-# CIRCLE 档摩擦圆参数 n：v_target^2 + (angle_target * v_real)^2 = n。
-speed_scheme_friction_circle_n = 100000.0
 # 速度方案单周期最大降速比例。
 speed_scheme_max_drop_ratio_per_cycle = 0.95
 # 速度方案单周期最大升速比例。
 speed_scheme_max_rise_ratio_per_cycle = 0.01
-# 速度方案基础速度下限（摩擦圆决策后再次下限裁剪）。
+# 速度方案基础速度下限。
 speed_scheme_min_base_speed = 460.0
 

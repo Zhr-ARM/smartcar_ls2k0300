@@ -270,12 +270,12 @@ int main(int, char**)
         return -1;
     }
 
-    // 利用这 2s 视觉预热窗口同步完成 IMU 静止零偏标定：
-    // 1) 不额外增加总启动时间；
-    // 2) 标定结束后再启动 IMU 后台采集线程，后续按 5ms 周期持续更新并发布 gyro_z。
-    brushless_driver.set_left_duty(0);
-    brushless_driver.set_right_duty(0);
+    // 开机即启动无刷电机，校准期间保持运转。
+    brushless_driver.init();
+    update_brushless_realtime_control();
 
+    // IMU 静止零偏标定：标定期间不驱动行走电机，确保小车静止；
+    // 标定结束后再启动 IMU 后台采集线程，后续按 5ms 周期持续更新并发布 gyro_z。
     if (!imu_thread_calibrate_and_start(pid_tuning::imu::kStartupCalibrateDurationMs))
     {
         cleanup();
@@ -292,8 +292,8 @@ int main(int, char**)
         cleanup();
         return -1;
     }
-    brushless_driver.set_left_duty(0);
-    brushless_driver.set_right_duty(0);
+    // motor_thread_init 内部会复位无刷，这里立刻恢复目标占空比。
+    update_brushless_realtime_control();
 
     if (g_vision_runtime_config.screen_display_enabled && !screen_display_thread_init())
     {

@@ -413,10 +413,9 @@ void vision_line_error_layer_get_index_range(int *index_min, int *index_max)
     if (index_max) *index_max = g_ipm_line_error_index_max.load();
 }
 
-void vision_line_error_layer_set_prefix_exp_params(float prefix_ratio, float exp_lambda)
+void vision_line_error_layer_set_prefix_exp_params(float prefix_ratio)
 {
     g_ipm_line_error_prefix_ratio.store(std::clamp(prefix_ratio, 0.01f, 1.0f));
-    g_ipm_line_error_exp_lambda.store(std::clamp(exp_lambda, 0.0f, 20.0f));
 }
 
 void vision_line_error_layer_get_prefix_exp_params(float *prefix_ratio, float *exp_lambda)

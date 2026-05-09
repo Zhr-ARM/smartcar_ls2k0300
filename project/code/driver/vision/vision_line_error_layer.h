@@ -35,7 +35,7 @@ void vision_line_error_layer_get_speed_formula(float *speed_k, float *speed_b);
 void vision_line_error_layer_set_index_range(int index_min, int index_max);
 void vision_line_error_layer_get_index_range(int *index_min, int *index_max);
 
-void vision_line_error_layer_set_prefix_exp_params(float prefix_ratio, float exp_lambda);
+void vision_line_error_layer_set_prefix_exp_params(float prefix_ratio);
 void vision_line_error_layer_get_prefix_exp_params(float *prefix_ratio, float *exp_lambda);
 
 void vision_line_error_layer_get_track_point(bool *valid, int *x, int *y);
