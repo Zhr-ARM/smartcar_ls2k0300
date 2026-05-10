@@ -97,12 +97,6 @@ struct Profile
     float position_kd;
     float position_max_integral;
     float position_max_output;
-    bool position_feedforward_enabled;
-    float position_feedforward_first_diff_gain;
-    float position_feedforward_second_diff_gain;
-    float position_feedforward_speed_gain;
-    float position_feedforward_error_trend_gain;
-    float position_feedforward_max_output;
     float steering_max_output;
 
     float yaw_rate_ref_from_error_gain_dps;
@@ -125,13 +119,17 @@ struct Profile
     float speed_scheme_max_drop_ratio_per_cycle;
     float speed_scheme_max_rise_ratio_per_cycle;
     float speed_scheme_min_base_speed;
+    bool speed_scheme_yaw_rate_change_enabled;
+    float speed_scheme_yaw_rate_change_start_dps2;
+    float speed_scheme_yaw_rate_change_full_dps2;
+    float speed_scheme_yaw_rate_change_min_scale;
+    float speed_scheme_yaw_rate_change_filter_alpha;
 };
 
 extern float kGlobalBaseSpeedScale;
 
 bool is_dynamic_kp_range_valid(const Profile &profile);
 bool is_position_kp_piecewise_range_valid(const Profile &profile);
-bool is_position_feedforward_range_valid(const Profile &profile);
 bool is_line_error_prefix_exp_valid(const Profile &profile);
 bool is_speed_scheme_range_valid(const Profile &profile);
 

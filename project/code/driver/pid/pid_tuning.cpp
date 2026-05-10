@@ -133,15 +133,6 @@ bool is_position_kp_piecewise_range_valid(const Profile &profile)
             profile.position_dynamic_kp_mid_error_threshold_px);
 }
 
-bool is_position_feedforward_range_valid(const Profile &profile)
-{
-    return (profile.position_feedforward_first_diff_gain >= 0.0f) &&
-           (profile.position_feedforward_second_diff_gain >= 0.0f) &&
-           (profile.position_feedforward_speed_gain >= 0.0f) &&
-           (profile.position_feedforward_error_trend_gain >= 0.0f) &&
-           (profile.position_feedforward_max_output >= 0.0f);
-}
-
 bool is_line_error_prefix_exp_valid(const Profile &profile)
 {
     return (profile.line_error_prefix_ratio > 0.0f) &&
@@ -164,27 +155,43 @@ bool is_speed_scheme_range_valid(const Profile &profile)
     {
         return false;
     }
+    if (profile.speed_scheme_yaw_rate_change_start_dps2 < 0.0f ||
+        profile.speed_scheme_yaw_rate_change_full_dps2 < 0.0f ||
+        profile.speed_scheme_yaw_rate_change_full_dps2 < profile.speed_scheme_yaw_rate_change_start_dps2)
+    {
+        return false;
+    }
+    if (profile.speed_scheme_yaw_rate_change_min_scale < 0.0f ||
+        profile.speed_scheme_yaw_rate_change_min_scale > 1.0f)
+    {
+        return false;
+    }
+    if (profile.speed_scheme_yaw_rate_change_filter_alpha < 0.0f ||
+        profile.speed_scheme_yaw_rate_change_filter_alpha > 1.0f)
+    {
+        return false;
+    }
     return true;
 }
 
 Profile kNormalProfile = {
     350.0f,
     3.0f, 2.1f, 0.0f, 50.0f, 3.0f, 4.6f, 10.0f, 5.6f, 0.0f, 0.15f, 0.0f, 210.0f,
-    false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
     210.0f,
     0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 200.0f,
     0.6f,
-    0.82f, 0.01f, 270.0f
+    0.82f, 0.01f, 270.0f,
+    true, 1800.0f, 7200.0f, 0.72f, 0.35f
 };
 
 Profile kCircleProfile = {
     320.0f,
     1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 9.0f, 4.4f, 0.0f, 0.0f, 0.0f, 400.0f,
-    false, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
     660.0f,
     0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
     0.6f,
-    0.82f, 0.01f, 270.0f
+    0.82f, 0.01f, 270.0f,
+    true, 1600.0f, 6500.0f, 0.70f, 0.35f
 };
 } // namespace route_line_follow
 } // namespace pid_tuning

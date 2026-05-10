@@ -25,7 +25,7 @@ volatile sig_atomic_t g_should_exit = 0;
 
 namespace
 {
-constexpr float kStartupLowVoltageThresholdV = 9.8f;
+constexpr float kStartupLowVoltageThresholdV = 10.8f;
 constexpr int kMainLoopPeriodMs = 5;
 constexpr int kLowVoltageStatusPrintPeriodMs = 2000;
 

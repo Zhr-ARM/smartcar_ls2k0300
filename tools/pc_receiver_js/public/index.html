@@ -1160,11 +1160,11 @@
               <div class="straight-focus-value" id="speedFocusDesiredSpeed">--</div>
             </div>
             <div class="straight-focus-stat">
-              <div class="straight-focus-label">绝对误差和</div>
+              <div class="straight-focus-label">角速度变化率</div>
               <div class="straight-focus-value" id="speedFocusErrorSum">--</div>
             </div>
             <div class="straight-focus-stat">
-              <div class="straight-focus-label">耦合项 (角度*实时速度)</div>
+              <div class="straight-focus-label">目标/实测取大</div>
               <div class="straight-focus-value" id="speedFocusErrorThreshold">--</div>
             </div>
           </div>
@@ -1334,11 +1334,11 @@
                     <div class="straight-focus-value" id="playbackSpeedFocusDesiredSpeed">--</div>
                   </div>
                   <div class="straight-focus-stat">
-                    <div class="straight-focus-label">绝对误差和</div>
+                    <div class="straight-focus-label">角速度变化率</div>
                     <div class="straight-focus-value" id="playbackSpeedFocusErrorSum">--</div>
                   </div>
                   <div class="straight-focus-stat">
-                    <div class="straight-focus-label">耦合项 (角度*实时速度)</div>
+                    <div class="straight-focus-label">目标/实测取大</div>
                     <div class="straight-focus-value" id="playbackSpeedFocusErrorThreshold">--</div>
                   </div>
                 </div>
@@ -1636,7 +1636,7 @@
     let grayFetchInFlight = false;
     let activeGraySource = 'none';
     const traceDirZoomHalfWindow = 10;
-    const SPEED_SCHEME_MODE = 'profile_base_speed';
+    const SPEED_SCHEME_MODE = 'yaw_rate_change';
     const traceDirZoomState = {
       left: { hoverIndex: null },
       right: { hoverIndex: null }
@@ -1882,12 +1882,16 @@
     function renderSpeedFocusPanel(status, refs) {
       if (!refs || !refs.panel) return;
       const centerlineCount = Number(status && status.straight_selected_centerline_count);
-      const targetAbsAngle = Number(status && status.pid_common_speed_scheme_blended_abs_error_sum);
+      const yawRateChangeRate = Number(status && (
+        hasValue(status.pid_common_yaw_rate_change_rate_dps2)
+          ? status.pid_common_yaw_rate_change_rate_dps2
+          : status.pid_common_speed_scheme_blended_abs_error_sum
+      ));
       const profileBaseSpeed = Number(status && status.pid_common_profile_base_speed);
       const desiredBaseSpeed = Number(status && status.pid_common_desired_base_speed);
       const appliedBaseSpeed = Number(status && status.pid_common_applied_base_speed);
       const hasData = Number.isFinite(centerlineCount) ||
-        Number.isFinite(targetAbsAngle) ||
+        Number.isFinite(yawRateChangeRate) ||
         Number.isFinite(desiredBaseSpeed);
 
       refs.panel.classList.remove('ready', 'not-ready');
@@ -1909,7 +1913,7 @@
       refs.centerlineCount.textContent = Number.isFinite(centerlineCount) ? String(centerlineCount) : '--';
       refs.desiredSpeed.textContent = Number.isFinite(desiredBaseSpeed) ? desiredBaseSpeed.toFixed(1) : '--';
       refs.minCount.textContent = '--';
-      refs.errorSum.textContent = Number.isFinite(targetAbsAngle) ? targetAbsAngle.toFixed(1) : '--';
+      refs.errorSum.textContent = Number.isFinite(yawRateChangeRate) ? yawRateChangeRate.toFixed(1) : '--';
       refs.errorThreshold.textContent = '--';
 
       if (!hasData) {
@@ -1918,9 +1922,9 @@
       }
 
       const details = [];
-      details.push('速度依据：profile_base_speed（全速）');
-      if (Number.isFinite(targetAbsAngle)) {
-        details.push(`目标角度(abs deg)=${targetAbsAngle.toFixed(1)}`);
+      details.push('速度依据：角速度变化率（目标/实测取大）');
+      if (Number.isFinite(yawRateChangeRate)) {
+        details.push(`角速度变化率(dps/s)=${yawRateChangeRate.toFixed(1)}`);
       }
       if (Number.isFinite(profileBaseSpeed) && Number.isFinite(desiredBaseSpeed) && Number.isFinite(appliedBaseSpeed)) {
         const speedDelta = desiredBaseSpeed - appliedBaseSpeed;
@@ -2160,7 +2164,8 @@
             `模式: <span>${SPEED_SCHEME_MODE}</span>`,
             `split_ratio: <span>${fmtPidValue(splitRatio)}</span>（前段 0~split，后段 split~1）`,
             `后段指数权重 lambda: <span>${fmtPidValue(rearExpLambda)}</span>`,
-            `目标角度(abs deg): <span>${fmtPidValue(status.pid_common_speed_scheme_blended_abs_error_sum)}</span>`,
+            `角速度变化率(dps/s): <span>${fmtPidValue(status.pid_common_yaw_rate_change_rate_dps2)}</span>`,
+            `目标/实测变化率: <span>${fmtPidValue(status.pid_common_yaw_rate_change_ref_dps2)} / ${fmtPidValue(status.pid_common_yaw_rate_change_measured_dps2)}</span>`,
             `实时速度: <span>${fmtPidValue(realtimeSpeed)}</span>`,
             `比例(raw/final): <span>${fmtPidValue(errorScaleRaw)} / ${fmtPidValue(status.pid_common_speed_scheme_final_speed_scale)}</span>`,
             `中线点数 current: <span>${fmtPidValue(status.pid_common_speed_scheme_point_count)}</span>`,
@@ -2204,6 +2209,8 @@
         ['measured_yaw_rate_dps', status.pid_common_measured_yaw_rate_dps],
         ['yaw_rate_ref_dps', status.pid_common_yaw_rate_ref_dps],
         ['yaw_rate_error_dps', status.pid_common_yaw_rate_error_dps],
+        ['yaw_rate_change(ref/measured/filtered)', [status.pid_common_yaw_rate_change_ref_dps2, status.pid_common_yaw_rate_change_measured_dps2, status.pid_common_yaw_rate_change_rate_dps2]],
+        ['yaw_rate_change_speed_scale', status.pid_common_yaw_rate_change_speed_scale],
         ['dynamic_position_kp', status.pid_common_dynamic_position_kp],
         ['dynamic_yaw_rate_kp', status.pid_common_dynamic_yaw_rate_kp],
         ['applied_yaw_rate_kp', status.pid_common_applied_yaw_rate_kp],
@@ -2220,7 +2227,7 @@
         ['speed_scheme_split_ratio', getSpeedSchemeSplitRatio(status)],
         ['speed_scheme_rear_exp_lambda', getSpeedSchemeRearExpLambda(status)],
         ['speed_scheme_realtime_speed', getSpeedSchemeRealtimeSpeed(status)],
-        ['speed_scheme_target_abs_angle_deg', status.pid_common_speed_scheme_blended_abs_error_sum],
+        ['speed_scheme_yaw_rate_change_dps2', status.pid_common_yaw_rate_change_rate_dps2],
         ['speed_scheme_error_scale_raw', getSpeedSchemeErrorScaleRaw(status)],
         ['speed_scheme_scale(current)', status.pid_common_speed_scheme_final_speed_scale],
         ['speed_scheme_point_count', status.pid_common_speed_scheme_point_count],
@@ -2228,6 +2235,8 @@
         ['speed_scheme_state(ready/triggered/winner)', [status.pid_common_speed_scheme_ready, status.pid_common_speed_scheme_triggered, slowdownWinnerLabel(status.pid_common_speed_scheme_winner_branch)]],
         ['steering(raw/clamped/applied)', [status.pid_common_raw_steering_output, status.pid_common_clamped_steering_output, status.pid_common_applied_steering_output]],
         ['line_follow_targets(L/R)', [status.pid_common_left_target_count_from_line_follow, status.pid_common_right_target_count_from_line_follow]],
+        ['motor_current_count(L/R)', [status.pid_left_current_count ?? status.left_current_count, status.pid_right_current_count ?? status.right_current_count]],
+        ['motor_feedback(L/R)', [status.pid_left_feedback ?? status.left_filtered_count, status.pid_right_feedback ?? status.right_filtered_count]],
         ['loop_dt_ms(vision/imu)', [status.pid_common_vision_dt_ms, status.pid_common_imu_dt_ms]],
         ['motor_cfg(integral/max_step/correction/duty)', [status.pid_common_motor_integral_limit, status.pid_common_motor_max_output_step, status.pid_common_motor_correction_limit, status.pid_common_motor_duty_limit]],
         ['motor_cfg(bias_thr/decel_thr/gain/limit)', [status.pid_common_motor_feedforward_bias_threshold, status.pid_common_motor_decel_error_threshold, status.pid_common_motor_decel_duty_gain, status.pid_common_motor_decel_duty_limit]]
@@ -2328,7 +2337,7 @@
       push(basicRows, 'speed_scheme_split_ratio', getSpeedSchemeSplitRatio(status));
       push(basicRows, 'speed_scheme_rear_exp_lambda', getSpeedSchemeRearExpLambda(status));
       push(basicRows, 'speed_scheme_realtime_speed', getSpeedSchemeRealtimeSpeed(status));
-      push(basicRows, 'speed_scheme_target_abs_angle_deg', status.pid_common_speed_scheme_blended_abs_error_sum);
+      push(basicRows, 'speed_scheme_yaw_rate_change_dps2', status.pid_common_yaw_rate_change_rate_dps2);
       push(basicRows, 'speed_scheme_error_scale_raw', getSpeedSchemeErrorScaleRaw(status));
       push(basicRows, 'speed_scheme_scale_current', status.pid_common_speed_scheme_final_speed_scale);
       push(basicRows, 'speed_scheme_point_count', status.pid_common_speed_scheme_point_count);
