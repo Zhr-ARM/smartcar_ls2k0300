@@ -335,38 +335,13 @@ static const pid_tuning::route_line_follow::Profile *select_route_line_follow_pr
             return &pid_tuning::route_line_follow::kStraightProfile;
 
         case VISION_ROUTE_MAIN_CROSS:
-            if (profile_id) *profile_id = kLineErrorProfileCross;
-            return &pid_tuning::route_line_follow::kCrossProfile;
+            if (profile_id) *profile_id = kLineErrorProfileNormal;
+            return &pid_tuning::route_line_follow::kNormalProfile;
 
         case VISION_ROUTE_MAIN_CIRCLE_LEFT:
         case VISION_ROUTE_MAIN_CIRCLE_RIGHT:
-            switch (route_snapshot.sub_state)
-            {
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_1:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_1:
-                    if (profile_id) *profile_id = kLineErrorProfileCircleEnter;
-                    return &pid_tuning::route_line_follow::kCircleEnterProfile;
-
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_2:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_3:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_4:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_2:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:
-                    if (profile_id) *profile_id = kLineErrorProfileCircleInside;
-                    return &pid_tuning::route_line_follow::kCircleInsideProfile;
-
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_5:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_6:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_6:
-                    if (profile_id) *profile_id = kLineErrorProfileCircleExit;
-                    return &pid_tuning::route_line_follow::kCircleExitProfile;
-
-                default:
-                    if (profile_id) *profile_id = kLineErrorProfileCircleEnter;
-                    return &pid_tuning::route_line_follow::kCircleEnterProfile;
-            }
+            if (profile_id) *profile_id = kLineErrorProfileNormal;
+            return &pid_tuning::route_line_follow::kNormalProfile;
 
         case VISION_ROUTE_MAIN_NORMAL:
         default:

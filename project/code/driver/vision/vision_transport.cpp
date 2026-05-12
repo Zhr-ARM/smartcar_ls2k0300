@@ -1070,7 +1070,6 @@ static void send_tcp_status()
         append_int(enabled, "pid_common_route_sub_state", line_follow_pid_debug.route_sub_state);
         append_float(enabled, "pid_common_normal_speed_reference", line_follow_pid_debug.normal_speed_reference);
         append_float(enabled, "pid_common_profile_base_speed", line_follow_pid_debug.profile_base_speed);
-        append_float(enabled, "pid_common_desired_base_speed", line_follow_pid_debug.desired_base_speed);
         append_float(enabled, "pid_common_applied_base_speed", line_follow_pid_debug.applied_base_speed);
         append_float(enabled, "pid_common_raw_error_px", line_follow_pid_debug.raw_error_px);
         append_float(enabled, "pid_common_filtered_error_px", line_follow_pid_debug.filtered_error_px);
@@ -1083,11 +1082,7 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_current_track_point_angle_deg", line_follow_pid_debug.current_track_point_angle_deg);
         append_float(enabled, "pid_common_filtered_track_point_angle_deg", line_follow_pid_debug.filtered_track_point_angle_deg);
         append_float(enabled, "pid_common_measured_yaw_rate_dps", line_follow_pid_debug.measured_yaw_rate_dps);
-        append_float(enabled, "pid_common_yaw_rate_ref_dps", line_follow_pid_debug.yaw_rate_ref_dps);
-        append_float(enabled, "pid_common_yaw_rate_error_dps", line_follow_pid_debug.yaw_rate_error_dps);
         append_float(enabled, "pid_common_dynamic_position_kp", line_follow_pid_debug.dynamic_position_kp);
-        append_float(enabled, "pid_common_dynamic_yaw_rate_kp", line_follow_pid_debug.dynamic_yaw_rate_kp);
-        append_float(enabled, "pid_common_applied_yaw_rate_kp", line_follow_pid_debug.applied_yaw_rate_kp);
         append_float(enabled, "pid_common_position_pid_kp", line_follow_pid_debug.position_pid_kp);
         append_float(enabled, "pid_common_position_pid_ki", line_follow_pid_debug.position_pid_ki);
         append_float(enabled, "pid_common_position_pid_kd", line_follow_pid_debug.position_pid_kd);
@@ -1110,49 +1105,8 @@ static void send_tcp_status()
                     line_follow_pid_debug.position_feedforward_enabled);
         append_float(enabled, "pid_common_position_pid_max_integral", line_follow_pid_debug.position_pid_max_integral);
         append_float(enabled, "pid_common_position_pid_max_output", line_follow_pid_debug.position_pid_max_output);
-        append_float(enabled, "pid_common_yaw_pid_kp", line_follow_pid_debug.yaw_pid_kp);
-        append_float(enabled, "pid_common_yaw_pid_ki", line_follow_pid_debug.yaw_pid_ki);
-        append_float(enabled, "pid_common_yaw_pid_kd", line_follow_pid_debug.yaw_pid_kd);
-        append_float(enabled, "pid_common_yaw_pid_target", line_follow_pid_debug.yaw_pid_target);
-        append_float(enabled, "pid_common_yaw_pid_error", line_follow_pid_debug.yaw_pid_error);
-        append_float(enabled, "pid_common_yaw_pid_integral", line_follow_pid_debug.yaw_pid_integral);
-        append_float(enabled, "pid_common_yaw_pid_output", line_follow_pid_debug.yaw_pid_output);
-        append_float(enabled, "pid_common_yaw_pid_max_integral", line_follow_pid_debug.yaw_pid_max_integral);
-        append_float(enabled, "pid_common_yaw_pid_max_output", line_follow_pid_debug.yaw_pid_max_output);
-        append_float(enabled, "pid_common_route_yaw_rate_ref_gain", line_follow_pid_debug.route_yaw_rate_ref_gain);
-        append_float(enabled, "pid_common_route_yaw_rate_ref_limit", line_follow_pid_debug.route_yaw_rate_ref_limit);
         append_float(enabled, "pid_common_route_steering_max_output", line_follow_pid_debug.route_steering_max_output);
-        append_float(enabled, "pid_common_route_yaw_rate_kp_enable_error_threshold_px",
-                     line_follow_pid_debug.route_yaw_rate_kp_enable_error_threshold_px);
         append_float(enabled, "pid_common_mean_abs_path_error", line_follow_pid_debug.mean_abs_path_error);
-        append_float(enabled, "pid_common_speed_scheme_blended_abs_error_sum",
-                     line_follow_pid_debug.speed_scheme_blended_abs_error_sum);
-        append_float(enabled, "pid_common_speed_scheme_friction_circle_n",
-                     line_follow_pid_debug.speed_scheme_friction_circle_n);
-        append_float(enabled, "pid_common_speed_scheme_realtime_speed",
-                     line_follow_pid_debug.speed_scheme_realtime_speed);
-        append_float(enabled, "pid_common_speed_scheme_friction_coupling",
-                     line_follow_pid_debug.speed_scheme_friction_coupling);
-        append_float(enabled, "pid_common_speed_scheme_error_scale_raw",
-                     line_follow_pid_debug.speed_scheme_error_scale_raw);
-        append_float(enabled, "pid_common_speed_scheme_final_speed_scale",
-                     line_follow_pid_debug.speed_scheme_final_speed_scale);
-        append_float(enabled, "pid_common_speed_scheme_split_ratio", line_follow_pid_debug.speed_scheme_split_ratio);
-        append_float(enabled, "pid_common_speed_scheme_rear_exp_lambda",
-                     line_follow_pid_debug.speed_scheme_rear_exp_lambda);
-        append_int(enabled, "pid_common_speed_scheme_point_count",
-                   line_follow_pid_debug.speed_scheme_point_count);
-        append_bool(enabled, "pid_common_speed_scheme_ready",
-                    line_follow_pid_debug.speed_scheme_ready);
-        append_bool(enabled, "pid_common_speed_scheme_triggered",
-                    line_follow_pid_debug.speed_scheme_triggered);
-        append_int(enabled, "pid_common_speed_scheme_winner_branch",
-                   line_follow_pid_debug.speed_scheme_winner_branch);
-        append_float(enabled, "pid_common_speed_scheme_max_drop_ratio_per_cycle",
-                     line_follow_pid_debug.speed_scheme_max_drop_ratio_per_cycle);
-        append_float(enabled, "pid_common_speed_scheme_max_rise_ratio_per_cycle",
-                     line_follow_pid_debug.speed_scheme_max_rise_ratio_per_cycle);
-        append_bool(enabled, "pid_common_force_full_speed", line_follow_pid_debug.force_full_speed);
         append_float(enabled, "pid_common_raw_steering_output", line_follow_pid_debug.raw_steering_output);
         append_float(enabled, "pid_common_clamped_steering_output", line_follow_pid_debug.clamped_steering_output);
         append_float(enabled, "pid_common_applied_steering_output", line_follow_pid_debug.applied_steering_output);

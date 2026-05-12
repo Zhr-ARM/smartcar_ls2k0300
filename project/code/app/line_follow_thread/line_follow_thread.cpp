@@ -35,30 +35,6 @@ constexpr float RAD_TO_DEG = 180.0f / 3.1415926f;
 
 using RouteProfile = pid_tuning::route_line_follow::Profile;
 
-struct SpeedSchemeRuntimeParams
-{
-    float split_ratio;
-    float rear_exp_lambda;
-    float friction_circle_n;
-    float max_drop_ratio_per_cycle;
-    float max_rise_ratio_per_cycle;
-    float min_base_speed;
-};
-
-SpeedSchemeRuntimeParams read_speed_scheme_runtime_params(const RouteProfile &profile)
-{
-    SpeedSchemeRuntimeParams params{};
-    params.split_ratio = std::clamp(profile.line_error_prefix_ratio, 0.01f, 1.0f);
-    params.rear_exp_lambda = std::clamp(profile.speed_scheme_rear_exp_lambda, 0.0f, 20.0f);
-    params.friction_circle_n = std::max(0.0f, profile.speed_scheme_friction_circle_n);
-    params.max_drop_ratio_per_cycle =
-        std::clamp(profile.speed_scheme_max_drop_ratio_per_cycle, 0.0f, 1.0f);
-    params.max_rise_ratio_per_cycle =
-        std::clamp(profile.speed_scheme_max_rise_ratio_per_cycle, 0.0f, 1.0f);
-    params.min_base_speed = std::max(0.0f, profile.speed_scheme_min_base_speed);
-    return params;
-}
-
 std::thread g_line_follow_thread;
 std::atomic<bool> g_line_follow_running(false);
 std::atomic<int32> g_thread_tid(0);
@@ -68,9 +44,6 @@ std::atomic<float> g_normal_speed_reference(pid_tuning::route_line_follow::kNorm
 std::atomic<float> g_line_error_px(0.0f);
 std::atomic<float> g_turn_output(0.0f);
 std::atomic<bool> g_reload_from_globals_requested(false);
-bool g_friction_circle_gate_enabled = false;
-int g_friction_circle_enter_count = 0;
-int g_friction_circle_exit_count = 0;
 
 // 滤波后的归一化误差状态，跨周期保留。
 // 这里刻意保留“状态记忆”，因为巡线不是单次运算，而是连续控制。
@@ -82,11 +55,9 @@ float g_filtered_yaw_rate_dps = 0.0f;
 // 滤波后的目标点夹角：由跟踪点相对图像中垂线的偏转角得到。
 // 注意：状态只在“拿到新视觉帧”时推进一次。
 float g_filtered_track_point_angle_deg = 0.0f;
-// 当前真正参与左右轮目标合成的基础速度状态：把“理想基础速度”做成缓增缓降，避免一帧一跳。
-float g_applied_base_speed_state = -1.0f;
-// 位置环与角速度环各自最近一次真实更新后的输出，样本未更新时沿用旧值。
+// 位置环最近一次真实更新后的输出，样本未更新时沿用旧值。
 float g_position_output_state = 0.0f;
-float g_yaw_rate_output_state = 0.0f;
+float g_applied_base_speed_state = -1.0f;
 float g_position_feedforward_output_state = 0.0f;
 float g_position_ff_last_error_px = 0.0f;
 float g_position_ff_prev_error_px = 0.0f;
@@ -102,11 +73,9 @@ uint32 g_last_vision_frame_seq = 0;
 bool g_has_last_imu_update_time = false;
 bool g_has_last_vision_update_time = false;
 bool g_has_last_position_pid_time = false;
-bool g_has_last_yaw_rate_pid_time = false;
 std::chrono::steady_clock::time_point g_last_imu_update_time;
 std::chrono::steady_clock::time_point g_last_vision_update_time;
 std::chrono::steady_clock::time_point g_last_position_pid_time;
-std::chrono::steady_clock::time_point g_last_yaw_rate_pid_time;
 bool g_has_last_logged_route_state = false;
 int g_last_logged_route_main_state = VISION_ROUTE_MAIN_NORMAL;
 int g_last_logged_route_sub_state = VISION_ROUTE_SUB_NONE;
@@ -240,7 +209,6 @@ void reset_line_follow_runtime_state()
     g_filtered_track_point_angle_deg = 0.0f;
     g_applied_base_speed_state = -1.0f;
     g_position_output_state = 0.0f;
-    g_yaw_rate_output_state = 0.0f;
     g_position_feedforward_output_state = 0.0f;
     g_position_ff_last_error_px = 0.0f;
     g_position_ff_prev_error_px = 0.0f;
@@ -254,13 +222,9 @@ void reset_line_follow_runtime_state()
     g_has_last_imu_update_time = false;
     g_has_last_vision_update_time = false;
     g_has_last_position_pid_time = false;
-    g_has_last_yaw_rate_pid_time = false;
     g_has_last_logged_route_state = false;
     g_last_logged_route_main_state = VISION_ROUTE_MAIN_NORMAL;
     g_last_logged_route_sub_state = VISION_ROUTE_SUB_NONE;
-    g_friction_circle_gate_enabled = false;
-    g_friction_circle_enter_count = 0;
-    g_friction_circle_exit_count = 0;
     std::lock_guard<std::mutex> lock(g_pid_debug_mutex);
     g_pid_debug_status = {};
 }
@@ -321,10 +285,6 @@ const char *route_sub_state_name(int route_sub_state)
 
 RouteProfileSelection select_route_profile_selection(int route_main_state, int route_sub_state)
 {
-    using pid_tuning::route_line_follow::kCircleEnterProfile;
-    using pid_tuning::route_line_follow::kCircleExitProfile;
-    using pid_tuning::route_line_follow::kCircleInsideProfile;
-    using pid_tuning::route_line_follow::kCrossProfile;
     using pid_tuning::route_line_follow::kNormalProfile;
     using pid_tuning::route_line_follow::kStraightProfile;
 
@@ -334,33 +294,12 @@ RouteProfileSelection select_route_profile_selection(int route_main_state, int r
             return {kStraightProfile, "STRAIGHT"};
 
         case VISION_ROUTE_MAIN_CROSS:
-            return {kCrossProfile, "CROSS"};
+            return {kNormalProfile, "NORMAL"};
 
         case VISION_ROUTE_MAIN_CIRCLE_LEFT:
         case VISION_ROUTE_MAIN_CIRCLE_RIGHT:
-            switch (route_sub_state)
-            {
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_1:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_1:
-                    return {kCircleEnterProfile, "CIRCLE_ENTER"};
-
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_2:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_3:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_4:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_2:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_3:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_4:
-                    return {kCircleInsideProfile, "CIRCLE_INSIDE"};
-
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_5:
-                case VISION_ROUTE_SUB_CIRCLE_LEFT_6:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_5:
-                case VISION_ROUTE_SUB_CIRCLE_RIGHT_6:
-                    return {kCircleExitProfile, "CIRCLE_EXIT"};
-
-                default:
-                    return {kCircleEnterProfile, "CIRCLE_ENTER"};
-            }
+            (void)route_sub_state;
+            return {kNormalProfile, "NORMAL"};
 
         default:
             return {kNormalProfile, "NORMAL"};
@@ -422,16 +361,11 @@ float compute_signed_track_point_angle_deg(bool track_valid, int track_x, int tr
 
 void configure_line_follow_controllers_for_profile(const RouteProfile &profile,
                                                    float position_kp,
-                                                   float position_kd,
-                                                   float yaw_rate_kp)
+                                                   float position_kd)
 {
     position_pid1.set_params(position_kp, profile.position_ki, position_kd);
     position_pid1.set_integral_limit(profile.position_max_integral);
     position_pid1.set_output_limit(profile.position_max_output);
-
-    position_pid2.set_params(yaw_rate_kp, profile.yaw_rate_ki, profile.yaw_rate_kd);
-    position_pid2.set_integral_limit(profile.yaw_rate_max_integral);
-    position_pid2.set_output_limit(profile.yaw_rate_max_output);
 }
 
 float compute_profile_base_speed_from_normal_reference(float normal_speed_reference,
@@ -446,62 +380,6 @@ float compute_profile_base_speed_from_normal_reference(float normal_speed_refere
                     profile.base_speed *
                     pid_tuning::route_line_follow::kGlobalBaseSpeedScale *
                     runtime_scale_from_normal_speed);
-}
-
-float compute_abs_track_point_angle_deg(bool track_valid, int track_x, int track_y)
-{
-    if (!track_valid)
-    {
-        return 0.0f;
-    }
-
-    const float dx_abs = std::fabs(static_cast<float>(track_x - (VISION_IPM_WIDTH / 2)));
-    const float dy = std::max(1.0f, static_cast<float>((VISION_IPM_HEIGHT - 1) - track_y));
-    return std::atan2(dx_abs, dy) * RAD_TO_DEG;
-}
-
-float compute_desired_base_speed(float profile_base_speed,
-                                 const RouteProfile &profile,
-                                 float abs_filtered_error_px,
-                                 float abs_yaw_rate_ref_dps,
-                                 float mean_abs_path_error,
-                                 int selected_centerline_count,
-                                 bool speed_target_valid,
-                                 int speed_target_x,
-                                 int speed_target_y,
-                                 const SpeedSchemeRuntimeParams &speed_scheme,
-                                 float realtime_speed,
-                                 float &speed_scheme_error_scale_raw,
-                                 float &speed_scheme_final_speed_scale,
-                                 bool &force_full_speed)
-{
-    (void)profile;
-    (void)abs_filtered_error_px;
-    (void)abs_yaw_rate_ref_dps;
-    (void)mean_abs_path_error;
-    (void)selected_centerline_count;
-    force_full_speed = false;
-    speed_scheme_error_scale_raw = 1.0f;
-    speed_scheme_final_speed_scale = 1.0f;
-    // 摩擦圆方案：
-    // v_target^2 + (angle_target_rad * v_real)^2 = n
-    // => v_target = sqrt(max(0, n - (angle_target * v_real)^2))
-    const float target_abs_angle_deg =
-        compute_abs_track_point_angle_deg(speed_target_valid, speed_target_x, speed_target_y);
-    const float target_abs_angle_rad = target_abs_angle_deg / RAD_TO_DEG;
-    const float safe_realtime_speed = std::max(0.0f, realtime_speed);
-    const float coupling = target_abs_angle_rad * safe_realtime_speed;
-    const float target_speed_squared =
-        std::max(0.0f, speed_scheme.friction_circle_n - coupling * coupling);
-    const float friction_target_speed = std::sqrt(target_speed_squared);
-    const float min_base_speed = std::clamp(speed_scheme.min_base_speed, 0.0f, profile_base_speed);
-    const float desired_speed = std::clamp(friction_target_speed, min_base_speed, profile_base_speed);
-    if (profile_base_speed > 1.0e-3f)
-    {
-        speed_scheme_error_scale_raw = std::clamp(desired_speed / profile_base_speed, 0.0f, 1.0f);
-    }
-    speed_scheme_final_speed_scale = speed_scheme_error_scale_raw;
-    return desired_speed;
 }
 
 float clamp_valid_dt_seconds(float dt_seconds, float fallback_dt_seconds, float max_dt_seconds)
@@ -687,33 +565,6 @@ float compute_iir_alpha_from_dt(float dt_seconds, float time_constant_seconds)
     return std::clamp(dt_seconds / (time_constant_seconds + dt_seconds), 0.0f, 1.0f);
 }
 
-float update_applied_base_speed(float current_base_speed,
-                                float profile_base_speed,
-                                float desired_base_speed,
-                                bool force_full_speed,
-                                const SpeedSchemeRuntimeParams &speed_scheme)
-{
-    if (current_base_speed < 0.0f)
-    {
-        return desired_base_speed;
-    }
-
-    if (force_full_speed)
-    {
-        return profile_base_speed;
-    }
-
-    const float max_drop = std::max(0.0f,
-                                    current_base_speed *
-                                    speed_scheme.max_drop_ratio_per_cycle);
-    const float max_rise = std::max(0.0f,
-                                    current_base_speed *
-                                    speed_scheme.max_rise_ratio_per_cycle);
-    return std::clamp(desired_base_speed,
-                      current_base_speed - max_drop,
-                      current_base_speed + max_rise);
-}
-
 float clamp_steering_to_wheel_room(float applied_base_speed, float raw_steering_output)
 {
     const float max_left_turn_room = applied_base_speed - pid_tuning::line_follow::kTargetCountMin;
@@ -722,84 +573,6 @@ float clamp_steering_to_wheel_room(float applied_base_speed, float raw_steering_
     return std::clamp(raw_steering_output,
                       -available_steering_limit,
                       available_steering_limit);
-}
-
-bool update_friction_circle_gate_if_needed(bool vision_updated,
-                                           int route_main_state,
-                                           float abs_target_angle_deg,
-                                           float abs_filtered_error_px,
-                                           float abs_yaw_rate_ref_dps)
-{
-    if (route_main_state == VISION_ROUTE_MAIN_STRAIGHT)
-    {
-        g_friction_circle_gate_enabled = false;
-        g_friction_circle_enter_count = 0;
-        g_friction_circle_exit_count = 0;
-        return false;
-    }
-
-    if (!vision_updated)
-    {
-        return g_friction_circle_gate_enabled;
-    }
-
-    const float angle_on = std::max(0.0f, pid_tuning::line_follow::kFrictionCircleAngleOnDeg);
-    const float error_on = std::max(0.0f, pid_tuning::line_follow::kFrictionCircleErrorOnPx);
-    const float yaw_rate_on = std::max(0.0f, pid_tuning::line_follow::kFrictionCircleYawRateOnDps);
-    const float angle_off =
-        std::clamp(pid_tuning::line_follow::kFrictionCircleAngleOffDeg, 0.0f, angle_on);
-    const float error_off =
-        std::clamp(pid_tuning::line_follow::kFrictionCircleErrorOffPx, 0.0f, error_on);
-    const float yaw_rate_off =
-        std::clamp(pid_tuning::line_follow::kFrictionCircleYawRateOffDps, 0.0f, yaw_rate_on);
-    const int enter_frames = std::max(1, pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames);
-    const int exit_frames = std::max(1, pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames);
-
-    const bool turn_demand_on =
-        (abs_target_angle_deg > angle_on) ||
-        (abs_filtered_error_px > error_on) ||
-        (abs_yaw_rate_ref_dps > yaw_rate_on);
-    const bool turn_demand_off =
-        (abs_target_angle_deg < angle_off) &&
-        (abs_filtered_error_px < error_off) &&
-        (abs_yaw_rate_ref_dps < yaw_rate_off);
-
-    if (!g_friction_circle_gate_enabled)
-    {
-        g_friction_circle_exit_count = 0;
-        if (turn_demand_on)
-        {
-            ++g_friction_circle_enter_count;
-            if (g_friction_circle_enter_count >= enter_frames)
-            {
-                g_friction_circle_gate_enabled = true;
-                g_friction_circle_enter_count = 0;
-            }
-        }
-        else
-        {
-            g_friction_circle_enter_count = 0;
-        }
-    }
-    else
-    {
-        g_friction_circle_enter_count = 0;
-        if (turn_demand_off)
-        {
-            ++g_friction_circle_exit_count;
-            if (g_friction_circle_exit_count >= exit_frames)
-            {
-                g_friction_circle_gate_enabled = false;
-                g_friction_circle_exit_count = 0;
-            }
-        }
-        else
-        {
-            g_friction_circle_exit_count = 0;
-        }
-    }
-
-    return g_friction_circle_gate_enabled;
 }
 
 bool update_filtered_yaw_rate_if_new_sample(float *sample_dt_seconds_out)
@@ -937,16 +710,12 @@ void line_follow_loop()
         if (g_reload_from_globals_requested.exchange(false))
         {
             position_pid1.reset();
-            position_pid2.reset();
             g_normal_speed_reference.store(std::max(0.0f, pid_tuning::route_line_follow::kNormalProfile.base_speed));
             g_position_feedforward_output_state = 0.0f;
             g_position_ff_last_error_px = 0.0f;
             g_position_ff_prev_error_px = 0.0f;
             g_has_position_ff_last_error = false;
             g_has_position_ff_prev_error = false;
-            g_friction_circle_gate_enabled = false;
-            g_friction_circle_enter_count = 0;
-            g_friction_circle_exit_count = 0;
         }
 
         // 这里的 normal_speed_reference 表示“当前希望的 NORMAL 档直道参考速度”。
@@ -995,32 +764,9 @@ void line_follow_loop()
                                                                   route_profile.position_dynamic_kd_min,
                                                                   route_profile.position_dynamic_kd_max,
                                                                   position_error_rate_px_per_second);
-
-        // 第二条支路：角速度环 PID。
-        // 当前固定采用“跟踪点夹角 -> 目标横摆角速度”的路线：
-        // 1) 跟踪点偏角负责告诉车头“该往哪边、该多快转”；
-        // 2) IMU 负责反馈“车身现在实际转了多少”；
-        // 3) 角速度环去逼近这个由夹角生成的目标横摆角速度。
-        // 这样位置环和角速度环职责更清楚：位置环回中线，角速度环管车头朝向。
-        const float yaw_rate_ref_dps = std::clamp(
-            g_filtered_track_point_angle_deg * route_profile.yaw_rate_ref_from_track_point_gain_dps,
-            -route_profile.yaw_rate_ref_limit_dps,
-            route_profile.yaw_rate_ref_limit_dps);
-        //角速度的差
-        const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 目标角速度与实际角速度之差
-        const float dynamic_yaw_rate_kp = compute_linear_abs_gain(route_profile.yaw_rate_kp,
-                                                                  route_profile.yaw_rate_dynamic_kp_quad_a,
-                                                                  route_profile.yaw_rate_dynamic_kp_min,
-                                                                  route_profile.yaw_rate_dynamic_kp_max,
-                                                                  yaw_rate_error_dps);
-        const bool enable_yaw_rate_kp =
-            (route_profile.yaw_rate_kp_enable_error_threshold_px <= 0.0f) ||
-            (error_state.abs_filtered_error_px >= route_profile.yaw_rate_kp_enable_error_threshold_px);
-        const float applied_yaw_rate_kp = enable_yaw_rate_kp ? dynamic_yaw_rate_kp : 0.0f;
         configure_line_follow_controllers_for_profile(route_profile,
                                                       dynamic_kp,
-                                                      dynamic_position_kd,
-                                                      applied_yaw_rate_kp);
+                                                      dynamic_position_kd);
 
         // ---------------- 并级控制核心 ----------------
         // 第一条支路：位置环 PID，只负责“把车拉回中线”。
@@ -1047,103 +793,18 @@ void line_follow_loop()
                                                  -route_profile.position_max_output,
                                                  route_profile.position_max_output);
 
-        const float yaw_rate_pid_dt_fallback =
-            vision_updated ? vision_frame_dt_seconds : imu_sample_dt_seconds;
-        g_yaw_rate_output_state = update_pid_output_state_if_needed(vision_updated || imu_updated,
-                                                                    yaw_rate_error_dps,
-                                                                    yaw_rate_pid_dt_fallback,
-                                                                    g_last_yaw_rate_pid_time,
-                                                                    g_has_last_yaw_rate_pid_time,
-                                                                    route_profile.yaw_rate_max_output,
-                                                                    position_pid2,
-                                                                    g_yaw_rate_output_state);
-        const float yaw_rate_output = g_yaw_rate_output_state;
-
-        // 并级的意思，就是两条支路独立算完后再直接相加：
-        // - position_output 管“位置偏了多少”；
-        // - yaw_rate_output 管“车身现在转得对不对”。
-        const float raw_steering_output = std::clamp(position_output + yaw_rate_output,
+        const float raw_steering_output = std::clamp(position_output,
                                                      -route_profile.steering_max_output,
                                                      route_profile.steering_max_output);
-        const float abs_yaw_rate_ref_dps = std::fabs(yaw_rate_ref_dps);
-
-        bool force_full_speed = false;
         const float mean_abs_path_error = vision_image_processor_ipm_mean_abs_offset_error(); // 视觉给出的整条分析路径平均绝对偏差像素
         bool track_point_valid = false;
         int track_point_x = 0;
         int track_point_y = 0;
         vision_image_processor_get_ipm_line_error_track_point(&track_point_valid, &track_point_x, &track_point_y);
-        const SpeedSchemeRuntimeParams speed_scheme = read_speed_scheme_runtime_params(route_profile);
-        bool speed_target_valid = false;
-        int speed_target_x = 0;
-        int speed_target_y = 0;
-        vision_image_processor_ipm_rear_exp_weighted_target_point(speed_scheme.split_ratio,
-                                                                  speed_scheme.rear_exp_lambda,
-                                                                  &speed_target_valid,
-                                                                  &speed_target_x,
-                                                                  &speed_target_y);
-        const int selected_centerline_count = vision_image_processor_ipm_selected_centerline_count();
-        const float speed_scheme_target_abs_angle_deg =
-            compute_abs_track_point_angle_deg(speed_target_valid, speed_target_x, speed_target_y);
-        const float speed_scheme_target_abs_angle_rad = speed_scheme_target_abs_angle_deg / RAD_TO_DEG;
-        const float friction_coupling = speed_scheme_target_abs_angle_rad * realtime_speed;
-        float speed_scheme_error_scale_raw = 1.0f;
-        float speed_scheme_final_speed_scale = 1.0f;
-        const bool speed_scheme_ready =
-            speed_target_valid &&
-            (speed_scheme.friction_circle_n > 0.0f);
-        const bool friction_circle_enabled =
-            (std::strcmp(route_selection.name, "CIRCLE_INSIDE") == 0) ?
-                true :
-                update_friction_circle_gate_if_needed(
-                    vision_updated,
-                    route_main_state,
-                    speed_scheme_target_abs_angle_deg,
-                    error_state.abs_filtered_error_px,
-                    abs_yaw_rate_ref_dps);
-        const float desired_base_speed = friction_circle_enabled ?
-            compute_desired_base_speed(profile_base_speed,
-                                       route_profile,
-                                       error_state.abs_filtered_error_px,
-                                       abs_yaw_rate_ref_dps,
-                                       mean_abs_path_error,
-                                       selected_centerline_count,
-                                       speed_target_valid,
-                                       speed_target_x,
-                                       speed_target_y,
-                                       speed_scheme,
-                                       realtime_speed,
-                                       speed_scheme_error_scale_raw,
-                                       speed_scheme_final_speed_scale,
-                                       force_full_speed) :
-            profile_base_speed;
-        if (!friction_circle_enabled)
-        {
-            force_full_speed = true;
-            speed_scheme_error_scale_raw = 1.0f;
-            speed_scheme_final_speed_scale = 1.0f;
-        }
-        const bool speed_scheme_triggered =
-            friction_circle_enabled &&
-            speed_scheme_ready &&
-            (desired_base_speed < profile_base_speed);
-        int speed_scheme_winner_branch = 0; // 0: none/full-speed, 1: speed_scheme
-        if (!force_full_speed && speed_scheme_triggered)
-        {
-            speed_scheme_winner_branch = 1;
-        }
-        // 速度规划摩擦圆链路：
-        // 1) 用后段指数加权点得到目标角度 angle_target；
-        // 2) 读取实时速度 v_real；
-        // 3) 用 v_target^2 + (angle_target * v_real)^2 = n 反解 v_target。
-        g_applied_base_speed_state = update_applied_base_speed(g_applied_base_speed_state,
-                                                               profile_base_speed,
-                                                               desired_base_speed,
-                                                               force_full_speed,
-                                                               speed_scheme);
-        const float applied_base_speed = std::clamp(g_applied_base_speed_state, // 经过所有降速和缓冲限幅后的最终下发基础速度
+        const float applied_base_speed = std::clamp(profile_base_speed,
                                                     pid_tuning::line_follow::kTargetCountMin,
                                                     pid_tuning::line_follow::kTargetCountMax);
+        g_applied_base_speed_state = applied_base_speed;
         const float steering_output = clamp_steering_to_wheel_room(applied_base_speed,
                                                                    raw_steering_output);
 
@@ -1180,7 +841,6 @@ void line_follow_loop()
             g_pid_debug_status.route_sub_state = route_sub_state;
             g_pid_debug_status.normal_speed_reference = current_normal_speed_reference;
             g_pid_debug_status.profile_base_speed = profile_base_speed;
-            g_pid_debug_status.desired_base_speed = desired_base_speed;
             g_pid_debug_status.applied_base_speed = applied_base_speed;
             g_pid_debug_status.raw_error_px = raw_error_px;
             g_pid_debug_status.filtered_error_px = error_state.filtered_error_px;
@@ -1192,11 +852,7 @@ void line_follow_loop()
             g_pid_debug_status.current_track_point_angle_deg = current_track_point_angle_deg;
             g_pid_debug_status.filtered_track_point_angle_deg = g_filtered_track_point_angle_deg;
             g_pid_debug_status.measured_yaw_rate_dps = measured_yaw_rate_dps;
-            g_pid_debug_status.yaw_rate_ref_dps = yaw_rate_ref_dps;
-            g_pid_debug_status.yaw_rate_error_dps = yaw_rate_error_dps;
             g_pid_debug_status.dynamic_position_kp = dynamic_kp;
-            g_pid_debug_status.dynamic_yaw_rate_kp = dynamic_yaw_rate_kp;
-            g_pid_debug_status.applied_yaw_rate_kp = applied_yaw_rate_kp;
             g_pid_debug_status.position_pid_kp = position_pid1.kp();
             g_pid_debug_status.position_pid_ki = position_pid1.ki();
             g_pid_debug_status.position_pid_kd = position_pid1.kd();
@@ -1213,36 +869,8 @@ void line_follow_loop()
             g_pid_debug_status.position_feedforward_enabled = route_profile.position_feedforward_enabled;
             g_pid_debug_status.position_pid_max_integral = position_pid1.max_integral();
             g_pid_debug_status.position_pid_max_output = position_pid1.max_output();
-            g_pid_debug_status.yaw_pid_kp = position_pid2.kp();
-            g_pid_debug_status.yaw_pid_ki = position_pid2.ki();
-            g_pid_debug_status.yaw_pid_kd = position_pid2.kd();
-            g_pid_debug_status.yaw_pid_target = position_pid2.get_target();
-            g_pid_debug_status.yaw_pid_error = position_pid2.get_error();
-            g_pid_debug_status.yaw_pid_integral = position_pid2.integral();
-            g_pid_debug_status.yaw_pid_output = position_pid2.get_output();
-            g_pid_debug_status.yaw_pid_max_integral = position_pid2.max_integral();
-            g_pid_debug_status.yaw_pid_max_output = position_pid2.max_output();
-            g_pid_debug_status.route_yaw_rate_ref_gain = route_profile.yaw_rate_ref_from_track_point_gain_dps;
-            g_pid_debug_status.route_yaw_rate_ref_limit = route_profile.yaw_rate_ref_limit_dps;
             g_pid_debug_status.route_steering_max_output = route_profile.steering_max_output;
-            g_pid_debug_status.route_yaw_rate_kp_enable_error_threshold_px =
-                route_profile.yaw_rate_kp_enable_error_threshold_px;
             g_pid_debug_status.mean_abs_path_error = mean_abs_path_error;
-            g_pid_debug_status.speed_scheme_blended_abs_error_sum = speed_scheme_target_abs_angle_deg;
-            g_pid_debug_status.speed_scheme_friction_circle_n = speed_scheme.friction_circle_n;
-            g_pid_debug_status.speed_scheme_realtime_speed = realtime_speed;
-            g_pid_debug_status.speed_scheme_friction_coupling = friction_coupling;
-            g_pid_debug_status.speed_scheme_error_scale_raw = speed_scheme_error_scale_raw;
-            g_pid_debug_status.speed_scheme_final_speed_scale = speed_scheme_final_speed_scale;
-            g_pid_debug_status.speed_scheme_split_ratio = speed_scheme.split_ratio;
-            g_pid_debug_status.speed_scheme_rear_exp_lambda = speed_scheme.rear_exp_lambda;
-            g_pid_debug_status.speed_scheme_point_count = selected_centerline_count;
-            g_pid_debug_status.speed_scheme_ready = speed_scheme_ready;
-            g_pid_debug_status.speed_scheme_triggered = speed_scheme_triggered;
-            g_pid_debug_status.speed_scheme_winner_branch = speed_scheme_winner_branch;
-            g_pid_debug_status.speed_scheme_max_drop_ratio_per_cycle = speed_scheme.max_drop_ratio_per_cycle;
-            g_pid_debug_status.speed_scheme_max_rise_ratio_per_cycle = speed_scheme.max_rise_ratio_per_cycle;
-            g_pid_debug_status.force_full_speed = force_full_speed;
             g_pid_debug_status.raw_steering_output = raw_steering_output;
             g_pid_debug_status.clamped_steering_output = steering_output;
             g_pid_debug_status.applied_steering_output = applied_steering_output;
@@ -1274,16 +902,6 @@ bool line_follow_thread_init()
                        default_profile.position_max_integral,
                        default_profile.position_max_output);
     position_pid1.set_target(0.0f);
-    // 角速度环：同样目标为 0，但真正计算时使用的是 compute_by_error(r_ref - r)。
-    // 这里明确采用位置式 PID，把“目标角速度和实际角速度的差”直接变成一份差速补偿量。
-    // 这样更符合它作为并级支路的角色，也更方便你后面直接看输出大小来调参。
-    position_pid2.init(default_profile.yaw_rate_kp,
-                       default_profile.yaw_rate_ki,
-                       default_profile.yaw_rate_kd,
-                       default_profile.yaw_rate_max_integral,
-                       default_profile.yaw_rate_max_output);
-    position_pid2.set_target(0.0f);
-
     g_line_follow_running = true;
     g_line_follow_thread = std::thread(line_follow_loop);
     return true;
@@ -1306,7 +924,6 @@ void line_follow_thread_cleanup()
 
     // 清掉 PID 和滤波残留，避免下次启动时把上一次的“方向记忆”带进来。
     position_pid1.reset();
-    position_pid2.reset();
     reset_line_follow_runtime_state();
 }
 

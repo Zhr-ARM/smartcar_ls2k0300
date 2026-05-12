@@ -716,26 +716,8 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".position_feedforward_error_trend_gain", &profile->position_feedforward_error_trend_gain, error_message) &&
            require_float(values, consumed, prefix + ".position_feedforward_max_output", &profile->position_feedforward_max_output, error_message) &&
            require_float(values, consumed, prefix + ".steering_max_output", &profile->steering_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_from_error_gain_dps", &profile->yaw_rate_ref_from_error_gain_dps, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_from_curvature_gain_dps", &profile->yaw_rate_ref_from_curvature_gain_dps, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_from_track_point_gain_dps", &profile->yaw_rate_ref_from_track_point_gain_dps, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_limit_dps", &profile->yaw_rate_ref_limit_dps, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_kp", &profile->yaw_rate_kp, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_quad_a", &profile->yaw_rate_dynamic_kp_quad_a, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_min", &profile->yaw_rate_dynamic_kp_min, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_max", &profile->yaw_rate_dynamic_kp_max, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_kp_enable_error_threshold_px", &profile->yaw_rate_kp_enable_error_threshold_px, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ki", &profile->yaw_rate_ki, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_kd", &profile->yaw_rate_kd, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_max_integral", &profile->yaw_rate_max_integral, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_max_output", &profile->yaw_rate_max_output, error_message) &&
            require_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message) &&
-           require_float(values, consumed, prefix + ".line_error_exp_lambda", &profile->line_error_exp_lambda, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_rear_exp_lambda", &profile->speed_scheme_rear_exp_lambda, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_friction_circle_n", &profile->speed_scheme_friction_circle_n, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_max_drop_ratio_per_cycle", &profile->speed_scheme_max_drop_ratio_per_cycle, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_max_rise_ratio_per_cycle", &profile->speed_scheme_max_rise_ratio_per_cycle, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_min_base_speed", &profile->speed_scheme_min_base_speed, error_message);
+           require_float(values, consumed, prefix + ".line_error_exp_lambda", &profile->line_error_exp_lambda, error_message);
 }
 
 PidSnapshot capture_pid_snapshot()
@@ -777,16 +759,6 @@ PidSnapshot capture_pid_snapshot()
     snapshot.line_follow_error_deadzone_px = pid_tuning::line_follow::kErrorDeadzonePx;
     snapshot.line_follow_error_low_gain_limit_px = pid_tuning::line_follow::kErrorLowGainLimitPx;
     snapshot.line_follow_error_low_gain = pid_tuning::line_follow::kErrorLowGain;
-    snapshot.line_follow_friction_circle_angle_on_deg = pid_tuning::line_follow::kFrictionCircleAngleOnDeg;
-    snapshot.line_follow_friction_circle_angle_off_deg = pid_tuning::line_follow::kFrictionCircleAngleOffDeg;
-    snapshot.line_follow_friction_circle_error_on_px = pid_tuning::line_follow::kFrictionCircleErrorOnPx;
-    snapshot.line_follow_friction_circle_error_off_px = pid_tuning::line_follow::kFrictionCircleErrorOffPx;
-    snapshot.line_follow_friction_circle_yaw_rate_on_dps = pid_tuning::line_follow::kFrictionCircleYawRateOnDps;
-    snapshot.line_follow_friction_circle_yaw_rate_off_dps = pid_tuning::line_follow::kFrictionCircleYawRateOffDps;
-    snapshot.line_follow_friction_circle_enter_consecutive_frames =
-        pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames;
-    snapshot.line_follow_friction_circle_exit_consecutive_frames =
-        pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames;
 
     snapshot.normal_weighted_profile = pid_tuning::line_error_preview::kNormalWeightedProfile;
     snapshot.straight_weighted_profile = pid_tuning::line_error_preview::kStraightWeightedProfile;
@@ -843,16 +815,6 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
     pid_tuning::line_follow::kErrorDeadzonePx = snapshot.line_follow_error_deadzone_px;
     pid_tuning::line_follow::kErrorLowGainLimitPx = snapshot.line_follow_error_low_gain_limit_px;
     pid_tuning::line_follow::kErrorLowGain = snapshot.line_follow_error_low_gain;
-    pid_tuning::line_follow::kFrictionCircleAngleOnDeg = snapshot.line_follow_friction_circle_angle_on_deg;
-    pid_tuning::line_follow::kFrictionCircleAngleOffDeg = snapshot.line_follow_friction_circle_angle_off_deg;
-    pid_tuning::line_follow::kFrictionCircleErrorOnPx = snapshot.line_follow_friction_circle_error_on_px;
-    pid_tuning::line_follow::kFrictionCircleErrorOffPx = snapshot.line_follow_friction_circle_error_off_px;
-    pid_tuning::line_follow::kFrictionCircleYawRateOnDps = snapshot.line_follow_friction_circle_yaw_rate_on_dps;
-    pid_tuning::line_follow::kFrictionCircleYawRateOffDps = snapshot.line_follow_friction_circle_yaw_rate_off_dps;
-    pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames =
-        snapshot.line_follow_friction_circle_enter_consecutive_frames;
-    pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames =
-        snapshot.line_follow_friction_circle_exit_consecutive_frames;
 
     pid_tuning::line_error_preview::kNormalWeightedProfile = snapshot.normal_weighted_profile;
     pid_tuning::line_error_preview::kStraightWeightedProfile = snapshot.straight_weighted_profile;
@@ -1284,29 +1246,102 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_PID_FLOAT("pid.line_follow.error_deadzone_px", pid_tuning::line_follow::kErrorDeadzonePx);
     REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain_limit_px", pid_tuning::line_follow::kErrorLowGainLimitPx);
     REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain", pid_tuning::line_follow::kErrorLowGain);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_angle_on_deg", pid_tuning::line_follow::kFrictionCircleAngleOnDeg);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_angle_off_deg", pid_tuning::line_follow::kFrictionCircleAngleOffDeg);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_error_on_px", pid_tuning::line_follow::kFrictionCircleErrorOnPx);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_error_off_px", pid_tuning::line_follow::kFrictionCircleErrorOffPx);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_yaw_rate_on_dps", pid_tuning::line_follow::kFrictionCircleYawRateOnDps);
-    REQUIRE_PID_FLOAT("pid.line_follow.friction_circle_yaw_rate_off_dps", pid_tuning::line_follow::kFrictionCircleYawRateOffDps);
-    REQUIRE_PID_INT("pid.line_follow.friction_circle_enter_consecutive_frames",
-                    pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames);
-    REQUIRE_PID_INT("pid.line_follow.friction_circle_exit_consecutive_frames",
-                    pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames);
     REQUIRE_PID_FLOAT("pid.route_line_follow.global.base_speed_scale", pid_tuning::route_line_follow::kGlobalBaseSpeedScale);
 
 #undef REQUIRE_PID_FLOAT
 #undef REQUIRE_PID_INT
 
     if (!load_route_profile(values, &consumed, "pid.route_line_follow.normal", &pid_tuning::route_line_follow::kNormalProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.straight", &pid_tuning::route_line_follow::kStraightProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.cross", &pid_tuning::route_line_follow::kCrossProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.circle_enter", &pid_tuning::route_line_follow::kCircleEnterProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.circle_inside", &pid_tuning::route_line_follow::kCircleInsideProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.circle_exit", &pid_tuning::route_line_follow::kCircleExitProfile, error_message))
+        !load_route_profile(values, &consumed, "pid.route_line_follow.straight", &pid_tuning::route_line_follow::kStraightProfile, error_message))
     {
         return false;
+    }
+    // 根源策略：仅保留 normal + straight 两套参数。
+    // cross/circle 在参数层统一使用 normal，不再有独立入口。
+    pid_tuning::route_line_follow::kCrossProfile = pid_tuning::route_line_follow::kNormalProfile;
+    pid_tuning::route_line_follow::kCircleEnterProfile = pid_tuning::route_line_follow::kNormalProfile;
+    pid_tuning::route_line_follow::kCircleInsideProfile = pid_tuning::route_line_follow::kNormalProfile;
+    pid_tuning::route_line_follow::kCircleExitProfile = pid_tuning::route_line_follow::kNormalProfile;
+    const auto consume_removed_route_keys = [&](const char *prefix) {
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_ref_from_error_gain_dps");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_ref_from_curvature_gain_dps");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_ref_from_track_point_gain_dps");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_ref_limit_dps");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_kp");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_dynamic_kp_quad_a");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_dynamic_kp_min");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_dynamic_kp_max");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_kp_enable_error_threshold_px");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_ki");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_kd");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_max_integral");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".yaw_rate_max_output");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".speed_scheme_rear_exp_lambda");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".speed_scheme_friction_circle_n");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".speed_scheme_max_drop_ratio_per_cycle");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".speed_scheme_max_rise_ratio_per_cycle");
+        consume_optional_key_if_present(values, &consumed, std::string(prefix) + ".speed_scheme_min_base_speed");
+    };
+    consume_removed_route_keys("pid.route_line_follow.normal");
+    consume_removed_route_keys("pid.route_line_follow.straight");
+    consume_removed_route_keys("pid.route_line_follow.cross");
+    consume_removed_route_keys("pid.route_line_follow.circle_enter");
+    consume_removed_route_keys("pid.route_line_follow.circle_inside");
+    consume_removed_route_keys("pid.route_line_follow.circle_exit");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.base_speed");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kp_quad_a");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kp_base");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kp_min");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kp_max");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kp_low_error_threshold_px");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kp_mid_a");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kp_mid_error_threshold_px");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kp_high_a");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_ki");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_kd");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kd_quad_a");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kd_min");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_dynamic_kd_max");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_max_integral");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_max_output");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_feedforward_enabled");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_feedforward_first_diff_gain");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_feedforward_second_diff_gain");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_feedforward_speed_gain");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_feedforward_error_trend_gain");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.position_feedforward_max_output");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.steering_max_output");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.line_error_prefix_ratio");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.line_error_exp_lambda");
+    const char *circle_groups[] = {"circle_enter", "circle_inside", "circle_exit"};
+    for (const char *g : circle_groups)
+    {
+        const std::string p = std::string("pid.route_line_follow.") + g + ".";
+        consume_optional_key_if_present(values, &consumed, p + "base_speed");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kp_quad_a");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kp_base");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kp_min");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kp_max");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kp_low_error_threshold_px");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kp_mid_a");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kp_mid_error_threshold_px");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kp_high_a");
+        consume_optional_key_if_present(values, &consumed, p + "position_ki");
+        consume_optional_key_if_present(values, &consumed, p + "position_kd");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kd_quad_a");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kd_min");
+        consume_optional_key_if_present(values, &consumed, p + "position_dynamic_kd_max");
+        consume_optional_key_if_present(values, &consumed, p + "position_max_integral");
+        consume_optional_key_if_present(values, &consumed, p + "position_max_output");
+        consume_optional_key_if_present(values, &consumed, p + "position_feedforward_enabled");
+        consume_optional_key_if_present(values, &consumed, p + "position_feedforward_first_diff_gain");
+        consume_optional_key_if_present(values, &consumed, p + "position_feedforward_second_diff_gain");
+        consume_optional_key_if_present(values, &consumed, p + "position_feedforward_speed_gain");
+        consume_optional_key_if_present(values, &consumed, p + "position_feedforward_error_trend_gain");
+        consume_optional_key_if_present(values, &consumed, p + "position_feedforward_max_output");
+        consume_optional_key_if_present(values, &consumed, p + "steering_max_output");
+        consume_optional_key_if_present(values, &consumed, p + "line_error_prefix_ratio");
+        consume_optional_key_if_present(values, &consumed, p + "line_error_exp_lambda");
     }
 
     if (g_vision_runtime_config.ncnn_label_count > VISION_NCNN_CONFIG_MAX_LABELS)
@@ -1320,8 +1355,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
                pid_tuning::route_line_follow::is_dynamic_position_kd_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_feedforward_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile) &&
-               pid_tuning::route_line_follow::is_speed_scheme_range_valid(profile);
+               pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile);
     };
     if (!route_valid(pid_tuning::route_line_follow::kNormalProfile) ||
         !route_valid(pid_tuning::route_line_follow::kStraightProfile) ||
@@ -1333,22 +1367,14 @@ bool load_from_path(const std::string &path, std::string *error_message)
         *error_message = "pid.route_line_follow contains invalid profile";
         return false;
     }
-    if (pid_tuning::line_follow::kFrictionCircleAngleOnDeg < 0.0f ||
-        pid_tuning::line_follow::kFrictionCircleAngleOffDeg < 0.0f ||
-        pid_tuning::line_follow::kFrictionCircleErrorOnPx < 0.0f ||
-        pid_tuning::line_follow::kFrictionCircleErrorOffPx < 0.0f ||
-        pid_tuning::line_follow::kFrictionCircleYawRateOnDps < 0.0f ||
-        pid_tuning::line_follow::kFrictionCircleYawRateOffDps < 0.0f)
-    {
-        *error_message = "pid.line_follow friction_circle thresholds must be >= 0";
-        return false;
-    }
-    if (pid_tuning::line_follow::kFrictionCircleEnterConsecutiveFrames <= 0 ||
-        pid_tuning::line_follow::kFrictionCircleExitConsecutiveFrames <= 0)
-    {
-        *error_message = "pid.line_follow friction_circle consecutive_frames must be > 0";
-        return false;
-    }
+    consume_optional_key_if_present(values, &consumed, "pid.line_follow.friction_circle_angle_on_deg");
+    consume_optional_key_if_present(values, &consumed, "pid.line_follow.friction_circle_angle_off_deg");
+    consume_optional_key_if_present(values, &consumed, "pid.line_follow.friction_circle_error_on_px");
+    consume_optional_key_if_present(values, &consumed, "pid.line_follow.friction_circle_error_off_px");
+    consume_optional_key_if_present(values, &consumed, "pid.line_follow.friction_circle_yaw_rate_on_dps");
+    consume_optional_key_if_present(values, &consumed, "pid.line_follow.friction_circle_yaw_rate_off_dps");
+    consume_optional_key_if_present(values, &consumed, "pid.line_follow.friction_circle_enter_consecutive_frames");
+    consume_optional_key_if_present(values, &consumed, "pid.line_follow.friction_circle_exit_consecutive_frames");
     if (g_vision_runtime_config.route_straight_min_centerline_points < 1)
     {
         *error_message = "vision.runtime.route_straight_min_centerline_points must be >= 1";
