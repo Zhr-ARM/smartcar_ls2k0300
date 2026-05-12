@@ -711,11 +711,11 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".speed_scheme_max_drop_ratio_per_cycle", &profile->speed_scheme_max_drop_ratio_per_cycle, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_rise_ratio_per_cycle", &profile->speed_scheme_max_rise_ratio_per_cycle, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_min_base_speed", &profile->speed_scheme_min_base_speed, error_message) &&
-           require_bool(values, consumed, prefix + ".speed_scheme_yaw_rate_change_enabled", &profile->speed_scheme_yaw_rate_change_enabled, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_yaw_rate_change_start_dps2", &profile->speed_scheme_yaw_rate_change_start_dps2, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_yaw_rate_change_full_dps2", &profile->speed_scheme_yaw_rate_change_full_dps2, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_yaw_rate_change_min_scale", &profile->speed_scheme_yaw_rate_change_min_scale, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_yaw_rate_change_filter_alpha", &profile->speed_scheme_yaw_rate_change_filter_alpha, error_message);
+           require_bool(values, consumed, prefix + ".speed_scheme_target_yaw_rate_enabled", &profile->speed_scheme_target_yaw_rate_enabled, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_start_dps", &profile->speed_scheme_target_yaw_rate_start_dps, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_full_dps", &profile->speed_scheme_target_yaw_rate_full_dps, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_min_scale", &profile->speed_scheme_target_yaw_rate_min_scale, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_filter_alpha", &profile->speed_scheme_target_yaw_rate_filter_alpha, error_message);
 }
 
 PidSnapshot capture_pid_snapshot()

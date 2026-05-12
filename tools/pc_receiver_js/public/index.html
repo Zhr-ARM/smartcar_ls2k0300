@@ -1883,8 +1883,8 @@
       if (!refs || !refs.panel) return;
       const centerlineCount = Number(status && status.straight_selected_centerline_count);
       const yawRateChangeRate = Number(status && (
-        hasValue(status.pid_common_yaw_rate_change_rate_dps2)
-          ? status.pid_common_yaw_rate_change_rate_dps2
+        hasValue(status.pid_common_target_yaw_rate_abs_filtered_dps)
+          ? status.pid_common_target_yaw_rate_abs_filtered_dps
           : status.pid_common_speed_scheme_blended_abs_error_sum
       ));
       const profileBaseSpeed = Number(status && status.pid_common_profile_base_speed);
@@ -2164,8 +2164,8 @@
             `模式: <span>${SPEED_SCHEME_MODE}</span>`,
             `split_ratio: <span>${fmtPidValue(splitRatio)}</span>（前段 0~split，后段 split~1）`,
             `后段指数权重 lambda: <span>${fmtPidValue(rearExpLambda)}</span>`,
-            `角速度变化率(dps/s): <span>${fmtPidValue(status.pid_common_yaw_rate_change_rate_dps2)}</span>`,
-            `目标/实测变化率: <span>${fmtPidValue(status.pid_common_yaw_rate_change_ref_dps2)} / ${fmtPidValue(status.pid_common_yaw_rate_change_measured_dps2)}</span>`,
+            `目标角速度(dps): <span>${fmtPidValue(status.pid_common_target_yaw_rate_abs_filtered_dps)}</span>`,
+            `目标角速度参考: <span>${fmtPidValue(status.pid_common_yaw_rate_ref_dps)}</span>`,
             `实时速度: <span>${fmtPidValue(realtimeSpeed)}</span>`,
             `比例(raw/final): <span>${fmtPidValue(errorScaleRaw)} / ${fmtPidValue(status.pid_common_speed_scheme_final_speed_scale)}</span>`,
             `中线点数 current: <span>${fmtPidValue(status.pid_common_speed_scheme_point_count)}</span>`,
@@ -2209,8 +2209,7 @@
         ['measured_yaw_rate_dps', status.pid_common_measured_yaw_rate_dps],
         ['yaw_rate_ref_dps', status.pid_common_yaw_rate_ref_dps],
         ['yaw_rate_error_dps', status.pid_common_yaw_rate_error_dps],
-        ['yaw_rate_change(ref/measured/filtered)', [status.pid_common_yaw_rate_change_ref_dps2, status.pid_common_yaw_rate_change_measured_dps2, status.pid_common_yaw_rate_change_rate_dps2]],
-        ['yaw_rate_change_speed_scale', status.pid_common_yaw_rate_change_speed_scale],
+        ['yaw_rate(target_abs_filtered/speed_scale)', [status.pid_common_target_yaw_rate_abs_filtered_dps, status.pid_common_target_yaw_rate_speed_scale]],
         ['dynamic_position_kp', status.pid_common_dynamic_position_kp],
         ['dynamic_yaw_rate_kp', status.pid_common_dynamic_yaw_rate_kp],
         ['applied_yaw_rate_kp', status.pid_common_applied_yaw_rate_kp],
@@ -2227,7 +2226,7 @@
         ['speed_scheme_split_ratio', getSpeedSchemeSplitRatio(status)],
         ['speed_scheme_rear_exp_lambda', getSpeedSchemeRearExpLambda(status)],
         ['speed_scheme_realtime_speed', getSpeedSchemeRealtimeSpeed(status)],
-        ['speed_scheme_yaw_rate_change_dps2', status.pid_common_yaw_rate_change_rate_dps2],
+        ['speed_scheme_target_yaw_rate_abs_filtered_dps', status.pid_common_target_yaw_rate_abs_filtered_dps],
         ['speed_scheme_error_scale_raw', getSpeedSchemeErrorScaleRaw(status)],
         ['speed_scheme_scale(current)', status.pid_common_speed_scheme_final_speed_scale],
         ['speed_scheme_point_count', status.pid_common_speed_scheme_point_count],
@@ -2337,7 +2336,7 @@
       push(basicRows, 'speed_scheme_split_ratio', getSpeedSchemeSplitRatio(status));
       push(basicRows, 'speed_scheme_rear_exp_lambda', getSpeedSchemeRearExpLambda(status));
       push(basicRows, 'speed_scheme_realtime_speed', getSpeedSchemeRealtimeSpeed(status));
-      push(basicRows, 'speed_scheme_yaw_rate_change_dps2', status.pid_common_yaw_rate_change_rate_dps2);
+      push(basicRows, 'speed_scheme_target_yaw_rate_abs_filtered_dps', status.pid_common_target_yaw_rate_abs_filtered_dps);
       push(basicRows, 'speed_scheme_error_scale_raw', getSpeedSchemeErrorScaleRaw(status));
       push(basicRows, 'speed_scheme_scale_current', status.pid_common_speed_scheme_final_speed_scale);
       push(basicRows, 'speed_scheme_point_count', status.pid_common_speed_scheme_point_count);

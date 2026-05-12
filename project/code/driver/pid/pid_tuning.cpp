@@ -155,19 +155,19 @@ bool is_speed_scheme_range_valid(const Profile &profile)
     {
         return false;
     }
-    if (profile.speed_scheme_yaw_rate_change_start_dps2 < 0.0f ||
-        profile.speed_scheme_yaw_rate_change_full_dps2 < 0.0f ||
-        profile.speed_scheme_yaw_rate_change_full_dps2 < profile.speed_scheme_yaw_rate_change_start_dps2)
+    if (profile.speed_scheme_target_yaw_rate_start_dps < 0.0f ||
+        profile.speed_scheme_target_yaw_rate_full_dps < 0.0f ||
+        profile.speed_scheme_target_yaw_rate_full_dps < profile.speed_scheme_target_yaw_rate_start_dps)
     {
         return false;
     }
-    if (profile.speed_scheme_yaw_rate_change_min_scale < 0.0f ||
-        profile.speed_scheme_yaw_rate_change_min_scale > 1.0f)
+    if (profile.speed_scheme_target_yaw_rate_min_scale < 0.0f ||
+        profile.speed_scheme_target_yaw_rate_min_scale > 1.0f)
     {
         return false;
     }
-    if (profile.speed_scheme_yaw_rate_change_filter_alpha < 0.0f ||
-        profile.speed_scheme_yaw_rate_change_filter_alpha > 1.0f)
+    if (profile.speed_scheme_target_yaw_rate_filter_alpha < 0.0f ||
+        profile.speed_scheme_target_yaw_rate_filter_alpha > 1.0f)
     {
         return false;
     }
@@ -181,7 +181,7 @@ Profile kNormalProfile = {
     0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 200.0f,
     0.6f,
     0.82f, 0.01f, 270.0f,
-    true, 1800.0f, 7200.0f, 0.72f, 0.35f
+    true, 60.0f, 180.0f, 0.60f, 0.5f
 };
 
 Profile kCircleProfile = {
@@ -191,7 +191,7 @@ Profile kCircleProfile = {
     0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
     0.6f,
     0.82f, 0.01f, 270.0f,
-    true, 1600.0f, 6500.0f, 0.70f, 0.35f
+    true, 40.0f, 150.0f, 0.20f, 0.35f
 };
 } // namespace route_line_follow
 } // namespace pid_tuning

@@ -119,11 +119,11 @@ struct Profile
     float speed_scheme_max_drop_ratio_per_cycle;
     float speed_scheme_max_rise_ratio_per_cycle;
     float speed_scheme_min_base_speed;
-    bool speed_scheme_yaw_rate_change_enabled;
-    float speed_scheme_yaw_rate_change_start_dps2;
-    float speed_scheme_yaw_rate_change_full_dps2;
-    float speed_scheme_yaw_rate_change_min_scale;
-    float speed_scheme_yaw_rate_change_filter_alpha;
+    bool speed_scheme_target_yaw_rate_enabled;
+    float speed_scheme_target_yaw_rate_start_dps;
+    float speed_scheme_target_yaw_rate_full_dps;
+    float speed_scheme_target_yaw_rate_min_scale;
+    float speed_scheme_target_yaw_rate_filter_alpha;
 };
 
 extern float kGlobalBaseSpeedScale;

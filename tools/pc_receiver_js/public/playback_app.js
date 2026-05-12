@@ -131,8 +131,8 @@
           `模式: <span>${SPEED_SCHEME_MODE}</span>`,
           `split_ratio: <span>${fmtPidValue(splitRatio)}</span>（前段 0~split，后段 split~1）`,
           `后段指数权重 lambda: <span>${fmtPidValue(rearExpLambda)}</span>`,
-          `角速度变化率(dps/s): <span>${fmtPidValue(status && status.pid_common_yaw_rate_change_rate_dps2)}</span>`,
-          `目标/实测变化率: <span>${fmtPidValue(status && status.pid_common_yaw_rate_change_ref_dps2)} / ${fmtPidValue(status && status.pid_common_yaw_rate_change_measured_dps2)}</span>`,
+          `目标角速度(dps): <span>${fmtPidValue(status && status.pid_common_target_yaw_rate_abs_filtered_dps)}</span>`,
+          `目标角速度参考: <span>${fmtPidValue(status && status.pid_common_yaw_rate_ref_dps)}</span>`,
           `实时速度: <span>${fmtPidValue(realtimeSpeed)}</span>`,
           `比例(raw/final): <span>${fmtPidValue(errorScaleRaw)} / ${fmtPidValue(status && status.pid_common_speed_scheme_final_speed_scale)}</span>`,
           `中线点数 current: <span>${fmtPidValue(status && status.pid_common_speed_scheme_point_count)}</span>`,
@@ -259,8 +259,8 @@
     if (!speedFocusPanel) return;
     const centerlineCount = Number(status && status.straight_selected_centerline_count);
     const yawRateChangeRate = Number(status && (
-      hasValue(status.pid_common_yaw_rate_change_rate_dps2)
-        ? status.pid_common_yaw_rate_change_rate_dps2
+      hasValue(status.pid_common_target_yaw_rate_abs_filtered_dps)
+        ? status.pid_common_target_yaw_rate_abs_filtered_dps
         : status.pid_common_speed_scheme_blended_abs_error_sum
     ));
     const profileBaseSpeed = Number(status && status.pid_common_profile_base_speed);
@@ -434,8 +434,7 @@
       ['track_point', status.pid_common_track_point],
       ['track_angle(current/filtered)', [status.pid_common_current_track_point_angle_deg, status.pid_common_filtered_track_point_angle_deg]],
       ['yaw_rate(measured/ref/error)', [status.pid_common_measured_yaw_rate_dps, status.pid_common_yaw_rate_ref_dps, status.pid_common_yaw_rate_error_dps]],
-      ['yaw_rate_change(ref/measured/filtered)', [status.pid_common_yaw_rate_change_ref_dps2, status.pid_common_yaw_rate_change_measured_dps2, status.pid_common_yaw_rate_change_rate_dps2]],
-      ['yaw_rate_change_speed_scale', status.pid_common_yaw_rate_change_speed_scale],
+      ['yaw_rate(target_abs_filtered/speed_scale)', [status.pid_common_target_yaw_rate_abs_filtered_dps, status.pid_common_target_yaw_rate_speed_scale]],
       ['yaw_rate_error_norm', status.pid_common_yaw_rate_error_norm],
       ['dynamic_position_kp', status.pid_common_dynamic_position_kp],
       ['dynamic_yaw_rate_kp', status.pid_common_dynamic_yaw_rate_kp],
@@ -453,7 +452,7 @@
       ['speed_scheme_split_ratio', getSpeedSchemeSplitRatio(status)],
       ['speed_scheme_rear_exp_lambda', getSpeedSchemeRearExpLambda(status)],
       ['speed_scheme_realtime_speed', getSpeedSchemeRealtimeSpeed(status)],
-      ['speed_scheme_yaw_rate_change_dps2', status.pid_common_yaw_rate_change_rate_dps2],
+      ['speed_scheme_target_yaw_rate_abs_filtered_dps', status.pid_common_target_yaw_rate_abs_filtered_dps],
       ['speed_scheme_error_scale_raw', getSpeedSchemeErrorScaleRaw(status)],
       ['speed_scheme_scale(current)', status.pid_common_speed_scheme_final_speed_scale],
       ['speed_scheme_point_count', status.pid_common_speed_scheme_point_count],
@@ -524,7 +523,7 @@
       ['分段比例/后段指数lambda', `split=${splitRatioText}, lambda=${fmtPidValue(speedSchemeRearExpLambda)}`],
       ['实时速度', fmtPidValue(speedSchemeRealtimeSpeed)],
       ['中线点数', hasValue(status.pid_common_speed_scheme_point_count) ? fmtPidValue(status.pid_common_speed_scheme_point_count) : 'N/A'],
-      ['角速度变化率/error_scale/current', `${hasValue(status.pid_common_yaw_rate_change_rate_dps2) ? fmtPidValue(status.pid_common_yaw_rate_change_rate_dps2) : 'N/A'} / ${hasValue(speedSchemeErrorScaleRaw) ? fmtPidValue(speedSchemeErrorScaleRaw) : 'N/A'} / ${hasValue(status.pid_common_speed_scheme_final_speed_scale) ? fmtPidValue(status.pid_common_speed_scheme_final_speed_scale) : 'N/A'}`],
+      ['目标角速度(filtered/scale/current)', `${hasValue(status.pid_common_target_yaw_rate_abs_filtered_dps) ? fmtPidValue(status.pid_common_target_yaw_rate_abs_filtered_dps) : 'N/A'} / ${hasValue(speedSchemeErrorScaleRaw) ? fmtPidValue(speedSchemeErrorScaleRaw) : 'N/A'} / ${hasValue(status.pid_common_speed_scheme_final_speed_scale) ? fmtPidValue(status.pid_common_speed_scheme_final_speed_scale) : 'N/A'}`],
       ['单周期升降速', `${hasValue(status.pid_common_speed_scheme_max_rise_ratio_per_cycle) ? fmtPidValue(status.pid_common_speed_scheme_max_rise_ratio_per_cycle) : 'N/A'} / ${hasValue(status.pid_common_speed_scheme_max_drop_ratio_per_cycle) ? fmtPidValue(status.pid_common_speed_scheme_max_drop_ratio_per_cycle) : 'N/A'} (rise/drop)`],
       ['巡线输出', hasValue(status.pid_common_applied_steering_output) ? fmtPidValue(status.pid_common_applied_steering_output) : 'N/A'],
       ['基础速度', hasValue(status.pid_common_applied_base_speed) ? fmtPidValue(status.pid_common_applied_base_speed) : 'N/A'],
