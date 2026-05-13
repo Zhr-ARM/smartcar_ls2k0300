@@ -67,6 +67,14 @@ bool g_has_position_ff_prev_error = false;
 float g_position_error_rate_px_per_second = 0.0f;
 float g_last_position_control_error_px = 0.0f;
 bool g_has_last_position_control_error = false;
+float g_fuzzy_kp_state = 0.0f;
+float g_fuzzy_ki_state = 0.0f;
+float g_fuzzy_kd_state = 0.0f;
+float g_fuzzy_last_e_norm = 0.0f;
+float g_fuzzy_last_de_norm = 0.0f;
+float g_fuzzy_last_dkp = 0.0f;
+float g_fuzzy_last_dki = 0.0f;
+float g_fuzzy_last_dkd = 0.0f;
 // 最近一次已消费的 IMU / 视觉样本序号。
 uint32 g_last_imu_sample_seq = 0;
 uint32 g_last_vision_frame_seq = 0;
@@ -102,6 +110,19 @@ struct PositionFeedforwardRuntime
     float second_diff_px;
     float speed_scale;
     float trend_scale;
+};
+
+struct FuzzyPidRuntime
+{
+    bool enabled;
+    float kp;
+    float ki;
+    float kd;
+    float e_norm;
+    float de_norm;
+    float dkp;
+    float dki;
+    float dkd;
 };
 
 float apply_iir_filter(float previous_value, float current_value, float alpha)
@@ -178,6 +199,145 @@ float compute_piecewise_linear_abs_gain(float base_gain,
                        high_a * high_segment;
     return std::clamp(gain, min_gain, max_gain);
 }
+
+float trap_membership(float x, float a, float b, float c, float d)
+{
+    if (x <= a || x >= d) return 0.0f;
+    if (x >= b && x <= c) return 1.0f;
+    if (x > a && x < b) return (x - a) / std::max(1.0e-6f, b - a);
+    return (d - x) / std::max(1.0e-6f, d - c);
+}
+
+float tri_membership(float x, float a, float b, float c)
+{
+    if (x <= a || x >= c) return 0.0f;
+    if (x == b) return 1.0f;
+    if (x < b) return (x - a) / std::max(1.0e-6f, b - a);
+    return (c - x) / std::max(1.0e-6f, c - b);
+}
+
+void eval_fuzzy_membership_9(float x, float mu[pid_tuning::route_line_follow::kFuzzyRuleDim])
+{
+    const float centers[pid_tuning::route_line_follow::kFuzzyRuleDim] = {
+        -1.0f, -0.75f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 0.75f, 1.0f
+    };
+    for (int i = 0; i < pid_tuning::route_line_follow::kFuzzyRuleDim; ++i) mu[i] = 0.0f;
+    mu[0] = trap_membership(x, -1.5f, -1.0f, -1.0f, centers[1]);
+    mu[pid_tuning::route_line_follow::kFuzzyRuleDim - 1] =
+        trap_membership(x, centers[pid_tuning::route_line_follow::kFuzzyRuleDim - 2], 1.0f, 1.0f, 1.5f);
+    for (int i = 1; i < pid_tuning::route_line_follow::kFuzzyRuleDim - 1; ++i)
+    {
+        mu[i] = tri_membership(x, centers[i - 1], centers[i], centers[i + 1]);
+    }
+}
+
+float fuzzy_defuzz_9x9(const float rule[pid_tuning::route_line_follow::kFuzzyRuleCount],
+                       const float mu_e[pid_tuning::route_line_follow::kFuzzyRuleDim],
+                       const float mu_de[pid_tuning::route_line_follow::kFuzzyRuleDim])
+{
+    float weighted_sum = 0.0f;
+    float weight_total = 0.0f;
+    for (int i = 0; i < pid_tuning::route_line_follow::kFuzzyRuleDim; ++i)
+    {
+        for (int j = 0; j < pid_tuning::route_line_follow::kFuzzyRuleDim; ++j)
+        {
+            const float w = mu_e[i] * mu_de[j];
+            const int idx = i * pid_tuning::route_line_follow::kFuzzyRuleDim + j;
+            weighted_sum += w * rule[idx];
+            weight_total += w;
+        }
+    }
+    if (weight_total <= 1.0e-6f)
+    {
+        return 0.0f;
+    }
+    return weighted_sum / weight_total;
+}
+
+FuzzyPidRuntime update_fuzzy_pid_if_needed(bool vision_updated,
+                                           float control_error_px,
+                                           float error_rate_px_per_second,
+                                           const RouteProfile &profile)
+{
+    FuzzyPidRuntime rt{};
+    rt.enabled = profile.fuzzy_pid_enabled;
+    if (!profile.fuzzy_pid_enabled)
+    {
+        rt.kp = compute_piecewise_linear_abs_gain(profile.position_dynamic_kp_base,
+                                                  profile.position_dynamic_kp_quad_a,
+                                                  profile.position_dynamic_kp_low_error_threshold_px,
+                                                  profile.position_dynamic_kp_mid_a,
+                                                  profile.position_dynamic_kp_mid_error_threshold_px,
+                                                  profile.position_dynamic_kp_high_a,
+                                                  profile.position_dynamic_kp_min,
+                                                  profile.position_dynamic_kp_max,
+                                                  control_error_px);
+        rt.ki = profile.position_ki;
+        rt.kd = compute_linear_abs_gain(profile.position_kd,
+                                        profile.position_dynamic_kd_quad_a,
+                                        profile.position_dynamic_kd_min,
+                                        profile.position_dynamic_kd_max,
+                                        error_rate_px_per_second);
+        return rt;
+    }
+
+    if (!vision_updated && g_fuzzy_kp_state > 0.0f)
+    {
+        rt.kp = g_fuzzy_kp_state;
+        rt.ki = g_fuzzy_ki_state;
+        rt.kd = g_fuzzy_kd_state;
+        rt.e_norm = g_fuzzy_last_e_norm;
+        rt.de_norm = g_fuzzy_last_de_norm;
+        rt.dkp = g_fuzzy_last_dkp;
+        rt.dki = g_fuzzy_last_dki;
+        rt.dkd = g_fuzzy_last_dkd;
+        return rt;
+    }
+
+    const float e_norm = std::clamp(control_error_px / std::max(1.0e-6f, profile.fuzzy_pid_e_scale), -1.0f, 1.0f);
+    const float de_norm = std::clamp(error_rate_px_per_second / std::max(1.0e-6f, profile.fuzzy_pid_de_scale), -1.0f, 1.0f);
+    float mu_e[pid_tuning::route_line_follow::kFuzzyRuleDim];
+    float mu_de[pid_tuning::route_line_follow::kFuzzyRuleDim];
+    eval_fuzzy_membership_9(e_norm, mu_e);
+    eval_fuzzy_membership_9(de_norm, mu_de);
+
+    const float dkp = fuzzy_defuzz_9x9(profile.fuzzy_pid_rule_dkp, mu_e, mu_de) * profile.fuzzy_pid_dkp_scale;
+    const float dki = fuzzy_defuzz_9x9(profile.fuzzy_pid_rule_dki, mu_e, mu_de) * profile.fuzzy_pid_dki_scale;
+    const float dkd = fuzzy_defuzz_9x9(profile.fuzzy_pid_rule_dkd, mu_e, mu_de) * profile.fuzzy_pid_dkd_scale;
+
+    const float raw_kp = std::clamp(profile.fuzzy_pid_kp_base + dkp, profile.fuzzy_pid_kp_min, profile.fuzzy_pid_kp_max);
+    const float raw_ki = std::clamp(profile.fuzzy_pid_ki_base + dki, profile.fuzzy_pid_ki_min, profile.fuzzy_pid_ki_max);
+    const float raw_kd = std::clamp(profile.fuzzy_pid_kd_base + dkd, profile.fuzzy_pid_kd_min, profile.fuzzy_pid_kd_max);
+    const float alpha = std::clamp(profile.fuzzy_pid_gain_update_alpha, 0.0f, 1.0f);
+    if (g_fuzzy_kp_state <= 0.0f && g_fuzzy_ki_state <= 0.0f && g_fuzzy_kd_state <= 0.0f)
+    {
+        g_fuzzy_kp_state = raw_kp;
+        g_fuzzy_ki_state = raw_ki;
+        g_fuzzy_kd_state = raw_kd;
+    }
+    else
+    {
+        g_fuzzy_kp_state = apply_iir_filter(g_fuzzy_kp_state, raw_kp, alpha);
+        g_fuzzy_ki_state = apply_iir_filter(g_fuzzy_ki_state, raw_ki, alpha);
+        g_fuzzy_kd_state = apply_iir_filter(g_fuzzy_kd_state, raw_kd, alpha);
+    }
+
+    g_fuzzy_last_e_norm = e_norm;
+    g_fuzzy_last_de_norm = de_norm;
+    g_fuzzy_last_dkp = dkp;
+    g_fuzzy_last_dki = dki;
+    g_fuzzy_last_dkd = dkd;
+
+    rt.kp = g_fuzzy_kp_state;
+    rt.ki = g_fuzzy_ki_state;
+    rt.kd = g_fuzzy_kd_state;
+    rt.e_norm = e_norm;
+    rt.de_norm = de_norm;
+    rt.dkp = dkp;
+    rt.dki = dki;
+    rt.dkd = dkd;
+    return rt;
+}
 // 把滤波后的像素误差转换成真正参与位置环控制的像素 control_error_px，
 // 同时保留便于调试的绝对误差量。
 ControlErrorState compute_control_error_state(float filtered_error_px)
@@ -217,6 +377,14 @@ void reset_line_follow_runtime_state()
     g_position_error_rate_px_per_second = 0.0f;
     g_last_position_control_error_px = 0.0f;
     g_has_last_position_control_error = false;
+    g_fuzzy_kp_state = 0.0f;
+    g_fuzzy_ki_state = 0.0f;
+    g_fuzzy_kd_state = 0.0f;
+    g_fuzzy_last_e_norm = 0.0f;
+    g_fuzzy_last_de_norm = 0.0f;
+    g_fuzzy_last_dkp = 0.0f;
+    g_fuzzy_last_dki = 0.0f;
+    g_fuzzy_last_dkd = 0.0f;
     g_last_imu_sample_seq = 0;
     g_last_vision_frame_seq = 0;
     g_has_last_imu_update_time = false;
@@ -361,9 +529,10 @@ float compute_signed_track_point_angle_deg(bool track_valid, int track_x, int tr
 
 void configure_line_follow_controllers_for_profile(const RouteProfile &profile,
                                                    float position_kp,
+                                                   float position_ki,
                                                    float position_kd)
 {
-    position_pid1.set_params(position_kp, profile.position_ki, position_kd);
+    position_pid1.set_params(position_kp, position_ki, position_kd);
     position_pid1.set_integral_limit(profile.position_max_integral);
     position_pid1.set_output_limit(profile.position_max_output);
 }
@@ -743,30 +912,19 @@ void line_follow_loop()
         // 位置环当前也直接在像素量纲下工作。
         const ControlErrorState error_state = compute_control_error_state(g_filtered_error);
 
-        // 动态 Kp：误差越大，比例增益越强。
-        // 这里不再对动态 Kp 的输入额外归一化，直接用经过死区/低增益处理后的像素误差。
-        const float dynamic_kp =
-            compute_piecewise_linear_abs_gain(route_profile.position_dynamic_kp_base,
-                                              route_profile.position_dynamic_kp_quad_a,
-                                              route_profile.position_dynamic_kp_low_error_threshold_px,
-                                              route_profile.position_dynamic_kp_mid_a,
-                                              route_profile.position_dynamic_kp_mid_error_threshold_px,
-                                              route_profile.position_dynamic_kp_high_a,
-                                              route_profile.position_dynamic_kp_min,
-                                              route_profile.position_dynamic_kp_max,
-                                              error_state.control_error_px);
         const float position_error_rate_px_per_second =
             update_position_error_rate_if_needed(vision_updated,
                                                  error_state.control_error_px,
                                                  vision_frame_dt_seconds);
-        const float dynamic_position_kd = compute_linear_abs_gain(route_profile.position_kd,
-                                                                  route_profile.position_dynamic_kd_quad_a,
-                                                                  route_profile.position_dynamic_kd_min,
-                                                                  route_profile.position_dynamic_kd_max,
-                                                                  position_error_rate_px_per_second);
+        const FuzzyPidRuntime fuzzy_pid_runtime =
+            update_fuzzy_pid_if_needed(vision_updated,
+                                       error_state.control_error_px,
+                                       position_error_rate_px_per_second,
+                                       route_profile);
         configure_line_follow_controllers_for_profile(route_profile,
-                                                      dynamic_kp,
-                                                      dynamic_position_kd);
+                                                      fuzzy_pid_runtime.kp,
+                                                      fuzzy_pid_runtime.ki,
+                                                      fuzzy_pid_runtime.kd);
 
         // ---------------- 并级控制核心 ----------------
         // 第一条支路：位置环 PID，只负责“把车拉回中线”。
@@ -852,7 +1010,18 @@ void line_follow_loop()
             g_pid_debug_status.current_track_point_angle_deg = current_track_point_angle_deg;
             g_pid_debug_status.filtered_track_point_angle_deg = g_filtered_track_point_angle_deg;
             g_pid_debug_status.measured_yaw_rate_dps = measured_yaw_rate_dps;
-            g_pid_debug_status.dynamic_position_kp = dynamic_kp;
+            g_pid_debug_status.dynamic_position_kp = fuzzy_pid_runtime.kp;
+            g_pid_debug_status.dynamic_position_ki = fuzzy_pid_runtime.ki;
+            g_pid_debug_status.dynamic_position_kd = fuzzy_pid_runtime.kd;
+            g_pid_debug_status.fuzzy_pid_enabled = fuzzy_pid_runtime.enabled;
+            g_pid_debug_status.fuzzy_e_norm = fuzzy_pid_runtime.e_norm;
+            g_pid_debug_status.fuzzy_de_norm = fuzzy_pid_runtime.de_norm;
+            g_pid_debug_status.fuzzy_dkp = fuzzy_pid_runtime.dkp;
+            g_pid_debug_status.fuzzy_dki = fuzzy_pid_runtime.dki;
+            g_pid_debug_status.fuzzy_dkd = fuzzy_pid_runtime.dkd;
+            g_pid_debug_status.fuzzy_kp_applied = fuzzy_pid_runtime.kp;
+            g_pid_debug_status.fuzzy_ki_applied = fuzzy_pid_runtime.ki;
+            g_pid_debug_status.fuzzy_kd_applied = fuzzy_pid_runtime.kd;
             g_pid_debug_status.position_pid_kp = position_pid1.kp();
             g_pid_debug_status.position_pid_ki = position_pid1.ki();
             g_pid_debug_status.position_pid_kd = position_pid1.kd();

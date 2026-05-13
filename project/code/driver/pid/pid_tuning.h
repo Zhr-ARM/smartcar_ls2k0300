@@ -81,6 +81,9 @@ extern WeightedProfile kCircleExitWeightedProfile;
 
 namespace route_line_follow
 {
+inline constexpr int kFuzzyRuleDim = 9;
+inline constexpr int kFuzzyRuleCount = kFuzzyRuleDim * kFuzzyRuleDim;
+
 struct Profile
 {
     float base_speed;
@@ -111,6 +114,27 @@ struct Profile
     // line_error 前缀指数加权参数（新方案，按状态独立）。
     float line_error_prefix_ratio;
     float line_error_exp_lambda;
+
+    // 模糊自整定 PID 参数（仅位置环使用）。
+    bool fuzzy_pid_enabled = false;
+    float fuzzy_pid_kp_base = 0.0f;
+    float fuzzy_pid_ki_base = 0.0f;
+    float fuzzy_pid_kd_base = 0.0f;
+    float fuzzy_pid_kp_min = 0.0f;
+    float fuzzy_pid_kp_max = 0.0f;
+    float fuzzy_pid_ki_min = 0.0f;
+    float fuzzy_pid_ki_max = 0.0f;
+    float fuzzy_pid_kd_min = 0.0f;
+    float fuzzy_pid_kd_max = 0.0f;
+    float fuzzy_pid_e_scale = 1.0f;
+    float fuzzy_pid_de_scale = 1.0f;
+    float fuzzy_pid_dkp_scale = 0.0f;
+    float fuzzy_pid_dki_scale = 0.0f;
+    float fuzzy_pid_dkd_scale = 0.0f;
+    float fuzzy_pid_gain_update_alpha = 1.0f;
+    float fuzzy_pid_rule_dkp[kFuzzyRuleCount] = {0.0f};
+    float fuzzy_pid_rule_dki[kFuzzyRuleCount] = {0.0f};
+    float fuzzy_pid_rule_dkd[kFuzzyRuleCount] = {0.0f};
 };
 
 extern float kGlobalBaseSpeedScale;
@@ -120,6 +144,7 @@ bool is_dynamic_position_kd_range_valid(const Profile &profile);
 bool is_position_kp_piecewise_range_valid(const Profile &profile);
 bool is_position_feedforward_range_valid(const Profile &profile);
 bool is_line_error_prefix_exp_valid(const Profile &profile);
+bool is_fuzzy_pid_range_valid(const Profile &profile);
 
 extern Profile kNormalProfile;
 extern Profile kStraightProfile;

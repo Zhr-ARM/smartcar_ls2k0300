@@ -211,9 +211,6 @@ bool motor_thread_init()
     brushless_driver.init();
     count_pid.init(MotorSpeedPidController::default_config((float)MOTOR_MAX_DUTY_PERCENT));
 
-    brushless_driver.set_left_duty(0);
-    brushless_driver.set_right_duty(0);
-
     g_motor_running = true;
     g_motor_thread = std::thread(motor_loop);
 

@@ -154,6 +154,34 @@ bool is_line_error_prefix_exp_valid(const Profile &profile)
            (profile.line_error_exp_lambda <= 20.0f);
 }
 
+bool is_fuzzy_pid_range_valid(const Profile &profile)
+{
+    if (profile.fuzzy_pid_e_scale <= 0.0f || profile.fuzzy_pid_de_scale <= 0.0f)
+    {
+        return false;
+    }
+    if (profile.fuzzy_pid_gain_update_alpha < 0.0f || profile.fuzzy_pid_gain_update_alpha > 1.0f)
+    {
+        return false;
+    }
+    if (profile.fuzzy_pid_kp_min > profile.fuzzy_pid_kp_max ||
+        profile.fuzzy_pid_ki_min > profile.fuzzy_pid_ki_max ||
+        profile.fuzzy_pid_kd_min > profile.fuzzy_pid_kd_max)
+    {
+        return false;
+    }
+    for (int i = 0; i < kFuzzyRuleCount; ++i)
+    {
+        if (profile.fuzzy_pid_rule_dkp[i] < -1.0f || profile.fuzzy_pid_rule_dkp[i] > 1.0f ||
+            profile.fuzzy_pid_rule_dki[i] < -1.0f || profile.fuzzy_pid_rule_dki[i] > 1.0f ||
+            profile.fuzzy_pid_rule_dkd[i] < -1.0f || profile.fuzzy_pid_rule_dkd[i] > 1.0f)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 Profile kNormalProfile = {
     350.0f,
     3.0f, 2.1f, 0.0f, 50.0f, 3.0f, 4.6f, 10.0f, 5.6f, 0.0f, 0.15f, 0.0f, 0.0f, 2.0f, 0.0f, 210.0f,

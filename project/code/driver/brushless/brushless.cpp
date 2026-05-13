@@ -6,6 +6,7 @@
  */
 Brushless::Brushless(const char *pwm_path)
     : pwm_path_(pwm_path),
+      initialized_(false),
       current_duty_percent_(0),
       current_raw_duty_(BRUSHLESS_PWM_OFF_DUTY)
 {
@@ -17,7 +18,13 @@ Brushless::Brushless(const char *pwm_path)
  */
 void Brushless::init()
 {
+    if (initialized_)
+    {
+        return;
+    }
+
     pwm_get_dev_info(pwm_path_, &pwm_info_);
+    initialized_ = true;
     stop();
 }
 

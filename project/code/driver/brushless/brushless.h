@@ -136,6 +136,7 @@ private:
 
     const char *pwm_path_;
     struct pwm_info pwm_info_;
+    bool initialized_;
     float current_duty_percent_;
     uint32 current_raw_duty_;
 };

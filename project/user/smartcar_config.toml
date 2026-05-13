@@ -201,7 +201,7 @@ cross_upper_dir6_post_run_len = 3
 ipm_line_error_source = 2
 # line_error 计算方法。
 # 0=固定索引，1=离散点位加权索引，2=随速度索引，3=前缀指数加权索引。
-ipm_line_error_method = 0
+ipm_line_error_method = 1
 
 [vision.runtime.ncnn]
 # ncnn 模型输入宽度。
@@ -486,36 +486,10 @@ base_speed_scale = 1.0
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
 base_speed = 300.0
-# NORMAL 档位置环动态 Kp 低误差段一次项系数。
-position_dynamic_kp_quad_a = 0
-# NORMAL 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 8
-# NORMAL 档位置环动态 Kp 下限。
-position_dynamic_kp_min = 0.0
-# NORMAL 档位置环动态 Kp 上限。
-position_dynamic_kp_max = 70.0
-# NORMAL 档位置环动态 Kp 低误差段结束阈值。
-position_dynamic_kp_low_error_threshold_px = 5.0
-# NORMAL 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 0
-# NORMAL 档位置环动态 Kp 中误差段结束阈值。
-position_dynamic_kp_mid_error_threshold_px = 15.0
-# NORMAL 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 0
-# NORMAL 档位置环 Ki。
-position_ki = 0.0
-# NORMAL 档位置环 Kd 基础值。
-position_kd = 0.02
-# NORMAL 档位置环动态 Kd 一次项系数。
-position_dynamic_kd_quad_a = 0.0
-# NORMAL 档位置环动态 Kd 下限。
-position_dynamic_kd_min = 0.0
-# NORMAL 档位置环动态 Kd 上限。
-position_dynamic_kd_max = 2.0
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
-position_max_output = 270.0
+position_max_output = 200.0
 # NORMAL 档位置环前馈开关（基于历史误差一阶/二阶差分）。
 position_feedforward_enabled = true
 # NORMAL 档位置环前馈一阶差分增益。
@@ -529,41 +503,41 @@ position_feedforward_error_trend_gain = 0.0
 # NORMAL 档位置环前馈输出限幅。
 position_feedforward_max_output = 200.0
 # NORMAL 档总转向输出限幅。
-steering_max_output = 270.0
+steering_max_output = 200.0
 # NORMAL 档 line_error 前缀比例（0,1]。
 line_error_prefix_ratio = 0.4
 # NORMAL 档 line_error 指数权重参数 lambda（>=0） 越大越偏向近端点。。
 line_error_exp_lambda = 1
+# NORMAL 档模糊自整定 PID 开关。
+fuzzy_pid.enable_fuzzy_pid = true
+# NORMAL 档模糊 PID 基础增益。
+fuzzy_pid.kp_base = 8.0
+fuzzy_pid.ki_base = 0.0
+fuzzy_pid.kd_base = 0.02
+# NORMAL 档模糊 PID 增益限幅。
+fuzzy_pid.kp_min = 0.0
+fuzzy_pid.kp_max = 40.0
+fuzzy_pid.ki_min = 0.0
+fuzzy_pid.ki_max = 1.0
+fuzzy_pid.kd_min = 0.0
+fuzzy_pid.kd_max = 2.0
+# NORMAL 档模糊输入归一化尺度。
+fuzzy_pid.e_scale = 30.0
+fuzzy_pid.de_scale = 3000.0
+# NORMAL 档模糊输出增量尺度。
+fuzzy_pid.dkp_scale = 0.0
+fuzzy_pid.dki_scale = 0.0
+fuzzy_pid.dkd_scale = 0.0
+# NORMAL 档模糊增益平滑系数 [0,1]。
+fuzzy_pid.gain_update_alpha = 0.35
+# NORMAL 档 9x9 规则表（范围 [-1,1]，按 e 行、de 列展平）。
+fuzzy_pid.rule_dkp = [0.96, 0.915, 0.87, 0.825, 0.78, 0.72, 0.66, 0.6, 0.54, 0.675, 0.647, 0.618, 0.589, 0.56, 0.51, 0.46, 0.41, 0.36, 0.401, 0.389, 0.376, 0.364, 0.351, 0.311, 0.271, 0.231, 0.191, 0.143, 0.147, 0.151, 0.155, 0.158, 0.128, 0.098, 0.068, 0.038, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.038, 0.068, 0.098, 0.128, 0.158, 0.155, 0.151, 0.147, 0.143, 0.191, 0.231, 0.271, 0.311, 0.351, 0.364, 0.376, 0.389, 0.401, 0.36, 0.41, 0.46, 0.51, 0.56, 0.589, 0.618, 0.647, 0.675, 0.54, 0.6, 0.66, 0.72, 0.78, 0.825, 0.87, 0.915, 0.96]
+fuzzy_pid.rule_dki = [-0.8, -0.682, -0.567, -0.454, -0.35, -0.429, -0.517, -0.607, -0.7, -0.651, -0.512, -0.374, -0.24, -0.114, -0.221, -0.337, -0.455, -0.576, -0.508, -0.346, -0.187, -0.031, 0.117, -0.018, -0.162, -0.309, -0.458, -0.371, -0.188, -0.006, 0.171, 0.341, 0.178, 0.006, -0.169, -0.346, -0.25, -0.045, 0.158, 0.358, 0.55, 0.358, 0.158, -0.045, -0.25, -0.346, -0.169, 0.006, 0.178, 0.341, 0.171, -0.006, -0.188, -0.371, -0.458, -0.309, -0.162, -0.018, 0.117, -0.031, -0.187, -0.346, -0.508, -0.576, -0.455, -0.337, -0.221, -0.114, -0.24, -0.374, -0.512, -0.651, -0.7, -0.607, -0.517, -0.429, -0.35, -0.454, -0.567, -0.682, -0.8]
+fuzzy_pid.rule_dkd = [0.76, 0.649, 0.532, 0.408, 0.26, 0.506, 0.727, 0.941, 1, 0.745, 0.626, 0.502, 0.371, 0.215, 0.449, 0.66, 0.862, 1, 0.73, 0.604, 0.472, 0.333, 0.17, 0.393, 0.592, 0.784, 0.97, 0.715, 0.581, 0.442, 0.296, 0.125, 0.337, 0.525, 0.705, 0.88, 0.7, 0.559, 0.412, 0.258, 0.08, 0.258, 0.412, 0.559, 0.7, 0.88, 0.705, 0.525, 0.337, 0.125, 0.296, 0.442, 0.581, 0.715, 0.97, 0.784, 0.592, 0.393, 0.17, 0.333, 0.472, 0.604, 0.73, 1, 0.862, 0.66, 0.449, 0.215, 0.371, 0.502, 0.626, 0.745, 1, 0.941, 0.727, 0.506, 0.26, 0.408, 0.532, 0.649, 0.76]
 
 [pid.route_line_follow.straight]
 # STRAIGHT 档基础速度。
 base_speed = 270.0
-# STRAIGHT 档位置环动态 Kp 低误差段一次项系数。
-position_dynamic_kp_quad_a = 0.0
-# STRAIGHT 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 4.0
-# STRAIGHT 档位置环动态 Kp 下限。
-position_dynamic_kp_min = 0.0
-# STRAIGHT 档位置环动态 Kp 上限。
-position_dynamic_kp_max = 30.0
-# STRAIGHT 档位置环动态 Kp 低误差段结束阈值。
-position_dynamic_kp_low_error_threshold_px = 3.0
-# STRAIGHT 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 0.0
-# STRAIGHT 档位置环动态 Kp 中误差段结束阈值。
-position_dynamic_kp_mid_error_threshold_px = 10.0
-# STRAIGHT 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 0.0
-# STRAIGHT 档位置环 Ki。
-position_ki = 0.0
-# STRAIGHT 档位置环 Kd。
-position_kd = 0.0
-# STRAIGHT 档位置环动态 Kd 一次项系数。
-position_dynamic_kd_quad_a = 0.0
-# STRAIGHT 档位置环动态 Kd 下限。
-position_dynamic_kd_min = 0.0
-# STRAIGHT 档位置环动态 Kd 上限。
-position_dynamic_kd_max = 2.0
 # STRAIGHT 档位置环积分限幅。
 position_max_integral = 0.0
 # STRAIGHT 档位置环输出限幅。
@@ -586,4 +560,29 @@ steering_max_output = 270.0
 line_error_prefix_ratio = 0.6
 # STRAIGHT 档 line_error 指数权重参数 lambda（>=0）。
 line_error_exp_lambda = 1
-
+# STRAIGHT 档模糊自整定 PID 开关。
+fuzzy_pid.enable_fuzzy_pid = true
+# STRAIGHT 档模糊 PID 基础增益。
+fuzzy_pid.kp_base = 4.0
+fuzzy_pid.ki_base = 0.0
+fuzzy_pid.kd_base = 0.0
+# STRAIGHT 档模糊 PID 增益限幅。
+fuzzy_pid.kp_min = 0.0
+fuzzy_pid.kp_max = 30.0
+fuzzy_pid.ki_min = 0.0
+fuzzy_pid.ki_max = 1.0
+fuzzy_pid.kd_min = 0.0
+fuzzy_pid.kd_max = 2.0
+# STRAIGHT 档模糊输入归一化尺度。
+fuzzy_pid.e_scale = 25.0
+fuzzy_pid.de_scale = 260.0
+# STRAIGHT 档模糊输出增量尺度。
+fuzzy_pid.dkp_scale = 8.0
+fuzzy_pid.dki_scale = 0.05
+fuzzy_pid.dkd_scale = 0.18
+# STRAIGHT 档模糊增益平滑系数 [0,1]。
+fuzzy_pid.gain_update_alpha = 0.30
+# STRAIGHT 档 9x9 规则表（范围 [-1,1]，按 e 行、de 列展平）。
+fuzzy_pid.rule_dkp = [0.96, 0.915, 0.87, 0.825, 0.78, 0.72, 0.66, 0.6, 0.54, 0.675, 0.647, 0.618, 0.589, 0.56, 0.51, 0.46, 0.41, 0.36, 0.401, 0.389, 0.376, 0.364, 0.351, 0.311, 0.271, 0.231, 0.191, 0.143, 0.147, 0.151, 0.155, 0.158, 0.128, 0.098, 0.068, 0.038, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.038, 0.068, 0.098, 0.128, 0.158, 0.155, 0.151, 0.147, 0.143, 0.191, 0.231, 0.271, 0.311, 0.351, 0.364, 0.376, 0.389, 0.401, 0.36, 0.41, 0.46, 0.51, 0.56, 0.589, 0.618, 0.647, 0.675, 0.54, 0.6, 0.66, 0.72, 0.78, 0.825, 0.87, 0.915, 0.96]
+fuzzy_pid.rule_dki = [-0.8, -0.682, -0.567, -0.454, -0.35, -0.429, -0.517, -0.607, -0.7, -0.651, -0.512, -0.374, -0.24, -0.114, -0.221, -0.337, -0.455, -0.576, -0.508, -0.346, -0.187, -0.031, 0.117, -0.018, -0.162, -0.309, -0.458, -0.371, -0.188, -0.006, 0.171, 0.341, 0.178, 0.006, -0.169, -0.346, -0.25, -0.045, 0.158, 0.358, 0.55, 0.358, 0.158, -0.045, -0.25, -0.346, -0.169, 0.006, 0.178, 0.341, 0.171, -0.006, -0.188, -0.371, -0.458, -0.309, -0.162, -0.018, 0.117, -0.031, -0.187, -0.346, -0.508, -0.576, -0.455, -0.337, -0.221, -0.114, -0.24, -0.374, -0.512, -0.651, -0.7, -0.607, -0.517, -0.429, -0.35, -0.454, -0.567, -0.682, -0.8]
+fuzzy_pid.rule_dkd = [0.76, 0.649, 0.532, 0.408, 0.26, 0.506, 0.727, 0.941, 1, 0.745, 0.626, 0.502, 0.371, 0.215, 0.449, 0.66, 0.862, 1, 0.73, 0.604, 0.472, 0.333, 0.17, 0.393, 0.592, 0.784, 0.97, 0.715, 0.581, 0.442, 0.296, 0.125, 0.337, 0.525, 0.705, 0.88, 0.7, 0.559, 0.412, 0.258, 0.08, 0.258, 0.412, 0.559, 0.7, 0.88, 0.705, 0.525, 0.337, 0.125, 0.296, 0.442, 0.581, 0.715, 0.97, 0.784, 0.592, 0.393, 0.17, 0.333, 0.472, 0.604, 0.73, 1, 0.862, 0.66, 0.449, 0.215, 0.371, 0.502, 0.626, 0.745, 1, 0.941, 0.727, 0.506, 0.26, 0.408, 0.532, 0.649, 0.76]

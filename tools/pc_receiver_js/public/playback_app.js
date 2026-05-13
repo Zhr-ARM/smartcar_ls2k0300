@@ -128,6 +128,11 @@
 
   function renderSlowdownCards(status, container) {
     if (!container) return;
+    if (!hasValue(status && status.pid_common_speed_scheme_winner_branch) &&
+        !hasValue(status && status.pid_common_speed_scheme_point_count)) {
+      container.innerHTML = '';
+      return;
+    }
     const winner = Number(status && status.pid_common_speed_scheme_winner_branch) || 0;
     const splitRatio = getSpeedSchemeSplitRatio(status);
     const rearExpLambda = getSpeedSchemeRearExpLambda(status);
@@ -439,42 +444,27 @@
       ['route_sub_state', status.pid_common_route_sub_state],
       ['normal_speed_reference', status.pid_common_normal_speed_reference],
       ['profile_base_speed', status.pid_common_profile_base_speed],
-      ['desired_base_speed', status.pid_common_desired_base_speed],
       ['applied_base_speed', status.pid_common_applied_base_speed],
       ['raw_error_px', status.pid_common_raw_error_px],
-      ['normalized_error', status.pid_common_normalized_error],
-      ['filtered_error_norm', status.pid_common_filtered_error_norm],
       ['filtered_error_px', status.pid_common_filtered_error_px],
       ['abs_filtered_error_px', status.pid_common_abs_filtered_error_px],
-      ['control_error_norm', status.pid_common_control_error_norm],
+      ['control_error_px', status.pid_common_control_error_px],
       ['track_point', status.pid_common_track_point],
       ['track_angle(current/filtered)', [status.pid_common_current_track_point_angle_deg, status.pid_common_filtered_track_point_angle_deg]],
-      ['yaw_rate(measured/ref/error)', [status.pid_common_measured_yaw_rate_dps, status.pid_common_yaw_rate_ref_dps, status.pid_common_yaw_rate_error_dps]],
-      ['yaw_rate_error_norm', status.pid_common_yaw_rate_error_norm],
-      ['dynamic_position_kp', status.pid_common_dynamic_position_kp],
-      ['dynamic_yaw_rate_kp', status.pid_common_dynamic_yaw_rate_kp],
-      ['applied_yaw_rate_kp', status.pid_common_applied_yaw_rate_kp],
-      ['position_pid(kp/ki/kd)', [status.pid_common_position_pid_kp, status.pid_common_position_pid_ki, status.pid_common_position_pid_kd]],
+      ['measured_yaw_rate_dps', status.pid_common_measured_yaw_rate_dps],
+      ['fuzzy_enabled', status.pid_common_fuzzy_enabled],
+      ['fuzzy_norm(e/de)', [status.pid_common_fuzzy_e_norm, status.pid_common_fuzzy_de_norm]],
+      ['fuzzy_delta(dKp/dKi/dKd)', [status.pid_common_fuzzy_dkp, status.pid_common_fuzzy_dki, status.pid_common_fuzzy_dkd]],
+      ['fuzzy_applied(Kp/Ki/Kd)', [status.pid_common_fuzzy_kp_applied, status.pid_common_fuzzy_ki_applied, status.pid_common_fuzzy_kd_applied]],
+      ['position_gain(Kp/Ki/Kd)', [status.pid_common_position_pid_kp, status.pid_common_position_pid_ki, status.pid_common_position_pid_kd]],
       ['position_pid(target/error/output)', [status.pid_common_position_pid_target, status.pid_common_position_pid_error, status.pid_common_position_pid_output]],
       ['position_pid(integral/max_i/max_o)', [status.pid_common_position_pid_integral, status.pid_common_position_pid_max_integral, status.pid_common_position_pid_max_output]],
-      ['yaw_pid(kp/ki/kd)', [status.pid_common_yaw_pid_kp, status.pid_common_yaw_pid_ki, status.pid_common_yaw_pid_kd]],
-      ['yaw_pid(target/error/output)', [status.pid_common_yaw_pid_target, status.pid_common_yaw_pid_error, status.pid_common_yaw_pid_output]],
-      ['yaw_pid(integral/max_i/max_o)', [status.pid_common_yaw_pid_integral, status.pid_common_yaw_pid_max_integral, status.pid_common_yaw_pid_max_output]],
-      ['route(yaw_gain/ref_limit/steer_max)', [status.pid_common_route_yaw_rate_ref_gain, status.pid_common_route_yaw_rate_ref_limit, status.pid_common_route_steering_max_output]],
-      ['yaw_kp_enable_error_threshold_px', status.pid_common_route_yaw_rate_kp_enable_error_threshold_px],
+      ['position_feedforward_output', status.pid_common_position_feedforward_output],
+      ['position_output_with_feedforward', status.pid_common_position_output_with_feedforward],
+      ['position_ff(diff1/diff2)', [status.pid_common_position_feedforward_first_diff_px, status.pid_common_position_feedforward_second_diff_px]],
+      ['position_ff(speed/trend/enabled)', [status.pid_common_position_feedforward_speed_scale, status.pid_common_position_feedforward_trend_scale, status.pid_common_position_feedforward_enabled]],
+      ['route_steering_max_output', status.pid_common_route_steering_max_output],
       ['mean_abs_path_error', status.pid_common_mean_abs_path_error],
-      ['speed_scheme_mode', SPEED_SCHEME_MODE],
-      ['speed_scheme_split_ratio', getSpeedSchemeSplitRatio(status)],
-      ['speed_scheme_rear_exp_lambda', getSpeedSchemeRearExpLambda(status)],
-      ['speed_scheme_friction_circle_n', getSpeedSchemeFrictionCircleN(status)],
-      ['speed_scheme_realtime_speed', getSpeedSchemeRealtimeSpeed(status)],
-      ['speed_scheme_friction_coupling', getSpeedSchemeFrictionCoupling(status)],
-      ['speed_scheme_target_abs_angle_deg', status.pid_common_speed_scheme_blended_abs_error_sum],
-      ['speed_scheme_error_scale_raw', getSpeedSchemeErrorScaleRaw(status)],
-      ['speed_scheme_scale(current)', status.pid_common_speed_scheme_final_speed_scale],
-      ['speed_scheme_point_count', status.pid_common_speed_scheme_point_count],
-      ['speed_scheme_ramp(rise/drop)', [status.pid_common_speed_scheme_max_rise_ratio_per_cycle, status.pid_common_speed_scheme_max_drop_ratio_per_cycle]],
-      ['speed_scheme_state(ready/triggered/winner)', [status.pid_common_speed_scheme_ready, status.pid_common_speed_scheme_triggered, slowdownWinnerLabel(status.pid_common_speed_scheme_winner_branch)]],
       ['steering(raw/clamped/applied)', [status.pid_common_raw_steering_output, status.pid_common_clamped_steering_output, status.pid_common_applied_steering_output]],
       ['line_follow_targets(L/R)', [status.pid_common_left_target_count_from_line_follow, status.pid_common_right_target_count_from_line_follow]],
       ['loop_dt_ms(vision/imu)', [status.pid_common_vision_dt_ms, status.pid_common_imu_dt_ms]],
@@ -525,24 +515,13 @@
   }
 
   function renderOverview(status, video, duration) {
-    const splitRatio = getSpeedSchemeSplitRatio(status);
-    const splitRatioText = Number.isFinite(splitRatio) ? fmtPidValue(splitRatio) : 'N/A';
-    const speedSchemeRearExpLambda = getSpeedSchemeRearExpLambda(status);
-    const speedSchemeFrictionCircleN = getSpeedSchemeFrictionCircleN(status);
-    const speedSchemeRealtimeSpeed = getSpeedSchemeRealtimeSpeed(status);
-    const speedSchemeFrictionCoupling = getSpeedSchemeFrictionCoupling(status);
-    const speedSchemeErrorScaleRaw = getSpeedSchemeErrorScaleRaw(status);
     const rows = [
       ['当前时间', `${fmtPlaybackTime(video ? (video.currentTime || 0) : 0)} / ${fmtPlaybackTime(duration || 0)}`],
       ['主时间轴', playbackPrimaryKey || '--'],
       ['line_error', hasValue(status.line_error) ? fmtPidValue(status.line_error) : 'N/A'],
-      ['速度方案', SPEED_SCHEME_MODE],
-      ['分段比例/后段指数lambda', `split=${splitRatioText}, lambda=${fmtPidValue(speedSchemeRearExpLambda)}`],
-      ['摩擦圆参数', `n=${fmtPidValue(speedSchemeFrictionCircleN)}, v_rt=${fmtPidValue(speedSchemeRealtimeSpeed)}`],
-      ['中线点数', hasValue(status.pid_common_speed_scheme_point_count) ? fmtPidValue(status.pid_common_speed_scheme_point_count) : 'N/A'],
-      ['目标夹角/error_scale/current', `${hasValue(status.pid_common_speed_scheme_blended_abs_error_sum) ? fmtPidValue(status.pid_common_speed_scheme_blended_abs_error_sum) : 'N/A'} / ${hasValue(speedSchemeErrorScaleRaw) ? fmtPidValue(speedSchemeErrorScaleRaw) : 'N/A'} / ${hasValue(status.pid_common_speed_scheme_final_speed_scale) ? fmtPidValue(status.pid_common_speed_scheme_final_speed_scale) : 'N/A'}`],
-      ['耦合项(角度*实时速度)', hasValue(speedSchemeFrictionCoupling) ? fmtPidValue(speedSchemeFrictionCoupling) : 'N/A'],
-      ['单周期升降速', `${hasValue(status.pid_common_speed_scheme_max_rise_ratio_per_cycle) ? fmtPidValue(status.pid_common_speed_scheme_max_rise_ratio_per_cycle) : 'N/A'} / ${hasValue(status.pid_common_speed_scheme_max_drop_ratio_per_cycle) ? fmtPidValue(status.pid_common_speed_scheme_max_drop_ratio_per_cycle) : 'N/A'} (rise/drop)`],
+      ['模糊PID e/de', fmtPidValue([status.pid_common_fuzzy_e_norm, status.pid_common_fuzzy_de_norm])],
+      ['模糊PID dK', fmtPidValue([status.pid_common_fuzzy_dkp, status.pid_common_fuzzy_dki, status.pid_common_fuzzy_dkd])],
+      ['应用Kp/Ki/Kd', fmtPidValue([status.pid_common_fuzzy_kp_applied, status.pid_common_fuzzy_ki_applied, status.pid_common_fuzzy_kd_applied])],
       ['巡线输出', hasValue(status.pid_common_applied_steering_output) ? fmtPidValue(status.pid_common_applied_steering_output) : 'N/A'],
       ['基础速度', hasValue(status.pid_common_applied_base_speed) ? fmtPidValue(status.pid_common_applied_base_speed) : 'N/A'],
       ['状态机', [status.route_main_state, status.route_sub_state].filter(hasValue).join(' / ') || 'N/A'],

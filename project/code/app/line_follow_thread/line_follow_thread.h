@@ -23,6 +23,17 @@ struct LineFollowPidDebugStatus
     float filtered_track_point_angle_deg;
     float measured_yaw_rate_dps;
     float dynamic_position_kp;
+    float dynamic_position_ki;
+    float dynamic_position_kd;
+    bool fuzzy_pid_enabled;
+    float fuzzy_e_norm;
+    float fuzzy_de_norm;
+    float fuzzy_dkp;
+    float fuzzy_dki;
+    float fuzzy_dkd;
+    float fuzzy_kp_applied;
+    float fuzzy_ki_applied;
+    float fuzzy_kd_applied;
     float position_pid_kp;
     float position_pid_ki;
     float position_pid_kd;

@@ -693,31 +693,78 @@ bool load_route_profile(const RawMap &values,
                         pid_tuning::route_line_follow::Profile *profile,
                         std::string *error_message)
 {
-    return require_float(values, consumed, prefix + ".base_speed", &profile->base_speed, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_quad_a", &profile->position_dynamic_kp_quad_a, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_base", &profile->position_dynamic_kp_base, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_min", &profile->position_dynamic_kp_min, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_max", &profile->position_dynamic_kp_max, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_low_error_threshold_px", &profile->position_dynamic_kp_low_error_threshold_px, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_mid_a", &profile->position_dynamic_kp_mid_a, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_mid_error_threshold_px", &profile->position_dynamic_kp_mid_error_threshold_px, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_high_a", &profile->position_dynamic_kp_high_a, error_message) &&
-           require_float(values, consumed, prefix + ".position_ki", &profile->position_ki, error_message) &&
-           require_float(values, consumed, prefix + ".position_kd", &profile->position_kd, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kd_quad_a", &profile->position_dynamic_kd_quad_a, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kd_min", &profile->position_dynamic_kd_min, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kd_max", &profile->position_dynamic_kd_max, error_message) &&
-           require_float(values, consumed, prefix + ".position_max_integral", &profile->position_max_integral, error_message) &&
-           require_float(values, consumed, prefix + ".position_max_output", &profile->position_max_output, error_message) &&
-           require_bool(values, consumed, prefix + ".position_feedforward_enabled", &profile->position_feedforward_enabled, error_message) &&
-           require_float(values, consumed, prefix + ".position_feedforward_first_diff_gain", &profile->position_feedforward_first_diff_gain, error_message) &&
-           require_float(values, consumed, prefix + ".position_feedforward_second_diff_gain", &profile->position_feedforward_second_diff_gain, error_message) &&
-           require_float(values, consumed, prefix + ".position_feedforward_speed_gain", &profile->position_feedforward_speed_gain, error_message) &&
-           require_float(values, consumed, prefix + ".position_feedforward_error_trend_gain", &profile->position_feedforward_error_trend_gain, error_message) &&
-           require_float(values, consumed, prefix + ".position_feedforward_max_output", &profile->position_feedforward_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".steering_max_output", &profile->steering_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message) &&
-           require_float(values, consumed, prefix + ".line_error_exp_lambda", &profile->line_error_exp_lambda, error_message);
+    const char *deprecated_position_keys[] = {
+        ".position_dynamic_kp_quad_a",
+        ".position_dynamic_kp_base",
+        ".position_dynamic_kp_min",
+        ".position_dynamic_kp_max",
+        ".position_dynamic_kp_low_error_threshold_px",
+        ".position_dynamic_kp_mid_a",
+        ".position_dynamic_kp_mid_error_threshold_px",
+        ".position_dynamic_kp_high_a",
+        ".position_ki",
+        ".position_kd",
+        ".position_dynamic_kd_quad_a",
+        ".position_dynamic_kd_min",
+        ".position_dynamic_kd_max",
+    };
+    for (const char *key_suffix : deprecated_position_keys)
+    {
+        consume_optional_key_if_present(values, consumed, prefix + key_suffix);
+    }
+
+    if (!require_float(values, consumed, prefix + ".base_speed", &profile->base_speed, error_message) ||
+        !require_float(values, consumed, prefix + ".position_max_integral", &profile->position_max_integral, error_message) ||
+        !require_float(values, consumed, prefix + ".position_max_output", &profile->position_max_output, error_message) ||
+        !require_bool(values, consumed, prefix + ".position_feedforward_enabled", &profile->position_feedforward_enabled, error_message) ||
+        !require_float(values, consumed, prefix + ".position_feedforward_first_diff_gain", &profile->position_feedforward_first_diff_gain, error_message) ||
+        !require_float(values, consumed, prefix + ".position_feedforward_second_diff_gain", &profile->position_feedforward_second_diff_gain, error_message) ||
+        !require_float(values, consumed, prefix + ".position_feedforward_speed_gain", &profile->position_feedforward_speed_gain, error_message) ||
+        !require_float(values, consumed, prefix + ".position_feedforward_error_trend_gain", &profile->position_feedforward_error_trend_gain, error_message) ||
+        !require_float(values, consumed, prefix + ".position_feedforward_max_output", &profile->position_feedforward_max_output, error_message) ||
+        !require_float(values, consumed, prefix + ".steering_max_output", &profile->steering_max_output, error_message) ||
+        !require_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message) ||
+        !require_float(values, consumed, prefix + ".line_error_exp_lambda", &profile->line_error_exp_lambda, error_message) ||
+        !require_bool(values, consumed, prefix + ".fuzzy_pid.enable_fuzzy_pid", &profile->fuzzy_pid_enabled, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.kp_base", &profile->fuzzy_pid_kp_base, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.ki_base", &profile->fuzzy_pid_ki_base, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.kd_base", &profile->fuzzy_pid_kd_base, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.kp_min", &profile->fuzzy_pid_kp_min, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.kp_max", &profile->fuzzy_pid_kp_max, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.ki_min", &profile->fuzzy_pid_ki_min, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.ki_max", &profile->fuzzy_pid_ki_max, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.kd_min", &profile->fuzzy_pid_kd_min, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.kd_max", &profile->fuzzy_pid_kd_max, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.e_scale", &profile->fuzzy_pid_e_scale, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.de_scale", &profile->fuzzy_pid_de_scale, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.dkp_scale", &profile->fuzzy_pid_dkp_scale, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.dki_scale", &profile->fuzzy_pid_dki_scale, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.dkd_scale", &profile->fuzzy_pid_dkd_scale, error_message) ||
+        !require_float(values, consumed, prefix + ".fuzzy_pid.gain_update_alpha", &profile->fuzzy_pid_gain_update_alpha, error_message) ||
+        !require_float_array(values, consumed, prefix + ".fuzzy_pid.rule_dkp", profile->fuzzy_pid_rule_dkp, error_message) ||
+        !require_float_array(values, consumed, prefix + ".fuzzy_pid.rule_dki", profile->fuzzy_pid_rule_dki, error_message) ||
+        !require_float_array(values, consumed, prefix + ".fuzzy_pid.rule_dkd", profile->fuzzy_pid_rule_dkd, error_message))
+    {
+        return false;
+    }
+
+    // 旧动态 Kp/Kd 入口已经从用户配置移除。保留这些结构体字段只是为了
+    // enable_fuzzy_pid=false 时能退化成固定 PID，而不是重新暴露旧分段调参链路。
+    profile->position_dynamic_kp_quad_a = 0.0f;
+    profile->position_dynamic_kp_base = profile->fuzzy_pid_kp_base;
+    profile->position_dynamic_kp_min = profile->fuzzy_pid_kp_min;
+    profile->position_dynamic_kp_max = profile->fuzzy_pid_kp_max;
+    profile->position_dynamic_kp_low_error_threshold_px = 0.0f;
+    profile->position_dynamic_kp_mid_a = 0.0f;
+    profile->position_dynamic_kp_mid_error_threshold_px = 0.0f;
+    profile->position_dynamic_kp_high_a = 0.0f;
+    profile->position_ki = profile->fuzzy_pid_ki_base;
+    profile->position_kd = profile->fuzzy_pid_kd_base;
+    profile->position_dynamic_kd_quad_a = 0.0f;
+    profile->position_dynamic_kd_min = profile->fuzzy_pid_kd_min;
+    profile->position_dynamic_kd_max = profile->fuzzy_pid_kd_max;
+
+    return true;
 }
 
 PidSnapshot capture_pid_snapshot()
@@ -1313,6 +1360,25 @@ bool load_from_path(const std::string &path, std::string *error_message)
     consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.steering_max_output");
     consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.line_error_prefix_ratio");
     consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.line_error_exp_lambda");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.enable_fuzzy_pid");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.kp_base");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.ki_base");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.kd_base");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.kp_min");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.kp_max");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.ki_min");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.ki_max");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.kd_min");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.kd_max");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.e_scale");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.de_scale");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.dkp_scale");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.dki_scale");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.dkd_scale");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.gain_update_alpha");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.rule_dkp");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.rule_dki");
+    consume_optional_key_if_present(values, &consumed, "pid.route_line_follow.cross.fuzzy_pid.rule_dkd");
     const char *circle_groups[] = {"circle_enter", "circle_inside", "circle_exit"};
     for (const char *g : circle_groups)
     {
@@ -1342,6 +1408,25 @@ bool load_from_path(const std::string &path, std::string *error_message)
         consume_optional_key_if_present(values, &consumed, p + "steering_max_output");
         consume_optional_key_if_present(values, &consumed, p + "line_error_prefix_ratio");
         consume_optional_key_if_present(values, &consumed, p + "line_error_exp_lambda");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.enable_fuzzy_pid");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.kp_base");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.ki_base");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.kd_base");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.kp_min");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.kp_max");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.ki_min");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.ki_max");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.kd_min");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.kd_max");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.e_scale");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.de_scale");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.dkp_scale");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.dki_scale");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.dkd_scale");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.gain_update_alpha");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.rule_dkp");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.rule_dki");
+        consume_optional_key_if_present(values, &consumed, p + "fuzzy_pid.rule_dkd");
     }
 
     if (g_vision_runtime_config.ncnn_label_count > VISION_NCNN_CONFIG_MAX_LABELS)
@@ -1355,7 +1440,8 @@ bool load_from_path(const std::string &path, std::string *error_message)
                pid_tuning::route_line_follow::is_dynamic_position_kd_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile) &&
                pid_tuning::route_line_follow::is_position_feedforward_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile);
+               pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile) &&
+               pid_tuning::route_line_follow::is_fuzzy_pid_range_valid(profile);
     };
     if (!route_valid(pid_tuning::route_line_follow::kNormalProfile) ||
         !route_valid(pid_tuning::route_line_follow::kStraightProfile) ||

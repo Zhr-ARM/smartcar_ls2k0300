@@ -28,6 +28,7 @@ namespace
 constexpr float kStartupLowVoltageThresholdV = 9.8f;
 constexpr int kMainLoopPeriodMs = 5;
 constexpr int kLowVoltageStatusPrintPeriodMs = 2000;
+constexpr int kBrushlessPreImuSettleMs = 300;
 
 bool g_worker_cleanup_done = false;
 
@@ -53,6 +54,7 @@ void cleanup_worker_threads_once()
 void cleanup_once()
 {
     cleanup_worker_threads_once();
+    brushless_driver.stop_all();
     beep_thread_set_alarm_enabled(false);
     beep_thread_cleanup();
 }
@@ -76,6 +78,26 @@ float clamp_brushless_duty_percent(float duty_percent)
         return 100.0f;
     }
     return duty_percent;
+}
+
+void apply_configured_brushless_duty(const char *stage)
+{
+    const bool enabled = pid_tuning::brushless::kRealtimeEnabled;
+    if (!enabled)
+    {
+        brushless_driver.stop_all();
+        printf("[BRUSHLESS] %s realtime disabled -> stop all\r\n", stage);
+        return;
+    }
+
+    const float left_duty = clamp_brushless_duty_percent(pid_tuning::brushless::kLeftDutyPercent);
+    const float right_duty = clamp_brushless_duty_percent(pid_tuning::brushless::kRightDutyPercent);
+    brushless_driver.set_left_duty(left_duty);
+    brushless_driver.set_right_duty(right_duty);
+    printf("[BRUSHLESS] %s configured left=%.2f right=%.2f\r\n",
+           stage,
+           static_cast<double>(left_duty),
+           static_cast<double>(right_duty));
 }
 
 void update_brushless_realtime_control()
@@ -273,8 +295,16 @@ int main(int, char**)
     // 利用这 2s 视觉预热窗口同步完成 IMU 静止零偏标定：
     // 1) 不额外增加总启动时间；
     // 2) 标定结束后再启动 IMU 后台采集线程，后续按 5ms 周期持续更新并发布 gyro_z。
-    brushless_driver.set_left_duty(0);
-    brushless_driver.set_right_duty(0);
+    // 先打开配置的负压，让涵道电流在陀螺仪标定前进入稳定状态，减少标定后的电机干扰。
+    brushless_driver.init();
+    apply_configured_brushless_duty("pre_imu_calibration");
+    if (pid_tuning::brushless::kRealtimeEnabled &&
+        (clamp_brushless_duty_percent(pid_tuning::brushless::kLeftDutyPercent) > 0.0f ||
+         clamp_brushless_duty_percent(pid_tuning::brushless::kRightDutyPercent) > 0.0f))
+    {
+        printf("[BRUSHLESS] pre_imu_calibration settle %dms\r\n", kBrushlessPreImuSettleMs);
+        system_delay_ms(kBrushlessPreImuSettleMs);
+    }
 
     if (!imu_thread_calibrate_and_start(pid_tuning::imu::kStartupCalibrateDurationMs))
     {
@@ -292,8 +322,7 @@ int main(int, char**)
         cleanup();
         return -1;
     }
-    brushless_driver.set_left_duty(0);
-    brushless_driver.set_right_duty(0);
+    apply_configured_brushless_duty("after_motor_thread_init");
 
     if (g_vision_runtime_config.screen_display_enabled && !screen_display_thread_init())
     {

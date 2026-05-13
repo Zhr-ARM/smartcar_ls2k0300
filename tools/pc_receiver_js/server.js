@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { execFile } = require('node:child_process');
+const { execFile, spawn } = require('node:child_process');
 const WebSocket = require('ws');
 const { summarizeSyncStatus } = require('../pc_receiver_local_compute/wasm_sync_meta.js');
 
@@ -87,6 +87,14 @@ let cachedWasmSyncStatusAtMs = 0;
 let boardConnectionStore = loadBoardConnectionStore();
 
 let wss = null;
+let boardRunProcess = null;
+let boardRunStartedAtMs = 0;
+let boardRunLastStatus = {
+  running: false,
+  message: 'not started',
+  stdout_tail: '',
+  stderr_tail: ''
+};
 
 function broadcastWs(type, data) {
   if (!wss) return;
@@ -389,6 +397,117 @@ function execFileAsync(file, args) {
       resolve({ stdout, stderr });
     });
   });
+}
+
+function shellQuote(value) {
+  return `'${String(value || '').replace(/'/g, `'\\''`)}'`;
+}
+
+function appendTailText(current, chunk, maxLen = 12000) {
+  const next = `${current || ''}${chunk || ''}`;
+  return next.length > maxLen ? next.slice(next.length - maxLen) : next;
+}
+
+function buildBoardRunStatus(extra = {}) {
+  const settings = getBoardConnectionSettings();
+  return Object.assign({
+    ok: true,
+    running: !!boardRunProcess,
+    started_at_ms: boardRunStartedAtMs || 0,
+    ssh_target: {
+      host: settings.build_target_host || settings.board_ssh_host,
+      port: settings.build_target_port || settings.board_ssh_port,
+      user: settings.build_target_user || settings.board_ssh_user,
+      app_path: settings.build_target_app_path || '/home/root/tst',
+      executable: './project'
+    },
+    message: boardRunLastStatus.message || (boardRunProcess ? 'running' : 'not started'),
+    stdout_tail: boardRunLastStatus.stdout_tail || '',
+    stderr_tail: boardRunLastStatus.stderr_tail || ''
+  }, extra);
+}
+
+function startBoardRunProcess() {
+  if (boardRunProcess) {
+    return buildBoardRunStatus({ message: 'already running' });
+  }
+
+  const settings = getBoardConnectionSettings();
+  const host = settings.build_target_host || settings.board_ssh_host;
+  const port = settings.build_target_port || settings.board_ssh_port || 22;
+  const user = settings.build_target_user || settings.board_ssh_user || 'root';
+  const appPath = settings.build_target_app_path || '/home/root/tst';
+  if (!host || !user || !appPath) {
+    throw new Error('build target SSH settings are incomplete');
+  }
+
+  const remote = `${user}@${host}`;
+  const remoteCommand = `cd ${shellQuote(appPath)} && chmod +x ./project >/dev/null 2>&1 || true; exec ./project`;
+  const args = [
+    '-tt',
+    '-p', String(port),
+    remote,
+    remoteCommand
+  ];
+
+  const child = spawn('ssh', args, {
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+
+  boardRunProcess = child;
+  boardRunStartedAtMs = Date.now();
+  boardRunLastStatus = {
+    running: true,
+    message: `started ${remote}:${appPath}/project`,
+    stdout_tail: '',
+    stderr_tail: ''
+  };
+
+  child.stdout.on('data', (chunk) => {
+    boardRunLastStatus.stdout_tail = appendTailText(boardRunLastStatus.stdout_tail, chunk.toString('utf8'));
+  });
+  child.stderr.on('data', (chunk) => {
+    boardRunLastStatus.stderr_tail = appendTailText(boardRunLastStatus.stderr_tail, chunk.toString('utf8'));
+  });
+  child.on('error', (err) => {
+    boardRunLastStatus.message = `ssh spawn error: ${err.message}`;
+  });
+  child.on('exit', (code, signal) => {
+    boardRunProcess = null;
+    boardRunLastStatus.running = false;
+    boardRunLastStatus.message = `exited code=${code === null ? 'null' : code} signal=${signal || 'none'}`;
+  });
+
+  return buildBoardRunStatus();
+}
+
+function stopBoardRunProcess() {
+  if (!boardRunProcess) {
+    return buildBoardRunStatus({ message: 'not running' });
+  }
+
+  const child = boardRunProcess;
+  boardRunLastStatus.message = 'sending Ctrl+C';
+  try {
+    if (child.stdin && !child.stdin.destroyed) {
+      child.stdin.write('\x03');
+      child.stdin.end();
+    }
+  } catch (err) {
+    boardRunLastStatus.message = `failed to send Ctrl+C: ${err.message}`;
+  }
+
+  setTimeout(() => {
+    if (boardRunProcess === child) {
+      try {
+        child.kill('SIGTERM');
+      } catch (_) {
+        // ignore fallback kill failure
+      }
+    }
+  }, 2500);
+
+  return buildBoardRunStatus({ message: 'Ctrl+C sent' });
 }
 
 function persistLocalConfigToml(tomlText) {
@@ -912,6 +1031,10 @@ function startHttpServer() {
       serveFile(res, path.join(PUBLIC_DIR, 'config_app.js'), 'application/javascript; charset=utf-8');
       return;
     }
+    if (pathname === '/run_control_widget.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'run_control_widget.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
     if (pathname === '/local_compute_app.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'local_compute_app.js'), 'application/javascript; charset=utf-8');
       return;
@@ -989,6 +1112,35 @@ function startHttpServer() {
       buildConfigStatusPayload()
         .then((result) => sendJson(res, 200, result))
         .catch((err) => sendJson(res, 500, { ok: false, message: String(err && err.message ? err.message : err) }));
+      return;
+    }
+
+    if (pathname === '/api/run_control/status') {
+      sendJson(res, 200, buildBoardRunStatus());
+      return;
+    }
+
+    if (pathname === '/api/run_control/start' && req.method === 'POST') {
+      try {
+        sendJson(res, 200, startBoardRunProcess());
+      } catch (err) {
+        sendJson(res, 500, Object.assign(buildBoardRunStatus(), {
+          ok: false,
+          message: String(err && err.message ? err.message : err)
+        }));
+      }
+      return;
+    }
+
+    if (pathname === '/api/run_control/stop' && req.method === 'POST') {
+      try {
+        sendJson(res, 200, stopBoardRunProcess());
+      } catch (err) {
+        sendJson(res, 500, Object.assign(buildBoardRunStatus(), {
+          ok: false,
+          message: String(err && err.message ? err.message : err)
+        }));
+      }
       return;
     }
 

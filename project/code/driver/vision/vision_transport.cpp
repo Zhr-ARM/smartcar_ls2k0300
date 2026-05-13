@@ -1083,6 +1083,17 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_filtered_track_point_angle_deg", line_follow_pid_debug.filtered_track_point_angle_deg);
         append_float(enabled, "pid_common_measured_yaw_rate_dps", line_follow_pid_debug.measured_yaw_rate_dps);
         append_float(enabled, "pid_common_dynamic_position_kp", line_follow_pid_debug.dynamic_position_kp);
+        append_float(enabled, "pid_common_dynamic_position_ki", line_follow_pid_debug.dynamic_position_ki);
+        append_float(enabled, "pid_common_dynamic_position_kd", line_follow_pid_debug.dynamic_position_kd);
+        append_bool(enabled, "pid_common_fuzzy_enabled", line_follow_pid_debug.fuzzy_pid_enabled);
+        append_float(enabled, "pid_common_fuzzy_e_norm", line_follow_pid_debug.fuzzy_e_norm);
+        append_float(enabled, "pid_common_fuzzy_de_norm", line_follow_pid_debug.fuzzy_de_norm);
+        append_float(enabled, "pid_common_fuzzy_dkp", line_follow_pid_debug.fuzzy_dkp);
+        append_float(enabled, "pid_common_fuzzy_dki", line_follow_pid_debug.fuzzy_dki);
+        append_float(enabled, "pid_common_fuzzy_dkd", line_follow_pid_debug.fuzzy_dkd);
+        append_float(enabled, "pid_common_fuzzy_kp_applied", line_follow_pid_debug.fuzzy_kp_applied);
+        append_float(enabled, "pid_common_fuzzy_ki_applied", line_follow_pid_debug.fuzzy_ki_applied);
+        append_float(enabled, "pid_common_fuzzy_kd_applied", line_follow_pid_debug.fuzzy_kd_applied);
         append_float(enabled, "pid_common_position_pid_kp", line_follow_pid_debug.position_pid_kp);
         append_float(enabled, "pid_common_position_pid_ki", line_follow_pid_debug.position_pid_ki);
         append_float(enabled, "pid_common_position_pid_kd", line_follow_pid_debug.position_pid_kd);
