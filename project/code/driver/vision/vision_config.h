@@ -46,6 +46,16 @@ typedef struct
     size_t ncnn_label_count;
     // ncnn 默认模型标签表，索引顺序必须与模型输出类别顺序一致。
     const char *ncnn_labels[VISION_NCNN_CONFIG_MAX_LABELS];
+    // 红框 HSV 检测与 ncnn ROI 裁剪参数（full 图 320x240 坐标系）。
+    int red_roi_h_span;
+    int red_roi_s_min;
+    int red_roi_v_min;
+    int red_roi_close_iter;
+    int red_roi_open_iter;
+    int red_roi_area_min;
+    float red_roi_ratio_w;
+    float red_roi_ratio_h;
+    float red_roi_offset_ratio;
     // 客户端发送开关：控制逐飞助手发送链路是否启用。
     bool client_sender_enabled;
     // 车载屏显示开关：true 时启动 screen_display_thread。
@@ -245,14 +255,14 @@ typedef struct
     // - 更小表示更靠左；
     // - 更大表示更靠右。
     float ipm_center_target_offset_from_left_px;
-    // 武器类别命中后使用的左偏目标偏移（距离左边界 px）。
-    float ipm_center_target_offset_weapons_from_left_px;
-    // 物资类别命中后使用的右偏目标偏移（距离左边界 px）。
-    float ipm_center_target_offset_supplies_from_left_px;
-    // 从“正常无框”进入目标引导前，需要累计多少个有效推理结果。
-    int infer_offset_vote_result_count;
-    // 已进入目标引导后，连续多少帧无红框时恢复默认偏移。
-    int infer_offset_restore_no_red_count;
+    // 目标板确认：连续多少帧同类且高置信才进入目标板状态。
+    int infer_target_confirm_count;
+    // 目标板确认：Top1 置信度阈值。
+    float infer_target_confidence_threshold;
+    // 目标板绕行：相对进入前中线的左右偏移量 n（px）。
+    float infer_avoid_offset_delta_px;
+    // 目标板退出：进入状态后连续多少帧无红框时恢复默认偏移。
+    int infer_target_exit_no_red_count;
     // 逆透视处理中线独立后处理总开关（去重/平滑/重采样）。
     bool ipm_centerline_postprocess_enabled;
     // 逆透视处理中线三角滤波开关。

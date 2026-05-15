@@ -17,10 +17,10 @@ send_mode = 1
 send_max_fps = 60
 # 推理总开关。
 # false 时关闭红框检测和 ncnn 分类主链。
-infer_enabled = false
+infer_enabled = true
 # ncnn 分类子开关。
 # false 时即使 infer_enabled=true，也只保留红框检测，不做 ncnn 分类。
-ncnn_enabled = false
+ncnn_enabled = true
 # 逐飞客户端发送开关。
 # true 时启用客户端发送链路。
 client_sender_enabled = false
@@ -103,14 +103,14 @@ ipm_boundary_straight_min_cos = 0.95
 ipm_track_width_px = 28.0
 # 默认目标中线距离左边界的偏移像素。
 ipm_center_target_offset_from_left_px = 14.0
-# weapons 类别命中后采用的左偏目标中线偏移。
-ipm_center_target_offset_weapons_from_left_px = 4.0
-# supplies 类别命中后采用的右偏目标中线偏移。
-ipm_center_target_offset_supplies_from_left_px = 24.0
-# 进入目标偏移引导前需要累计的有效推理结果数。
-infer_offset_vote_result_count = 5
-# 目标偏移引导恢复默认值前允许连续无红框的帧数。
-infer_offset_restore_no_red_count = 5
+# 进入目标板状态前，需要连续多少帧同类高置信 Top1。
+infer_target_confirm_count = 5
+# 目标板确认的 Top1 置信度阈值。
+infer_target_confidence_threshold = 0.7
+# 绕行相对偏移 n：武器 default-n，物资 default+n，车辆 default。
+infer_avoid_offset_delta_px = 14.0
+# 目标板状态恢复默认值前允许连续无红框的帧数。
+infer_target_exit_no_red_count = 5
 # IPM 中线后处理总开关。
 # 控制去重、平滑和重采样等后处理步骤。
 ipm_centerline_postprocess_enabled = true
@@ -210,10 +210,27 @@ input_width = 64
 input_height = 64
 # ncnn 标签数量。
 # 必须与 labels 数组长度一致。
-label_count = 3
+label_count = 6
 # ncnn 类别标签表。
 # 顺序必须与模型输出类别顺序一致。
-labels = ["supplies", "vehicles", "weapons"]
+labels = ["ambulance", "armored_car", "bomb", "gun", "medicine", "telescope"]
+
+[vision.runtime.red_roi]
+# HSV 红色 Hue 半宽，匹配 [0,h_span] 和 [180-h_span,180]。
+h_span = 12
+# HSV 饱和度/亮度下限。
+s_min = 50
+v_min = 50
+# 3x3 形态学 close/open 迭代次数。
+close_iter = 1
+open_iter = 1
+# 最大红色轮廓的最小面积阈值。
+area_min = 50
+# 基于 320x240 full 图红框宽度推导 ncnn ROI 的宽/高比例。
+ratio_w = 1.2
+ratio_h = 1.2
+# ROI 底部锚点从红框底部上抬的比例。
+offset_ratio = 0.0
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
@@ -242,7 +259,7 @@ data_profile = 0
 # 网页端 TCP 状态发送总开关。
 tcp_enabled = true
 # PC 接收端 IP 地址。
-server_ip = "10.100.175.102"
+server_ip = "172.21.79.129"
 # PC 接收端 UDP 视频端口。
 video_port = 10000
 # PC 接收端 TCP 状态端口。
@@ -360,7 +377,7 @@ ipm_size = true
 # 逐飞助手 UDP 通道开关。
 enabled = false
 # 逐飞助手接收端 IP。
-server_ip = "10.100.175.102"
+server_ip = "172.21.79.129"
 # 逐飞助手接收端端口。
 server_port = 8899
 

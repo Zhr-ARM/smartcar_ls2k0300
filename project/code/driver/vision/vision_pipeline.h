@@ -52,6 +52,14 @@ bool vision_pipeline_infer_enabled();
 void vision_pipeline_set_ncnn_enabled(bool enabled);
 bool vision_pipeline_ncnn_enabled();
 
+// 作用：读取目标板绕行状态（ncnn 分类驱动的动态中线偏移）。
+// state 返回 "none"/"weapon"/"supply"/"vehicle"。
+const char *vision_pipeline_target_board_state_name();
+bool vision_pipeline_target_board_active();
+int vision_pipeline_target_board_confirm_count();
+int vision_pipeline_target_board_no_red_count();
+float vision_pipeline_target_board_offset_px();
+
 // 作用：读取红色矩形结果（来自 image_processor 全局状态）。
 // 意义：供外部状态上报/UI显示使用。
 void vision_pipeline_get_red_rect(bool *found, int *x, int *y, int *w, int *h, int *cx, int *cy);

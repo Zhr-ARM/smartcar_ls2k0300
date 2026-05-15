@@ -952,6 +952,15 @@ bool load_from_path(const std::string &path, std::string *error_message)
         !require_int(values, &consumed, "vision.runtime.ncnn.input_height", &g_vision_runtime_config.ncnn_input_height, error_message) ||
         !require_size_t(values, &consumed, "vision.runtime.ncnn.label_count", &ncnn_label_count, error_message) ||
         !require_string_array(values, &consumed, "vision.runtime.ncnn.labels", &g_string_storage.ncnn_labels, g_vision_runtime_config.ncnn_labels, &g_vision_runtime_config.ncnn_label_count, error_message) ||
+        !require_int(values, &consumed, "vision.runtime.red_roi.h_span", &g_vision_runtime_config.red_roi_h_span, error_message) ||
+        !require_int(values, &consumed, "vision.runtime.red_roi.s_min", &g_vision_runtime_config.red_roi_s_min, error_message) ||
+        !require_int(values, &consumed, "vision.runtime.red_roi.v_min", &g_vision_runtime_config.red_roi_v_min, error_message) ||
+        !require_int(values, &consumed, "vision.runtime.red_roi.close_iter", &g_vision_runtime_config.red_roi_close_iter, error_message) ||
+        !require_int(values, &consumed, "vision.runtime.red_roi.open_iter", &g_vision_runtime_config.red_roi_open_iter, error_message) ||
+        !require_int(values, &consumed, "vision.runtime.red_roi.area_min", &g_vision_runtime_config.red_roi_area_min, error_message) ||
+        !require_float(values, &consumed, "vision.runtime.red_roi.ratio_w", &g_vision_runtime_config.red_roi_ratio_w, error_message) ||
+        !require_float(values, &consumed, "vision.runtime.red_roi.ratio_h", &g_vision_runtime_config.red_roi_ratio_h, error_message) ||
+        !require_float(values, &consumed, "vision.runtime.red_roi.offset_ratio", &g_vision_runtime_config.red_roi_offset_ratio, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.client_sender_enabled", &g_vision_runtime_config.client_sender_enabled, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.screen_display_enabled", &g_vision_runtime_config.screen_display_enabled, error_message))
     {
@@ -961,6 +970,18 @@ bool load_from_path(const std::string &path, std::string *error_message)
     if (ncnn_label_count != g_vision_runtime_config.ncnn_label_count)
     {
         *error_message = "vision.runtime.ncnn.label_count does not match labels array length";
+        return false;
+    }
+    if (g_vision_runtime_config.red_roi_h_span < 0 || g_vision_runtime_config.red_roi_h_span > 90 ||
+        g_vision_runtime_config.red_roi_s_min < 0 || g_vision_runtime_config.red_roi_s_min > 255 ||
+        g_vision_runtime_config.red_roi_v_min < 0 || g_vision_runtime_config.red_roi_v_min > 255 ||
+        g_vision_runtime_config.red_roi_close_iter < 0 || g_vision_runtime_config.red_roi_open_iter < 0 ||
+        g_vision_runtime_config.red_roi_area_min < 1 ||
+        g_vision_runtime_config.red_roi_ratio_w <= 0.0f ||
+        g_vision_runtime_config.red_roi_ratio_h <= 0.0f ||
+        g_vision_runtime_config.red_roi_offset_ratio < 0.0f)
+    {
+        *error_message = "vision.runtime.red_roi contains invalid value";
         return false;
     }
 
@@ -1090,10 +1111,10 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_FLOAT(ipm_boundary_straight_min_cos);
     REQUIRE_RUNTIME_FLOAT(ipm_track_width_px);
     REQUIRE_RUNTIME_FLOAT(ipm_center_target_offset_from_left_px);
-    REQUIRE_RUNTIME_FLOAT(ipm_center_target_offset_weapons_from_left_px);
-    REQUIRE_RUNTIME_FLOAT(ipm_center_target_offset_supplies_from_left_px);
-    REQUIRE_RUNTIME_INT(infer_offset_vote_result_count);
-    REQUIRE_RUNTIME_INT(infer_offset_restore_no_red_count);
+    REQUIRE_RUNTIME_INT(infer_target_confirm_count);
+    REQUIRE_RUNTIME_FLOAT(infer_target_confidence_threshold);
+    REQUIRE_RUNTIME_FLOAT(infer_avoid_offset_delta_px);
+    REQUIRE_RUNTIME_INT(infer_target_exit_no_red_count);
     REQUIRE_RUNTIME_BOOL(ipm_centerline_postprocess_enabled);
     REQUIRE_RUNTIME_BOOL(ipm_centerline_triangle_filter_enabled);
     REQUIRE_RUNTIME_BOOL(ipm_centerline_resample_enabled);
@@ -1250,6 +1271,15 @@ bool load_from_path(const std::string &path, std::string *error_message)
     if (g_vision_runtime_config.ncnn_label_count > VISION_NCNN_CONFIG_MAX_LABELS)
     {
         *error_message = "vision.runtime.ncnn.label_count exceeds max";
+        return false;
+    }
+    if (g_vision_runtime_config.infer_target_confirm_count < 1 ||
+        g_vision_runtime_config.infer_target_confidence_threshold < 0.0f ||
+        g_vision_runtime_config.infer_target_confidence_threshold > 1.0f ||
+        g_vision_runtime_config.infer_avoid_offset_delta_px < 0.0f ||
+        g_vision_runtime_config.infer_target_exit_no_red_count < 1)
+    {
+        *error_message = "vision.runtime target board infer parameters are invalid";
         return false;
     }
 

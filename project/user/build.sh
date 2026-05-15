@@ -218,4 +218,17 @@ scp -O -P "$TARGET_PORT" ../user/smartcar_config.toml "${TARGET_USER}@${TARGET_H
     exit 1
 }
 
+ssh -p "$TARGET_PORT" "${TARGET_USER}@${TARGET_HOST}" "mkdir -p '${TARGET_APP_PATH}/ncnn_model'" || {
+    echo "模型目录创建失败。"
+    exit 1
+}
+
+scp -O -P "$TARGET_PORT" ../user/ncnn_model/tiny_classifier_fp32.ncnn.param \
+    ../user/ncnn_model/tiny_classifier_fp32.ncnn.bin \
+    ../user/ncnn_model/labels.txt \
+    "${TARGET_USER}@${TARGET_HOST}:${TARGET_APP_PATH}/ncnn_model/" || {
+    echo "NCNN 模型文件传输失败。"
+    exit 1
+}
+
 echo "传输完成"

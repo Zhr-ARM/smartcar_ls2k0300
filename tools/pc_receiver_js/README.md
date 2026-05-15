@@ -26,5 +26,5 @@ npm run dev
 ## 2. 可选环境变量
 
 ```bash
-BIND_HOST=0.0.0.0 UDP_PORT=10000 TCP_PORT=10001 HTTP_PORT=8080 npm run dev
+BIND_HOST=0.0.0.0 UDP_PORT=10000 TCP_PORT=10001 HTTP_PORT=9080 npm run dev
 ```

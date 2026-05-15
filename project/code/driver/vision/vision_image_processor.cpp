@@ -188,8 +188,8 @@ static uint16 g_src_shift_right_center_y[VISION_BOUNDARY_NUM];
 static int g_src_shift_right_center_count = 0;
 
 // 图像缓存：
-// - g_image_bgr_full: full 分辨率原图；
-// - g_image_bgr/g_image_gray/g_image_binary_u8: 处理分辨率图像。
+// - g_image_bgr_full: full 采集分辨率原图（当前 320x240）；
+// - g_image_bgr/g_image_gray/g_image_binary_u8: 降采样处理图（固定 160x120）。
 static uint8 g_image_bgr_full[UVC_HEIGHT * UVC_WIDTH * 3];
 static uint8 g_image_bgr[kProcHeight * kProcWidth * 3];
 static uint8 g_image_gray[kProcHeight * kProcWidth];
@@ -4087,8 +4087,8 @@ bool vision_image_processor_process_step()
 
     auto t_pre_start = t1;
 
-    // 处理分辨率固定为 kProcWidth x kProcHeight（当前为 160x120）。
-    // 当采图分辨率与处理分辨率不一致（如 320x240 -> 160x120）时，
+    // 处理分辨率固定为 kProcWidth x kProcHeight（160x120）。
+    // 当前默认采图为 320x240，因此除 ncnn 高清 ROI 外，主处理链在这里降采样到 160x120。
     // 在“未开启去畸变”路径也需要先正确缩放，再进入灰度/二值/巡线流程。
     cv::Mat bgr_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr_full);
     cv::Mat bgr(kProcHeight, kProcWidth, CV_8UC3, g_image_bgr);

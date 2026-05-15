@@ -1706,12 +1706,26 @@
       merged.right_boundary = Array.isArray(payload.rightBoundary) ? payload.rightBoundary : (merged.right_boundary || []);
       merged.ipm_left_boundary = Array.isArray(payload.ipmLeftBoundary) ? payload.ipmLeftBoundary : (merged.ipm_left_boundary || []);
       merged.ipm_right_boundary = Array.isArray(payload.ipmRightBoundary) ? payload.ipmRightBoundary : (merged.ipm_right_boundary || []);
-      merged.src_centerline_selected_shift = Array.isArray(payload.centerline) ? payload.centerline : (merged.src_centerline_selected_shift || []);
-      merged.ipm_centerline_selected_shift = Array.isArray(payload.ipmCenterline) ? payload.ipmCenterline : (merged.ipm_centerline_selected_shift || []);
-      merged.ipm_track_valid = !!payload.ipm_track_valid;
-      merged.ipm_track_index = Number(payload.ipm_track_index);
-      merged.ipm_track_point = Array.isArray(payload.ipm_track_point) ? payload.ipm_track_point : (merged.ipm_track_point || []);
-      merged.line_error = Number.isFinite(Number(payload.line_error)) ? Number(payload.line_error) : merged.line_error;
+      const hasBoardSrcCenterline = Array.isArray(merged.src_centerline_selected_shift) && merged.src_centerline_selected_shift.length > 0;
+      const hasBoardIpmCenterline = Array.isArray(merged.ipm_centerline_selected_shift) && merged.ipm_centerline_selected_shift.length > 0;
+      if (!hasBoardSrcCenterline) {
+        merged.src_centerline_selected_shift = Array.isArray(payload.centerline) ? payload.centerline : (merged.src_centerline_selected_shift || []);
+      }
+      if (!hasBoardIpmCenterline) {
+        merged.ipm_centerline_selected_shift = Array.isArray(payload.ipmCenterline) ? payload.ipmCenterline : (merged.ipm_centerline_selected_shift || []);
+      }
+      if (!hasValue(merged.ipm_track_valid)) {
+        merged.ipm_track_valid = !!payload.ipm_track_valid;
+      }
+      if (!hasValue(merged.ipm_track_index)) {
+        merged.ipm_track_index = Number(payload.ipm_track_index);
+      }
+      if (!Array.isArray(merged.ipm_track_point)) {
+        merged.ipm_track_point = Array.isArray(payload.ipm_track_point) ? payload.ipm_track_point : [];
+      }
+      if (!hasValue(merged.line_error)) {
+        merged.line_error = Number.isFinite(Number(payload.line_error)) ? Number(payload.line_error) : merged.line_error;
+      }
       merged.ipm_centerline_selected_count = Array.isArray(merged.ipm_centerline_selected_shift) ? merged.ipm_centerline_selected_shift.length : merged.ipm_centerline_selected_count;
       merged.src_centerline_selected_count = Array.isArray(merged.src_centerline_selected_shift) ? merged.src_centerline_selected_shift.length : merged.src_centerline_selected_count;
       if (!hasValue(merged.ipm_centerline_source)) {
@@ -2398,6 +2412,12 @@
       push(detectRows, 'ncnn_top_score', status.ncnn_top_score);
       push(detectRows, 'ncnn_top_label', status.ncnn_top_label);
       pushArray(detectRows, 'ncnn_probs', status.ncnn_probs);
+      push(detectRows, 'target_board_state', status.target_board_state);
+      push(detectRows, 'target_board_active', status.target_board_active);
+      push(detectRows, 'target_board_confirm_count', status.target_board_confirm_count);
+      push(detectRows, 'target_board_no_red_count', status.target_board_no_red_count);
+      push(detectRows, 'target_board_offset_px', status.target_board_offset_px);
+      push(detectRows, 'ipm_center_target_offset_px', status.ipm_center_target_offset_px);
       addSection('检测结果', detectRows);
 
       const trackRows = [];

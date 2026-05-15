@@ -13,33 +13,21 @@
 #include <cstdio>
 #include <cstring>
 #include <cmath>
+#include <cstdlib>
+#include <limits.h>
 #include <limits>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
+#include <unistd.h>
 
 namespace
 {
-// 固定分辨率参数：当前工程推理 ROI 直接基于 160x120 处理图裁剪。
+// 固定分辨率参数：主链处理图为 160x120，红框/ROI/ncnn 使用 320x240 full 图。
 static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
 static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
 static constexpr int kFullWidth = UVC_WIDTH;
 static constexpr int kFullHeight = UVC_HEIGHT;
-
-static constexpr int kRefProcWidth = 160;
-static constexpr int kRefProcHeight = 120;
-static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
-
-// 红框搜索区域参数（以 x=80 竖线附近搜索）。
-static constexpr int kRedSearchExpandXRef = 28;
-static constexpr int kRedSearchCenterXRef = 80;
-static constexpr int kRedSearchMinWRef = 48;
-static constexpr int kRedSearchMinHRef = 36;
-
-// 红框连通域筛选阈值（面积范围与目标面积）。
-static constexpr int kRedExpectedAreaPxRef = 60;
-static constexpr int kRedAreaMinPxRef = 20;
-static constexpr int kRedAreaMaxPxRef = 450;
 
 struct infer_job_t
 {
@@ -50,7 +38,7 @@ struct infer_job_t
 
 struct infer_worker_result_t
 {
-    // 异步任务输出：红框信息 + ncnn ROI（处理分辨率坐标）。
+    // 异步任务输出：红框信息 + ncnn ROI（full 分辨率坐标）。
     bool found = false;
     int red_x = 0;
     int red_y = 0;
@@ -60,7 +48,7 @@ struct infer_worker_result_t
     int red_cy = 0;
     int red_area = 0;
     uint32 red_detect_us = 0;
-    cv::Rect ncnn_roi_proc;
+    cv::Rect ncnn_roi_full;
     bool ncnn_enabled = false;
     bool ncnn_infer_valid = false;
     uint32 ncnn_infer_us = 0;
@@ -88,192 +76,88 @@ static infer_worker_result_t g_latest_infer_result;
 static bool g_latest_infer_result_valid = false;
 static uint32 g_latest_infer_result_seq = 0;
 
-// 作用：参考分辨率参数缩放到当前处理分辨率。
-static inline int scale_by_width(int ref_px)
+static cv::Rect build_ncnn_roi_from_red_rect(int red_x,
+                                             int red_y,
+                                             int red_w,
+                                             int red_h,
+                                             int image_width,
+                                             int image_height)
 {
-    if (ref_px <= 0)
-    {
-        return 0;
-    }
-    return std::max(1, (ref_px * kProcWidth + kRefProcWidth / 2) / kRefProcWidth);
+    const float ratio_w = std::max(0.01f, g_vision_runtime_config.red_roi_ratio_w);
+    const float ratio_h = std::max(0.01f, g_vision_runtime_config.red_roi_ratio_h);
+    const float offset_ratio = std::max(0.0f, g_vision_runtime_config.red_roi_offset_ratio);
+    const int bw = std::max(1, red_w);
+    const int lift = static_cast<int>(std::lround(static_cast<float>(bw) * offset_ratio));
+    const int anchor_y = red_y + red_h - lift;
+    const int roi_w = std::max(3, static_cast<int>(std::lround(static_cast<float>(bw) * ratio_w)));
+    const int roi_h = std::max(3, static_cast<int>(std::lround(static_cast<float>(bw) * ratio_h)));
+    int roi_x = static_cast<int>(std::lround(static_cast<float>(red_x) + (static_cast<float>(bw - roi_w) * 0.5f)));
+    int roi_y = anchor_y - roi_h;
+
+    roi_x = std::clamp(roi_x, 0, std::max(0, image_width - roi_w));
+    roi_y = std::clamp(roi_y, 0, std::max(0, image_height - roi_h));
+    return cv::Rect(roi_x, roi_y, roi_w, roi_h) & cv::Rect(0, 0, image_width, image_height);
 }
 
-static inline int scale_by_height(int ref_px)
-{
-    if (ref_px <= 0)
-    {
-        return 0;
-    }
-    return std::max(1, (ref_px * kProcHeight + kRefProcHeight / 2) / kRefProcHeight);
-}
-
-static inline int scale_by_area(int ref_area_px)
-{
-    if (ref_area_px <= 0)
-    {
-        return 0;
-    }
-    const int64_t scaled = static_cast<int64_t>(ref_area_px) * kProcWidth * kProcHeight;
-    return std::max(1, static_cast<int>((scaled + kRefProcPixels / 2) / kRefProcPixels));
-}
-
-static cv::Rect build_ncnn_proc_roi_from_red_rect(int red_x_proc,
-                                                  int red_y_proc,
-                                                  int red_w_proc,
-                                                  int red_h_proc)
-{
-    // 对齐 vision_specific：
-    // 1. 以红框上边中点作为 ROI 中心；
-    // 2. ROI 为正方形；
-    // 3. 边长 = 红框宽 * 3 / 2。
-    const int side_proc = std::max(1, (std::max(1, red_w_proc) * 3) / 2);
-    const int center_x_proc = red_x_proc + red_w_proc / 2;
-    const int center_y_proc = red_y_proc;
-
-    int roi_x_proc = center_x_proc - side_proc / 2;
-    int roi_y_proc = center_y_proc - side_proc / 2;
-    roi_x_proc = std::clamp(roi_x_proc, 0, std::max(0, kProcWidth - side_proc));
-    roi_y_proc = std::clamp(roi_y_proc, 0, std::max(0, kProcHeight - side_proc));
-    return cv::Rect(roi_x_proc, roi_y_proc, side_proc, side_proc) & cv::Rect(0, 0, kProcWidth, kProcHeight);
-}
-
-static cv::Rect fallback_center_roi()
-{
-    const int rw = std::clamp(kProcWidth / 2, scale_by_width(kRedSearchMinWRef), kProcWidth);
-    const int rh = std::clamp(kProcHeight / 2, scale_by_height(kRedSearchMinHRef), kProcHeight);
-    int rx = (kProcWidth - rw) / 2;
-    int ry = (kProcHeight - rh) / 2;
-    rx = std::clamp(rx, 0, std::max(0, kProcWidth - rw));
-    ry = std::clamp(ry, 0, std::max(0, kProcHeight - rh));
-    return cv::Rect(rx, ry, rw, rh);
-}
-
-// 作用：在 x=80 附近生成红框搜索 ROI。
-static cv::Rect build_red_search_roi_from_x_line()
-{
-    const int kExpandX = scale_by_width(kRedSearchExpandXRef);
-    const int kMinRoiW = scale_by_width(kRedSearchMinWRef);
-    const int kMinRoiH = std::min(kProcHeight, scale_by_height(kRedSearchMinHRef));
-    const int center_x = std::clamp(scale_by_width(kRedSearchCenterXRef), 0, kProcWidth - 1);
-
-    int x0 = std::max(0, center_x - kExpandX);
-    int x1 = std::min(kProcWidth - 1, center_x + kExpandX);
-    int y0 = 0;
-    int y1 = kProcHeight - 1;
-
-    int rw = x1 - x0 + 1;
-    int rh = y1 - y0 + 1;
-    if (rw < kMinRoiW)
-    {
-        const int cx = (x0 + x1) / 2;
-        x0 = std::max(0, cx - kMinRoiW / 2);
-        x1 = std::min(kProcWidth - 1, x0 + kMinRoiW - 1);
-        x0 = std::max(0, x1 - kMinRoiW + 1);
-        rw = x1 - x0 + 1;
-    }
-    if (rh < kMinRoiH)
-    {
-        const int cy = (y0 + y1) / 2;
-        y0 = std::max(0, cy - kMinRoiH / 2);
-        y1 = std::min(kProcHeight - 1, y0 + kMinRoiH - 1);
-        y0 = std::max(0, y1 - kMinRoiH + 1);
-        rh = y1 - y0 + 1;
-    }
-    if (rw <= 0 || rh <= 0)
-    {
-        return fallback_center_roi();
-    }
-    return cv::Rect(x0, y0, rw, rh);
-}
-
-// 作用：在搜索 ROI 内找红色实心矩形。
-// 如何修改：可调颜色阈值、面积阈值、形状约束。
-static bool detect_red_rectangle_bbox(const cv::Mat &bgr, const cv::Rect &search_roi, cv::Rect *bbox, int *area_px)
+// 作用：按 data_gen fine_crop_debug.py 的 HSV 双红区间算法找最大红色轮廓。
+static bool detect_red_rectangle_bbox(const cv::Mat &bgr, cv::Rect *bbox, int *area_px)
 {
     if (bbox == nullptr || area_px == nullptr || bgr.empty() || bgr.type() != CV_8UC3)
     {
         return false;
     }
 
-    cv::Rect roi = search_roi & cv::Rect(0, 0, bgr.cols, bgr.rows);
-    if (roi.width <= 0 || roi.height <= 0)
+    cv::Mat hsv;
+    cv::cvtColor(bgr, hsv, cv::COLOR_BGR2HSV);
+    const int h_span = std::clamp(g_vision_runtime_config.red_roi_h_span, 0, 90);
+    const int s_min = std::clamp(g_vision_runtime_config.red_roi_s_min, 0, 255);
+    const int v_min = std::clamp(g_vision_runtime_config.red_roi_v_min, 0, 255);
+
+    cv::Mat mask1;
+    cv::Mat mask2;
+    cv::Mat mask;
+    cv::inRange(hsv, cv::Scalar(0, s_min, v_min), cv::Scalar(h_span, 255, 255), mask1);
+    cv::inRange(hsv, cv::Scalar(180 - h_span, s_min, v_min), cv::Scalar(180, 255, 255), mask2);
+    cv::bitwise_or(mask1, mask2, mask);
+
+    const cv::Mat kernel = cv::Mat::ones(3, 3, CV_8U);
+    const int close_iter = std::max(0, g_vision_runtime_config.red_roi_close_iter);
+    const int open_iter = std::max(0, g_vision_runtime_config.red_roi_open_iter);
+    if (close_iter > 0)
+    {
+        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel, cv::Point(-1, -1), close_iter);
+    }
+    if (open_iter > 0)
+    {
+        cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel, cv::Point(-1, -1), open_iter);
+    }
+
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    if (contours.empty())
     {
         return false;
     }
 
-    cv::Mat mask(roi.height, roi.width, CV_8UC1, cv::Scalar(0));
-    for (int y = 0; y < roi.height; ++y)
+    int best_index = -1;
+    double best_area = 0.0;
+    for (int i = 0; i < static_cast<int>(contours.size()); ++i)
     {
-        const cv::Vec3b *src = bgr.ptr<cv::Vec3b>(roi.y + y);
-        uint8 *dst = mask.ptr<uint8>(y);
-        for (int x = 0; x < roi.width; ++x)
+        const double area = cv::contourArea(contours[i]);
+        if (area > best_area)
         {
-            const cv::Vec3b &px = src[roi.x + x];
-            const int b = static_cast<int>(px[0]);
-            const int g = static_cast<int>(px[1]);
-            const int r = static_cast<int>(px[2]);
-            if (r >= 80 && (r - g) >= 28 && (r - b) >= 22)
-            {
-                dst[x] = 255;
-            }
-        }
-    }
-
-    cv::Mat labels;
-    cv::Mat stats;
-    cv::Mat centroids;
-    const int comp_num = cv::connectedComponentsWithStats(mask, labels, stats, centroids, 8, CV_32S);
-    if (comp_num <= 1)
-    {
-        return false;
-    }
-
-    int best_label = -1;
-    int best_score = std::numeric_limits<int>::max();
-    int best_area = 0;
-    const int kAreaMinPx = scale_by_area(kRedAreaMinPxRef);
-    const int kAreaMaxPx = scale_by_area(kRedAreaMaxPxRef);
-    const int kExpectedAreaPx = scale_by_area(kRedExpectedAreaPxRef);
-    const int kMinCompW = scale_by_width(3);
-    const int kMinCompH = scale_by_height(3);
-    for (int i = 1; i < comp_num; ++i)
-    {
-        const int area = stats.at<int>(i, cv::CC_STAT_AREA);
-        const int w = stats.at<int>(i, cv::CC_STAT_WIDTH);
-        const int h = stats.at<int>(i, cv::CC_STAT_HEIGHT);
-        if (area < kAreaMinPx || area > kAreaMaxPx || w < kMinCompW || h < kMinCompH)
-        {
-            continue;
-        }
-
-        const int side_min = std::min(w, h);
-        const int side_max = std::max(w, h);
-        if (side_min <= 0 || side_max > side_min * 6)
-        {
-            continue;
-        }
-
-        const int area_cost = std::abs(area - kExpectedAreaPx);
-        const int shape_cost = std::abs((w * 10) - (h * 24));
-        const int score = area_cost * 4 + shape_cost;
-        if (score < best_score || (score == best_score && area > best_area))
-        {
-            best_score = score;
-            best_label = i;
             best_area = area;
+            best_index = i;
         }
     }
 
-    if (best_label < 0)
+    if (best_index < 0 || best_area <= static_cast<double>(std::max(1, g_vision_runtime_config.red_roi_area_min)))
     {
         return false;
     }
 
-    *bbox = cv::Rect(stats.at<int>(best_label, cv::CC_STAT_LEFT) + roi.x,
-                     stats.at<int>(best_label, cv::CC_STAT_TOP) + roi.y,
-                     stats.at<int>(best_label, cv::CC_STAT_WIDTH),
-                     stats.at<int>(best_label, cv::CC_STAT_HEIGHT));
-    *area_px = best_area;
+    *bbox = cv::boundingRect(contours[best_index]) & cv::Rect(0, 0, bgr.cols, bgr.rows);
+    *area_px = static_cast<int>(std::lround(best_area));
     return true;
 }
 
@@ -295,6 +179,68 @@ static bool ncnn_step(const uint8 *bgr_data,
 
     cv::Mat bgr(height, width, CV_8UC3, const_cast<uint8 *>(bgr_data));
     return g_ncnn->InferWithProbs(bgr, top_class_id, top_score, top_label, labels, probs, infer_us);
+}
+
+static bool file_exists(const std::string &path)
+{
+    return access(path.c_str(), R_OK) == 0;
+}
+
+static std::string executable_dir()
+{
+    char exe_path[PATH_MAX] = {0};
+    const ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (len <= 0)
+    {
+        return "";
+    }
+    exe_path[len] = '\0';
+    const char *slash = std::strrchr(exe_path, '/');
+    if (slash == nullptr)
+    {
+        return "";
+    }
+    return std::string(exe_path, static_cast<size_t>(slash - exe_path));
+}
+
+static std::string join_path(const std::string &dir, const char *name)
+{
+    if (dir.empty())
+    {
+        return name;
+    }
+    return dir + "/" + name;
+}
+
+static void resolve_default_model_paths(std::string *param_path, std::string *bin_path)
+{
+    const char *param_name = "tiny_classifier_fp32.ncnn.param";
+    const char *bin_name = "tiny_classifier_fp32.ncnn.bin";
+    const std::string exe_dir = executable_dir();
+    if (!exe_dir.empty())
+    {
+        const std::string model_dir = exe_dir + "/ncnn_model";
+        const std::string exe_param = join_path(model_dir, param_name);
+        const std::string exe_bin = join_path(model_dir, bin_name);
+        if (file_exists(exe_param) && file_exists(exe_bin))
+        {
+            *param_path = exe_param;
+            *bin_path = exe_bin;
+            return;
+        }
+    }
+
+    const std::string cwd_param = join_path("ncnn_model", param_name);
+    const std::string cwd_bin = join_path("ncnn_model", bin_name);
+    if (file_exists(cwd_param) && file_exists(cwd_bin))
+    {
+        *param_path = cwd_param;
+        *bin_path = cwd_bin;
+        return;
+    }
+
+    *param_path = param_name;
+    *bin_path = bin_name;
 }
 
 // 作用：清空异步任务与结果共享状态。
@@ -332,15 +278,17 @@ static void run_infer_worker()
         auto detect_start = std::chrono::steady_clock::now();
         cv::Rect red_bbox;
         int red_area = 0;
-        const cv::Rect search_roi = build_red_search_roi_from_x_line();
-        const bool found = detect_red_rectangle_bbox(job.proc_bgr, search_roi, &red_bbox, &red_area);
+        const cv::Mat &detect_bgr = !job.full_bgr.empty() ? job.full_bgr : job.proc_bgr;
+        const int detect_width = detect_bgr.cols;
+        const int detect_height = detect_bgr.rows;
+        const bool found = detect_red_rectangle_bbox(detect_bgr, &red_bbox, &red_area);
         auto detect_end = std::chrono::steady_clock::now();
         result.red_detect_us = static_cast<uint32>(
             std::chrono::duration_cast<std::chrono::microseconds>(detect_end - detect_start).count());
 
         if (found)
         {
-            red_bbox &= cv::Rect(0, 0, kProcWidth, kProcHeight);
+            red_bbox &= cv::Rect(0, 0, detect_width, detect_height);
             result.found = true;
             result.red_x = red_bbox.x;
             result.red_y = red_bbox.y;
@@ -350,17 +298,20 @@ static void run_infer_worker()
             result.red_cy = red_bbox.y + red_bbox.height / 2;
             result.red_area = red_area;
 
-            result.ncnn_roi_proc = build_ncnn_proc_roi_from_red_rect(result.red_x,
-                                                                     result.red_y,
-                                                                     result.red_w,
-                                                                     result.red_h);
+            result.ncnn_roi_full = build_ncnn_roi_from_red_rect(result.red_x,
+                                                                result.red_y,
+                                                                result.red_w,
+                                                                result.red_h,
+                                                                detect_width,
+                                                                detect_height);
 
             if (g_ncnn_enabled.load())
             {
-                cv::Rect safe_roi = result.ncnn_roi_proc & cv::Rect(0, 0, kProcWidth, kProcHeight);
+                cv::Rect safe_roi = result.ncnn_roi_full & cv::Rect(0, 0, detect_width, detect_height);
                 if (safe_roi.width > 0 && safe_roi.height > 0)
                 {
-                    cv::Mat roi_bgr = job.proc_bgr(safe_roi).clone();
+                    cv::Mat roi_bgr;
+                    roi_bgr = detect_bgr(safe_roi).clone();
                     result.ncnn_infer_valid = ncnn_step(reinterpret_cast<const uint8 *>(roi_bgr.data),
                                                         roi_bgr.cols,
                                                         roi_bgr.rows,
@@ -387,17 +338,17 @@ static void run_infer_worker()
 
 LQ_NCNN::LQ_NCNN()
     : m_initialized(false)
-    , m_input_width(96)
-    , m_input_height(96)
+    , m_input_width(64)
+    , m_input_height(64)
     , m_input_name("in0")
     , m_output_name("out0")
 {
     m_mean_vals[0] = 123.675f;
     m_mean_vals[1] = 116.28f;
     m_mean_vals[2] = 103.53f;
-    m_norm_vals[0] = 0.01712475f;
-    m_norm_vals[1] = 0.017507f;
-    m_norm_vals[2] = 0.01742919f;
+    m_norm_vals[0] = 1.0f / 58.395f;
+    m_norm_vals[1] = 1.0f / 57.12f;
+    m_norm_vals[2] = 1.0f / 57.375f;
 }
 
 bool LQ_NCNN::Init()
@@ -642,8 +593,9 @@ bool vision_infer_init_default_model(LQ_NCNN &ncnn)
     return false;
 #else
     // 默认模型配置：集中在此，替换模型时优先修改这里。
-    const std::string model_param = "tiny_classifier_fp32.ncnn.param";
-    const std::string model_bin = "tiny_classifier_fp32.ncnn.bin";
+    std::string model_param;
+    std::string model_bin;
+    resolve_default_model_paths(&model_param, &model_bin);
     const int input_width = g_vision_runtime_config.ncnn_input_width;
     const int input_height = g_vision_runtime_config.ncnn_input_height;
     std::vector<std::string> labels;
@@ -659,13 +611,13 @@ bool vision_infer_init_default_model(LQ_NCNN &ncnn)
         labels.emplace_back(label);
     }
     float mean_vals[3] = {123.675f, 116.28f, 103.53f};
-    float norm_vals[3] = {0.01712475f, 0.017507f, 0.01742919f};
+    float norm_vals[3] = {1.0f / 58.395f, 1.0f / 57.12f, 1.0f / 57.375f};
 
     ncnn.SetModelPath(model_param, model_bin);
     ncnn.SetInputSize(input_width, input_height);
     ncnn.SetLabels(labels);
     ncnn.SetNormalize(mean_vals, norm_vals);
-    printf("[NCNN] loading model...\n");
+    printf("[NCNN] loading model: %s / %s\n", model_param.c_str(), model_bin.c_str());
     if (!ncnn.Init())
     {
         printf("[NCNN] model init failed\n");
@@ -804,11 +756,11 @@ bool vision_infer_async_fetch_latest(vision_infer_async_result_t *out)
     out->red_cy = result.red_cy;
     out->red_area = result.red_area;
     out->red_detect_us = result.red_detect_us;
-    out->ncnn_roi_valid = result.found && result.ncnn_roi_proc.width > 0 && result.ncnn_roi_proc.height > 0;
-    out->ncnn_roi_x = result.ncnn_roi_proc.x;
-    out->ncnn_roi_y = result.ncnn_roi_proc.y;
-    out->ncnn_roi_w = result.ncnn_roi_proc.width;
-    out->ncnn_roi_h = result.ncnn_roi_proc.height;
+    out->ncnn_roi_valid = result.found && result.ncnn_roi_full.width > 0 && result.ncnn_roi_full.height > 0;
+    out->ncnn_roi_x = result.ncnn_roi_full.x;
+    out->ncnn_roi_y = result.ncnn_roi_full.y;
+    out->ncnn_roi_w = result.ncnn_roi_full.width;
+    out->ncnn_roi_h = result.ncnn_roi_full.height;
     out->ncnn_enabled = result.ncnn_enabled;
     out->ncnn_infer_valid = result.ncnn_infer_valid;
     out->ncnn_infer_us = result.ncnn_infer_us;

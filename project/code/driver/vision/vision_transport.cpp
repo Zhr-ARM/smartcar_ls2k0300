@@ -6,6 +6,7 @@
 #include "driver/vision/vision_frame_capture.h"
 #include "driver/vision/vision_infer_async.h"
 #include "driver/vision/vision_image_processor.h"
+#include "driver/vision/vision_pipeline.h"
 #include "vision_thread.h"
 
 #include "zf_driver_tcp_client.h"
@@ -506,8 +507,24 @@ static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *he
         enc_params = {cv::IMWRITE_JPEG_QUALITY, kRoiJpegQuality};
     }
 
-    const uint8 *bgr = vision_image_processor_bgr_downsampled_image();
-    if (bgr != nullptr)
+    const uint8 *bgr_full = vision_image_processor_bgr_full_image();
+    if (bgr_full != nullptr)
+    {
+        cv::Mat full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, const_cast<uint8 *>(bgr_full));
+        cv::Rect safe = roi_rect & cv::Rect(0, 0, full.cols, full.rows);
+        if (safe.width <= 0 || safe.height <= 0)
+        {
+            return false;
+        }
+        cv::Mat roi = full(safe);
+        cv::Mat roi64;
+        cv::resize(roi, roi64, cv::Size(kRoi64Size, kRoi64Size), 0.0, 0.0, cv::INTER_LINEAR);
+        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi64, *image_out, enc_params))
+        {
+            return false;
+        }
+    }
+    else if (const uint8 *bgr = vision_image_processor_bgr_downsampled_image())
     {
         cv::Mat full(VISION_DOWNSAMPLED_HEIGHT, VISION_DOWNSAMPLED_WIDTH, CV_8UC3, const_cast<uint8 *>(bgr));
         cv::Rect safe = roi_rect & cv::Rect(0, 0, full.cols, full.rows);
@@ -1244,6 +1261,12 @@ static void send_tcp_status()
         append_string(true, "ncnn_top_label",
                       (has_infer_result && infer_result.ncnn_infer_valid) ? infer_result.ncnn_top_label : "");
         append_prob_pairs(true, "ncnn_probs", infer_result);
+        append_string(true, "target_board_state", vision_pipeline_target_board_state_name());
+        append_bool(true, "target_board_active", vision_pipeline_target_board_active());
+        append_int(true, "target_board_confirm_count", vision_pipeline_target_board_confirm_count());
+        append_int(true, "target_board_no_red_count", vision_pipeline_target_board_no_red_count());
+        append_float(true, "target_board_offset_px", vision_pipeline_target_board_offset_px());
+        append_float(true, "ipm_center_target_offset_px", vision_image_processor_ipm_center_target_offset_from_left_px());
         append_pid_debug(true);
         append_bool(true, "udp_web_send_roi64", roi_valid);
         append_int_array(true, "roi64_size", {kRoi64Size, kRoi64Size});
@@ -1310,6 +1333,12 @@ static void send_tcp_status()
     append_string(true, "ncnn_top_label",
                   (has_infer_result && infer_result.ncnn_infer_valid) ? infer_result.ncnn_top_label : "");
     append_prob_pairs(true, "ncnn_probs", infer_result);
+    append_string(true, "target_board_state", vision_pipeline_target_board_state_name());
+    append_bool(true, "target_board_active", vision_pipeline_target_board_active());
+    append_int(true, "target_board_confirm_count", vision_pipeline_target_board_confirm_count());
+    append_int(true, "target_board_no_red_count", vision_pipeline_target_board_no_red_count());
+    append_float(true, "target_board_offset_px", vision_pipeline_target_board_offset_px());
+    append_float(true, "ipm_center_target_offset_px", vision_image_processor_ipm_center_target_offset_from_left_px());
     append_pid_debug(true);
     append_bool(true, "udp_web_send_roi64", roi_valid);
     append_int_array(true, "roi64_size", {kRoi64Size, kRoi64Size});

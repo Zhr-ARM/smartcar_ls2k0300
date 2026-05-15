@@ -51,19 +51,32 @@ vision_runtime_config_t g_vision_runtime_config = {
     // 图传发送上限帧率，0 表示不限速。
     .send_max_fps = 60,
     // 推理总开关：false 时关闭红色识别与 ncnn 推理。
-    .infer_enabled = false,
+    .infer_enabled = true,
     // ncnn 子开关：false 时只保留红框检测，不做 ncnn 分类。
-    .ncnn_enabled = false,
+    .ncnn_enabled = true,
     // ncnn 默认模型输入尺寸。
     .ncnn_input_width = 64,
     .ncnn_input_height = 64,
     // ncnn 标签顺序必须与模型输出类别索引严格一致。
-    .ncnn_label_count = 3,
+    .ncnn_label_count = 6,
     .ncnn_labels = {
-        "supplies",
-        "vehicles",
-        "weapons",
+        "ambulance",
+        "armored_car",
+        "bomb",
+        "gun",
+        "medicine",
+        "telescope",
     },
+    // 红框检测和 ROI 裁剪默认参数，对齐 data_gen fine_crop_debug.py。
+    .red_roi_h_span = 12,
+    .red_roi_s_min = 50,
+    .red_roi_v_min = 50,
+    .red_roi_close_iter = 1,
+    .red_roi_open_iter = 1,
+    .red_roi_area_min = 50,
+    .red_roi_ratio_w = 1.2f,
+    .red_roi_ratio_h = 1.2f,
+    .red_roi_offset_ratio = 0.0f,
     // 逐飞客户端发送开关。
     .client_sender_enabled = false,
     // 车载屏显示开关。
@@ -311,14 +324,14 @@ vision_runtime_config_t g_vision_runtime_config = {
     // 目标中线距离左边界的偏移，单位 px。
     // 当前 14 表示落在 28px 赛道宽度的正中间。
     .ipm_center_target_offset_from_left_px = 14.0f,
-    // 武器类别：靠左走。
-    .ipm_center_target_offset_weapons_from_left_px = 4.0f,
-    // 物资类别：靠右走。
-    .ipm_center_target_offset_supplies_from_left_px = 24.0f,
-    // 从正常巡线切入目标引导前，先累计 5 个有效推理结果再决策类别。
-    .infer_offset_vote_result_count = 5,
-    // 连续 5 帧无红框后，退出目标引导并恢复默认偏移。
-    .infer_offset_restore_no_red_count = 5,
+    // 连续 2 帧同类且高置信后进入目标板状态。
+    .infer_target_confirm_count = 2,
+    // Top1 概率至少 0.7 才参与目标板确认。
+    .infer_target_confidence_threshold = 0.7f,
+    // 绕行相对偏移 n：默认 14 +/- 10 => 约 4/24。
+    .infer_avoid_offset_delta_px = 10.0f,
+    // 连续 5 帧无红框后，退出目标板状态并恢复进入前偏移。
+    .infer_target_exit_no_red_count = 5,
     // 中线独立后处理总开关。
     .ipm_centerline_postprocess_enabled = true,
     // 中线三角滤波开关。

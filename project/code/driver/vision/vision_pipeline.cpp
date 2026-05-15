@@ -6,7 +6,7 @@
 #include "driver/vision/vision_transport.h"
 
 #include <algorithm>
-#include <array>
+#include <cmath>
 #include <opencv2/opencv.hpp>
 
 namespace
@@ -17,77 +17,175 @@ static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
 static constexpr int kFullWidth = UVC_WIDTH;
 static constexpr int kFullHeight = UVC_HEIGHT;
 
-static bool g_center_target_offset_override_active = false;
-static int g_center_target_offset_no_red_count = 0;
+enum target_board_state_enum
+{
+    TARGET_BOARD_NONE = 0,
+    TARGET_BOARD_WEAPON = 1,
+    TARGET_BOARD_SUPPLY = 2,
+    TARGET_BOARD_VEHICLE = 3
+};
+
+static target_board_state_enum g_target_board_state = TARGET_BOARD_NONE;
 static uint32 g_last_processed_infer_result_seq = 0;
 static float g_center_target_offset_restore_px = g_vision_runtime_config.ipm_center_target_offset_from_left_px;
-static int g_infer_offset_vote_valid_result_count = 0;
-static std::array<float, VISION_NCNN_MAX_CLASSES> g_infer_offset_prob_sums = {};
+static int g_target_board_candidate_class_id = -1;
+static int g_target_board_confirm_count = 0;
+static int g_target_board_no_red_count = 0;
+static float g_target_board_applied_offset_px = g_vision_runtime_config.ipm_center_target_offset_from_left_px;
 
-static void reset_infer_offset_vote_state()
+static void reset_target_board_candidate_state()
 {
-    g_infer_offset_vote_valid_result_count = 0;
-    g_infer_offset_prob_sums.fill(0.0f);
+    g_target_board_candidate_class_id = -1;
+    g_target_board_confirm_count = 0;
 }
 
-// 作用：为“识别类别 -> 目标偏移”预留映射接口。
-// 当前策略：
-// - weapons  -> 左偏配置；
-// - supplies -> 右偏配置；
-// - vehicles -> 赛道宽度一半（居中）。
-static float resolve_center_target_offset_for_class_id(int class_id)
+// TinyClassifier 6 类顺序：ambulance, armored_car, bomb, gun, medicine, telescope。
+static target_board_state_enum resolve_target_board_state_for_class_id(int class_id)
 {
-    if (class_id == 2)
+    if (class_id == 2 || class_id == 3)
     {
-        return g_vision_runtime_config.ipm_center_target_offset_weapons_from_left_px;
+        return TARGET_BOARD_WEAPON;
     }
-    if (class_id == 0)
+    if (class_id == 4 || class_id == 5)
     {
-        return g_vision_runtime_config.ipm_center_target_offset_supplies_from_left_px;
+        return TARGET_BOARD_SUPPLY;
     }
-    return std::max(0.0f, g_vision_runtime_config.ipm_track_width_px * 0.5f);
+    if (class_id == 0 || class_id == 1)
+    {
+        return TARGET_BOARD_VEHICLE;
+    }
+    return TARGET_BOARD_NONE;
 }
 
-static int select_best_class_id_from_prob_sums()
+static const char *target_board_state_name(target_board_state_enum state)
 {
-    float best_sum = -1.0f;
-    int best_class_id = -1;
-    const int class_count = std::clamp(VISION_NCNN_MAX_CLASSES, 0, VISION_NCNN_MAX_CLASSES);
-    for (int i = 0; i < class_count; ++i)
+    switch (state)
     {
-        if (g_infer_offset_prob_sums[i] > best_sum)
-        {
-            best_sum = g_infer_offset_prob_sums[i];
-            best_class_id = i;
-        }
+        case TARGET_BOARD_WEAPON:
+            return "weapon";
+        case TARGET_BOARD_SUPPLY:
+            return "supply";
+        case TARGET_BOARD_VEHICLE:
+            return "vehicle";
+        case TARGET_BOARD_NONE:
+        default:
+            return "none";
     }
-    return best_class_id;
 }
 
-static void restore_center_target_offset_if_needed()
+static float clamp_center_target_offset(float offset_px)
 {
-    if (!g_center_target_offset_override_active)
+    const float track_width_px = std::max(0.0f, g_vision_runtime_config.ipm_track_width_px);
+    return std::clamp(offset_px, 0.0f, track_width_px);
+}
+
+static float resolve_target_board_offset(target_board_state_enum state, float restore_offset_px)
+{
+    const float delta_px = std::max(0.0f, g_vision_runtime_config.infer_avoid_offset_delta_px);
+    switch (state)
+    {
+        case TARGET_BOARD_WEAPON:
+            return clamp_center_target_offset(restore_offset_px - delta_px);
+        case TARGET_BOARD_SUPPLY:
+            return clamp_center_target_offset(restore_offset_px + delta_px);
+        case TARGET_BOARD_VEHICLE:
+        case TARGET_BOARD_NONE:
+        default:
+            return clamp_center_target_offset(restore_offset_px);
+    }
+}
+
+static void restore_target_board_state_if_needed()
+{
+    if (g_target_board_state == TARGET_BOARD_NONE)
     {
         return;
     }
     vision_image_processor_set_ipm_center_target_offset_from_left_px(g_center_target_offset_restore_px);
-    g_center_target_offset_override_active = false;
-    g_center_target_offset_no_red_count = 0;
-    reset_infer_offset_vote_state();
+    g_target_board_state = TARGET_BOARD_NONE;
+    g_target_board_no_red_count = 0;
+    g_target_board_applied_offset_px = g_center_target_offset_restore_px;
+    reset_target_board_candidate_state();
 }
 
 static void reset_dynamic_center_target_offset_state(bool restore_default)
 {
     if (restore_default)
     {
-        restore_center_target_offset_if_needed();
+        restore_target_board_state_if_needed();
     }
     g_last_processed_infer_result_seq = 0;
-    g_center_target_offset_no_red_count = 0;
-    reset_infer_offset_vote_state();
-    if (!g_center_target_offset_override_active)
+    g_target_board_no_red_count = 0;
+    reset_target_board_candidate_state();
+    if (g_target_board_state == TARGET_BOARD_NONE)
     {
         g_center_target_offset_restore_px = vision_image_processor_ipm_center_target_offset_from_left_px();
+        g_target_board_applied_offset_px = g_center_target_offset_restore_px;
+    }
+}
+
+static void enter_target_board_state(target_board_state_enum state)
+{
+    g_center_target_offset_restore_px = vision_image_processor_ipm_center_target_offset_from_left_px();
+    g_target_board_state = state;
+    g_target_board_no_red_count = 0;
+    g_target_board_applied_offset_px = resolve_target_board_offset(state, g_center_target_offset_restore_px);
+    vision_image_processor_set_ipm_center_target_offset_from_left_px(g_target_board_applied_offset_px);
+    reset_target_board_candidate_state();
+}
+
+static void enforce_active_target_board_offset()
+{
+    if (g_target_board_state == TARGET_BOARD_NONE)
+    {
+        return;
+    }
+    // 配置热更新/旧初始化路径可能会把动态偏移刷回 TOML 默认值；
+    // 目标板状态未退出前，每帧处理开始前重新下发一次绕行偏移。
+    vision_image_processor_set_ipm_center_target_offset_from_left_px(g_target_board_applied_offset_px);
+}
+
+static void update_active_target_board_state(bool red_found)
+{
+    if (red_found)
+    {
+        g_target_board_no_red_count = 0;
+        return;
+    }
+
+    ++g_target_board_no_red_count;
+    if (g_target_board_no_red_count >= std::max(1, g_vision_runtime_config.infer_target_exit_no_red_count))
+    {
+        restore_target_board_state_if_needed();
+    }
+}
+
+static void update_idle_target_board_candidate(const vision_infer_async_result_t &result)
+{
+    const float threshold = std::clamp(g_vision_runtime_config.infer_target_confidence_threshold, 0.0f, 1.0f);
+    const bool valid_candidate = result.found &&
+                                 result.ncnn_infer_valid &&
+                                 result.ncnn_top_score >= threshold &&
+                                 resolve_target_board_state_for_class_id(result.ncnn_top_class_id) != TARGET_BOARD_NONE;
+    if (!valid_candidate)
+    {
+        reset_target_board_candidate_state();
+        return;
+    }
+
+    if (result.ncnn_top_class_id == g_target_board_candidate_class_id)
+    {
+        ++g_target_board_confirm_count;
+    }
+    else
+    {
+        g_target_board_candidate_class_id = result.ncnn_top_class_id;
+        g_target_board_confirm_count = 1;
+    }
+
+    if (g_target_board_confirm_count >= std::max(1, g_vision_runtime_config.infer_target_confirm_count))
+    {
+        enter_target_board_state(resolve_target_board_state_for_class_id(result.ncnn_top_class_id));
     }
 }
 
@@ -99,56 +197,27 @@ static void update_dynamic_center_target_offset_from_infer_result(const vision_i
     }
     g_last_processed_infer_result_seq = result.result_seq;
 
-    if (result.found && result.ncnn_infer_valid)
+    if (g_target_board_state != TARGET_BOARD_NONE)
     {
-        g_center_target_offset_no_red_count = 0;
-        if (g_center_target_offset_override_active)
-        {
-            return;
-        }
-
-        if (g_infer_offset_vote_valid_result_count == 0)
-        {
-            g_center_target_offset_restore_px = vision_image_processor_ipm_center_target_offset_from_left_px();
-        }
-
-        const int class_count = std::clamp(result.ncnn_class_count, 0, VISION_NCNN_MAX_CLASSES);
-        for (int i = 0; i < class_count; ++i)
-        {
-            g_infer_offset_prob_sums[i] += std::max(0.0f, result.ncnn_probs[i]);
-        }
-        ++g_infer_offset_vote_valid_result_count;
-
-        const int vote_result_count = std::max(1, g_vision_runtime_config.infer_offset_vote_result_count);
-        if (g_infer_offset_vote_valid_result_count < vote_result_count)
-        {
-            return;
-        }
-
-        const int best_class_id = select_best_class_id_from_prob_sums();
-        vision_image_processor_set_ipm_center_target_offset_from_left_px(
-            resolve_center_target_offset_for_class_id(best_class_id));
-        g_center_target_offset_override_active = true;
-        reset_infer_offset_vote_state();
+        update_active_target_board_state(result.found);
         return;
     }
 
-    if (result.found)
-    {
-        g_center_target_offset_no_red_count = 0;
-        return;
-    }
+    update_idle_target_board_candidate(result);
+}
 
-    if (!g_center_target_offset_override_active)
+static cv::Rect map_full_rect_to_proc_rect(int x, int y, int w, int h)
+{
+    if (w <= 0 || h <= 0 || kFullWidth <= 0 || kFullHeight <= 0)
     {
-        return;
+        return cv::Rect();
     }
-
-    ++g_center_target_offset_no_red_count;
-    if (g_center_target_offset_no_red_count >= std::max(1, g_vision_runtime_config.infer_offset_restore_no_red_count))
-    {
-        restore_center_target_offset_if_needed();
-    }
+    const int x0 = static_cast<int>(std::floor(static_cast<double>(x) * kProcWidth / kFullWidth));
+    const int y0 = static_cast<int>(std::floor(static_cast<double>(y) * kProcHeight / kFullHeight));
+    const int x1 = static_cast<int>(std::ceil(static_cast<double>(x + w) * kProcWidth / kFullWidth));
+    const int y1 = static_cast<int>(std::ceil(static_cast<double>(y + h) * kProcHeight / kFullHeight));
+    return cv::Rect(x0, y0, std::max(0, x1 - x0), std::max(0, y1 - y0)) &
+           cv::Rect(0, 0, kProcWidth, kProcHeight);
 }
 
 // 作用：清空 image_processor 内缓存的推理结果。
@@ -202,33 +271,37 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
 
     const uint8 *bgr_proc_data = vision_image_processor_bgr_image();
     const uint8 *gray_data = vision_image_processor_gray_image();
+    const cv::Rect red_proc_rect = map_full_rect_to_proc_rect(result->red_x,
+                                                              result->red_y,
+                                                              result->red_w,
+                                                              result->red_h);
+    const cv::Rect roi_proc_rect = map_full_rect_to_proc_rect(result->ncnn_roi_x,
+                                                              result->ncnn_roi_y,
+                                                              result->ncnn_roi_w,
+                                                              result->ncnn_roi_h);
     if (bgr_proc_data != nullptr)
     {
         cv::Mat proc_frame(kProcHeight, kProcWidth, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
-        cv::rectangle(proc_frame,
-                      cv::Rect(result->red_x, result->red_y, result->red_w, result->red_h),
-                      cv::Scalar(0, 0, 255),
-                      1,
-                      cv::LINE_8);
-        cv::rectangle(proc_frame,
-                      cv::Rect(result->ncnn_roi_x, result->ncnn_roi_y, result->ncnn_roi_w, result->ncnn_roi_h),
-                      cv::Scalar(0, 255, 0),
-                      1,
-                      cv::LINE_8);
+        if (red_proc_rect.width > 0 && red_proc_rect.height > 0)
+        {
+            cv::rectangle(proc_frame, red_proc_rect, cv::Scalar(0, 0, 255), 1, cv::LINE_8);
+        }
+        if (roi_proc_rect.width > 0 && roi_proc_rect.height > 0)
+        {
+            cv::rectangle(proc_frame, roi_proc_rect, cv::Scalar(0, 255, 0), 1, cv::LINE_8);
+        }
     }
     if (gray_data != nullptr)
     {
         cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, const_cast<uint8 *>(gray_data));
-        cv::rectangle(gray,
-                      cv::Rect(result->red_x, result->red_y, result->red_w, result->red_h),
-                      cv::Scalar(200),
-                      1,
-                      cv::LINE_8);
-        cv::rectangle(gray,
-                      cv::Rect(result->ncnn_roi_x, result->ncnn_roi_y, result->ncnn_roi_w, result->ncnn_roi_h),
-                      cv::Scalar(255),
-                      1,
-                      cv::LINE_8);
+        if (red_proc_rect.width > 0 && red_proc_rect.height > 0)
+        {
+            cv::rectangle(gray, red_proc_rect, cv::Scalar(200), 1, cv::LINE_8);
+        }
+        if (roi_proc_rect.width > 0 && roi_proc_rect.height > 0)
+        {
+            cv::rectangle(gray, roi_proc_rect, cv::Scalar(255), 1, cv::LINE_8);
+        }
     }
 }
 
@@ -264,6 +337,8 @@ void vision_pipeline_cleanup()
 
 bool vision_pipeline_process_step()
 {
+    enforce_active_target_board_offset();
+
     // 1) 固定先跑采图+巡线/逆透视。
     if (!vision_image_processor_process_step())
     {
@@ -374,6 +449,31 @@ void vision_pipeline_set_ncnn_enabled(bool enabled)
 bool vision_pipeline_ncnn_enabled()
 {
     return vision_infer_async_ncnn_enabled();
+}
+
+const char *vision_pipeline_target_board_state_name()
+{
+    return target_board_state_name(g_target_board_state);
+}
+
+bool vision_pipeline_target_board_active()
+{
+    return g_target_board_state != TARGET_BOARD_NONE;
+}
+
+int vision_pipeline_target_board_confirm_count()
+{
+    return g_target_board_confirm_count;
+}
+
+int vision_pipeline_target_board_no_red_count()
+{
+    return g_target_board_no_red_count;
+}
+
+float vision_pipeline_target_board_offset_px()
+{
+    return g_target_board_applied_offset_px;
 }
 
 void vision_pipeline_get_red_rect(bool *found, int *x, int *y, int *w, int *h, int *cx, int *cy)

@@ -88,7 +88,7 @@ typedef struct
 {
     uint32 result_seq;     // 异步结果序号；每产生一帧新结果递增。
     bool found;            // 是否找到红色矩形。
-    int red_x;             // 红框左上角 x（处理分辨率坐标）。
+    int red_x;             // 红框左上角 x（full 分辨率坐标）。
     int red_y;             // 红框左上角 y。
     int red_w;             // 红框宽。
     int red_h;             // 红框高。
@@ -97,7 +97,7 @@ typedef struct
     int red_area;          // 红框面积。
     uint32 red_detect_us;  // 红框检测耗时（us）。
     bool ncnn_roi_valid;   // ncnn ROI 是否有效。
-    int ncnn_roi_x;        // ncnn ROI 左上角 x（处理分辨率坐标）。
+    int ncnn_roi_x;        // ncnn ROI 左上角 x（full 分辨率坐标）。
     int ncnn_roi_y;        // ncnn ROI 左上角 y。
     int ncnn_roi_w;        // ncnn ROI 宽。
     int ncnn_roi_h;        // ncnn ROI 高。

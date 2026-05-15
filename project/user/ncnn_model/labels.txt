@@ -1,0 +1,6 @@
+ambulance
+armored_car
+bomb
+gun
+medicine
+telescope
