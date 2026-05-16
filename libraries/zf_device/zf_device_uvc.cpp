@@ -38,11 +38,16 @@ int8 uvc_camera_init(const char *path)
         printf("find uvc camera Successfully.\r\n");
     }
 
-    cap.set(CAP_PROP_FOURCC, VideoWriter::fourcc('M', 'J', 'P', 'G'));  // 设置格式
+    cap.set(CAP_PROP_FOURCC,
+            VideoWriter::fourcc(UVC_FOURCC_CHAR_0,
+                                UVC_FOURCC_CHAR_1,
+                                UVC_FOURCC_CHAR_2,
+                                UVC_FOURCC_CHAR_3));                    // 设置格式
     cap.set(CAP_PROP_FRAME_WIDTH, UVC_WIDTH);                           // 设置摄像头宽度
     cap.set(CAP_PROP_FRAME_HEIGHT, UVC_HEIGHT);                         // 设置摄像头高度
     cap.set(CAP_PROP_FPS, UVC_FPS);                                     // 显示屏幕帧率
 
+    printf("get uvc format = %s.\r\n", UVC_FORMAT_NAME);
     printf("get uvc width = %f.\r\n",  cap.get(CAP_PROP_FRAME_WIDTH));
     printf("get uvc height = %f.\r\n", cap.get(CAP_PROP_FRAME_HEIGHT));
     printf("get uvc fps = %f.\r\n",    cap.get(CAP_PROP_FPS));
@@ -53,24 +58,25 @@ int8 uvc_camera_init(const char *path)
 
 int8 wait_image_refresh()
 {
-    try 
+    try
     {
         // 阻塞式等待图像刷新
         cap >> frame_rgb;
+        if (frame_rgb.empty())
+        {
+            std::cerr << "未获取到有效图像帧" << std::endl;
+            bgr_image = nullptr;
+            return -1;
+        }
         if (!frame_rgb.isContinuous()) {
             frame_rgb = frame_rgb.clone();
         }
         bgr_image = frame_rgb.ptr<uint8_t>(0);
-        // cap.read(frame_rgb);
-        if (frame_rgb.empty()) 
-        {
-            std::cerr << "未获取到有效图像帧" << std::endl;
-            return -1;
-        }
-    } 
-    catch (const cv::Exception& e) 
+    }
+    catch (const cv::Exception& e)
     {
         std::cerr << "OpenCV 异常: " << e.what() << std::endl;
+        bgr_image = nullptr;
         return -1;
     }
     // 当前视觉主链路只消费BGR彩图；灰度/二值/RGB565均在后级按处理分辨率生成。

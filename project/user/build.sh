@@ -17,6 +17,7 @@ TARGET_APP_PATH="/home/root/tst"
 TARGET_CONFIG_PATH="/home/root/tst/smartcar_config.toml"
 MAKE_JOBS="12"
 CAMERA_CAPTURE_WIDTH="320"
+CAMERA_CAPTURE_FORMAT="yuy2"
 ENABLE_NCNN="1"
 
 print_usage() {
@@ -29,6 +30,8 @@ print_usage() {
     ./build.sh --preset hotspot_b
     ./build.sh --camera-width 160
     ./build.sh --camera-width 320
+    ./build.sh --camera-format mjpg
+    ./build.sh --camera-format yuy2
     ./build.sh --enable-ncnn 0
     ./build.sh --enable-ncnn 1
     ./build.sh --jobs 16
@@ -46,6 +49,7 @@ print_usage() {
      app_path=$TARGET_APP_PATH
      config_path=$TARGET_CONFIG_PATH
      camera_width=$CAMERA_CAPTURE_WIDTH
+     camera_format=$CAMERA_CAPTURE_FORMAT
      enable_ncnn=$ENABLE_NCNN
 EOF
 }
@@ -136,6 +140,10 @@ while [ $# -gt 0 ]; do
             CAMERA_CAPTURE_WIDTH="$2"
             shift 2
             ;;
+        --camera-format)
+            CAMERA_CAPTURE_FORMAT="$2"
+            shift 2
+            ;;
         --enable-ncnn)
             ENABLE_NCNN="$2"
             shift 2
@@ -162,6 +170,11 @@ if [ "$CAMERA_CAPTURE_WIDTH" != "160" ] && [ "$CAMERA_CAPTURE_WIDTH" != "320" ];
     exit 1
 fi
 
+if [ "$CAMERA_CAPTURE_FORMAT" != "mjpg" ] && [ "$CAMERA_CAPTURE_FORMAT" != "yuy2" ]; then
+    echo "CAMERA_CAPTURE_FORMAT 仅支持 mjpg / yuy2，当前: $CAMERA_CAPTURE_FORMAT"
+    exit 1
+fi
+
 if [ "$ENABLE_NCNN" != "0" ] && [ "$ENABLE_NCNN" != "1" ]; then
     echo "ENABLE_NCNN 仅支持 0 或 1，当前: $ENABLE_NCNN"
     exit 1
@@ -172,11 +185,17 @@ if [ "$CAMERA_CAPTURE_WIDTH" = "160" ]; then
     UVC_RES_PRESET="0"
 fi
 
+UVC_FORMAT_PRESET="1"
+if [ "$CAMERA_CAPTURE_FORMAT" = "yuy2" ]; then
+    UVC_FORMAT_PRESET="0"
+fi
+
 echo "[BUILD] 目标预设: ${TARGET_PRESET}"
 echo "[BUILD] 目标主板: ${TARGET_USER}@${TARGET_HOST}:${TARGET_PORT}"
 echo "[BUILD] APP 目标路径: ${TARGET_APP_PATH}"
 echo "[BUILD] 配置目标路径: ${TARGET_CONFIG_PATH}"
 echo "[BUILD] 摄像头采图宽度: ${CAMERA_CAPTURE_WIDTH} (UVC_RES_PRESET=${UVC_RES_PRESET})"
+echo "[BUILD] 摄像头输出格式: ${CAMERA_CAPTURE_FORMAT} (UVC_FORMAT_PRESET=${UVC_FORMAT_PRESET})"
 echo "[BUILD] NCNN 编译开关: ${ENABLE_NCNN}"
 
 node "$SYNC_TOML_SCRIPT" "$CONNECTION_PRESETS_FILE" "$TARGET_PRESET" "$SCRIPT_DIR/smartcar_config.toml" || {
@@ -194,7 +213,7 @@ find . -mindepth 1 ! -name "本文件夹作用.txt" -exec rm -rf {} + || {
     exit 1
 }
 
-cmake ../user -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUVC_RES_PRESET="${UVC_RES_PRESET}" -DENABLE_NCNN="${ENABLE_NCNN}" || {
+cmake ../user -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUVC_RES_PRESET="${UVC_RES_PRESET}" -DUVC_FORMAT_PRESET="${UVC_FORMAT_PRESET}" -DENABLE_NCNN="${ENABLE_NCNN}" || {
     echo "cmake 命令执行失败。"
     exit 1
 }
