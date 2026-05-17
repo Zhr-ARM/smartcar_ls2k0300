@@ -51,9 +51,9 @@ vision_runtime_config_t g_vision_runtime_config = {
     // 图传发送上限帧率，0 表示不限速。
     .send_max_fps = 60,
     // 推理总开关：false 时关闭红色识别与 ncnn 推理。
-    .infer_enabled = true,
+    .infer_enabled = false,
     // ncnn 子开关：false 时只保留红框检测，不做 ncnn 分类。
-    .ncnn_enabled = true,
+    .ncnn_enabled = false,
     // ncnn 默认模型输入尺寸。
     .ncnn_input_width = 64,
     .ncnn_input_height = 64,

@@ -50,7 +50,7 @@
 #error "Invalid UVC_FORMAT_PRESET. Use 0=YUY2 or 1=MJPG."
 #endif
 
-#define UVC_FPS     120
+#define UVC_FPS     180
 
 int8 uvc_camera_init(const char *path);
 int8 wait_image_refresh();
