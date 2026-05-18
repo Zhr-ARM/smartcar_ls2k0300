@@ -48,14 +48,13 @@ uint32 vision_transport_get_send_max_fps();
 void vision_transport_set_send_enabled(bool enabled);
 bool vision_transport_is_send_enabled();
 
-// 作用：初始化 UDP 视频 + TCP 状态上传通道。
+// 作用：初始化 UDP 视频 + 状态上传通道（统一协议）。
 // 意义：统一网页端调试链路入口。
 // 如何修改：
 // - server_ip: 接收端IP；
-// - video_port: UDP视频端口；
-// - meta_port: TCP状态端口（0 可禁用）。
+// - video_port: UDP视频端口。
 // 是否调用：是，main.cpp 启动时调用。
-bool vision_transport_udp_init(const char *server_ip, uint16 video_port, uint16 meta_port);
+bool vision_transport_udp_init(const char *server_ip, uint16 video_port);
 
 // 作用：UDP/TCP 发送模块清理接口。
 // 意义：与初始化形成对称，便于后续补充底层 close。
@@ -76,12 +75,5 @@ bool vision_transport_udp_is_enabled();
 // 是否调用：是，main.cpp 配置下发。
 void vision_transport_udp_set_max_fps(uint32 max_fps);
 uint32 vision_transport_udp_get_max_fps();
-
-// 作用：开关 TCP 状态发送。
-// 意义：可只发视频不发状态，减少解析负担。
-// 如何修改：true=发送状态，false=不发送状态。
-// 是否调用：是，main.cpp 配置下发。
-void vision_transport_udp_set_tcp_enabled(bool enabled);
-bool vision_transport_udp_tcp_enabled();
 
 #endif

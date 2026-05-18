@@ -14,12 +14,6 @@
 
 typedef enum
 {
-    VISION_WEB_DATA_PROFILE_FULL = 0,
-    VISION_WEB_DATA_PROFILE_RAW_MINIMAL = 1
-} vision_web_data_profile_enum;
-
-typedef enum
-{
     VISION_WEB_IMAGE_FORMAT_JPEG = 0,
     VISION_WEB_IMAGE_FORMAT_PNG = 1,
     VISION_WEB_IMAGE_FORMAT_BMP = 2
@@ -76,104 +70,20 @@ typedef struct
     //
     // 当前这份配置里，可切换的是“是否发送灰度 / 二值 / 彩图”
     // 以及三路图像各自的格式（JPEG / PNG / BMP）与 FULL / RAW_MINIMAL。
-    // UDP 网页图传开关：控制是否向电脑端发送视频帧。
+    // UDP 网页图传开关。
     bool udp_web_enabled;
     // UDP 网页图传最大发送帧率，0 表示不限速。
     uint32 udp_web_max_fps;
-    // UDP 网页图传是否发送灰度图。
-    // 推荐：
-    // 1. 本地复算优先：只开灰度图，再配 RAW_MINIMAL。
-    // 2. 若担心 JPEG 失真，优先改用灰度 PNG，而不是直接上 BMP。
-    bool udp_web_send_gray_jpeg;
-    // UDP 网页灰度图格式：0=JPEG，1=PNG，2=BMP。
-    int udp_web_gray_image_format;
-    // UDP 网页图传是否发送二值图。
-    // 推荐默认关闭。二值图可由网页侧根据灰度图 + otsu_threshold 现算。
-    bool udp_web_send_binary_jpeg;
-    // UDP 网页二值图格式：0=JPEG，1=PNG，2=BMP。
-    int udp_web_binary_image_format;
-    // UDP 网页图传是否发送原始 BGR 彩图。
-    // 推荐：
-    // 1. 展示彩图优先：只开彩图图传，再配 RAW_MINIMAL。
-    // 2. 若同时开启灰度 + 彩图，会额外占用带宽，通常不建议长期并开。
-    bool udp_web_send_rgb_jpeg;
-    // UDP 网页彩图格式：0=JPEG，1=PNG，2=BMP。
-    int udp_web_rgb_image_format;
-    // 网页端 TCP 数据模式：0=全量调试数据，1=仅原始最小状态。
-    // 推荐：
-    // 1. FULL：用于完整调试，但状态负载明显更高。
-    // 2. RAW_MINIMAL：用于“图片 + 最小状态 + 网页侧本地复算”，更适合长期使用。
-    int udp_web_data_profile;
-    // TCP 状态上报开关：控制是否向电脑端发送 JSON 状态数据。
-    bool udp_web_tcp_enabled;
-    // TCP 状态字段开关（通用）。
-    bool udp_web_tcp_send_ts_ms;
-    // TCP 状态字段开关（视觉相关）。
-    bool udp_web_tcp_send_line_error;
-    bool udp_web_tcp_send_cpu_usage_percent;
-    bool udp_web_tcp_send_mem_usage_percent;
-    // TCP 状态字段开关（电机相关）。
-    bool udp_web_tcp_send_base_speed;
-    bool udp_web_tcp_send_left_target_count;
-    bool udp_web_tcp_send_right_target_count;
-    bool udp_web_tcp_send_left_current_count;
-    bool udp_web_tcp_send_right_current_count;
-    bool udp_web_tcp_send_left_filtered_count;
-    bool udp_web_tcp_send_right_filtered_count;
-    bool udp_web_tcp_send_left_error;
-    bool udp_web_tcp_send_right_error;
-    bool udp_web_tcp_send_left_feedforward;
-    bool udp_web_tcp_send_right_feedforward;
-    bool udp_web_tcp_send_left_correction;
-    bool udp_web_tcp_send_right_correction;
-    bool udp_web_tcp_send_left_decel_assist;
-    bool udp_web_tcp_send_right_decel_assist;
-    bool udp_web_tcp_send_left_duty;
-    bool udp_web_tcp_send_right_duty;
-    bool udp_web_tcp_send_left_hardware_duty;
-    bool udp_web_tcp_send_right_hardware_duty;
-    bool udp_web_tcp_send_left_dir_level;
-    bool udp_web_tcp_send_right_dir_level;
-    // TCP 状态字段开关（视觉相关）。
-    // OTSU / 性能 / 迷宫结果。
-    bool udp_web_tcp_send_otsu_threshold;
-    bool udp_web_tcp_send_perf_capture_wait_us;
-    bool udp_web_tcp_send_perf_preprocess_us;
-    bool udp_web_tcp_send_perf_otsu_us;
-    bool udp_web_tcp_send_perf_maze_us;
-    bool udp_web_tcp_send_perf_total_us;
-    bool udp_web_tcp_send_maze_left_points_raw;
-    bool udp_web_tcp_send_maze_right_points_raw;
-    // 视觉检测结果。
-    bool udp_web_tcp_send_red_found;
-    bool udp_web_tcp_send_red_rect;
-    bool udp_web_tcp_send_roi_valid;
-    bool udp_web_tcp_send_roi_rect;
-    // 巡线/偏差调试结果。
-    bool udp_web_tcp_send_ipm_track_valid;
-    bool udp_web_tcp_send_ipm_track_method;
-    bool udp_web_tcp_send_ipm_centerline_source;
-    bool udp_web_tcp_send_ipm_track_index;
-    bool udp_web_tcp_send_ipm_track_point;
-    // 边界/中线点列。
-    bool udp_web_tcp_send_left_boundary;
-    bool udp_web_tcp_send_right_boundary;
-    bool udp_web_tcp_send_ipm_left_boundary;
-    bool udp_web_tcp_send_ipm_right_boundary;
-    bool udp_web_tcp_send_ipm_centerline_selected_shift;
-    bool udp_web_tcp_send_src_centerline_selected_shift;
-    bool udp_web_tcp_send_ipm_centerline_selected_count;
-    bool udp_web_tcp_send_src_centerline_selected_count;
-    bool udp_web_tcp_send_ipm_centerline_selected_curvature;
-    // 尺寸元数据（视觉相关）。
-    bool udp_web_tcp_send_gray_size;
-    bool udp_web_tcp_send_ipm_size;
-    // 电脑端接收服务 IP（运行 vision_pc_receiver.py 的主机地址）。
+    // 网页发送图像模式：0=二值图，1=灰度图。
+    int web_send_mode;
+    // 网页图像格式：0=JPEG，1=PNG，2=BMP。
+    int web_image_format;
+    // 网页 JPEG 质量（1-100），仅 JPEG 格式时生效。
+    int web_jpeg_quality;
+    // 电脑端接收服务 IP。
     const char *udp_web_server_ip;
-    // 电脑端 UDP 视频端口（需与 PC 接收端 --udp-port 一致）。
+    // 电脑端 UDP 端口。
     uint16 udp_web_video_port;
-    // 电脑端 TCP 状态端口（需与 PC 接收端 --tcp-port 一致）。
-    uint16 udp_web_meta_port;
     // 逐飞客户端 UDP 通道开关（与网页端 UDP/TCP 独立）。
     bool assistant_udp_enabled;
     // 逐飞客户端接收端 IP。

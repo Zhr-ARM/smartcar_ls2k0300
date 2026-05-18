@@ -233,25 +233,20 @@ int main(int, char**)
         printf("[ASSISTANT_UDP] disabled\r\n");
     }
 
-    // 初始化 UDP/TCP 到电脑端的数据通道（UDP=视频，TCP=状态）。
+    // 初始化 UDP 统一通道（图像+状态）。
     if (!vision_transport_udp_init(g_vision_runtime_config.udp_web_server_ip,
-                                   g_vision_runtime_config.udp_web_video_port,
-                                   g_vision_runtime_config.udp_web_meta_port))
+                                   g_vision_runtime_config.udp_web_video_port))
     {
         printf("[UDP_WEB] init failed\r\n");
     }
-    vision_transport_udp_set_enabled(g_vision_runtime_config.udp_web_enabled);      // UDP 视频发送开关
-    vision_transport_udp_set_max_fps(g_vision_runtime_config.udp_web_max_fps);       // UDP 视频发送限频
-    vision_transport_udp_set_tcp_enabled(g_vision_runtime_config.udp_web_tcp_enabled); // TCP 状态发送开关
-    printf("[UDP_WEB] enabled=%d server=%s video=%u meta=%u fps=%u gray=%d rgb=%d profile=%d\r\n",
+    vision_transport_udp_set_enabled(g_vision_runtime_config.udp_web_enabled);
+    vision_transport_udp_set_max_fps(g_vision_runtime_config.udp_web_max_fps);
+    printf("[UDP_WEB] enabled=%d server=%s video=%u fps=%u send_mode=%d\r\n",
            vision_transport_udp_is_enabled() ? 1 : 0,
            g_vision_runtime_config.udp_web_server_ip,
            static_cast<unsigned int>(g_vision_runtime_config.udp_web_video_port),
-           static_cast<unsigned int>(g_vision_runtime_config.udp_web_meta_port),
            static_cast<unsigned int>(vision_transport_udp_get_max_fps()),
-           g_vision_runtime_config.udp_web_send_gray_jpeg ? 1 : 0,
-           g_vision_runtime_config.udp_web_send_rgb_jpeg ? 1 : 0,
-           g_vision_runtime_config.udp_web_data_profile);
+           g_vision_runtime_config.web_send_mode);
 
     // 初始化 ncnn 模型；后续是否真正执行推理由配置中的 infer_enabled / ncnn_enabled 控制。
     LQ_NCNN ncnn;

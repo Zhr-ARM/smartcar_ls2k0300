@@ -869,8 +869,6 @@ void collect_restart_required_keys(const ConfigSnapshot &old_config,
             "vision.runtime.screen_display_enabled");
     push_if(old_config.vision_runtime.udp_web_video_port != g_vision_runtime_config.udp_web_video_port,
             "vision.runtime.web.video_port");
-    push_if(old_config.vision_runtime.udp_web_meta_port != g_vision_runtime_config.udp_web_meta_port,
-            "vision.runtime.web.meta_port");
     push_if(std::string(old_config.vision_runtime.udp_web_server_ip ? old_config.vision_runtime.udp_web_server_ip : "") !=
                 std::string(g_vision_runtime_config.udp_web_server_ip ? g_vision_runtime_config.udp_web_server_ip : ""),
             "vision.runtime.web.server_ip");
@@ -903,7 +901,6 @@ void apply_runtime_changes_after_commit()
 {
     vision_transport_udp_set_enabled(g_vision_runtime_config.udp_web_enabled);
     vision_transport_udp_set_max_fps(g_vision_runtime_config.udp_web_max_fps);
-    vision_transport_udp_set_tcp_enabled(g_vision_runtime_config.udp_web_tcp_enabled);
 
     vision_thread_set_send_mode(static_cast<vision_thread_send_mode_enum>(g_vision_runtime_config.send_mode));
     vision_thread_set_send_max_fps(g_vision_runtime_config.send_max_fps);
@@ -941,7 +938,6 @@ bool load_from_path(const std::string &path, std::string *error_message)
     int send_max_fps = 0;
     int udp_web_max_fps = 0;
     int udp_web_video_port = 0;
-    int udp_web_meta_port = 0;
     int assistant_server_port = 0;
     size_t ncnn_label_count = 0;
     if (!require_int(values, &consumed, "vision.runtime.send_mode", &g_vision_runtime_config.send_mode, error_message) ||
@@ -987,80 +983,16 @@ bool load_from_path(const std::string &path, std::string *error_message)
 
     if (!require_bool(values, &consumed, "vision.runtime.web.enabled", &g_vision_runtime_config.udp_web_enabled, error_message) ||
         !require_int(values, &consumed, "vision.runtime.web.max_fps", &udp_web_max_fps, error_message) ||
-        !require_bool(values, &consumed, "vision.runtime.web.send_gray_jpeg", &g_vision_runtime_config.udp_web_send_gray_jpeg, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.web.gray_image_format", &g_vision_runtime_config.udp_web_gray_image_format, error_message) ||
-        !require_bool(values, &consumed, "vision.runtime.web.send_binary_jpeg", &g_vision_runtime_config.udp_web_send_binary_jpeg, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.web.binary_image_format", &g_vision_runtime_config.udp_web_binary_image_format, error_message) ||
-        !require_bool(values, &consumed, "vision.runtime.web.send_rgb_jpeg", &g_vision_runtime_config.udp_web_send_rgb_jpeg, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.web.rgb_image_format", &g_vision_runtime_config.udp_web_rgb_image_format, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.web.data_profile", &g_vision_runtime_config.udp_web_data_profile, error_message) ||
-        !require_bool(values, &consumed, "vision.runtime.web.tcp_enabled", &g_vision_runtime_config.udp_web_tcp_enabled, error_message))
+        !require_int(values, &consumed, "vision.runtime.web.send_mode", &g_vision_runtime_config.web_send_mode, error_message) ||
+        !require_int(values, &consumed, "vision.runtime.web.image_format", &g_vision_runtime_config.web_image_format, error_message) ||
+        !require_int(values, &consumed, "vision.runtime.web.jpeg_quality", &g_vision_runtime_config.web_jpeg_quality, error_message))
     {
         return false;
     }
     g_vision_runtime_config.udp_web_max_fps = static_cast<uint32>(std::max(udp_web_max_fps, 0));
 
-#define REQUIRE_WEB_TCP_BOOL(name) \
-    if (!require_bool(values, &consumed, "vision.runtime.web.tcp." #name, &g_vision_runtime_config.udp_web_tcp_send_##name, error_message)) return false
-
-    REQUIRE_WEB_TCP_BOOL(ts_ms);
-    REQUIRE_WEB_TCP_BOOL(line_error);
-    REQUIRE_WEB_TCP_BOOL(cpu_usage_percent);
-    REQUIRE_WEB_TCP_BOOL(mem_usage_percent);
-    REQUIRE_WEB_TCP_BOOL(base_speed);
-    REQUIRE_WEB_TCP_BOOL(left_target_count);
-    REQUIRE_WEB_TCP_BOOL(right_target_count);
-    REQUIRE_WEB_TCP_BOOL(left_current_count);
-    REQUIRE_WEB_TCP_BOOL(right_current_count);
-    REQUIRE_WEB_TCP_BOOL(left_filtered_count);
-    REQUIRE_WEB_TCP_BOOL(right_filtered_count);
-    REQUIRE_WEB_TCP_BOOL(left_error);
-    REQUIRE_WEB_TCP_BOOL(right_error);
-    REQUIRE_WEB_TCP_BOOL(left_feedforward);
-    REQUIRE_WEB_TCP_BOOL(right_feedforward);
-    REQUIRE_WEB_TCP_BOOL(left_correction);
-    REQUIRE_WEB_TCP_BOOL(right_correction);
-    REQUIRE_WEB_TCP_BOOL(left_decel_assist);
-    REQUIRE_WEB_TCP_BOOL(right_decel_assist);
-    REQUIRE_WEB_TCP_BOOL(left_duty);
-    REQUIRE_WEB_TCP_BOOL(right_duty);
-    REQUIRE_WEB_TCP_BOOL(left_hardware_duty);
-    REQUIRE_WEB_TCP_BOOL(right_hardware_duty);
-    REQUIRE_WEB_TCP_BOOL(left_dir_level);
-    REQUIRE_WEB_TCP_BOOL(right_dir_level);
-    REQUIRE_WEB_TCP_BOOL(otsu_threshold);
-    REQUIRE_WEB_TCP_BOOL(perf_capture_wait_us);
-    REQUIRE_WEB_TCP_BOOL(perf_preprocess_us);
-    REQUIRE_WEB_TCP_BOOL(perf_otsu_us);
-    REQUIRE_WEB_TCP_BOOL(perf_maze_us);
-    REQUIRE_WEB_TCP_BOOL(perf_total_us);
-    REQUIRE_WEB_TCP_BOOL(maze_left_points_raw);
-    REQUIRE_WEB_TCP_BOOL(maze_right_points_raw);
-    REQUIRE_WEB_TCP_BOOL(red_found);
-    REQUIRE_WEB_TCP_BOOL(red_rect);
-    REQUIRE_WEB_TCP_BOOL(roi_valid);
-    REQUIRE_WEB_TCP_BOOL(roi_rect);
-    REQUIRE_WEB_TCP_BOOL(ipm_track_valid);
-    REQUIRE_WEB_TCP_BOOL(ipm_track_method);
-    REQUIRE_WEB_TCP_BOOL(ipm_centerline_source);
-    REQUIRE_WEB_TCP_BOOL(ipm_track_index);
-    REQUIRE_WEB_TCP_BOOL(ipm_track_point);
-    REQUIRE_WEB_TCP_BOOL(left_boundary);
-    REQUIRE_WEB_TCP_BOOL(right_boundary);
-    REQUIRE_WEB_TCP_BOOL(ipm_left_boundary);
-    REQUIRE_WEB_TCP_BOOL(ipm_right_boundary);
-    REQUIRE_WEB_TCP_BOOL(ipm_centerline_selected_shift);
-    REQUIRE_WEB_TCP_BOOL(src_centerline_selected_shift);
-    REQUIRE_WEB_TCP_BOOL(ipm_centerline_selected_count);
-    REQUIRE_WEB_TCP_BOOL(src_centerline_selected_count);
-    REQUIRE_WEB_TCP_BOOL(ipm_centerline_selected_curvature);
-    REQUIRE_WEB_TCP_BOOL(gray_size);
-    REQUIRE_WEB_TCP_BOOL(ipm_size);
-#undef REQUIRE_WEB_TCP_BOOL
-
     if (!require_string(values, &consumed, "vision.runtime.web.server_ip", &g_string_storage.udp_web_server_ip, &g_vision_runtime_config.udp_web_server_ip, error_message) ||
         !require_int(values, &consumed, "vision.runtime.web.video_port", &udp_web_video_port, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.web.meta_port", &udp_web_meta_port, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.assistant.enabled", &g_vision_runtime_config.assistant_udp_enabled, error_message) ||
         !require_string(values, &consumed, "vision.runtime.assistant.server_ip", &g_string_storage.assistant_server_ip, &g_vision_runtime_config.assistant_server_ip, error_message) ||
         !require_int(values, &consumed, "vision.runtime.assistant.server_port", &assistant_server_port, error_message))
@@ -1068,7 +1000,6 @@ bool load_from_path(const std::string &path, std::string *error_message)
         return false;
     }
     g_vision_runtime_config.udp_web_video_port = static_cast<uint16>(std::max(udp_web_video_port, 0));
-    g_vision_runtime_config.udp_web_meta_port = static_cast<uint16>(std::max(udp_web_meta_port, 0));
     g_vision_runtime_config.assistant_server_port = static_cast<uint16>(std::max(assistant_server_port, 0));
 
 #define REQUIRE_RUNTIME_INT(name) \
