@@ -231,6 +231,10 @@ struct MotorSpeedPidConfig
     float left_feedforward_bias;      // 左轮静摩擦补偿
     float right_feedforward_bias;     // 右轮静摩擦补偿
     float feedforward_bias_threshold; // 前馈静摩擦补偿触发阈值
+    float left_feedforward_low_speed_boost; // 左轮低速额外前馈补偿
+    float right_feedforward_low_speed_boost; // 右轮低速额外前馈补偿
+    float left_feedforward_low_speed_cutoff; // 左轮低速补偿衰减到 0 的目标速度
+    float right_feedforward_low_speed_cutoff; // 右轮低速补偿衰减到 0 的目标速度
     float decel_error_threshold;      // 减速辅助触发误差阈值
     float decel_duty_gain;            // 减速辅助增益
     float decel_duty_limit;           // 减速辅助最大输出
@@ -273,6 +277,10 @@ struct MotorSpeedPidDebugInfo
     float left_feedforward_bias;
     float right_feedforward_bias;
     float feedforward_bias_threshold;
+    float left_feedforward_low_speed_boost;
+    float right_feedforward_low_speed_boost;
+    float left_feedforward_low_speed_cutoff;
+    float right_feedforward_low_speed_cutoff;
     float decel_error_threshold;
     float decel_duty_gain;
     float decel_duty_limit;
@@ -364,7 +372,11 @@ private:
 
     void sanitize_config();
     void reset_filters();
-    float compute_feedforward_duty(float target_count, float gain, float bias) const;
+    float compute_feedforward_duty(float target_count,
+                                   float gain,
+                                   float bias,
+                                   float low_speed_boost,
+                                   float low_speed_cutoff) const;
     float compute_decel_assist_duty(float target_count, float feedback_count) const;
     float update_feedback_filter(SpeedFeedbackFilter &filter, float raw_count);
     static int32 feedback_average_window();

@@ -450,3 +450,66 @@ const char *dual_board_strategy_name(DualBoardStrategy s)
         default:                return "UNKNOWN";
     }
 }
+
+// ============================================================
+// 速度环调试 UART DMA 发送实现
+// 复用双板通信的 g_dual_uart（ttyS1），不启动双板协议线程。
+// ============================================================
+
+namespace
+{
+
+bool g_speed_debug_active = false;
+
+} // namespace
+
+bool uart_thread_speed_debug_init()
+{
+    if (g_speed_debug_active)
+    {
+        return true;
+    }
+
+    // 复用双板通信的 ttyS1，仅打开串口，不启动协议收发
+    if (!g_dual_uart.init())
+    {
+        printf("[SPEED_DEBUG] UART init failed on ttyS1\r\n");
+        return false;
+    }
+
+    g_speed_debug_active = true;
+    printf("[SPEED_DEBUG] UART ready on ttyS1 @ 115200 baud (DMA nonblock write, dual-board protocol disabled)\r\n");
+    return true;
+}
+
+void uart_thread_speed_debug_send(float left_target, float right_target,
+                                  float left_current, float right_current)
+{
+    if (!g_speed_debug_active)
+    {
+        return;
+    }
+
+    // 格式化: <speed_debug>:ch0,ch1,ch2,ch3\n
+    // ch0=左轮目标速, ch1=右轮目标速, ch2=左轮当前速, ch3=右轮当前速
+    char buf[128];
+    int len = snprintf(buf, sizeof(buf),
+                       "<speed_debug>:%.1f,%.1f,%.1f,%.1f\n",
+                       static_cast<double>(left_target),
+                       static_cast<double>(right_target),
+                       static_cast<double>(left_current),
+                       static_cast<double>(right_current));
+
+    if (len > 0 && len < static_cast<int>(sizeof(buf)))
+    {
+        // 非阻塞 DMA 写：单次 write() 不等待，内核驱动自动使用 DMA
+        g_dual_uart.send_nonblock(reinterpret_cast<const uint8 *>(buf), static_cast<size_t>(len));
+    }
+}
+
+void uart_thread_speed_debug_cleanup()
+{
+    g_dual_uart.close();
+    g_speed_debug_active = false;
+    printf("[SPEED_DEBUG] UART closed (ttyS1)\r\n");
+}

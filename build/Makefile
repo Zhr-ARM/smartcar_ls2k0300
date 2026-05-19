@@ -610,6 +610,54 @@ home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.s
 .PHONY : home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.cpp.s
 
+home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.o: home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.o
+
+home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.i: home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.i
+
+home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.s: home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.cpp.s
+
+home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.o: home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.o
+
+home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.i: home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.i
+
+home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.s: home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.cpp.s
+
 home/zhr/2k0300/test1/project/code/app/imu_thread/imu_thread.o: home/zhr/2k0300/test1/project/code/app/imu_thread/imu_thread.cpp.o
 .PHONY : home/zhr/2k0300/test1/project/code/app/imu_thread/imu_thread.o
 
@@ -802,6 +850,30 @@ home/zhr/2k0300/test1/project/code/driver/brushless/brushless.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/brushless/brushless.cpp.s
 .PHONY : home/zhr/2k0300/test1/project/code/driver/brushless/brushless.cpp.s
 
+home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.o: home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.o
+
+home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.i: home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.i
+
+home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.s: home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.cpp.s
+
 home/zhr/2k0300/test1/project/code/driver/imu660ra/imu660ra.o: home/zhr/2k0300/test1/project/code/driver/imu660ra/imu660ra.cpp.o
 .PHONY : home/zhr/2k0300/test1/project/code/driver/imu660ra/imu660ra.o
 
@@ -873,6 +945,30 @@ home/zhr/2k0300/test1/project/code/driver/pid/pid.s: home/zhr/2k0300/test1/proje
 home/zhr/2k0300/test1/project/code/driver/pid/pid.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/pid/pid.cpp.s
 .PHONY : home/zhr/2k0300/test1/project/code/driver/pid/pid.cpp.s
+
+home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.o: home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.o
+
+# target to build an object file
+home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.o
+.PHONY : home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.o
+
+home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.i: home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.i
+
+# target to preprocess a source file
+home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.i
+.PHONY : home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.i
+
+home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.s: home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.s
+
+# target to generate assembly for a file
+home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/project.dir/build.make CMakeFiles/project.dir/home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.s
+.PHONY : home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.cpp.s
 
 home/zhr/2k0300/test1/project/code/driver/uart/uart.o: home/zhr/2k0300/test1/project/code/driver/uart/uart.cpp.o
 .PHONY : home/zhr/2k0300/test1/project/code/driver/uart/uart.o
@@ -1231,6 +1327,12 @@ help:
 	@echo "... home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.o"
 	@echo "... home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.i"
 	@echo "... home/zhr/2k0300/test1/libraries/zf_driver/zf_driver_udp.s"
+	@echo "... home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.o"
+	@echo "... home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.i"
+	@echo "... home/zhr/2k0300/test1/project/code/app/beep_thread/beep_thread.s"
+	@echo "... home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.o"
+	@echo "... home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.i"
+	@echo "... home/zhr/2k0300/test1/project/code/app/config_http_thread/config_http_thread.s"
 	@echo "... home/zhr/2k0300/test1/project/code/app/imu_thread/imu_thread.o"
 	@echo "... home/zhr/2k0300/test1/project/code/app/imu_thread/imu_thread.i"
 	@echo "... home/zhr/2k0300/test1/project/code/app/imu_thread/imu_thread.s"
@@ -1255,6 +1357,9 @@ help:
 	@echo "... home/zhr/2k0300/test1/project/code/driver/brushless/brushless.o"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/brushless/brushless.i"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/brushless/brushless.s"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.o"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.i"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/config/smartcar_config.s"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/imu660ra/imu660ra.o"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/imu660ra/imu660ra.i"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/imu660ra/imu660ra.s"
@@ -1264,6 +1369,9 @@ help:
 	@echo "... home/zhr/2k0300/test1/project/code/driver/pid/pid.o"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/pid/pid.i"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/pid/pid.s"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.o"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.i"
+	@echo "... home/zhr/2k0300/test1/project/code/driver/pid/pid_tuning.s"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/uart/uart.o"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/uart/uart.i"
 	@echo "... home/zhr/2k0300/test1/project/code/driver/uart/uart.s"

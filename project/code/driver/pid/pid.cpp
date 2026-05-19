@@ -420,6 +420,10 @@ MotorSpeedPidConfig MotorSpeedPidController::default_config(float duty_limit)
     config.left_feedforward_bias = pid_tuning::motor_speed::kLeftFeedforwardBias;
     config.right_feedforward_bias = pid_tuning::motor_speed::kRightFeedforwardBias;
     config.feedforward_bias_threshold = pid_tuning::motor_speed::kFeedforwardBiasThreshold;
+    config.left_feedforward_low_speed_boost = pid_tuning::motor_speed::kLeftFeedforwardLowSpeedBoost;
+    config.right_feedforward_low_speed_boost = pid_tuning::motor_speed::kRightFeedforwardLowSpeedBoost;
+    config.left_feedforward_low_speed_cutoff = pid_tuning::motor_speed::kLeftFeedforwardLowSpeedCutoff;
+    config.right_feedforward_low_speed_cutoff = pid_tuning::motor_speed::kRightFeedforwardLowSpeedCutoff;
     config.decel_error_threshold = pid_tuning::motor_speed::kDecelErrorThreshold;
     config.decel_duty_gain = pid_tuning::motor_speed::kDecelDutyGain;
     config.decel_duty_limit = pid_tuning::motor_speed::kDecelDutyLimit;
@@ -440,6 +444,10 @@ void MotorSpeedPidController::sanitize_config()
     config_.left_feedforward_bias = fabsf(config_.left_feedforward_bias);
     config_.right_feedforward_bias = fabsf(config_.right_feedforward_bias);
     config_.feedforward_bias_threshold = fabsf(config_.feedforward_bias_threshold);
+    config_.left_feedforward_low_speed_boost = fabsf(config_.left_feedforward_low_speed_boost);
+    config_.right_feedforward_low_speed_boost = fabsf(config_.right_feedforward_low_speed_boost);
+    config_.left_feedforward_low_speed_cutoff = fabsf(config_.left_feedforward_low_speed_cutoff);
+    config_.right_feedforward_low_speed_cutoff = fabsf(config_.right_feedforward_low_speed_cutoff);
     config_.decel_error_threshold = fabsf(config_.decel_error_threshold);
     config_.decel_duty_gain = fabsf(config_.decel_duty_gain);
     config_.decel_duty_limit = fabsf(config_.decel_duty_limit);
@@ -529,6 +537,10 @@ void MotorSpeedPidController::get_debug_info(MotorSpeedPidDebugInfo &info) const
     info.left_feedforward_bias = config_.left_feedforward_bias;
     info.right_feedforward_bias = config_.right_feedforward_bias;
     info.feedforward_bias_threshold = config_.feedforward_bias_threshold;
+    info.left_feedforward_low_speed_boost = config_.left_feedforward_low_speed_boost;
+    info.right_feedforward_low_speed_boost = config_.right_feedforward_low_speed_boost;
+    info.left_feedforward_low_speed_cutoff = config_.left_feedforward_low_speed_cutoff;
+    info.right_feedforward_low_speed_cutoff = config_.right_feedforward_low_speed_cutoff;
     info.decel_error_threshold = config_.decel_error_threshold;
     info.decel_duty_gain = config_.decel_duty_gain;
     info.decel_duty_limit = config_.decel_duty_limit;
@@ -633,7 +645,11 @@ float MotorSpeedPidController::median_of_three(float a, float b, float c)
  * @param bias 静摩擦补偿
  * @return 限幅后的前馈占空比
  */
-float MotorSpeedPidController::compute_feedforward_duty(float target_count, float gain, float bias) const
+float MotorSpeedPidController::compute_feedforward_duty(float target_count,
+                                                        float gain,
+                                                        float bias,
+                                                        float low_speed_boost,
+                                                        float low_speed_cutoff) const
 {
     float duty = target_count * gain;
 
@@ -644,6 +660,21 @@ float MotorSpeedPidController::compute_feedforward_duty(float target_count, floa
     else if (target_count < -config_.feedforward_bias_threshold)
     {
         duty -= bias;
+    }
+
+    if (low_speed_boost > 0.0f &&
+        low_speed_cutoff > config_.feedforward_bias_threshold)
+    {
+        const float abs_target = fabsf(target_count);
+        if (abs_target > config_.feedforward_bias_threshold &&
+            abs_target < low_speed_cutoff)
+        {
+            const float ratio =
+                (low_speed_cutoff - abs_target) /
+                (low_speed_cutoff - config_.feedforward_bias_threshold);
+            const float boost = low_speed_boost * clamp_float(ratio, 0.0f, 1.0f);
+            duty += (target_count >= 0.0f) ? boost : -boost;
+        }
     }
 
     return clamp_float(duty, -config_.duty_limit, config_.duty_limit);
@@ -750,10 +781,14 @@ MotorSpeedControlState MotorSpeedPidController::compute(float left_target, float
 
     state.left_feedforward = compute_feedforward_duty(left_target,
                                                       config_.left_feedforward_gain,
-                                                      config_.left_feedforward_bias);
+                                                      config_.left_feedforward_bias,
+                                                      config_.left_feedforward_low_speed_boost,
+                                                      config_.left_feedforward_low_speed_cutoff);
     state.right_feedforward = compute_feedforward_duty(right_target,
                                                        config_.right_feedforward_gain,
-                                                       config_.right_feedforward_bias);
+                                                       config_.right_feedforward_bias,
+                                                       config_.right_feedforward_low_speed_boost,
+                                                       config_.right_feedforward_low_speed_cutoff);
     state.left_decel_assist = compute_decel_assist_duty(left_target, state.left_feedback);
     state.right_decel_assist = compute_decel_assist_duty(right_target, state.right_feedback);
 

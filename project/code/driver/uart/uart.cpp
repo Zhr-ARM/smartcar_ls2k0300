@@ -201,6 +201,44 @@ int32 Uart::send_string(const char *str)
 }
 
 /**
+ * @brief 非阻塞 DMA 发送
+ * @param data 待发送数据缓冲区
+ * @param length 数据长度
+ * @return 实际发送字节数，失败返回负值
+ *
+ * 使用单次 write() 调用，不阻塞等待。
+ * 内核 UART 驱动在硬件 DMA 支持时自动使用 DMA 通道传输。
+ */
+int32 Uart::send_nonblock(const uint8 *data, size_t length)
+{
+    if (NULL == data || 0 == length)
+    {
+        return (NULL == data) ? -1 : 0;
+    }
+
+    if (!is_open())
+    {
+        return -1;
+    }
+
+    std::lock_guard<std::mutex> lock(tx_mutex_);
+
+    ssize_t sent = ::write(fd_, data, length);
+    if (sent >= 0)
+    {
+        return static_cast<int32>(sent);
+    }
+
+    // EAGAIN 表示内核发送缓冲区满，上层可选择稍后重试
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
+    {
+        return 0;
+    }
+
+    return -1;
+}
+
+/**
  * @brief 接收串口数据
  * @param buffer 接收缓冲区
  * @param length 缓冲区长度

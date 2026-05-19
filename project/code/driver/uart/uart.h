@@ -83,6 +83,19 @@ public:
     int32 send_string(const char *str);
 
     /**
+     * @brief 非阻塞 DMA 发送（不等待，立即返回）
+     * @param data 待发送数据缓冲区
+     * @param length 数据长度
+     * @return 实际发送字节数，失败返回负值
+     *
+     * 与 send() 的区别：不会在发送缓冲区满时阻塞等待，
+     * 而是立即返回已发送字节数或错误码。
+     * 适用于高频实时数据上报场景（如 PID 调试），
+     * 内核 UART 驱动在硬件支持时自动使用 DMA 传输。
+     */
+    int32 send_nonblock(const uint8 *data, size_t length);
+
+    /**
      * @brief 接收串口数据
      * @param buffer 接收缓冲区
      * @param length 缓冲区长度

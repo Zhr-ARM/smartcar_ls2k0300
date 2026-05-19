@@ -57,11 +57,16 @@ struct PidSnapshot
     float motor_left_feedforward_bias = 0.0f;
     float motor_right_feedforward_bias = 0.0f;
     float motor_feedforward_bias_threshold = 0.0f;
+    float motor_left_feedforward_low_speed_boost = 0.0f;
+    float motor_right_feedforward_low_speed_boost = 0.0f;
+    float motor_left_feedforward_low_speed_cutoff = 0.0f;
+    float motor_right_feedforward_low_speed_cutoff = 0.0f;
     float motor_decel_error_threshold = 0.0f;
     float motor_decel_duty_gain = 0.0f;
     float motor_decel_duty_limit = 0.0f;
     int32 motor_feedback_average_window = 0;
     float motor_feedback_low_pass_alpha = 0.0f;
+    bool motor_speed_debug_enabled = false;
     bool brushless_realtime_enabled = false;
     float brushless_left_duty_percent = 0.0f;
     float brushless_right_duty_percent = 0.0f;
@@ -739,11 +744,16 @@ PidSnapshot capture_pid_snapshot()
     snapshot.motor_left_feedforward_bias = pid_tuning::motor_speed::kLeftFeedforwardBias;
     snapshot.motor_right_feedforward_bias = pid_tuning::motor_speed::kRightFeedforwardBias;
     snapshot.motor_feedforward_bias_threshold = pid_tuning::motor_speed::kFeedforwardBiasThreshold;
+    snapshot.motor_left_feedforward_low_speed_boost = pid_tuning::motor_speed::kLeftFeedforwardLowSpeedBoost;
+    snapshot.motor_right_feedforward_low_speed_boost = pid_tuning::motor_speed::kRightFeedforwardLowSpeedBoost;
+    snapshot.motor_left_feedforward_low_speed_cutoff = pid_tuning::motor_speed::kLeftFeedforwardLowSpeedCutoff;
+    snapshot.motor_right_feedforward_low_speed_cutoff = pid_tuning::motor_speed::kRightFeedforwardLowSpeedCutoff;
     snapshot.motor_decel_error_threshold = pid_tuning::motor_speed::kDecelErrorThreshold;
     snapshot.motor_decel_duty_gain = pid_tuning::motor_speed::kDecelDutyGain;
     snapshot.motor_decel_duty_limit = pid_tuning::motor_speed::kDecelDutyLimit;
     snapshot.motor_feedback_average_window = pid_tuning::motor_speed::kFeedbackAverageWindow;
     snapshot.motor_feedback_low_pass_alpha = pid_tuning::motor_speed::kFeedbackLowPassAlpha;
+    snapshot.motor_speed_debug_enabled = pid_tuning::motor_speed::kSpeedDebugEnabled;
     snapshot.brushless_realtime_enabled = pid_tuning::brushless::kRealtimeEnabled;
     snapshot.brushless_left_duty_percent = pid_tuning::brushless::kLeftDutyPercent;
     snapshot.brushless_right_duty_percent = pid_tuning::brushless::kRightDutyPercent;
@@ -791,11 +801,16 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
     pid_tuning::motor_speed::kLeftFeedforwardBias = snapshot.motor_left_feedforward_bias;
     pid_tuning::motor_speed::kRightFeedforwardBias = snapshot.motor_right_feedforward_bias;
     pid_tuning::motor_speed::kFeedforwardBiasThreshold = snapshot.motor_feedforward_bias_threshold;
+    pid_tuning::motor_speed::kLeftFeedforwardLowSpeedBoost = snapshot.motor_left_feedforward_low_speed_boost;
+    pid_tuning::motor_speed::kRightFeedforwardLowSpeedBoost = snapshot.motor_right_feedforward_low_speed_boost;
+    pid_tuning::motor_speed::kLeftFeedforwardLowSpeedCutoff = snapshot.motor_left_feedforward_low_speed_cutoff;
+    pid_tuning::motor_speed::kRightFeedforwardLowSpeedCutoff = snapshot.motor_right_feedforward_low_speed_cutoff;
     pid_tuning::motor_speed::kDecelErrorThreshold = snapshot.motor_decel_error_threshold;
     pid_tuning::motor_speed::kDecelDutyGain = snapshot.motor_decel_duty_gain;
     pid_tuning::motor_speed::kDecelDutyLimit = snapshot.motor_decel_duty_limit;
     pid_tuning::motor_speed::kFeedbackAverageWindow = snapshot.motor_feedback_average_window;
     pid_tuning::motor_speed::kFeedbackLowPassAlpha = snapshot.motor_feedback_low_pass_alpha;
+    pid_tuning::motor_speed::kSpeedDebugEnabled = snapshot.motor_speed_debug_enabled;
     pid_tuning::brushless::kRealtimeEnabled = snapshot.brushless_realtime_enabled;
     pid_tuning::brushless::kLeftDutyPercent = snapshot.brushless_left_duty_percent;
     pid_tuning::brushless::kRightDutyPercent = snapshot.brushless_right_duty_percent;
@@ -1169,11 +1184,19 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_PID_FLOAT("pid.motor_speed.left_feedforward_bias", pid_tuning::motor_speed::kLeftFeedforwardBias);
     REQUIRE_PID_FLOAT("pid.motor_speed.right_feedforward_bias", pid_tuning::motor_speed::kRightFeedforwardBias);
     REQUIRE_PID_FLOAT("pid.motor_speed.feedforward_bias_threshold", pid_tuning::motor_speed::kFeedforwardBiasThreshold);
+    REQUIRE_PID_FLOAT("pid.motor_speed.left_feedforward_low_speed_boost", pid_tuning::motor_speed::kLeftFeedforwardLowSpeedBoost);
+    REQUIRE_PID_FLOAT("pid.motor_speed.right_feedforward_low_speed_boost", pid_tuning::motor_speed::kRightFeedforwardLowSpeedBoost);
+    REQUIRE_PID_FLOAT("pid.motor_speed.left_feedforward_low_speed_cutoff", pid_tuning::motor_speed::kLeftFeedforwardLowSpeedCutoff);
+    REQUIRE_PID_FLOAT("pid.motor_speed.right_feedforward_low_speed_cutoff", pid_tuning::motor_speed::kRightFeedforwardLowSpeedCutoff);
     REQUIRE_PID_FLOAT("pid.motor_speed.decel_error_threshold", pid_tuning::motor_speed::kDecelErrorThreshold);
     REQUIRE_PID_FLOAT("pid.motor_speed.decel_duty_gain", pid_tuning::motor_speed::kDecelDutyGain);
     REQUIRE_PID_FLOAT("pid.motor_speed.decel_duty_limit", pid_tuning::motor_speed::kDecelDutyLimit);
     REQUIRE_PID_INT("pid.motor_speed.feedback_average_window", pid_tuning::motor_speed::kFeedbackAverageWindow);
     REQUIRE_PID_FLOAT("pid.motor_speed.feedback_low_pass_alpha", pid_tuning::motor_speed::kFeedbackLowPassAlpha);
+    if (!require_bool(values, &consumed, "pid.motor_speed.speed_debug_enabled", &pid_tuning::motor_speed::kSpeedDebugEnabled, error_message))
+    {
+        return false;
+    }
     if (!require_bool(values, &consumed, "pid.brushless.realtime_enabled", &pid_tuning::brushless::kRealtimeEnabled, error_message))
     {
         return false;

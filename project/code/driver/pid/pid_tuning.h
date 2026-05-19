@@ -28,11 +28,16 @@ extern float kRightFeedforwardGain;
 extern float kLeftFeedforwardBias;
 extern float kRightFeedforwardBias;
 extern float kFeedforwardBiasThreshold;
+extern float kLeftFeedforwardLowSpeedBoost;
+extern float kRightFeedforwardLowSpeedBoost;
+extern float kLeftFeedforwardLowSpeedCutoff;
+extern float kRightFeedforwardLowSpeedCutoff;
 extern float kDecelErrorThreshold;
 extern float kDecelDutyGain;
 extern float kDecelDutyLimit;
 extern int32 kFeedbackAverageWindow;
 extern float kFeedbackLowPassAlpha;
+extern bool kSpeedDebugEnabled;
 } // namespace motor_speed
 
 namespace brushless

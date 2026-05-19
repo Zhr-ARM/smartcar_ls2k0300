@@ -367,8 +367,6 @@ int main(int, char**)
            g_vision_runtime_config.ipm_line_error_index_min,
            g_vision_runtime_config.ipm_line_error_index_max);
 
-    uart_thread_init();
-
     // 巡线直道参考速度配置：
     // 这里默认与 NORMAL 档基础速度保持一致；若想整体统一提速/降速，可改 pid_tuning 中的全局倍率，
     // 或在这里把“期望直道参考速度”改成一个新的值，让所有状态按比例一起缩放。
@@ -383,6 +381,126 @@ int main(int, char**)
     motor_thread_print_info();
     imu_thread_print_info();
     line_follow_thread_print_info();
+
+    // ============================================================
+    // 速度环调试模式
+    // 当 pid.motor_speed.speed_debug_enabled = true 时，
+    // 进入速度环调试序列：左轮和右轮分别在 200/300/400/500 速度下
+    // 各运行 2s，全程通过 ttyS1 UART DMA 上报调试数据，最后停止。
+    // 注意：此模式下双板通信协议不启动，ttyS1 专用于调试输出。
+    // ============================================================
+    if (pid_tuning::motor_speed::kSpeedDebugEnabled)
+    {
+        printf("[SPEED_DEBUG] === speed debug mode enabled ===\r\n");
+        printf("[SPEED_DEBUG] sequence: 200(2s) -> 300(2s) -> 400(2s) -> 500(2s) -> STOP\r\n");
+
+        // 初始化 ttyS1 仅用于调试输出，不启动双板协议
+        if (!uart_thread_speed_debug_init())
+        {
+            printf("[SPEED_DEBUG] UART init failed, abort debug mode\r\n");
+            pid_tuning::motor_speed::kSpeedDebugEnabled = false;
+        }
+        else
+        {
+            // 停止巡线干扰：将巡线参考速度清零，避免 line_follow_thread 覆盖目标
+            line_follow_thread_set_normal_speed_reference(0.0f);
+            motor_thread_set_target_count(0.0f, 0.0f);
+
+            enum class SpeedDebugPhase : int
+            {
+                SPEED_200 = 0,
+                SPEED_300,
+                SPEED_400,
+                SPEED_500,
+                STOP,
+                DONE
+            };
+
+            constexpr float kSpeedTable[] = {200.0f, 300.0f, 400.0f, 500.0f, 0.0f};
+            constexpr int kPhaseCount = sizeof(kSpeedTable) / sizeof(kSpeedTable[0]);
+            constexpr int kPhaseDurationMs = 800;
+
+            SpeedDebugPhase phase = SpeedDebugPhase::SPEED_200;
+            int elapsed_ms = 0;
+
+            printf("[SPEED_DEBUG] start phase SPEED_200 target=%.1f\r\n",
+                   static_cast<double>(kSpeedTable[0]));
+
+            while (!g_should_exit && phase != SpeedDebugPhase::DONE)
+            {
+                const int phase_idx = static_cast<int>(phase);
+                const float target_speed = (phase_idx < kPhaseCount) ? kSpeedTable[phase_idx] : 0.0f;
+
+                // 下发双轮目标速度
+                motor_thread_set_target_count(target_speed, target_speed);
+
+                // 读取当前状态并上报
+                const float left_target = motor_thread_left_target_count();
+                const float right_target = motor_thread_right_target_count();
+                const float left_current = motor_thread_left_count();
+                const float right_current = motor_thread_right_count();
+
+                uart_thread_speed_debug_send(left_target, right_target,
+                                             left_current, right_current);
+
+                system_delay_ms(kMainLoopPeriodMs);
+                elapsed_ms += kMainLoopPeriodMs;
+
+                // 阶段切换
+                if (elapsed_ms >= kPhaseDurationMs)
+                {
+                    elapsed_ms = 0;
+
+                    switch (phase)
+                    {
+                        case SpeedDebugPhase::SPEED_200:
+                            phase = SpeedDebugPhase::SPEED_300;
+                            break;
+                        case SpeedDebugPhase::SPEED_300:
+                            phase = SpeedDebugPhase::SPEED_400;
+                            break;
+                        case SpeedDebugPhase::SPEED_400:
+                            phase = SpeedDebugPhase::SPEED_500;
+                            break;
+                        case SpeedDebugPhase::SPEED_500:
+                            phase = SpeedDebugPhase::STOP;
+                            break;
+                        case SpeedDebugPhase::STOP:
+                            phase = SpeedDebugPhase::DONE;
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (phase != SpeedDebugPhase::DONE)
+                    {
+                        const int next_idx = static_cast<int>(phase);
+                        printf("[SPEED_DEBUG] phase -> %d target=%.1f\r\n",
+                               next_idx,
+                               static_cast<double>(kSpeedTable[next_idx]));
+                    }
+                }
+            }
+
+            // 确保电机完全停止
+            motor_thread_set_target_count(0.0f, 0.0f);
+            system_delay_ms(100);
+            stop_all_motion_immediately();
+            uart_thread_speed_debug_cleanup();
+
+            printf("[SPEED_DEBUG] === sequence complete, exiting ===\r\n");
+        }
+
+        if (g_should_exit)
+        {
+            printf("收到Ctrl+C,程序即将退出\n");
+        }
+        cleanup_once();
+        return 0;
+    }
+
+    // 正常模式：初始化双板通信 UART（ttyS1，启动协议收发线程）
+    uart_thread_init();
 
     bool zebra_cross_stop_triggered = false;
     while(!g_should_exit)

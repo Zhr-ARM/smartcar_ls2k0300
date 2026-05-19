@@ -406,6 +406,10 @@ bool motor_thread_get_pid_debug_status(MotorPidDebugStatus &status)
     status.left_feedforward_bias = info.left_feedforward_bias;
     status.right_feedforward_bias = info.right_feedforward_bias;
     status.feedforward_bias_threshold = info.feedforward_bias_threshold;
+    status.left_feedforward_low_speed_boost = info.left_feedforward_low_speed_boost;
+    status.right_feedforward_low_speed_boost = info.right_feedforward_low_speed_boost;
+    status.left_feedforward_low_speed_cutoff = info.left_feedforward_low_speed_cutoff;
+    status.right_feedforward_low_speed_cutoff = info.right_feedforward_low_speed_cutoff;
     status.decel_error_threshold = info.decel_error_threshold;
     status.decel_duty_gain = info.decel_duty_gain;
     status.decel_duty_limit = info.decel_duty_limit;

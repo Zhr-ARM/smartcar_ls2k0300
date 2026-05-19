@@ -55,6 +55,10 @@ struct MotorPidDebugStatus
     float left_feedforward_bias;
     float right_feedforward_bias;
     float feedforward_bias_threshold;
+    float left_feedforward_low_speed_boost;
+    float right_feedforward_low_speed_boost;
+    float left_feedforward_low_speed_cutoff;
+    float right_feedforward_low_speed_cutoff;
     float decel_error_threshold;
     float decel_duty_gain;
     float decel_duty_limit;

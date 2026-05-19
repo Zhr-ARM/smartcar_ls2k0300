@@ -25,11 +25,16 @@ float kRightFeedforwardGain = 0.090f;
 float kLeftFeedforwardBias = 1.4f;
 float kRightFeedforwardBias = 1.4f;
 float kFeedforwardBiasThreshold = 5.0f;
+float kLeftFeedforwardLowSpeedBoost = 0.0f;
+float kRightFeedforwardLowSpeedBoost = 0.0f;
+float kLeftFeedforwardLowSpeedCutoff = 0.0f;
+float kRightFeedforwardLowSpeedCutoff = 0.0f;
 float kDecelErrorThreshold = 5.0f;
 float kDecelDutyGain = 0.18f;
 float kDecelDutyLimit = 14.0f;
 int32 kFeedbackAverageWindow = 2;
 float kFeedbackLowPassAlpha = 0.95f;
+bool kSpeedDebugEnabled = false;
 } // namespace motor_speed
 
 namespace brushless

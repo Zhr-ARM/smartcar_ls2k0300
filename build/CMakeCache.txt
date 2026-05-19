@@ -229,6 +229,9 @@ ENABLE_CAR_SCREEN_DISPLAY:BOOL=ON
 //Enable E99 vision full stack
 ENABLE_E99_VISION_STACK:BOOL=ON
 
+//Enable NCNN inference support
+ENABLE_NCNN:BOOL=ON
+
 //Enable Seekfree assistant camera streaming
 ENABLE_SEEKFREE_ASSISTANT_CAMERA_STREAM:BOOL=OFF
 
@@ -258,6 +261,12 @@ PKG_CONFIG_ARGN:STRING=
 
 //pkg-config executable
 PKG_CONFIG_EXECUTABLE:FILEPATH=/usr/bin/pkg-config
+
+//UVC format preset: 0=YUY2, 1=MJPG
+UVC_FORMAT_PRESET:STRING=1
+
+//UVC capture preset: 0=160x120, 1=320x240
+UVC_RES_PRESET:STRING=1
 
 //The directory containing a CMake configuration file for ncnn.
 ncnn_DIR:PATH=/home/zhr/2k0300/test1/lib-ncnn/tools/LQ_Dep_libs/ncnn_install/lib/cmake/ncnn
@@ -484,6 +493,10 @@ PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
 PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
 //Result of TRY_COMPILE
 THREADS_HAVE_PTHREAD_ARG:INTERNAL=TRUE
+//STRINGS property for variable: UVC_FORMAT_PRESET
+UVC_FORMAT_PRESET-STRINGS:INTERNAL=0;1
+//STRINGS property for variable: UVC_RES_PRESET
+UVC_RES_PRESET-STRINGS:INTERNAL=0;1
 //linker supports push/pop state
 _CMAKE_LINKER_PUSHPOP_STATE_SUPPORTED:INTERNAL=TRUE
 __pkg_config_checked_NCNN:INTERNAL=1

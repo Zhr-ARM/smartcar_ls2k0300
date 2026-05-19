@@ -307,8 +307,9 @@ CMakeFiles/project.dir/main.cpp.o: \
  /home/zhr/2k0300/test1/project/user/../../libraries/zf_device/zf_device_imu963ra.h \
  /home/zhr/2k0300/test1/project/user/../../libraries/zf_components/seekfree_assistant.h \
  /home/zhr/2k0300/test1/project/user/../../libraries/zf_components/seekfree_assistant_interface.h \
+ /home/zhr/2k0300/test1/project/user/../code/app/beep_thread/beep_thread.h \
+ /home/zhr/2k0300/test1/project/user/../code/app/config_http_thread/config_http_thread.h \
  /home/zhr/2k0300/test1/project/user/../code/driver/battery/battery.h \
- /opt/ls_2k0300_env/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6/loongarch64-linux-gnu/sysroot/usr/include/c++/8.3.0/csignal \
  /home/zhr/2k0300/test1/project/user/../code/app/uart_thread/uart_thread.h \
  /home/zhr/2k0300/test1/project/user/../code/app/motor_thread/motor_thread.h \
  /home/zhr/2k0300/test1/project/user/../code/app/imu_thread/imu_thread.h \
@@ -317,6 +318,7 @@ CMakeFiles/project.dir/main.cpp.o: \
  /home/zhr/2k0300/test1/project/user/../code/app/vision_thread/vision_thread.h \
  /home/zhr/2k0300/test1/project/user/../code/app/screen_display_thread/screen_display_thread.h \
  /home/zhr/2k0300/test1/project/user/../code/driver/pid/pid_tuning.h \
+ /home/zhr/2k0300/test1/project/user/../code/driver/config/smartcar_config.h \
  /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_assistant_udp.h \
  /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_config.h \
  /home/zhr/2k0300/test1/project/user/../code/driver/vision/vision_image_processor.h \
