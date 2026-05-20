@@ -297,13 +297,13 @@ gyro_yaw_rate_filter_alpha = 0.45
 
 [pid.motor_speed]
 # 左轮速度环 Kp。
-left_kp = 0.070
+left_kp = 0.22
 # 左轮速度环 Ki。
 left_ki = 0.0
 # 左轮速度环 Kd。
 left_kd = 0.0
 # 右轮速度环 Kp。
-right_kp = 0.080
+right_kp = 0.19
 # 右轮速度环 Ki。
 right_ki = 0.0
 # 右轮速度环 Kd。
@@ -311,48 +311,48 @@ right_kd = 0.0
 # 速度环积分限幅。
 integral_limit = 0.0
 # 单周期 PID 修正项最大变化步长。
-max_output_step = 16.0
+max_output_step = 9.0
 # PID 修正项总限幅。
-correction_limit = 18.0
+correction_limit = 8.5
 # 左轮前馈斜率。
-left_feedforward_gain = 0.034
+left_feedforward_gain = 0.0330
 # 右轮前馈斜率。
-right_feedforward_gain = 0.038
+right_feedforward_gain = 0.0295
 # 左轮静摩擦补偿。
-left_feedforward_bias = 12.0
+left_feedforward_bias = 11.0
 # 右轮静摩擦补偿。
-right_feedforward_bias = 14.0
+right_feedforward_bias = 11.0
 # 静摩擦补偿触发阈值。
 feedforward_bias_threshold = 5.0
 # 左轮低速额外前馈补偿，随目标速度升高线性衰减。
-left_feedforward_low_speed_boost = 14.0
+left_feedforward_low_speed_boost = 11.0
 # 右轮低速额外前馈补偿，随目标速度升高线性衰减。
-right_feedforward_low_speed_boost = 20.0
+right_feedforward_low_speed_boost = 12.0
 # 左轮低速额外前馈在该目标速度处衰减为 0。
-left_feedforward_low_speed_cutoff = 420.0
+left_feedforward_low_speed_cutoff = 480.0
 # 右轮低速额外前馈在该目标速度处衰减为 0。
-right_feedforward_low_speed_cutoff = 440.0
+right_feedforward_low_speed_cutoff = 480.0
 # 减速辅助触发误差阈值。
-decel_error_threshold = 20.0
+decel_error_threshold = 60.0
 # 减速辅助增益。
-decel_duty_gain = 0.04
+decel_duty_gain = 0.015
 # 减速辅助最大输出。
-decel_duty_limit = 6.0
+decel_duty_limit = 2.0
 # 速度反馈平均窗口长度。
-feedback_average_window = 4
+feedback_average_window = 6
 # 速度反馈低通滤波 alpha。
-feedback_low_pass_alpha = 0.75
+feedback_low_pass_alpha = 0.52
 # 速度环调试模式开关。
-# true 时进入速度环调试序列：200→300→400→500 各 2s 后停止。
+# true 时进入速度环调试序列：200→300→400→500 各 0.8s 后停止。
 speed_debug_enabled = true
 
 [pid.brushless]
 # 是否启用主循环实时无刷控制。
 realtime_enabled = true
 # 左侧无刷目标占空比，单位百分比 [0, 100]。
-left_duty_percent = 85.0
+left_duty_percent = 0.0
 # 右侧无刷目标占空比，单位百分比 [0, 100]。
-right_duty_percent = 85.0
+right_duty_percent = 0.0
 
 [pid.yaw_rate_loop]
 # 视觉曲率滤波 alpha。
