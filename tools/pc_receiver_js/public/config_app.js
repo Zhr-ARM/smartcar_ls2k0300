@@ -507,6 +507,60 @@
     return lines.join('\n');
   }
 
+  async function smartApply() {
+    let tomlText = configEditor.value;
+    if (!tomlText.trim()) {
+      setStatus('TOML 文本为空，不能应用。', 'error');
+      return;
+    }
+    tomlText = syncPresetIpsIntoTomlText(tomlText);
+    configEditor.value = tomlText;
+    await refreshConnectionStatus().catch(() => {});
+    lastActionText.textContent = '最近操作: 正在智能应用...';
+
+    // Step 1: Try hot update via web proxy
+    try {
+      setStatus('正在热更新...', 'warn');
+      const result = await fetchJson('/api/config/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        body: tomlText
+      });
+      if (result.ok) {
+        const currentResult = await fetchCurrentConfigFromRuntime();
+        const verifySummary = summarizeDiff(currentResult.toml_text || '', tomlText);
+        lastActionText.textContent = '最近操作: 热更新成功';
+        setRestartKeys(result.restart_required_keys || []);
+        setStatus('已热更新成功', 'ok');
+        await refreshConnectionStatus().catch(() => {});
+        return;
+      }
+    } catch (e) {
+      // Hot update failed — fall through to SSH
+    }
+
+    // Step 2: Fallback to SSH offline write
+    try {
+      setStatus('热更新不可用，正在通过 SSH 离线写入...', 'warn');
+      lastActionText.textContent = '最近操作: 正在通过 SSH 写入主板...';
+      const result = await fetchJson('/api/config/ssh_push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        body: tomlText
+      });
+      if (result.ssh_target) {
+        sshTargetText.textContent =
+          'SSH 目标: ' + result.ssh_target.user + '@' + result.ssh_target.host + ':' + result.ssh_target.target_path + ' (port ' + result.ssh_target.port + ')';
+      }
+      lastActionText.textContent = '最近操作: SSH 写入成功';
+      setStatus('已通过 SSH 离线写入（需重启主板生效）', 'warn');
+      await refreshConnectionStatus().catch(() => {});
+    } catch (e) {
+      lastActionText.textContent = '最近操作: 应用失败';
+      setStatus('热更新和 SSH 写入均失败: ' + (e && e.message ? e.message : e), 'error');
+    }
+  }
+
   async function applyCurrentConfig() {
     let tomlText = configEditor.value;
     if (!tomlText.trim()) {
@@ -694,7 +748,7 @@
   }
 
   document.getElementById('loadConfigBtn').addEventListener('click', loadCurrentConfig);
-  document.getElementById('applyConfigBtn').addEventListener('click', applyCurrentConfig);
+  document.getElementById('smartApplyBtn').addEventListener('click', smartApply);
   presetSelect.addEventListener('change', () => {
     const selectedId = presetSelect.value;
     connectionStore.active_preset = selectedId;
@@ -758,7 +812,7 @@
     });
   });
   document.getElementById('sshPullBtn').addEventListener('click', sshPullCurrentConfig);
-  document.getElementById('sshPushBtn').addEventListener('click', sshPushCurrentConfig);
+  // sshPushBtn removed — now handled by smartApplyBtn
   document.getElementById('updateLocalConfigBtn').addEventListener('click', updateLocalConfigFromEditor);
   document.getElementById('compareBoardBtn').addEventListener('click', compareBoardFileAgainstEditor);
   document.getElementById('backupBoardBtn').addEventListener('click', backupBoardFileToLocal);

@@ -337,9 +337,8 @@
         </div>
         <button class="btn" id="refreshStatusBtn" title="重新探测主板运行态 HTTP 与 SSH 连通性">刷新连接状态</button>
         <button class="btn" id="loadConfigBtn" title="从主板运行态配置服务读取当前生效配置到编辑框">读取当前配置</button>
-        <button class="btn btn-primary" id="applyConfigBtn" title="在线下发到主板运行态并热更新；不会自动覆盖电脑本地文件">应用到主板</button>
+	        <button class="btn btn-primary" id="smartApplyBtn" title="优先热更新到主板运行态，失败自动降级为 SSH 离线写入">智能应用到主板</button>
         <button class="btn" id="sshPullBtn" title="通过 SSH 直接读取主板配置文件到编辑框">离线 SSH 读取主板</button>
-        <button class="btn" id="sshPushBtn" title="通过 SSH 直接写主板配置文件；不会自动覆盖电脑本地文件">离线 SSH 写入主板</button>
         <button class="btn" id="updateLocalConfigBtn" title="仅把当前编辑框 TOML 更新到电脑本地参数文件">更新到电脑端</button>
         <button class="btn" id="compareBoardBtn" title="通过 SSH 拉取主板文件并和当前编辑框逐行比较">比较主板文件</button>
         <button class="btn" id="backupBoardBtn" title="通过 SSH 拉取主板文件并下载为本地备份">备份主板文件</button>

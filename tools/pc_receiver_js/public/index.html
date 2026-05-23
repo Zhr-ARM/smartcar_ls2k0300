@@ -5,470 +5,634 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Smart Car Dashboard</title>
 <style>
+/* ============================================================
+   Race Telemetry Console — Design System
+   ============================================================ */
+:root {
+  --bg-deep: #080d14;
+  --bg-panel: rgba(12, 18, 28, 0.94);
+  --bg-card: rgba(14, 20, 32, 0.92);
+  --border-subtle: rgba(56, 189, 248, 0.10);
+  --border-panel: rgba(56, 189, 248, 0.14);
+  --border-active: rgba(56, 189, 248, 0.32);
+  --accent: #38bdf8;
+  --accent-glow: rgba(56, 189, 248, 0.15);
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --text-primary: #e2e8f0;
+  --text-secondary: #b0bec5;
+  --text-muted: #78909c;
+  --text-value: #f8fafc;
+  --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
+  --font-sans: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --spacing-unit: 4px;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
-  background: linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
-  color: #e2e8f0;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(circle at 30% 20%, rgba(56, 189, 248, 0.04), transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(34, 197, 94, 0.03), transparent 50%),
+    radial-gradient(circle, rgba(56, 189, 248, 0.06) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 40px 40px;
+  background-color: var(--bg-deep);
+  color: var(--text-primary);
   height: 100vh;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
-.wrap {
+
+.dashboard {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 10px 14px;
-  gap: 8px;
 }
 
-/* Hero bar */
+/* ===== Hero Bar (44px fixed) ===== */
 .hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  background: rgba(17,24,39,0.96);
-  border: 1px solid rgba(71,85,105,0.6);
-  border-radius: 10px;
+  height: 44px;
+  padding: 0 16px;
   flex-shrink: 0;
+  background: rgba(10, 16, 24, 0.96);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.12);
+  box-shadow: 0 1px 0 rgba(56, 189, 248, 0.04);
 }
-.hero h1 { font-size: 20px; color: #f8fafc; }
-.hero .pills { display: flex; gap: 10px; align-items: center; }
-.pill {
-  padding: 3px 10px;
-  border-radius: 12px;
+
+.hero-left { display: flex; align-items: center; gap: 4px; }
+
+.preset-btn {
+  padding: 6px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.preset-btn:hover { color: var(--text-secondary); }
+.preset-btn:active { transform: scale(0.97); }
+.preset-btn.active {
+  background: rgba(56, 189, 248, 0.14);
+  color: var(--accent);
+  border-color: var(--border-active);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.hero-right { display: flex; align-items: center; gap: 12px; }
+
+.status-pill {
+  padding: 3px 12px;
+  border-radius: 10px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(59,130,246,0.18);
-  color: #93c5fd;
-  border: 1px solid rgba(59,130,246,0.35);
+  font-family: var(--font-mono);
+  border: 1px solid;
+  transition: color 0.3s, background 0.3s, border-color 0.3s;
 }
-.pill.green { background: rgba(16,185,129,0.18); color: #6ee7b7; border-color: rgba(16,185,129,0.35); }
-.pill.yellow { background: rgba(251,191,36,0.18); color: #fcd34d; border-color: rgba(251,191,36,0.35); }
-.hero .btns { display: flex; gap: 6px; }
-.hero .btns button, .hero .btns a {
-  padding: 5px 14px;
+.status-pill.ok {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--ok);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+.status-pill.warn {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warn);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+.status-pill.danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.btn-hero {
+  padding: 4px 12px;
   border-radius: 6px;
   font-size: 12px;
-  border: 1px solid rgba(71,85,105,0.8);
-  background: rgba(30,41,59,0.9);
-  color: #cbd5e1;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  background: rgba(14, 20, 32, 0.8);
+  color: var(--text-secondary);
   cursor: pointer;
-  text-decoration: none;
+  transition: all 0.2s;
 }
-.hero .btns button:hover, .hero .btns a:hover { background: rgba(59,130,246,0.18); color: #f8fafc; }
-.hero .btns button.active { background: rgba(220,38,38,0.25); border-color: rgba(220,38,38,0.6); color: #fca5a5; }
+.btn-hero:hover { background: rgba(56, 189, 248, 0.12); color: var(--text-primary); }
+.btn-hero:active { transform: scale(0.97); }
 
-/* Main grid */
+.btn-hero.recording {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+  animation: pulse-record 2s ease-in-out infinite;
+}
+
+@keyframes pulse-record {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+
+.rec-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ===== Main Layout ===== */
 .main {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(380px, 1fr);
-  gap: 8px;
+  display: flex;
   flex: 1;
   min-height: 0;
-}
-
-/* Image panel */
-.img-panel {
-  display: flex;
-  flex-direction: column;
-  background: rgba(17,24,39,0.96);
-  border: 1px solid rgba(71,85,105,0.6);
-  border-radius: 10px;
+  gap: 8px;
   padding: 8px;
 }
-.img-panel .title {
-  font-size: 13px;
-  color: #93c5fd;
-  margin-bottom: 4px;
-  flex-shrink: 0;
+
+.left-col {
+  width: 30%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
-.img-panel canvas {
+
+.right-col {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* ===== Image Cards ===== */
+.img-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
+  border-radius: 10px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow:
+    inset 0 0 20px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.img-card .img-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  letter-spacing: 0.04em;
+}
+
+.img-card canvas {
   width: 100%;
-  min-height: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   image-rendering: pixelated;
   background: #000;
-}
-
-/* Right column */
-.right-col {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* IPM panel */
-.ipm-panel {
-  background: rgba(17,24,39,0.96);
-  border: 1px solid rgba(71,85,105,0.6);
-  border-radius: 10px;
-  padding: 8px;
-  flex-shrink: 0;
-}
-.ipm-panel .title { font-size: 13px; color: #93c5fd; margin-bottom: 4px; }
-.ipm-panel canvas { width: 100%; border-radius: 6px; image-rendering: pixelated; background: #000; }
-
-/* Status panels */
-.status-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.6);
   flex: 1;
   min-height: 0;
-  overflow: hidden;
 }
-.status-card {
-  background: rgba(17,24,39,0.96);
-  border: 1px solid rgba(71,85,105,0.6);
+
+/* ===== Overlay Toggles ===== */
+.overlay-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
   border-radius: 10px;
-  padding: 8px;
-  overflow-y: auto;
 }
-.status-card .title {
+.overlay-toggles label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  min-height: 28px;
+  padding: 2px 4px;
+}
+.overlay-toggles input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+}
+
+/* ===== L1 Cards Row ===== */
+.cards-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.l1-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(56, 189, 248, 0.14);
+  border-radius: 10px;
+  padding: 16px 12px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.l1-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.7;
+  border-radius: 0 0 2px 0;
+}
+.l1-card:hover {
+  border-color: var(--border-active);
+  box-shadow: 0 2px 12px var(--accent-glow);
+}
+
+.l1-card .l1-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.l1-card .l1-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-value);
+  font-family: var(--font-mono);
+  line-height: 1;
+  text-shadow: 0 0 20px var(--accent-glow);
+}
+
+.l1-card .l1-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 4px;
+}
+
+/* ===== Panels Area ===== */
+.panels-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  flex-shrink: 0;
+  transition: border-color 0.2s;
+}
+.panel.open { border-color: var(--border-panel); }
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+  min-height: 40px;
+  border-left: 2px solid transparent;
+  border-radius: 10px 10px 0 0;
+  transition: border-color 0.2s, background 0.2s;
+}
+.panel-header:hover { background: rgba(56, 189, 248, 0.04); }
+.panel-header:active { transform: scale(0.995); }
+
+.panel.open .panel-header {
+  border-left-color: var(--accent);
+  background: rgba(56, 189, 248, 0.04);
+}
+
+.panel-header .panel-title {
   font-size: 13px;
   font-weight: 600;
-  margin-bottom: 4px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(71,85,105,0.3);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
 }
-.status-card .title.vision { color: #93c5fd; }
-.status-card .title.control { color: #6ee7b7; }
-.status-card table { width: 100%; font-size: 11px; border-collapse: collapse; }
-.status-card td { padding: 2px 4px; }
-.status-card td.label { color: #94a3b8; white-space: nowrap; width: 1%; }
-.status-card td.value { color: #e2e8f0; text-align: right; font-variant-numeric: tabular-nums; font-family: "JetBrains Mono","Consolas",monospace; }
-.status-card .sub-title {
+
+.panel-header .panel-arrow {
   font-size: 11px;
-  color: #64748b;
-  padding: 4px 0 2px;
-  border-bottom: 1px solid rgba(71,85,105,0.15);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  transition: transform 0.25s ease;
+}
+
+.panel.open .panel-arrow { transform: rotate(90deg); color: var(--accent); }
+
+.panel-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.panel.open .panel-body {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 0 12px 10px;
+}
+
+/* ===== Panel Table ===== */
+.panel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+.panel-table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.06);
+}
+.panel-table .key { color: var(--text-muted); white-space: nowrap; width: 1%; }
+.panel-table .val { color: var(--text-primary); text-align: right; }
+
+.pid-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* PID 3-column grid */
+.pid-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.pid-col-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  font-family: var(--font-sans);
+}
+
+/* ===== Playback Bar ===== */
+.playback-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  flex-shrink: 0;
+  background: rgba(14, 20, 32, 0.98);
+  border-top: 1px solid rgba(245, 158, 11, 0.25);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.playback-bar.visible { display: flex; }
+.playback-bar button {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  background: rgba(14, 20, 32, 0.8);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.2s;
+}
+.playback-bar button:hover { background: rgba(56, 189, 248, 0.12); color: var(--text-primary); }
+.playback-bar button:active { transform: scale(0.97); }
+.playback-bar .pb-time { color: var(--text-secondary); white-space: nowrap; }
+.playback-bar input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+}
+
+/* ===== Params Sidebar ===== */
+.params-panel {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 340px;
+  z-index: 100;
+  background: rgba(8, 13, 20, 0.98);
+  border-left: 1px solid rgba(56, 189, 248, 0.2);
+  padding: 20px;
+  overflow-y: auto;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
+}
+.params-panel.visible { display: flex; }
+.params-panel h3 {
+  font-size: 15px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+.params-panel label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
   margin-bottom: 2px;
 }
+.params-panel input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.params-panel .param-val {
+  font-size: 12px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  min-width: 48px;
+  text-align: right;
+}
+.params-panel .param-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* ===== Scrollbar ===== */
+.panels-area::-webkit-scrollbar,
+.panel-body::-webkit-scrollbar,
+.params-panel::-webkit-scrollbar { width: 4px; }
+.panels-area::-webkit-scrollbar-thumb,
+.panel-body::-webkit-scrollbar-thumb,
+.params-panel::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.15);
+  border-radius: 2px;
+}
+.panels-area::-webkit-scrollbar-track,
+.panel-body::-webkit-scrollbar-track,
+.params-panel::-webkit-scrollbar-track { background: transparent; }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="dashboard">
+
+  <!-- ===== Hero Bar ===== -->
   <div class="hero">
-    <h1>Smart Car Dashboard</h1>
-    <div class="pills">
-      <span class="pill" id="wsPill">WS 等待</span>
-      <span class="pill green" id="fpsPill">0 fps</span>
-      <span class="pill yellow" id="modePill">-</span>
-      <span class="pill" id="kbpsPill">0 KB/s</span>
+    <div class="hero-left">
+      <button class="preset-btn active" data-preset="drive">驾驶</button>
+      <button class="preset-btn" data-preset="vision">视觉调试</button>
+      <button class="preset-btn" data-preset="control">车控调试</button>
     </div>
-    <div class="btns">
-      <button id="btnRecord">录制</button>
-      <button id="btnStop" style="display:none">停止</button>
-      <a href="/config.html">参数配置</a>
-      <a href="/playback.html">录制回放</a>
+    <div class="hero-right">
+      <span class="status-pill" id="connPill">--</span>
+      <span class="status-pill" id="fpsPill">-- fps</span>
+      <button class="btn-hero" id="paramsBtn">参数</button>
+      <button class="btn-hero" id="recordBtn">录制</button>
+      <span class="rec-status" id="recordStatus"></span>
     </div>
   </div>
 
+  <!-- ===== Main ===== -->
   <div class="main">
-    <!-- Left: main image -->
-    <div class="img-panel">
-      <div class="title">Main View <span id="imgLabel">-</span></div>
-      <canvas id="mainCanvas" width="160" height="120"></canvas>
+
+    <!-- Left Col: Images -->
+    <div class="left-col">
+      <div class="img-card" style="flex:1;">
+        <div class="img-title"><span>灰度图</span><span id="grayPixel">-</span></div>
+        <canvas id="grayCanvas" width="320" height="240"></canvas>
+      </div>
+      <div class="img-card">
+        <div class="img-title"><span>IPM 透视图</span><span id="ipmPixel">-</span></div>
+        <canvas id="ipmCanvas" width="400" height="120"></canvas>
+      </div>
+      <div class="overlay-toggles" id="overlayToggles">
+        <label><input type="checkbox" id="togBoundary" checked>边界</label>
+        <label><input type="checkbox" id="togCenterline">中线</label>
+        <label><input type="checkbox" id="togAnchor" checked>锚点</label>
+        <label><input type="checkbox" id="togDir">dir图</label>
+        <label><input type="checkbox" id="togSamplePoints">采样点</label>
+      </div>
     </div>
 
-    <!-- Right: IPM + status -->
+    <!-- Right Col: Data -->
     <div class="right-col">
-      <div class="ipm-panel">
-        <div class="title">IPM Perspective (280x140)</div>
-        <canvas id="ipmCanvas" width="280" height="140"></canvas>
+
+      <!-- L1 Cards -->
+      <div class="cards-row" id="cardsRow">
+        <div class="l1-card" id="card0"><div class="l1-label">--</div><div class="l1-value">--</div></div>
+        <div class="l1-card" id="card1"><div class="l1-label">--</div><div class="l1-value">--</div></div>
+        <div class="l1-card" id="card2"><div class="l1-label">--</div><div class="l1-value">--</div></div>
+        <div class="l1-card" id="card3"><div class="l1-label">--</div><div class="l1-value">--</div></div>
+        <div class="l1-card" id="card4"><div class="l1-label">--</div><div class="l1-value">--</div></div>
+        <div class="l1-card" id="card5"><div class="l1-label">--</div><div class="l1-value">--</div></div>
       </div>
-      <div class="status-grid">
-        <div class="status-card" id="visionCard">
-          <div class="title vision">Vision Status</div>
-          <div id="visionContent"></div>
+
+      <!-- L3 Collapsible Panels -->
+      <div class="panels-area" id="panelsArea">
+        <div class="panel" id="panelRoute">
+          <div class="panel-header" data-panel="route">
+            <span class="panel-title">元素状态机详情</span>
+            <span class="panel-arrow">▶</span>
+          </div>
+          <div class="panel-body" id="panelRouteBody"></div>
         </div>
-        <div class="status-card" id="controlCard">
-          <div class="title control">Control Status</div>
-          <div id="controlContent"></div>
+
+        <div class="panel" id="panelDetour">
+          <div class="panel-header" data-panel="detour">
+            <span class="panel-title">绕行状态机详情</span>
+            <span class="panel-arrow">▶</span>
+          </div>
+          <div class="panel-body" id="panelDetourBody"></div>
+        </div>
+
+        <div class="panel" id="panelPid">
+          <div class="panel-header" data-panel="pid">
+            <span class="panel-title">PID 参数详情</span>
+            <span class="panel-arrow">▶</span>
+          </div>
+          <div class="panel-body" id="panelPidBody"></div>
+        </div>
+
+        <div class="panel" id="panelGyro">
+          <div class="panel-header" data-panel="gyro">
+            <span class="panel-title">陀螺仪数据</span>
+            <span class="panel-arrow">▶</span>
+          </div>
+          <div class="panel-body" id="panelGyroBody"></div>
+        </div>
+
+        <div class="panel" id="panelDir">
+          <div class="panel-header" data-panel="dir">
+            <span class="panel-title">dir 数组</span>
+            <span class="panel-arrow">▶</span>
+          </div>
+          <div class="panel-body" id="panelDirBody"></div>
+        </div>
+
+        <div class="panel" id="panelTransport">
+          <div class="panel-header" data-panel="transport">
+            <span class="panel-title">传输状态详情</span>
+            <span class="panel-arrow">▶</span>
+          </div>
+          <div class="panel-body" id="panelTransportBody"></div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- ===== Playback Bar ===== -->
+  <div class="playback-bar" id="playbackBar">
+    <button id="pbPlay">▶</button>
+    <button id="pbBack">⏪ -1s</button>
+    <button id="pbFwd">⏩ +1s</button>
+    <span class="pb-time" id="pbTime">00:00 / 00:00</span>
+    <input type="range" id="pbSeek" min="0" max="100" value="0">
+    <button id="pbClose">关闭</button>
+  </div>
+
+  <!-- ===== Quick Params Sidebar ===== -->
+  <div class="params-panel" id="paramsPanel">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h3>快捷调参</h3>
+      <button id="paramsCloseBtn" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;">✕</button>
+    </div>
+    <div id="paramsContent"></div>
+    <button id="paramsApplyBtn" class="btn-hero" style="width:100%;margin-top:4px;padding:10px;font-size:13px;">应用（优先热更新）</button>
+    <div id="paramsResult" style="font-size:11px;color:var(--text-muted);margin-top:4px;"></div>
+  </div>
+
 </div>
 
-<script>
-(function() {
-  const mainCanvas = document.getElementById('mainCanvas');
-  const mainCtx = mainCanvas.getContext('2d', { willReadFrequently: false });
-  const ipmCanvas = document.getElementById('ipmCanvas');
-  const ipmCtx = ipmCanvas.getContext('2d');
-
-  const wsPill = document.getElementById('wsPill');
-  const fpsPill = document.getElementById('fpsPill');
-  const modePill = document.getElementById('modePill');
-  const kbpsPill = document.getElementById('kbpsPill');
-  const imgLabel = document.getElementById('imgLabel');
-  const visionContent = document.getElementById('visionContent');
-  const controlContent = document.getElementById('controlContent');
-
-  const btnRecord = document.getElementById('btnRecord');
-  const btnStop = document.getElementById('btnStop');
-
-  let pendingFrame = null;
-  let frameCount = 0;
-  let fpsTime = performance.now();
-  let byteCount = 0;
-
-  // Recording state
-  let mediaRecorder = null;
-  let recordedChunks = [];
-
-  const MODE_NAMES = { 0: 'Binary', 1: 'Gray' };
-  const ROUTE_MAIN = ['Normal','Circle','Straight','Cross'];
-  const ROUTE_SUB = {
-    '0,0':'Normal','1,0':'Circle-Left-Entry','1,1':'Circle-Left-Stage1','1,2':'Circle-Left-Stage2',
-    '1,3':'Circle-Left-Stage3','1,4':'Circle-Left-Stage4','1,5':'Circle-Left-Stage5','1,6':'Circle-Left-Stage6',
-    '2,0':'Circle-Right-Entry','2,1':'Circle-Right-Stage1','2,2':'Circle-Right-Stage2',
-    '2,3':'Circle-Right-Stage3','2,4':'Circle-Right-Stage4','2,5':'Circle-Right-Stage5','2,6':'Circle-Right-Stage6',
-    '3,0':'Straight','4,0':'Cross-Entry','4,1':'Cross-Stage2','4,2':'Cross-Stage3'
-  };
-  const CENTERLINE_SOURCE = ['None','FromLeft','FromRight'];
-
-  function routeStateName(main, sub) {
-    const key = main + ',' + sub;
-    if (ROUTE_SUB[key]) return ROUTE_SUB[key];
-    return (ROUTE_MAIN[main] || ('State'+main)) + '/' + sub;
-  }
-
-  function fmt(v, d) {
-    if (v === undefined || v === null || (typeof v === 'number' && !isFinite(v))) return d !== undefined ? d : '-';
-    if (typeof v === 'number') {
-      if (Number.isInteger(v)) return String(v);
-      return v.toFixed(3);
-    }
-    return String(v);
-  }
-
-  function buildVisionHTML(s) {
-    if (!s) return '<span style="color:#64748b">等待数据...</span>';
-    const detourName = routeStateName(s.detour ? s.detour.route_main : 0, s.detour ? s.detour.route_sub : 0);
-    const el = s.elements || {};
-    const cl = s.centerline || {};
-    return '<table>' +
-      '<tr><td class="label">Line Error</td><td class="value">' + fmt(s.line_error) + ' px</td></tr>' +
-      '<tr><td class="label">Elements:</td><td class="value">' +
-        'Red ' + (el.red_found ? 'YES' : 'no') +
-        ' | NCNN ' + fmt(el.ncnn_label, 'none') + ' ' + fmt(el.ncnn_score, '0') +
-      '</td></tr>' +
-      '<tr><td class="label">Detour:</td><td class="value">' + detourName +
-        ' | Zebra ' + fmt(s.detour ? s.detour.zebra : 0) +
-        ' | Src ' + fmt(s.detour ? s.detour.preferred_source : 0) +
-      '</td></tr>' +
-      '<tr><td class="label">Centerline:</td><td class="value">' +
-        'Src ' + CENTERLINE_SOURCE[cl.source] +
-        ' | Pts ' + fmt(cl.selected_count) +
-        ' | Valid ' + fmt(cl.track_valid) +
-      '</td></tr>' +
-      '<tr><td class="label">Track Point:</td><td class="value">' +
-        (cl.track_point ? cl.track_point[0]+','+cl.track_point[1] : '-') +
-        ' idx ' + fmt(cl.track_index) +
-      '</td></tr>' +
-      '<tr><td class="label">FPS:</td><td class="value">' +
-        'cap ' + fmt(s.fps ? s.fps.capture : 0) +
-        ' | vis ' + fmt(s.fps ? s.fps.vision : 0) +
-        ' | tx ' + fmt(s.fps ? s.fps.tx : 0) +
-      '</td></tr>' +
-    '</table>';
-  }
-
-  function buildControlHTML(s) {
-    if (!s) return '<span style="color:#64748b">等待数据...</span>';
-    const pid = s.pid || {};
-    const wh = s.wheels || {};
-    const sp = s.speed || {};
-    const im = s.imu || {};
-    const pos = pid.pos || {};
-    const yaw = pid.yaw || {};
-    const L = wh.left || {};
-    const R = wh.right || {};
-    return '<table>' +
-      '<tr><td colspan="2" class="sub-title">PID Loops</td></tr>' +
-      '<tr><td class="label">Position:</td><td class="value">err ' + fmt(pos.error) + ' | out ' + fmt(pos.output) + ' | Kp ' + fmt(pos.kp_dynamic) + '</td></tr>' +
-      '<tr><td class="label">Yaw:</td><td class="value">ref ' + fmt(yaw.ref) + ' | err ' + fmt(yaw.error) + ' | out ' + fmt(yaw.output) + '</td></tr>' +
-      '<tr><td class="label">Steering:</td><td class="value">' + fmt(pid.steering) + '</td></tr>' +
-      '<tr><td colspan="2" class="sub-title">Wheels</td></tr>' +
-      '<tr><td class="label">Left:</td><td class="value">tgt ' + fmt(L.target) + ' | cur ' + fmt(L.current) + ' | err ' + fmt(L.error) + ' | dty ' + fmt(L.duty) + '</td></tr>' +
-      '<tr><td class="label">Right:</td><td class="value">tgt ' + fmt(R.target) + ' | cur ' + fmt(R.current) + ' | err ' + fmt(R.error) + ' | dty ' + fmt(R.duty) + '</td></tr>' +
-      '<tr><td colspan="2" class="sub-title">Speed &amp; IMU</td></tr>' +
-      '<tr><td class="label">Base:</td><td class="value">' + fmt(sp.base) + ' | adj ' + fmt(sp.adjusted) + '</td></tr>' +
-      '<tr><td class="label">IMU:</td><td class="value">gyro_z ' + fmt(im.gyro_z) + ' | yaw_ref ' + fmt(im.yaw_ref) + ' | yaw_err ' + fmt(im.yaw_error) + '</td></tr>' +
-    '</table>';
-  }
-
-  function updateStatusPanels(status) {
-    visionContent.innerHTML = buildVisionHTML(status);
-    controlContent.innerHTML = buildControlHTML(status);
-  }
-
-  function render(now) {
-    requestAnimationFrame(render);
-    if (!pendingFrame) return;
-
-    const f = pendingFrame;
-    pendingFrame = null;
-
-    // FPS counter
-    frameCount++;
-    if (now - fpsTime >= 1000) {
-      const fps = Math.round(frameCount * 1000 / (now - fpsTime));
-      fpsPill.textContent = fps + ' fps';
-      kbpsPill.textContent = (byteCount / 1024).toFixed(0) + ' KB/s';
-      frameCount = 0;
-      fpsTime = now;
-      byteCount = 0;
-    }
-
-    // Update status panels
-    updateStatusPanels(f.status);
-
-    // Update mode label
-    if (f.mode !== undefined) {
-      modePill.textContent = MODE_NAMES[f.mode] || ('Mode'+f.mode);
-      imgLabel.textContent = MODE_NAMES[f.mode] || ('Mode'+f.mode);
-    }
-
-    // Render main image
-    createImageBitmap(f.blob).then(function(bmp) {
-      if (mainCanvas.width !== bmp.width || mainCanvas.height !== bmp.height) {
-        mainCanvas.width = bmp.width;
-        mainCanvas.height = bmp.height;
-      }
-      mainCtx.drawImage(bmp, 0, 0);
-      bmp.close();
-    }).catch(function() {});
-
-    // Draw IPM boundaries (centerline from status)
-    drawIpmOverlay(f.status);
-  }
-
-  // Simple IPM centerline overlay
-  function drawIpmOverlay(status) {
-    if (!status) return;
-    ipmCtx.clearRect(0, 0, ipmCanvas.width, ipmCanvas.height);
-    ipmCtx.fillStyle = '#0b1220';
-    ipmCtx.fillRect(0, 0, ipmCanvas.width, ipmCanvas.height);
-
-    // Draw centerline track point if valid
-    const cl = status.centerline;
-    if (cl && cl.track_valid && cl.track_point) {
-      const px = (cl.track_point[0] / 280) * ipmCanvas.width;
-      const py = (cl.track_point[1] / 140) * ipmCanvas.height;
-      ipmCtx.fillStyle = '#22c55e';
-      ipmCtx.beginPath();
-      ipmCtx.arc(px, py, 4, 0, Math.PI * 2);
-      ipmCtx.fill();
-    }
-
-    // Label
-    ipmCtx.fillStyle = '#64748b';
-    ipmCtx.font = '10px monospace';
-    ipmCtx.fillText('IPM 280x140', 4, 12);
-    if (cl) {
-      ipmCtx.fillStyle = '#93c5fd';
-      ipmCtx.fillText('Src:' + CENTERLINE_SOURCE[cl.source] + ' Pts:' + fmt(cl.selected_count), 4, 26);
-    }
-  }
-
-  // WebSocket connection
-  function connectWS() {
-    const ws = new WebSocket('ws://' + location.host + '/');
-    ws.binaryType = 'arraybuffer';
-
-    ws.onopen = function() {
-      wsPill.textContent = 'WS OK';
-      wsPill.className = 'pill green';
-    };
-
-    ws.onclose = function() {
-      wsPill.textContent = 'WS 断开';
-      wsPill.className = 'pill';
-      setTimeout(connectWS, 2000);
-    };
-
-    ws.onerror = function() {
-      wsPill.textContent = 'WS 错误';
-      wsPill.className = 'pill';
-    };
-
-    ws.onmessage = function(event) {
-      if (typeof event.data === 'string') {
-        try {
-          var msg = JSON.parse(event.data);
-          if (msg.type === 'status' && msg.data) {
-            updateStatusPanels(msg.data);
-          }
-        } catch(_) {}
-        return;
-      }
-
-      // Binary message
-      var buf = event.data;
-      byteCount += buf.byteLength;
-      var view = new DataView(buf);
-      var statusLen = view.getUint16(0, false);
-
-      var status = null;
-      var imageStart = 2;
-      if (statusLen > 0 && statusLen < buf.byteLength - 2) {
-        try {
-          var statusStr = new TextDecoder().decode(new Uint8Array(buf, 2, statusLen));
-          status = JSON.parse(statusStr);
-        } catch(_) {}
-        imageStart = 2 + statusLen;
-      }
-
-      var imageBytes = new Uint8Array(buf, imageStart);
-      pendingFrame = {
-        status: status,
-        blob: new Blob([imageBytes], { type: 'image/jpeg' })
-      };
-    };
-  }
-
-  // Recording
-  btnRecord.addEventListener('click', function() {
-    var stream = mainCanvas.captureStream(60);
-    var mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-    mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
-    recordedChunks = [];
-    mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) recordedChunks.push(e.data); };
-    mediaRecorder.onstop = function() {
-      var blob = new Blob(recordedChunks, { type: 'video/webm' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'smartcar_' + new Date().toISOString().replace(/[:.]/g,'-') + '.webm';
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-    mediaRecorder.start();
-    btnRecord.style.display = 'none';
-    btnStop.style.display = '';
-    btnRecord.classList.add('active');
-  });
-
-  btnStop.addEventListener('click', function() {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    }
-    btnRecord.style.display = '';
-    btnStop.style.display = 'none';
-    btnRecord.classList.remove('active');
-  });
-
-  // Start
-  connectWS();
-  requestAnimationFrame(render);
-})();
-</script>
+<script src="shared_receiver_core.js"></script>
+<script src="dashboard_cards.js"></script>
+<script src="dashboard_panels.js"></script>
+<script src="dashboard_overlay.js"></script>
+<script src="dashboard_playback.js"></script>
+<script src="dashboard_params.js"></script>
+<script src="dashboard.js"></script>
 </body>
 </html>
