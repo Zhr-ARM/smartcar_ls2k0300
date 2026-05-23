@@ -62,14 +62,16 @@ function connectWs() {
   ws = new WebSocket(proto + '://' + location.host + '/ws');
 
   ws.onmessage = function(ev) {
-    try {
-      var msg = JSON.parse(ev.data);
-      if (msg.type === 'status') {
-        onStatus(msg.data || msg);
-      } else if (msg.type === 'frame') {
-        onFrame(msg);
-      }
-    } catch(e) {}
+    // Server sends both JSON status and binary [status+image] frames
+    if (typeof ev.data === 'string') {
+      try {
+        var msg = JSON.parse(ev.data);
+        if (msg.type === 'status') {
+          onStatus(msg.data || msg);
+        }
+      } catch(e) {}
+    }
+    // Binary messages (status+image) are ignored; we use HTTP polling for images
   };
 
   ws.onclose = function() {
@@ -114,12 +116,12 @@ function onStatus(raw) {
   }
 }
 
-// ===== Frame handler =====
-function onFrame(msg) {
+// ===== HTTP Image polling =====
+function pullFrames() {
   frameSeq++;
   var ts = '&_' + frameSeq;
 
-  // Gray
+  // Gray image
   var grayImg = new Image();
   grayImg.onload = function() {
     if (!gc) return;
@@ -127,17 +129,7 @@ function onFrame(msg) {
     gc.drawImage(grayImg, 0, 0, grayCanvas.width, grayCanvas.height);
     if (typeof drawOverlays === 'function') drawOverlays(latestStatus);
   };
-  grayImg.src = (typeof receiverCore !== 'undefined' ? receiverCore.frameUrlForMode('gray') : '/api/frame/gray') + ts;
-
-  // IPM
-  var ipmImg = new Image();
-  ipmImg.onload = function() {
-    if (!ic) return;
-    ic.clearRect(0, 0, ipmCanvas.width, ipmCanvas.height);
-    ic.drawImage(ipmImg, 0, 0, ipmCanvas.width, ipmCanvas.height);
-    if (typeof drawOverlays === 'function') drawOverlays(latestStatus);
-  };
-  ipmImg.src = (typeof receiverCore !== 'undefined' ? receiverCore.frameUrlForMode('ipm') : '/api/frame/ipm') + ts;
+  grayImg.src = (typeof receiverCore !== 'undefined' ? receiverCore.frameUrlForMode('gray') : '/api/frame_gray.jpg') + ts;
 }
 
 // ===== Pixel probe =====
@@ -198,3 +190,4 @@ function saveRecording() {
 // ===== Start =====
 if (typeof applyPresetPanels === 'function') applyPresetPanels(currentPreset);
 connectWs();
+setInterval(pullFrames, 60);

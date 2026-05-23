@@ -18,7 +18,7 @@ const LOCAL_SMARTCAR_CONFIG_PATH = path.resolve(
 
 const BIND_HOST = process.env.BIND_HOST || '0.0.0.0';
 const UDP_PORT = Number(process.env.UDP_PORT || 10000);
-const HTTP_PORT = Number(process.env.HTTP_PORT || 8080);
+const HTTP_PORT = Number(process.env.HTTP_PORT || 9080);
 const WEB_IMAGE_FORMAT_JPEG = 0;
 const WEB_IMAGE_FORMAT_PNG = 1;
 const WEB_IMAGE_FORMAT_BMP = 2;
@@ -67,6 +67,13 @@ const defaultBoardConnectionStore = (() => {
 
 const latestFrame = {
   image: null, status: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 0, format: WEB_IMAGE_FORMAT_JPEG
+};
+
+const latestByMode = {
+  0: { image: null, status: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 0, format: WEB_IMAGE_FORMAT_JPEG },
+  1: { image: null, status: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 1, format: WEB_IMAGE_FORMAT_JPEG },
+  2: { image: null, status: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 2, format: WEB_IMAGE_FORMAT_JPEG },
+  3: { image: null, status: null, frameId: -1, updatedAtMs: 0, width: 0, height: 0, mode: 3, format: WEB_IMAGE_FORMAT_JPEG }
 };
 
 const inflightFrames = new Map();
@@ -720,6 +727,18 @@ function onUdpMessage(msg) {
       latestFrame.mode = hdr.mode;
       latestFrame.format = sanitizeImageFormat(hdr.format);
 
+      // Also update per-mode cache for HTTP frame endpoints
+      if (latestByMode[hdr.mode]) {
+        latestByMode[hdr.mode].image = image;
+        latestByMode[hdr.mode].status = status;
+        latestByMode[hdr.mode].frameId = hdr.frameId >>> 0;
+        latestByMode[hdr.mode].updatedAtMs = nowMs;
+        latestByMode[hdr.mode].width = hdr.width;
+        latestByMode[hdr.mode].height = hdr.height;
+        latestByMode[hdr.mode].mode = hdr.mode;
+        latestByMode[hdr.mode].format = sanitizeImageFormat(hdr.format);
+      }
+
       // Build binary WebSocket message: [status_len: uint16 BE] [status_json] [image_jpeg]
       if (status) {
         const statusJson = Buffer.from(JSON.stringify(status), 'utf8');
@@ -761,6 +780,18 @@ function startUdpReceiver() {
     console.log(`[JS_RECEIVER] UDP video listening on ${BIND_HOST}:${UDP_PORT}`);
   });
   setInterval(cleanupInflight, 500);
+
+  // Periodic status broadcast via WebSocket (for dashboard)
+  setInterval(function() {
+    if (!wss || wss.clients.size === 0) return;
+    var telemetry = buildTransportTelemetry();
+    var status = latestFrame.status || {};
+    // Merge telemetry into status for transport panel
+    status._transport_mbps = telemetry.rx_udp_mbps;
+    status._transport_kibs = telemetry.rx_udp_kib_per_sec;
+    status._fps = telemetry.rx_udp_frames_per_sec;
+    broadcastWs('status', status);
+  }, 120);
 }
 
 function serveFile(res, filePath, contentType) {
@@ -1057,6 +1088,26 @@ function startHttpServer() {
 
     if (pathname === '/api/frame.jpg') {
       writeImage(res, latestFrame, 'frame not ready');
+      return;
+    }
+
+    if (pathname === '/api/frame_gray.jpg') {
+      writeImage(res, latestByMode[1], 'gray frame not ready');
+      return;
+    }
+
+    if (pathname === '/api/frame_binary.jpg') {
+      writeImage(res, latestByMode[0], 'binary frame not ready');
+      return;
+    }
+
+    if (pathname === '/api/frame_rgb.jpg') {
+      writeImage(res, latestByMode[2], 'rgb frame not ready');
+      return;
+    }
+
+    if (pathname === '/api/frame_roi64.jpg') {
+      writeImage(res, latestByMode[3], 'roi64 frame not ready');
       return;
     }
 
