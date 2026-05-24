@@ -235,17 +235,17 @@ offset_ratio = 0.0
 [vision.runtime.web]
 enabled = true
 max_fps = 90
-send_mode = 0          # 0=二值图，1=灰度图
+send_mode = 1          # 0=二值图，1=灰度图
 image_format = 0       # 0=JPEG，1=PNG，2=BMP
 jpeg_quality = 70
-server_ip = "192.168.3.11"
+server_ip = "192.168.3.9"
 video_port = 10000
 
 [vision.runtime.assistant]
 # 逐飞助手 UDP 通道开关。
 enabled = false
 # 逐飞助手接收端 IP。
-server_ip = "192.168.3.11"
+server_ip = "192.168.3.9"
 # 逐飞助手接收端端口。
 server_port = 8899
 
@@ -344,7 +344,7 @@ feedback_average_window = 6
 feedback_low_pass_alpha = 0.52
 # 速度环调试模式开关。
 # true 时进入速度环调试序列：200→300→400→500 各 0.8s 后停止。
-speed_debug_enabled = true
+speed_debug_enabled = false
 
 [pid.brushless]
 # 是否启用主循环实时无刷控制。

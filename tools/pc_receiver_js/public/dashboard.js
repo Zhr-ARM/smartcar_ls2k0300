@@ -45,12 +45,14 @@ function updateFps(now) {
     fpsCounter = 0;
     fpsTimer = now;
   }
-  latestStatus._fps = currentFps;
+
+  // Use server-reported UDP FPS if available, otherwise client-side message rate
+  var displayFps = latestStatus._fps || currentFps || 0;
 
   var pill = document.getElementById('fpsPill');
   if (!pill) return;
-  pill.textContent = currentFps + ' fps';
-  pill.className = 'status-pill ' + (currentFps > 30 ? 'ok' : currentFps > 15 ? 'warn' : 'danger');
+  pill.textContent = displayFps + ' fps';
+  pill.className = 'status-pill ' + (displayFps > 30 ? 'ok' : displayFps > 15 ? 'warn' : 'danger');
 }
 
 // ===== WebSocket =====
@@ -95,17 +97,8 @@ function connectWs() {
 // ===== Status handler =====
 function onStatus(raw) {
   latestStatus = raw || {};
+  latestStatus._fps = latestStatus._fps || 0;
   updateFps(Date.now());
-
-  // Transport computed fields
-  latestStatus._transport_mbps = raw._transport_mbps || '--';
-  latestStatus._transport_kibs = raw._transport_kibs || '--';
-  latestStatus._gray_fps = raw._gray_fps || '--';
-  latestStatus._rgb_fps = raw._rgb_fps || '--';
-  latestStatus._binary_fps = raw._binary_fps || '--';
-  latestStatus._cpu_pct = raw._cpu_pct || '--';
-  latestStatus._mem_pct = raw._mem_pct || '--';
-  latestStatus._sync_note = raw._sync_note || '--';
 
   if (typeof renderCards === 'function') renderCards(latestStatus, currentPreset);
   if (typeof renderAllPanels === 'function') renderAllPanels(latestStatus);
@@ -119,9 +112,9 @@ function onStatus(raw) {
 // ===== HTTP Image polling =====
 function pullFrames() {
   frameSeq++;
-  var ts = '&_' + frameSeq;
+  var ts = '?_=' + frameSeq;
 
-  // Gray image
+  // Image from car (car sends mode 0 = binary by default, use frame.jpg which serves latest)
   var grayImg = new Image();
   grayImg.onload = function() {
     if (!gc) return;
@@ -129,7 +122,7 @@ function pullFrames() {
     gc.drawImage(grayImg, 0, 0, grayCanvas.width, grayCanvas.height);
     if (typeof drawOverlays === 'function') drawOverlays(latestStatus);
   };
-  grayImg.src = (typeof receiverCore !== 'undefined' ? receiverCore.frameUrlForMode('gray') : '/api/frame_gray.jpg') + ts;
+  grayImg.src = '/api/frame.jpg' + ts;
 }
 
 // ===== Pixel probe =====

@@ -2,11 +2,15 @@
   const WEB_DATA_PROFILE_FULL = 0;
 
   function imageEndpointByMode(mode) {
+    if (mode === 'gray' || mode === 1) return '/api/frame_gray.jpg';
+    if (mode === 'binary' || mode === 0) return '/api/frame_binary.jpg';
+    if (mode === 'rgb' || mode === 2) return '/api/frame_rgb.jpg';
+    if (mode === 'roi64' || mode === 3) return '/api/frame_roi64.jpg';
     return '/api/frame.jpg';
   }
 
   function frameUrlForMode(mode) {
-    return `/api/frame.jpg?t=${Date.now()}`;
+    return imageEndpointByMode(mode) + '?t=' + Date.now();
   }
 
   async function fetchJsonNoStore(url) {
@@ -952,7 +956,7 @@
     return lines.length > 0 ? lines.join('\n') : 'waiting...';
   }
 
-  window.SharedReceiverCore = {
+  var SharedReceiverCore = {
     WEB_DATA_PROFILE_FULL,
     imageEndpointByMode,
     frameUrlForMode,
@@ -982,4 +986,6 @@
     bindPixelProbe,
     buildStatusSummary
   };
+  window.SharedReceiverCore = SharedReceiverCore;
+  window.receiverCore = SharedReceiverCore;
 })();

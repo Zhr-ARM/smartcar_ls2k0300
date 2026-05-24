@@ -661,7 +661,7 @@ function onUdpMessage(msg) {
   const hdr = parseHeader(msg);
   if (!hdr) return;
   if (hdr.magic !== MAGIC) return;
-  if (hdr.mode !== 0 && hdr.mode !== 1) return;
+  if (hdr.mode < 0 || hdr.mode > 3) return;
   if (hdr.chunkTotal === 0 || hdr.chunkIdx >= hdr.chunkTotal) return;
   if (HEADER_SIZE + hdr.payloadLen > msg.length) return;
 
@@ -853,6 +853,30 @@ function startHttpServer() {
     }
     if (pathname === '/shared_receiver_core.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'shared_receiver_core.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/dashboard_cards.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'dashboard_cards.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/dashboard_panels.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'dashboard_panels.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/dashboard_overlay.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'dashboard_overlay.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/dashboard_playback.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'dashboard_playback.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/dashboard_params.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'dashboard_params.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/dashboard.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'dashboard.js'), 'application/javascript; charset=utf-8');
       return;
     }
 

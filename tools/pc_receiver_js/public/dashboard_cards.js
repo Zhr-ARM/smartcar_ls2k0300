@@ -27,6 +27,17 @@ var CARD_DEFS = {
   ]
 };
 
+function detour(s) { return (s && s.detour) || {}; }
+function wheels(s) { return (s && s.wheels) || {}; }
+function wheel(s, side) { return (wheels(s)[side]) || {}; }
+function spd(s) { return (s && s.speed) || {}; }
+function imu(s) { return (s && s.imu) || {}; }
+function ctlPid(s) { return (s && s.pid) || {}; }
+function posPid(s) { return ctlPid(s).pos || {}; }
+function yawPid(s) { return ctlPid(s).yaw || {}; }
+function elems(s) { return (s && s.elements) || {}; }
+function cl(s) { return (s && s.centerline) || {}; }
+
 function cardValueForStatus(status, preset, index) {
   var defs = CARD_DEFS[preset] || CARD_DEFS['drive'];
   var def = defs[index];
@@ -35,32 +46,32 @@ function cardValueForStatus(status, preset, index) {
   switch (preset) {
     case 'drive':
       switch (index) {
-        case 0: return receiverCore.formatRouteMainState(status.route_main_state);
-        case 1: return receiverCore.formatRouteSubState(status.route_sub_state);
-        case 2: return fmtNum(status.pid_left_motor_speed_rpm);
-        case 3: return fmtNum(status.pid_right_motor_speed_rpm);
-        case 4: return fmtFloat1(status.pid_common_applied_base_speed);
+        case 0: return receiverCore.formatRouteMainState(detour(status).route_main);
+        case 1: return receiverCore.formatRouteSubState(detour(status).route_sub);
+        case 2: return fmtNum(wheel(status, 'left').current);
+        case 3: return fmtNum(wheel(status, 'right').current);
+        case 4: return fmtFloat1(spd(status).adjusted);
         case 5: return fmtNum(status._fps);
       }
       break;
     case 'vision':
       switch (index) {
-        case 0: return receiverCore.formatRouteMainState(status.route_main_state);
-        case 1: return receiverCore.formatRouteSubState(status.route_sub_state);
-        case 2: return status.detour_main_state || '--';
-        case 3: return fmtPct(status.infer_max_prob);
-        case 4: return fmtNum(status.straight_selected_centerline_count);
+        case 0: return receiverCore.formatRouteMainState(detour(status).route_main);
+        case 1: return receiverCore.formatRouteSubState(detour(status).route_sub);
+        case 2: return receiverCore.formatRouteMainState(detour(status).route_main);
+        case 3: return fmtPct(elems(status).ncnn_score);
+        case 4: return fmtNum(cl(status).selected_count);
         case 5: return fmtNum(status._fps);
       }
       break;
     case 'control':
       switch (index) {
-        case 0: return receiverCore.formatRouteMainState(status.route_main_state);
-        case 1: return receiverCore.formatRouteSubState(status.route_sub_state);
-        case 2: return fmtFloat1(status.pid_common_applied_base_speed);
+        case 0: return receiverCore.formatRouteMainState(detour(status).route_main);
+        case 1: return receiverCore.formatRouteSubState(detour(status).route_sub);
+        case 2: return fmtFloat1(spd(status).adjusted);
         case 3: return fmtFloat1(diffSpeed(status));
-        case 4: return fmtFloat1(status.pid_common_target_yaw_rate_abs_filtered_dps);
-        case 5: return fmtFloat1(status.gyro_z_dps);
+        case 4: return fmtFloat1(Math.abs(yawPid(status).ref));
+        case 5: return fmtFloat1(imu(status).gyro_z);
       }
       break;
   }
@@ -68,8 +79,8 @@ function cardValueForStatus(status, preset, index) {
 }
 
 function diffSpeed(s) {
-  var l = Number(s && s.pid_left_motor_speed_rpm);
-  var r = Number(s && s.pid_right_motor_speed_rpm);
+  var l = Number(wheel(s, 'left').target);
+  var r = Number(wheel(s, 'right').target);
   if (isNaN(l) || isNaN(r)) return null;
   return l - r;
 }

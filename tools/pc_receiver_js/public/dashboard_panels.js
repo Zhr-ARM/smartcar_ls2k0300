@@ -15,35 +15,22 @@ function buildTable(rows) {
 // ===== 元素状态机详情 =====
 function renderRoutePanel(status) {
   if (!status) return '<div class="pid-empty">等待数据...</div>';
+  var d = status.detour || {};
+  var cl = status.centerline || {};
   var rows = [];
 
-  rows.push(['主状态', receiverCore.formatRouteMainState(status.route_main_state)]);
-  rows.push(['子状态', receiverCore.formatRouteSubState(status.route_sub_state)]);
-  rows.push(['首选来源', receiverCore.formatRoutePreferredSource(status.route_preferred_source)]);
-  rows.push(['编码器计数', status.route_encoder_since_enter]);
+  rows.push(['主状态', receiverCore.formatRouteMainState(d.route_main)]);
+  rows.push(['子状态', receiverCore.formatRouteSubState(d.route_sub)]);
+  rows.push(['首选来源', receiverCore.formatRoutePreferredSource(d.preferred_source)]);
+  rows.push(['斑马线计数', d.zebra]);
 
-  rows.push(['直道中线数', status.straight_selected_centerline_count]);
-  rows.push(['直道 lastIndex', status.straight_required_last_index]);
-  rows.push(['直道误差和', receiverCore.formatValue(status.straight_abs_error_sum)]);
-  rows.push(['直道误差最大', receiverCore.formatValue(status.straight_abs_error_sum_max)]);
-  rows.push(['直道 ready', yn(status.straight_state_ready_now)]);
+  rows.push(['中线来源', cl.source]);
+  rows.push(['中线点数', cl.selected_count]);
+  rows.push(['跟踪有效', yn(cl.track_valid)]);
+  rows.push(['跟踪点', Array.isArray(cl.track_point) ? cl.track_point.join(', ') : '--']);
+  rows.push(['跟踪索引', cl.track_index]);
 
-  rows.push(['十字左角行数', status.cross_left_corner_post_frame_wall_rows]);
-  rows.push(['十字右角行数', status.cross_right_corner_post_frame_wall_rows]);
-  rows.push(['十字 gap_x', status.cross_start_boundary_gap_x]);
-  rows.push(['十字 entry', yn(status.cross_state_entry_ready_now)]);
-  rows.push(['十字 stage2', yn(status.cross_state_stage2_ready_now)]);
-  rows.push(['十字 stage3', yn(status.cross_state_stage3_ready_now)]);
-  rows.push(['十字 exit', yn(status.cross_state_exit_ready_now)]);
-
-  rows.push(['下一状态', status.route_next_state_label || '--']);
-
-  rows.push(['直道计数', status.route_cross_loss_count]);
-  rows.push(['左丢线', status.route_left_loss_count]);
-  rows.push(['左得线', status.route_left_gain_count]);
-  rows.push(['右丢线', status.route_right_loss_count]);
-  rows.push(['右得线', status.route_right_gain_count]);
-  rows.push(['斑马线', status.zebra_cross_count]);
+  rows.push(['line_error', status.line_error]);
 
   return buildTable(rows);
 }
@@ -51,21 +38,16 @@ function renderRoutePanel(status) {
 // ===== 绕行状态机详情 =====
 function renderDetourPanel(status) {
   if (!status) return '<div class="pid-empty">等待数据...</div>';
+  var el = status.elements || {};
   var rows = [];
 
-  rows.push(['绕行主状态', status.detour_main_state || '--']);
-  rows.push(['绕行子状态', status.detour_sub_state || '--']);
-
-  if (status.infer_probs && Array.isArray(status.infer_probs)) {
-    for (var i = 0; i < status.infer_probs.length; i++) {
-      rows.push(['分类' + i, (status.infer_probs[i] * 100).toFixed(1) + '%']);
-    }
+  rows.push(['红框检测', yn(el.red_found)]);
+  if (Array.isArray(el.red)) {
+    rows.push(['红框坐标', 'x=' + el.red[0] + ' y=' + el.red[1] + ' w=' + el.red[2] + ' h=' + el.red[3]]);
   }
-
-  rows.push(['左帧墙行数', status.left_start_frame_wall_rows]);
-  rows.push(['右帧墙行数', status.right_start_frame_wall_rows]);
-  rows.push(['左帧墙有', yn(status.src_left_trace_has_frame_wall)]);
-  rows.push(['右帧墙有', yn(status.src_right_trace_has_frame_wall)]);
+  rows.push(['ncnn标签', el.ncnn_label || '--']);
+  rows.push(['ncnn置信度', receiverCore.formatValue(el.ncnn_score)]);
+  rows.push(['ncnn类别ID', el.ncnn_class_id]);
 
   return buildTable(rows);
 }
@@ -74,40 +56,56 @@ function renderDetourPanel(status) {
 function renderPidPanel(status) {
   if (!status) return '<div class="pid-empty">等待数据...</div>';
 
+  var p = status.pid || {};
+  var pos = p.pos || {};
+  var yaw = p.yaw || {};
+  var whl = status.wheels || {};
+  var wl = whl.left || {};
+  var wr = whl.right || {};
+  var spd = status.speed || {};
+  var imu = status.imu || {};
+
   var html = '<div class="pid-grid">';
 
-  html += '<div><div class="pid-col-title">公共 PID</div>';
+  html += '<div><div class="pid-col-title">位置环 PID</div>';
   html += buildTable([
-    ['Kp', status.pid_common_kp], ['Ki', status.pid_common_ki], ['Kd', status.pid_common_kd],
-    ['目标角速度(dps)', receiverCore.formatValue(status.pid_common_target_yaw_rate_abs_filtered_dps)],
-    ['yaw rate ref', receiverCore.formatValue(status.pid_common_yaw_rate_ref_dps)]
+    ['Kp(dyn)', receiverCore.formatValue(pos.kp_dynamic)],
+    ['error', receiverCore.formatValue(pos.error)],
+    ['output', receiverCore.formatValue(pos.output)],
+    ['integral', receiverCore.formatValue(pos.integral)]
   ]);
   html += '</div>';
 
-  html += '<div><div class="pid-col-title">左轮 PID</div>';
+  html += '<div><div class="pid-col-title">角速度环 PID</div>';
   html += buildTable([
-    ['Kp', status.pid_left_kp], ['Ki', status.pid_left_ki], ['Kd', status.pid_left_kd],
-    ['转速(rpm)', status.pid_left_motor_speed_rpm]
+    ['yaw ref', receiverCore.formatValue(yaw.ref)],
+    ['yaw error', receiverCore.formatValue(yaw.error)],
+    ['yaw output', receiverCore.formatValue(yaw.output)],
+    ['yaw integral', receiverCore.formatValue(yaw.integral)]
   ]);
   html += '</div>';
 
-  html += '<div><div class="pid-col-title">右轮 PID</div>';
+  html += '<div><div class="pid-col-title">转向输出</div>';
   html += buildTable([
-    ['Kp', status.pid_right_kp], ['Ki', status.pid_right_ki], ['Kd', status.pid_right_kd],
-    ['转速(rpm)', status.pid_right_motor_speed_rpm]
+    ['steering', receiverCore.formatValue(p.steering)],
+    ['gyro_z', receiverCore.formatValue(imu.gyro_z)],
+    ['base speed', receiverCore.formatValue(spd.base)],
+    ['adj speed', receiverCore.formatValue(spd.adjusted)]
   ]);
   html += '</div>';
 
   html += '</div>';
 
-  html += '<div style="margin-top:8px;"><div class="pid-col-title">减速方案</div>';
+  html += '<div style="margin-top:8px;"><div class="pid-col-title">车轮详情</div>';
   html += buildTable([
-    ['exp_lambda', status.pid_common_speed_scheme_rear_exp_lambda],
-    ['split_ratio', status.pid_common_speed_scheme_split_ratio],
-    ['error_scale_raw', status.pid_common_speed_scheme_error_scale_raw],
-    ['realtime_speed', status.pid_common_speed_scheme_realtime_speed],
-    ['winner_branch', status.pid_common_speed_scheme_winner_branch],
-    ['final_scale', status.pid_common_speed_scheme_final_speed_scale]
+    ['左目标', receiverCore.formatValue(wl.target)],
+    ['左当前', receiverCore.formatValue(wl.current)],
+    ['左误差', receiverCore.formatValue(wl.error)],
+    ['左占空比', receiverCore.formatValue(wl.duty)],
+    ['右目标', receiverCore.formatValue(wr.target)],
+    ['右当前', receiverCore.formatValue(wr.current)],
+    ['右误差', receiverCore.formatValue(wr.error)],
+    ['右占空比', receiverCore.formatValue(wr.duty)]
   ]);
   html += '</div>';
 
@@ -117,13 +115,12 @@ function renderPidPanel(status) {
 // ===== 陀螺仪数据 =====
 function renderGyroPanel(status) {
   if (!status) return '<div class="pid-empty">等待数据...</div>';
+  var imu = status.imu || {};
   return buildTable([
-    ['角速度 Z(dps)', status.gyro_z_dps],
-    ['角速度 X', status.gyro_x_dps],
-    ['角速度 Y', status.gyro_y_dps],
-    ['加速度 X', status.accel_x],
-    ['加速度 Y', status.accel_y],
-    ['加速度 Z', status.accel_z]
+    ['角速度 Z(dps)', receiverCore.formatValue(imu.gyro_z)],
+    ['yaw ref', receiverCore.formatValue(imu.yaw_ref)],
+    ['yaw error', receiverCore.formatValue(imu.yaw_error)],
+    ['line_error', status.line_error]
   ]);
 }
 
@@ -144,17 +141,15 @@ function renderDirPanel(status) {
 // ===== 传输状态详情 =====
 function renderTransportPanel(status) {
   if (!status) return '<div class="pid-empty">等待数据...</div>';
+  var fps = status.fps || {};
   return buildTable([
-    ['速率(Mbps)', status._transport_mbps],
-    ['速率(KiB/s)', status._transport_kibs],
-    ['gray fps', status._gray_fps],
-    ['rgb fps', status._rgb_fps],
-    ['binary fps', status._binary_fps],
-    ['传输模式', status.udp_web_mode],
-    ['Max FPS', status.udp_web_max_fps],
-    ['CPU %', status._cpu_pct],
-    ['MEM %', status._mem_pct],
-    ['同步状态', status._sync_note]
+    ['UDP速率(Mbps)', status._transport_mbps],
+    ['UDP速率(KiB/s)', status._transport_kibs],
+    ['传输帧率', status._fps],
+    ['采集FPS', fps.capture],
+    ['视觉FPS', fps.vision],
+    ['发送FPS', fps.tx],
+    ['车端时间(s)', status.ts ? (status.ts / 1000).toFixed(1) : '--']
   ]);
 }
 
@@ -169,9 +164,9 @@ var PANEL_REGISTRY = {
 };
 
 var PRESET_OPEN = {
-  drive:    [],
-  vision:   ['route', 'detour', 'dir'],
-  control:  ['pid', 'gyro']
+  drive:    ['transport'],
+  vision:   ['route', 'detour', 'transport'],
+  control:  ['pid', 'gyro', 'transport']
 };
 
 function renderAllPanels(status) {
