@@ -32,10 +32,11 @@
 
 #define VISION_BOUNDARY_NUM (VISION_DOWNSAMPLED_HEIGHT * 2)
 static constexpr int kRefProcWidth = 160;
-static constexpr int kRefProcHeight = 120;
+static constexpr int kRefProcHeight = 60;
 static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
 static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
 static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
+static constexpr int kCropOffsetY = 30;
 
 static inline int scale_by_width(int ref_px)
 {
@@ -2009,7 +2010,7 @@ static bool init_undistort_remap_table()
         for (int x = 0; x < kProcWidth; ++x)
         {
             const double xu = static_cast<double>(x - move_x);
-            const double yu = static_cast<double>(y - move_y);
+            const double yu = static_cast<double>(y + kCropOffsetY - move_y);
 
             const double x_corrected = (xu - ux) / fx;
             const double y_corrected = (yu - uy) / fy;
@@ -2063,7 +2064,7 @@ static bool src_point_to_ipm_point(int src_x, int src_y, int *ipm_x, int *ipm_y)
         return false;
     }
 
-    // 逆透视矩阵按 160x120 标定；在其他分辨率下先映射回标定坐标系。
+    // 逆透视矩阵按裁剪后分辨率 160x60 标定，直接使用原图坐标。
     const double src_x_ref = (kProcWidth > 1)
                                  ? (static_cast<double>(src_x) * static_cast<double>(kRefProcWidth - 1) /
                                     static_cast<double>(kProcWidth - 1))
@@ -4087,37 +4088,46 @@ bool vision_image_processor_process_step()
 
     auto t_pre_start = t1;
 
-    // 处理分辨率固定为 kProcWidth x kProcHeight（160x120）。
-    // 当前默认采图为 320x240，因此除 ncnn 高清 ROI 外，主处理链在这里降采样到 160x120。
-    // 在“未开启去畸变”路径也需要先正确缩放，再进入灰度/二值/巡线流程。
+    // 处理分辨率固定为 160x60。
+    // 获取 160x120 全分辨率帧 -> 裁剪 y=30..89 共 60 行 -> 输入后续视觉处理。
     cv::Mat bgr_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr_full);
     cv::Mat bgr(kProcHeight, kProcWidth, CV_8UC3, g_image_bgr);
+
     if (g_undistort_enabled.load() && init_undistort_remap_table())
     {
-        cv::remap(bgr_full, bgr, g_undistort_map_x, g_undistort_map_y, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+        // init_undistort_remap_table 已构建 60x160 映射并包含 crop 偏移，
+        // remap 直接输出裁剪+去畸变结果，无需再裁剪。
+        cv::remap(bgr_full, bgr, g_undistort_map_x, g_undistort_map_y,
+                  cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
     }
     else
     {
-        if (UVC_WIDTH == kProcWidth && UVC_HEIGHT == kProcHeight)
+        static constexpr int kCropY = kCropOffsetY;
+        cv::Mat bgr_at_full_height;
+        if (UVC_WIDTH == 160 && UVC_HEIGHT == 120)
         {
-            std::memcpy(g_image_bgr, g_image_bgr_full, sizeof(g_image_bgr));
+            bgr_at_full_height = bgr_full;
         }
         else
         {
-            cv::resize(bgr_full, bgr, cv::Size(kProcWidth, kProcHeight), 0.0, 0.0, cv::INTER_AREA);
+            bgr_at_full_height = cv::Mat(120, 160, CV_8UC3);
+            cv::resize(bgr_full, bgr_at_full_height, cv::Size(160, 120), 0.0, 0.0, cv::INTER_AREA);
         }
+
+        cv::Mat crop_roi = bgr_at_full_height(cv::Rect(0, kCropY, kProcWidth, kProcHeight));
+        crop_roi.copyTo(bgr);
     }
     cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
 
-    // 斑马线检测：在灰度图 y=40 行按步长 3 采样，统计相邻采样点灰度跳变次数。
+    // 斑马线检测：在灰度图 y=50 行（裁剪后等效于原 y=80）按步长 3 采样，统计相邻采样点灰度跳变次数。
     // 若跳变次数 > 7，则认为命中一次斑马线，累计计数 +1。
     if (g_vision_runtime_config.zebra_cross_detection_enabled)
     {
         const int jump_count = count_gray_row_threshold_jumps(g_image_gray,
                                                               kProcWidth,
                                                               kProcHeight,
-                                                              80,
+                                                              50,
                                                               3,
                                                               50);
         if (jump_count > 7)

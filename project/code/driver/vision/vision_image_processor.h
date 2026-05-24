@@ -5,9 +5,9 @@
 #include <cstddef>
 
 #define VISION_DOWNSAMPLED_WIDTH 160
-#define VISION_DOWNSAMPLED_HEIGHT 120
-#define VISION_IPM_WIDTH 280
-#define VISION_IPM_HEIGHT 140
+#define VISION_DOWNSAMPLED_HEIGHT 60
+#define VISION_IPM_WIDTH 160
+#define VISION_IPM_HEIGHT 100
 
 // 轮廓线误差：在图像高度 line_sample_ratio 处，
 // 中线 x 与图像中心 x 的差值（右偏为正，左偏为负）。
@@ -16,7 +16,7 @@ extern int line_error;
 // line_error 采样行比例（0.0~1.0）：
 // sample_y = clamp(int(VISION_DOWNSAMPLED_HEIGHT * line_sample_ratio), 0, VISION_DOWNSAMPLED_HEIGHT - 1)。
 // 图像坐标系中 y 向下增大：0.0 靠近顶部，1.0 靠近底部。
-// 默认 0.55f（约在 y=66/120 位置取样）。
+// 默认 0.55f（约在 y=33/60 位置取样）。
 // 如何修改：提高比例值会让采样行下移（更靠近车前近处）；降低则上移（更看远处）。
 extern float line_sample_ratio;
 
