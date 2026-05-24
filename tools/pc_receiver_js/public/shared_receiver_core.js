@@ -1,12 +1,16 @@
 (() => {
   const WEB_DATA_PROFILE_FULL = 0;
+  const WEB_DATA_PROFILE_RAW_MINIMAL = 1;
 
   function imageEndpointByMode(mode) {
-    return '/api/frame.jpg';
+    if (mode === 'rgb') return '/api/frame_rgb.jpg';
+    if (mode === 'binary') return '/api/frame_binary.jpg';
+    if (mode === 'roi64') return '/api/frame_roi64.jpg';
+    return '/api/frame_gray.jpg';
   }
 
   function frameUrlForMode(mode) {
-    return `/api/frame.jpg?t=${Date.now()}`;
+    return `${imageEndpointByMode(mode)}?t=${Date.now()}`;
   }
 
   async function fetchJsonNoStore(url) {
@@ -44,6 +48,10 @@
 
   function isFullDebugProfile(profile) {
     return Number(profile) === WEB_DATA_PROFILE_FULL;
+  }
+
+  function isRawMinimalProfile(profile) {
+    return Number(profile) === WEB_DATA_PROFILE_RAW_MINIMAL;
   }
 
   function setElementVisible(el, visible) {
@@ -954,6 +962,7 @@
 
   window.SharedReceiverCore = {
     WEB_DATA_PROFILE_FULL,
+    WEB_DATA_PROFILE_RAW_MINIMAL,
     imageEndpointByMode,
     frameUrlForMode,
     fetchJsonNoStore,
@@ -961,6 +970,7 @@
     renderStatusList,
     hasValue,
     isFullDebugProfile,
+    isRawMinimalProfile,
     setElementVisible,
     frameSlotReady,
     formatArrayInline,
