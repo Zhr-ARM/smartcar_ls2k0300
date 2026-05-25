@@ -6,6 +6,12 @@
   "main": "server.js",
   "scripts": {
     "dev": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "record:fixture": "node scripts/record_live_fixture.js",
+    "mock:board": "node scripts/mock_board_sender.js",
+    "test:mock:pipeline": "node scripts/smoke_mock_pipeline.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
   }
 }

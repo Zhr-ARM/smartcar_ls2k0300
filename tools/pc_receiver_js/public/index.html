@@ -819,11 +819,9 @@
       word-break: break-word;
     }
     pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; color: #93c5fd; max-height: 280px; overflow: auto; }
-    #inferCard { grid-column: span 7; order: 1; }
-    #routeStateCard { grid-column: span 5; order: 2; }
-    #grayCard { grid-column: span 4; order: 3; }
-    #binaryCard { grid-column: span 4; order: 4; }
-    #rgbCard { grid-column: span 4; order: 5; }
+    #routeStateCard { grid-column: span 12; order: 1; }
+    #grayCard { grid-column: span 6; order: 2; }
+    #binaryCard { grid-column: span 6; order: 3; }
     #ipmCard, #ipmRawCard, #slowdownCard { grid-column: span 4; }
     #ipmCard { order: 6; }
     #ipmRawCard { order: 7; }
@@ -844,7 +842,6 @@
       .control-grid {
         grid-template-columns: 1fr;
       }
-      #inferCard,
       #routeStateCard,
       #ipmCard,
       #ipmRawCard,
@@ -856,7 +853,7 @@
       #pidStatusCard {
         grid-column: span 12;
       }
-      #rgbCard, #grayCard, #binaryCard {
+      #grayCard, #binaryCard {
         grid-column: span 6;
       }
       #statusCard {
@@ -882,9 +879,7 @@
       .pid-panel { grid-template-columns: 1fr; }
       .pid-slowdown-grid { grid-template-columns: 1fr; }
       .transport-panel { position: static; min-height: 0; }
-      #inferCard,
       #routeStateCard,
-      #rgbCard,
       #grayCard,
       #binaryCard,
       #statusCard,
@@ -985,42 +980,11 @@
       </div>
     </div>
     <div class="grid">
-      <div class="card" id="rgbCard">
-        <div class="title">原始彩图</div>
-        <div class="view">
-          <canvas id="rgbCanvas" width="160" height="120"></canvas>
-          <div class="pixel-info" id="rgbPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
-        </div>
-      </div>
       <div class="card" id="grayCard">
         <div class="title">灰度图与左右边界</div>
         <div class="view">
           <canvas id="grayCanvas" width="160" height="120"></canvas>
           <div class="pixel-info" id="grayPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
-        </div>
-      </div>
-      <div class="card" id="inferCard">
-        <div class="title">识别主视图</div>
-        <div class="infer-grid">
-          <div>
-            <div class="view">
-              <canvas id="inferCanvas" width="160" height="120"></canvas>
-            </div>
-            <div class="infer-meta-grid" id="inferMetaGrid"></div>
-          </div>
-          <div class="infer-side">
-            <div>
-              <div class="title" style="margin-bottom:8px;">ROI 64x64</div>
-              <div class="view">
-                <canvas id="roi64Canvas" width="64" height="64"></canvas>
-              </div>
-              <div class="infer-hint" id="roi64Hint">还没有可显示的 ROI64 图像。</div>
-            </div>
-            <div>
-              <div class="title" style="margin-bottom:8px;">分类概率</div>
-              <div class="prob-list" id="inferProbList"></div>
-            </div>
-          </div>
         </div>
       </div>
       <div class="card" id="binaryCard">
@@ -1441,13 +1405,24 @@
   </div>
   <script src="/shared_receiver_core.js?v=20260419-route-state-input-judge"></script>
   <script>
-    const rgbCanvas = document.getElementById('rgbCanvas');
+    function getCanvasOrCreate(id, width, height) {
+      const canvas = document.getElementById(id) || document.createElement('canvas');
+      canvas.width = canvas.width || width;
+      canvas.height = canvas.height || height;
+      return canvas;
+    }
+
+    function getElementOrCreate(id, tagName = 'div') {
+      return document.getElementById(id) || document.createElement(tagName);
+    }
+
+    const rgbCanvas = getCanvasOrCreate('rgbCanvas', 160, 120);
     const rgbCtx = rgbCanvas.getContext('2d');
     const grayCanvas = document.getElementById('grayCanvas');
     const grayCtx = grayCanvas.getContext('2d');
-    const inferCanvas = document.getElementById('inferCanvas');
+    const inferCanvas = getCanvasOrCreate('inferCanvas', 160, 120);
     const inferCtx = inferCanvas.getContext('2d');
-    const roi64Canvas = document.getElementById('roi64Canvas');
+    const roi64Canvas = getCanvasOrCreate('roi64Canvas', 64, 64);
     const roi64Ctx = roi64Canvas.getContext('2d');
     const binaryCanvas = document.getElementById('binaryCanvas');
     const binaryCtx = binaryCanvas.getContext('2d');
@@ -1463,14 +1438,14 @@
     const leftTraceDirZoomCtx = leftTraceDirZoomCanvas.getContext('2d');
     const rightTraceDirZoomCanvas = document.getElementById('rightTraceDirZoomCanvas');
     const rightTraceDirZoomCtx = rightTraceDirZoomCanvas.getContext('2d');
-    const rgbPixelInfo = document.getElementById('rgbPixelInfo');
+    const rgbPixelInfo = getElementOrCreate('rgbPixelInfo');
     const grayPixelInfo = document.getElementById('grayPixelInfo');
     const binaryPixelInfo = document.getElementById('binaryPixelInfo');
     const ipmPixelInfo = document.getElementById('ipmPixelInfo');
     const ipmRawPixelInfo = document.getElementById('ipmRawPixelInfo');
-    const inferMetaGrid = document.getElementById('inferMetaGrid');
-    const inferProbList = document.getElementById('inferProbList');
-    const roi64Hint = document.getElementById('roi64Hint');
+    const inferMetaGrid = getElementOrCreate('inferMetaGrid');
+    const inferProbList = getElementOrCreate('inferProbList');
+    const roi64Hint = getElementOrCreate('roi64Hint');
     const pidCommonList = document.getElementById('pidCommonList');
     const pidLeftList = document.getElementById('pidLeftList');
     const pidRightList = document.getElementById('pidRightList');
