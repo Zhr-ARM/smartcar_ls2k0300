@@ -54,10 +54,30 @@ print_usage() {
 EOF
 }
 
+require_command() {
+    local cmd="$1"
+    local install_hint="$2"
+
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "缺少命令: $cmd"
+        echo "安装建议: $install_hint"
+        exit 1
+    fi
+}
+
 if [ -f "$CONFIG_FILE" ]; then
     # shellcheck disable=SC1090
     . "$CONFIG_FILE"
 fi
+
+for arg in "$@"; do
+    if [ "$arg" = "-h" ] || [ "$arg" = "--help" ]; then
+        print_usage
+        exit 0
+    fi
+done
+
+require_command node "sudo apt update && sudo apt install -y nodejs npm，或继续使用 nvm 安装 Node.js"
 
 if [[ "$CONNECTION_PRESETS_FILE" != /* ]]; then
     CONNECTION_PRESETS_FILE="$SCRIPT_DIR/${CONNECTION_PRESETS_FILE#./}"
@@ -180,6 +200,11 @@ if [ "$ENABLE_NCNN" != "0" ] && [ "$ENABLE_NCNN" != "1" ]; then
     exit 1
 fi
 
+require_command cmake "sudo apt update && sudo apt install -y cmake"
+require_command make "sudo apt update && sudo apt install -y build-essential"
+require_command scp "sudo apt update && sudo apt install -y openssh-client"
+require_command ssh "sudo apt update && sudo apt install -y openssh-client"
+
 UVC_RES_PRESET="1"
 if [ "$CAMERA_CAPTURE_WIDTH" = "160" ]; then
     UVC_RES_PRESET="0"
@@ -200,6 +225,11 @@ echo "[BUILD] NCNN 编译开关: ${ENABLE_NCNN}"
 
 node "$SYNC_TOML_SCRIPT" "$CONNECTION_PRESETS_FILE" "$TARGET_PRESET" "$SCRIPT_DIR/smartcar_config.toml" || {
     echo "同步 smartcar_config.toml 中的电脑接收端 IP 失败。"
+    exit 1
+}
+
+mkdir -p "$OUT_DIR" || {
+    echo "无法创建输出目录: $OUT_DIR"
     exit 1
 }
 
@@ -237,17 +267,31 @@ scp -O -P "$TARGET_PORT" ../user/smartcar_config.toml "${TARGET_USER}@${TARGET_H
     exit 1
 }
 
-ssh -p "$TARGET_PORT" "${TARGET_USER}@${TARGET_HOST}" "mkdir -p '${TARGET_APP_PATH}/ncnn_model'" || {
-    echo "模型目录创建失败。"
-    exit 1
-}
+if [ "$ENABLE_NCNN" = "1" ]; then
+    NCNN_MODEL_PARAM="../user/ncnn_model/tiny_classifier_fp32.ncnn.param"
+    NCNN_MODEL_BIN="../user/ncnn_model/tiny_classifier_fp32.ncnn.bin"
+    NCNN_LABELS="../user/ncnn_model/labels.txt"
 
-scp -O -P "$TARGET_PORT" ../user/ncnn_model/tiny_classifier_fp32.ncnn.param \
-    ../user/ncnn_model/tiny_classifier_fp32.ncnn.bin \
-    ../user/ncnn_model/labels.txt \
-    "${TARGET_USER}@${TARGET_HOST}:${TARGET_APP_PATH}/ncnn_model/" || {
-    echo "NCNN 模型文件传输失败。"
-    exit 1
-}
+    if [ ! -f "$NCNN_MODEL_PARAM" ] || [ ! -f "$NCNN_MODEL_BIN" ] || [ ! -f "$NCNN_LABELS" ]; then
+        echo "NCNN 模型文件缺失，请检查 project/user/ncnn_model/。"
+        echo "注意: *.bin 默认被 .gitignore 忽略，新环境可能需要手动拷贝 tiny_classifier_fp32.ncnn.bin。"
+        exit 1
+    fi
+
+    ssh -p "$TARGET_PORT" "${TARGET_USER}@${TARGET_HOST}" "mkdir -p '${TARGET_APP_PATH}/ncnn_model'" || {
+        echo "模型目录创建失败。"
+        exit 1
+    }
+
+    scp -O -P "$TARGET_PORT" "$NCNN_MODEL_PARAM" \
+        "$NCNN_MODEL_BIN" \
+        "$NCNN_LABELS" \
+        "${TARGET_USER}@${TARGET_HOST}:${TARGET_APP_PATH}/ncnn_model/" || {
+        echo "NCNN 模型文件传输失败。"
+        exit 1
+    }
+else
+    echo "NCNN 已关闭，跳过模型文件传输。"
+fi
 
 echo "传输完成"

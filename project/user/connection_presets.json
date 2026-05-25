@@ -66,6 +66,22 @@
       "build_target_config_path": "/home/root/tst/smartcar_config.toml"
     },
     {
+      "id": "wsl_hotspot_e",
+      "label": "WSL 直连 3",
+      "board_config_base_url": "http://192.168.3.10:18080",
+      "board_ssh_host": "192.168.3.10",
+      "board_ssh_port": 22,
+      "board_ssh_user": "root",
+      "board_ssh_target_path": "/home/root/tst/smartcar_config.toml",
+      "pc_receiver_ip": "172.31.104.46",
+      "assistant_receiver_ip": "172.31.104.46",
+      "build_target_host": "192.168.3.10",
+      "build_target_user": "root",
+      "build_target_port": 22,
+      "build_target_app_path": "/home/root/tst",
+      "build_target_config_path": "/home/root/tst/smartcar_config.toml"
+    },
+    {
       "id": "hotspot_a",
       "label": "直连 2",
       "board_config_base_url": "http://192.168.3.10:18080",

@@ -936,7 +936,7 @@
             <div class="transport-subvalue" id="transportModeSub">max fps --</div>
           </div>
           <div class="transport-stat">
-            <div class="transport-label">本地复算同步</div>
+            <div class="transport-label">复算功能</div>
             <div class="transport-value" id="transportSyncValue">--</div>
             <div class="transport-subvalue" id="transportSyncSub">等待同步信息...</div>
           </div>
@@ -979,7 +979,7 @@
             <label><input type="checkbox" id="toggleIpmAnchorDot" checked /> 透视图显示锚点圆</label>
             <label><input type="checkbox" id="toggleBoundaryPointMode" checked /> 边界/中线按采样点显示</label>
             <label><input type="checkbox" id="toggleTraceDirCharts" checked /> 显示八邻域 dir 图</label>
-            <label><input type="checkbox" id="toggleLocalCompute" /> 启用本地复算补数</label>
+            <label><input type="checkbox" id="toggleLocalCompute" /> 本地复算已移除</label>
           </div>
         </div>
       </div>
@@ -1631,7 +1631,8 @@
     let playbackVideoEntries = [];
     let playbackPrimaryKey = '';
     let fullDebugModeActive = true;
-    let localComputeEnabled = new URLSearchParams(window.location.search).get('local_compute') === '1';
+    const localComputeFeatureAvailable = false;
+    let localComputeEnabled = false;
     let localWorkerBusy = false;
     let grayFrameReady = false;
     let rgbFrameReady = false;
@@ -1645,7 +1646,7 @@
       left: { hoverIndex: null },
       right: { hoverIndex: null }
     };
-    const localWorker = new Worker('/pipeline_worker.js');
+    const localWorker = null;
 
     function hasValue(value) {
       return value !== undefined && value !== null;
@@ -1693,7 +1694,7 @@
     }
 
     function shouldUseLocalCompute() {
-      return !!localComputeEnabled;
+      return localComputeFeatureAvailable && !!localComputeEnabled;
     }
 
     function buildLocalAugmentedStatus(status, payload) {
@@ -1739,7 +1740,7 @@
     }
 
     function requestLocalCompute() {
-      if (!shouldUseLocalCompute() || localWorkerBusy) return;
+      if (!shouldUseLocalCompute() || localWorkerBusy || !localWorker) return;
       const w = rawGrayCanvas.width;
       const h = rawGrayCanvas.height;
       if (!w || !h) return;
@@ -2309,16 +2310,18 @@
       renderPidStatusPanelInto(status, playbackPidCommonList, playbackPidLeftList, playbackPidRightList, playbackPidSlowdownCards);
     }
 
-    localWorker.onmessage = (ev) => {
-      localWorkerBusy = false;
-      latestLocalPayload = ev.data || {};
-      if (!fullDebugModeActive) return;
-      const renderStatus = getRenderStatus();
-      renderStatusPanels(renderStatus);
-      renderPidStatusPanel(renderStatus);
-      drawIpmBoundaries(renderStatus);
-      drawTraceDirCharts(renderStatus);
-    };
+    if (localWorker) {
+      localWorker.onmessage = (ev) => {
+        localWorkerBusy = false;
+        latestLocalPayload = ev.data || {};
+        if (!fullDebugModeActive) return;
+        const renderStatus = getRenderStatus();
+        renderStatusPanels(renderStatus);
+        renderPidStatusPanel(renderStatus);
+        drawIpmBoundaries(renderStatus);
+        drawTraceDirCharts(renderStatus);
+      };
+    }
 
     function setCardVisible(el, visible) {
       receiverCore.setElementVisible(el, visible);
@@ -4226,21 +4229,21 @@
       if (isFull) {
         if (localOn) {
           return syncState === 'synced'
-            ? '当前是 FULL 全量模式，页面主要直接显示主板完整结果；本地复算已同步，可用于补数和一致性比对。'
-            : '当前是 FULL 全量模式，页面主要直接显示主板完整结果；即使本地复算未同步或未构建，主画面仍然可以正常渲染。';
+            ? '当前是 FULL 全量模式，页面直接显示主板完整结果。'
+            : '当前是 FULL 全量模式，页面直接显示主板完整结果。';
         }
-        return '当前是 FULL 全量模式，页面直接显示主板完整结果；这一模式不依赖本地复算 WASM，本机没有构建链也能正常看图和调试。';
+        return '当前是 FULL 全量模式，页面直接显示主板完整结果。';
       }
       if (localOn) {
         if (syncState === 'synced') {
-          return '当前是 RAW_MINIMAL + 本地复算模式。主板只发基础数据，网页依赖本地 WASM 补出边界、中线等结果；当前本地复算已同步。';
+          return '当前是 RAW_MINIMAL 模式；本地复算功能已移除，页面只显示主板发送的数据。';
         }
         if (syncState === 'missing') {
-          return '当前是 RAW_MINIMAL + 本地复算模式，但本机还没有构建本地复算 WASM；原始图像仍可显示，补算结果不会完整。';
+          return '当前是 RAW_MINIMAL 模式；本地复算功能已移除，页面只显示主板发送的数据。';
         }
-        return '当前是 RAW_MINIMAL + 本地复算模式，但本地 WASM 与当前算法源码未同步；原始图像仍可显示，补算结果可能和最新算法不一致。';
+        return '当前是 RAW_MINIMAL 模式；本地复算功能已移除，页面只显示主板发送的数据。';
       }
-      return '当前是 RAW_MINIMAL 原始最小模式，页面只显示主板传来的原始图像和基础状态；如果想补出边界、中线等结果，请打开本地复算。';
+      return '当前是 RAW_MINIMAL 原始最小模式，页面只显示主板传来的原始图像和基础状态。';
     }
 
     function updateTransportPanel(status) {
@@ -4481,18 +4484,11 @@
     });
     bindTraceDirZoomHandlers(leftTraceDirCanvas, 'left');
     bindTraceDirZoomHandlers(rightTraceDirCanvas, 'right');
-    toggleLocalCompute.checked = localComputeEnabled;
-    toggleLocalCompute.addEventListener('change', () => {
-      localComputeEnabled = !!toggleLocalCompute.checked;
-      latestLocalPayload = null;
-      const isFull = receiverCore.isFullDebugProfile(latestStatus.web_data_profile);
-      setDebugPageActive(isFull || shouldUseLocalCompute());
-      modeNote.textContent = buildModeExplanation(latestStatus || {});
-      renderStatusPanels(getRenderStatus() || {});
-      drawIpmBoundaries(getRenderStatus() || {});
-      drawTraceDirCharts(getRenderStatus() || {});
-      if (grayFrameReady) renderGrayFrame();
-    });
+    if (toggleLocalCompute) {
+      toggleLocalCompute.checked = false;
+      toggleLocalCompute.disabled = true;
+      toggleLocalCompute.closest('label').style.display = 'none';
+    }
     showTraceDirCharts = !!toggleTraceDirCharts.checked;
     rebuildPlaybackGrid({}, {});
     setDebugPageActive(true);
