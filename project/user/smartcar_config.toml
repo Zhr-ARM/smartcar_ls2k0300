@@ -237,7 +237,7 @@ offset_ratio = 0.0
 enabled = true
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
-max_fps = 60
+max_fps = 45
 # 是否发送灰度图。
 send_gray_jpeg = true
 # 灰度图发送格式。

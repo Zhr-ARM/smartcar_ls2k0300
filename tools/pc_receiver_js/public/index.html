@@ -2160,7 +2160,10 @@
     const rawGrayCtx = rawGrayCanvas.getContext('2d');
     const receiverCore = window.SharedReceiverCore;
     const frameSource = window.ReceiverFrameSource.createReceiverFrameSource(receiverCore);
-    const sourceRecorder = window.ReceiverRecording.createSourceRecorder(receiverCore, () => latestStatus);
+    const LIVE_FRAME_INTERVAL_MS = 33;
+    const RECORDING_INTERVAL_MS = 33;
+    const REPLAY_FRAME_INTERVAL_MS = 33;
+    const sourceRecorder = window.ReceiverRecording.createSourceRecorder(receiverCore, () => latestStatus, getRecordingFrameModes);
     const pageParams = new URLSearchParams(window.location.search || '');
     const requestedReplayFolder = String(pageParams.get('replay') || '').trim();
     let latestStatus = {};
@@ -2172,6 +2175,8 @@
     let boundaryPointMode = true;
     let showTraceDirCharts = true;
     let recordingState = null;
+    let recordingTimer = null;
+    let recordingCaptureBusy = false;
     let lastRecording = null;
     let paramPanelOpen = false;
     let savedPanelOpen = false;
@@ -2195,6 +2200,9 @@
     let roi64FrameReady = false;
     let grayFetchSeq = 0;
     let grayFetchInFlight = false;
+    let lastReplayGrayUrl = '';
+    let lastReplayRgbUrl = '';
+    let lastReplayRoi64Url = '';
     let activeGraySource = 'none';
     const traceDirZoomHalfWindow = 10;
     const SPEED_SCHEME_MODE = 'yaw_rate_change';
@@ -3375,6 +3383,18 @@
       ), 0);
     }
 
+    function sortedReplaySourceFrames(sourceFrames) {
+      const input = sourceFrames && typeof sourceFrames === 'object' ? sourceFrames : {};
+      const output = {};
+      ['gray', 'binary', 'rgb', 'roi64'].forEach((mode) => {
+        const frames = Array.isArray(input[mode]) ? input[mode] : [];
+        output[mode] = frames.slice().sort((a, b) => (
+          (Number(a && a.client_ts_ms) || 0) - (Number(b && b.client_ts_ms) || 0)
+        ));
+      });
+      return output;
+    }
+
     function updateReplayControls() {
       if (!replayToolbar) return;
       replayToolbar.classList.toggle('active', replayMode);
@@ -3453,7 +3473,7 @@
       try {
         const j = await receiverCore.fetchJsonNoStore(`/api/recordings/load?folder=${encodeURIComponent(folder)}`);
         if (!j.ok) throw new Error(j.error || 'load failed');
-        const sourceFrames = j.source_frames && typeof j.source_frames === 'object' ? j.source_frames : {};
+        const sourceFrames = sortedReplaySourceFrames(j.source_frames);
         const sourceFrameCount = Object.values(sourceFrames).reduce((sum, frames) => (
           sum + (Array.isArray(frames) ? frames.length : 0)
         ), 0);
@@ -3479,6 +3499,7 @@
           || 0;
         replayPlaybackMs = 0;
         replayLastTickMs = Date.now();
+        resetReplayFrameUrlCache();
         renderReplayFrame();
       } catch (err) {
         replayRecording = null;
@@ -3659,6 +3680,36 @@
       return { key, recorder, stopped };
     }
 
+    function getRecordingFrameModes(status) {
+      const modes = [];
+      const hasAnySendFlag = isBool01(status && status.udp_web_send_gray)
+        || isBool01(status && status.udp_web_send_binary)
+        || isBool01(status && status.udp_web_send_rgb)
+        || isBool01(status && status.udp_web_send_roi64);
+      if (!hasAnySendFlag || Number(status && status.udp_web_send_gray) === 1) modes.push('gray');
+      if (Number(status && status.udp_web_send_binary) === 1) modes.push('binary');
+      if (Number(status && status.udp_web_send_rgb) === 1) modes.push('rgb');
+      if (Number(status && status.udp_web_send_roi64) === 1) modes.push('roi64');
+      return modes;
+    }
+
+    function clearRecordingTimer() {
+      if (recordingTimer) {
+        clearInterval(recordingTimer);
+        recordingTimer = null;
+      }
+    }
+
+    function captureRecordingTick() {
+      if (!sourceRecorder.active() || recordingCaptureBusy) return;
+      recordingCaptureBusy = true;
+      sourceRecorder.captureTick().catch((err) => {
+        recordingMeta.textContent = `源数据录制采样失败：${err}`;
+      }).finally(() => {
+        recordingCaptureBusy = false;
+      });
+    }
+
     async function startRecording() {
       if (sourceRecorder.active()) return;
       sourceRecorder.start();
@@ -3667,6 +3718,9 @@
         startedAtMs: Date.now(),
         statusFrames: []
       };
+      clearRecordingTimer();
+      captureRecordingTick();
+      recordingTimer = setInterval(captureRecordingTick, RECORDING_INTERVAL_MS);
       updateRecordingUi();
     }
 
@@ -3679,6 +3733,7 @@
 
     async function stopRecording() {
       if (!sourceRecorder.active()) return;
+      clearRecordingTimer();
       const finished = sourceRecorder.stop();
       recordingState = null;
       if (lastRecording) revokeRecordingUrls(lastRecording);
@@ -4777,11 +4832,17 @@
       renderRoi64Frame(getRenderStatus() || {});
     };
 
-    async function fetchGrayFrameDirect() {
+    function resetReplayFrameUrlCache() {
+      lastReplayGrayUrl = '';
+      lastReplayRgbUrl = '';
+      lastReplayRoi64Url = '';
+    }
+
+    async function fetchGrayFrameDirect(urlOverride) {
       const seq = ++grayFetchSeq;
       grayFetchInFlight = true;
+      const grayUrl = urlOverride || frameSource.urlForMode('gray');
       try {
-        const grayUrl = frameSource.urlForMode('gray');
         if (!grayUrl) throw new Error('gray frame unavailable');
         const response = await fetch(grayUrl, { cache: 'no-store' });
         if (!response.ok) throw new Error(`gray frame ${response.status}`);
@@ -4793,6 +4854,7 @@
         }
         grayFrameReady = true;
         renderGrayFrameFromSource(bitmap, bitmap.width || 160, bitmap.height || 120, 'gray');
+        if (frameSource.isReplay()) lastReplayGrayUrl = grayUrl;
         bitmap.close();
       } catch (_) {
         grayFrameReady = false;
@@ -4977,11 +5039,6 @@
         latestStatus = j;
         const isFull = receiverCore.isFullDebugProfile(j.web_data_profile);
         setDebugPageActive(isFull || shouldUseLocalCompute());
-        if (sourceRecorder.active()) {
-          sourceRecorder.captureTick().catch((err) => {
-            recordingMeta.textContent = `源数据录制采样失败：${err}`;
-          });
-        }
         const renderStatus = getRenderStatus();
         updateTransportPanel(j);
         modeNote.textContent = buildModeExplanation(j);
@@ -5009,14 +5066,22 @@
     }
 
     function pullFramesForCurrentSource() {
+      const isReplaySource = frameSource.isReplay();
       const rgbUrl = frameSource.urlForMode('rgb');
-      if (rgbUrl) rgbImg.src = rgbUrl;
-      if (!grayFetchInFlight) {
-        fetchGrayFrameDirect();
+      if (rgbUrl && (!isReplaySource || rgbUrl !== lastReplayRgbUrl)) {
+        rgbImg.src = rgbUrl;
+        if (isReplaySource) lastReplayRgbUrl = rgbUrl;
+      }
+      const grayUrl = frameSource.urlForMode('gray');
+      if (grayUrl && !grayFetchInFlight && (!isReplaySource || grayUrl !== lastReplayGrayUrl)) {
+        fetchGrayFrameDirect(grayUrl);
       }
       if (isBool01(latestStatus && latestStatus.udp_web_send_roi64)) {
         const roiUrl = frameSource.urlForMode('roi64');
-        if (roiUrl) roi64Img.src = roiUrl;
+        if (roiUrl && (!isReplaySource || roiUrl !== lastReplayRoi64Url)) {
+          roi64Img.src = roiUrl;
+          if (isReplaySource) lastReplayRoi64Url = roiUrl;
+        }
       } else if (roi64FrameReady) {
         roi64FrameReady = false;
         renderRoi64Frame(getRenderStatus() || {});
@@ -5173,8 +5238,8 @@
     setDebugPageActive(true);
     setInterval(pullStatus, 120);
     setInterval(pullWasmSyncStatus, 2000);
-    setInterval(pullFrames, 60);
-    setInterval(updateReplayClock, 60);
+    setInterval(pullFrames, LIVE_FRAME_INTERVAL_MS);
+    setInterval(updateReplayClock, REPLAY_FRAME_INTERVAL_MS);
     setInterval(updateRecordingUi, 500);
     updateRecordingUi();
     if (requestedReplayFolder) {

@@ -26,7 +26,7 @@
     };
   }
 
-  function createSourceRecorder(receiverCore, getStatus) {
+  function createSourceRecorder(receiverCore, getStatus, getFrameModes) {
     let state = null;
 
     return {
@@ -48,7 +48,10 @@
           client_ts_ms: Date.now(),
           status: JSON.parse(JSON.stringify(status || {}))
         });
-        await Promise.all(FRAME_MODES.map(async (mode) => {
+        const modes = typeof getFrameModes === 'function' ? getFrameModes(status) : FRAME_MODES;
+        const frameModes = Array.isArray(modes) && modes.length > 0 ? modes : FRAME_MODES;
+        await Promise.all(frameModes.map(async (mode) => {
+          if (!FRAME_MODES.includes(mode)) return;
           const frame = await fetchFrameForRecording(mode, receiverCore);
           if (frame) state.sourceFrames[mode].push(frame);
         }));
@@ -63,6 +66,18 @@
     };
   }
 
+  function sortedSourceFrames(sourceFrames) {
+    const input = sourceFrames && typeof sourceFrames === 'object' ? sourceFrames : {};
+    const output = {};
+    for (const mode of FRAME_MODES) {
+      const frames = Array.isArray(input[mode]) ? input[mode] : [];
+      output[mode] = frames.slice().sort((a, b) => (
+        (Number(a && a.client_ts_ms) || 0) - (Number(b && b.client_ts_ms) || 0)
+      ));
+    }
+    return output;
+  }
+
   function buildPersistableSourceRecording(recording) {
     const savedAtMs = Date.now();
     const startedAtMs = Number(recording && recording.startedAtMs) || savedAtMs;
@@ -74,7 +89,7 @@
       duration_ms: Math.max(0, savedAtMs - startedAtMs),
       frame_count: statusFrames.length,
       statuses: statusFrames,
-      source_frames: (recording && recording.sourceFrames) || {},
+      source_frames: sortedSourceFrames(recording && recording.sourceFrames),
       session_meta: {
         recording_kind: 'source_frames',
         recorded_views: [
