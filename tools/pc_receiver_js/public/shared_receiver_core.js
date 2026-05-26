@@ -125,6 +125,17 @@
     return `未知(${source})`;
   }
 
+  function formatTargetBoardState(state) {
+    const n = Number(state);
+    if (n === 0) return '未检测';
+    if (n === 1) return '候选确认';
+    if (n === 2) return '绕行准备';
+    if (n === 3) return '绕行中';
+    if (n === 4) return '绕行结束';
+    if (!Number.isFinite(n)) return '未知';
+    return `未知(${n})`;
+  }
+
   function pointDistance(pointA, pointB) {
     if (!Array.isArray(pointA) || !Array.isArray(pointB) || pointA.length < 2 || pointB.length < 2) return null;
     const ax = Number(pointA[0]);
@@ -980,6 +991,7 @@
     formatRouteMainState,
     formatRouteSubState,
     formatRoutePreferredSource,
+    formatTargetBoardState,
     buildRouteStateSummary,
     drawCurveChartToCanvas,
     drawPolyline,

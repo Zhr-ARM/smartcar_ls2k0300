@@ -548,6 +548,23 @@ function extByMime(mime) {
   return '.bin';
 }
 
+function imageExtByMime(mime) {
+  if (mime === 'image/png') return '.png';
+  if (mime === 'image/bmp') return '.bmp';
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return '.jpg';
+  return '.bin';
+}
+
+function normalizeSourceMode(mode) {
+  const text = String(mode || '').trim().toLowerCase();
+  if (text === 'gray' || text === 'binary' || text === 'rgb' || text === 'roi64') return text;
+  return '';
+}
+
+function isSafeRecordingFileName(name) {
+  return /^[A-Za-z0-9._-]+$/.test(name) && name !== '.' && name !== '..';
+}
+
 function writeRecordingFiles(folderName, payload) {
   const folderPath = folderPathFromName(folderName);
   if (!folderPath) throw new Error('invalid folder name');
@@ -578,6 +595,35 @@ function writeRecordingFiles(folderName, payload) {
     videoMeta[key] = { file: fileName, mime, title };
   }
 
+  const sourceFramesInput = payload.source_frames && typeof payload.source_frames === 'object'
+    ? payload.source_frames
+    : {};
+  const sourceFrameMeta = {};
+  for (const [rawMode, frames] of Object.entries(sourceFramesInput)) {
+    const mode = normalizeSourceMode(rawMode);
+    if (!mode || !Array.isArray(frames)) continue;
+    const modeDir = path.join(folderPath, 'source_frames', mode);
+    fs.mkdirSync(modeDir, { recursive: true });
+    sourceFrameMeta[mode] = [];
+    frames.forEach((frame, index) => {
+      if (!frame || typeof frame.data_b64 !== 'string' || !frame.data_b64) return;
+      const mime = typeof frame.mime === 'string' && frame.mime ? frame.mime : 'image/jpeg';
+      const ext = imageExtByMime(mime);
+      const seq = String(index).padStart(6, '0');
+      const fileName = `${seq}${ext}`;
+      fs.writeFileSync(path.join(modeDir, fileName), Buffer.from(frame.data_b64, 'base64'));
+      sourceFrameMeta[mode].push({
+        file: `source_frames/${mode}/${fileName}`,
+        mode,
+        mime,
+        client_ts_ms: Number(frame.client_ts_ms) || 0,
+        frame_id: Number.isFinite(Number(frame.frame_id)) ? Number(frame.frame_id) : index,
+        width: Number(frame.width) || 0,
+        height: Number(frame.height) || 0
+      });
+    });
+  }
+
   const meta = {
     folder: folderName,
     saved_at_ms: Date.now(),
@@ -586,7 +632,8 @@ function writeRecordingFiles(folderName, payload) {
     frame_count: payload.frame_count,
     video_labels: statusPayload.video_labels,
     session_meta: statusPayload.session_meta,
-    videos: videoMeta
+    videos: videoMeta,
+    source_frames: sourceFrameMeta
   };
   fs.writeFileSync(path.join(folderPath, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
   return meta;
@@ -905,6 +952,14 @@ function startHttpServer() {
       serveFile(res, path.join(PUBLIC_DIR, 'config_app.js'), 'application/javascript; charset=utf-8');
       return;
     }
+    if (pathname === '/receiver_frame_source.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'receiver_frame_source.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/receiver_recording.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'receiver_recording.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
     if (pathname === '/shared_receiver_core.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'shared_receiver_core.js'), 'application/javascript; charset=utf-8');
       return;
@@ -1220,19 +1275,45 @@ function startHttpServer() {
           videos[key] = `/api/recordings/file?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(name)}`;
         }
       }
-      sendJson(res, 200, { ok: true, folder, status, meta, videos });
+
+      const sourceFrames = {};
+      if (meta && meta.source_frames && typeof meta.source_frames === 'object') {
+        for (const [mode, frames] of Object.entries(meta.source_frames)) {
+          if (!Array.isArray(frames)) continue;
+          sourceFrames[mode] = frames
+            .filter((item) => item && typeof item.file === 'string' && item.file)
+            .map((item) => ({
+              mode: item.mode || mode,
+              client_ts_ms: Number(item.client_ts_ms) || 0,
+              frame_id: Number.isFinite(Number(item.frame_id)) ? Number(item.frame_id) : -1,
+              width: Number(item.width) || 0,
+              height: Number(item.height) || 0,
+              mime: typeof item.mime === 'string' && item.mime ? item.mime : 'application/octet-stream',
+              file: item.file,
+              url: `/api/recordings/file?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(item.file)}`
+            }));
+        }
+      }
+
+      sendJson(res, 200, { ok: true, folder, status, meta, videos, source_frames: sourceFrames });
       return;
     }
 
     if (pathname === '/api/recordings/file') {
       const folder = sanitizeFolderName(reqUrl.searchParams.get('folder') || '');
-      const name = path.basename(reqUrl.searchParams.get('name') || '');
+      const name = String(reqUrl.searchParams.get('name') || '').replace(/\\/g, '/');
       if (!folder || !name) {
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('bad request');
         return;
       }
-      if (!/^[A-Za-z0-9._-]+$/.test(name)) {
+      const nameParts = name.split('/');
+      const isTopLevelFile = nameParts.length === 1 && isSafeRecordingFileName(name);
+      const isSourceFrameFile = nameParts.length === 3
+        && nameParts[0] === 'source_frames'
+        && !!normalizeSourceMode(nameParts[1])
+        && isSafeRecordingFileName(nameParts[2]);
+      if (!isTopLevelFile && !isSourceFrameFile) {
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('bad file name');
         return;
@@ -1244,8 +1325,10 @@ function startHttpServer() {
         res.end('folder not found');
         return;
       }
-      const filePath = path.join(folderPath, name);
-      if (!filePath.startsWith(folderPath) || !fs.existsSync(filePath)) {
+      const folderRoot = path.resolve(folderPath);
+      const filePath = path.resolve(folderRoot, ...nameParts);
+      const relativePath = path.relative(folderRoot, filePath);
+      if (relativePath.startsWith('..') || path.isAbsolute(relativePath) || !fs.existsSync(filePath)) {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('file not found');
         return;
@@ -1256,7 +1339,13 @@ function startHttpServer() {
         ? 'video/webm'
         : (ext === '.mp4'
           ? 'video/mp4'
-          : (ext === '.json' ? 'application/json; charset=utf-8' : 'application/octet-stream'));
+          : (ext === '.json'
+            ? 'application/json; charset=utf-8'
+            : (ext === '.jpg' || ext === '.jpeg'
+              ? 'image/jpeg'
+              : (ext === '.png'
+                ? 'image/png'
+                : (ext === '.bmp' ? 'image/bmp' : 'application/octet-stream')))));
       res.writeHead(200, {
         'Content-Type': contentType,
         'Cache-Control': 'no-store'
