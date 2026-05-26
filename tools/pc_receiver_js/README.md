@@ -65,7 +65,7 @@ npm run mock:board -- --duration 30
 也可以回放上一节录到的 fixture：
 
 ```bash
-npm run mock:board -- --fixture recordings/live_fixture_YYYYMMDDTHHMMSSZ --duration 30
+npm run mock:board -- --fixture recordings/live_fixture_20260525T090208Z --duration 30
 ```
 
 常用隔离端口，适合自动化测试：
@@ -83,7 +83,14 @@ npm run mock:board -- --udp-port 19000 --tcp-port 19001 --duration 30
 npm run test:mock:pipeline
 ```
 
-它会启动隔离接收器、启动模拟主板、检查 `/api/status`、`/api/frame_gray.jpg` 和主页可访问性，然后自动退出。这个测试主要拦截“后端没数据、API 坏了、主页没起来”的问题；布局截图回归可以在这个基础上再接 Playwright。
+它会启动隔离接收器、启动模拟主板、检查 `/api/status`、`/api/frame_gray.jpg` 和主页可访问性，然后自动退出。默认会优先回放 `recordings/live_fixture_*` 里最新的已录制 fixture；如果没有 fixture，才退回合成模拟数据。这个测试主要拦截“后端没数据、API 坏了、主页没起来”的问题；布局截图回归可以在这个基础上再接 Playwright。
+
+也可以显式指定或强制使用合成数据：
+
+```bash
+npm run test:mock:pipeline -- --fixture recordings/live_fixture_20260525T090208Z
+npm run test:mock:pipeline -- --synthetic
+```
 
 ## 4. 可选环境变量
 

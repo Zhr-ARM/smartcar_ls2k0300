@@ -2,6 +2,7 @@
 'use strict';
 
 const { spawn } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -18,7 +19,8 @@ Options:
   --http-port <port>  Test HTTP port, default ${DEFAULT_HTTP_PORT}
   --udp-port <port>   Test UDP port, default ${DEFAULT_UDP_PORT}
   --tcp-port <port>   Test TCP port, default ${DEFAULT_TCP_PORT}
-  --fixture <dir>     Replay fixture through mock board instead of synthetic data
+  --fixture <dir>     Replay this fixture instead of auto-selecting the latest one
+  --synthetic         Force generated mock data, even when recordings exist
   --timeout <ms>      Overall timeout, default 10000
   --help              Show this help
 `);
@@ -31,6 +33,7 @@ function parseArgs(argv) {
     udpPort: DEFAULT_UDP_PORT,
     tcpPort: DEFAULT_TCP_PORT,
     fixtureDir: '',
+    synthetic: false,
     timeoutMs: 10000
   };
 
@@ -39,6 +42,10 @@ function parseArgs(argv) {
     if (arg === '--help' || arg === '-h') {
       usage();
       process.exit(0);
+    }
+    if (arg === '--synthetic' || arg === '--no-fixture') {
+      opts.synthetic = true;
+      continue;
     }
     const next = argv[i + 1];
     if (arg === '--host') {
@@ -65,6 +72,7 @@ function parseArgs(argv) {
   }
 
   if (!opts.host) throw new Error('--host cannot be empty');
+  if (opts.synthetic && opts.fixtureDir) throw new Error('--synthetic cannot be combined with --fixture');
   for (const key of ['httpPort', 'udpPort', 'tcpPort']) {
     if (!Number.isInteger(opts[key]) || opts[key] <= 0) throw new Error(`--${key} must be a positive integer`);
   }
@@ -92,6 +100,28 @@ function stopChild(child) {
   child.kill('SIGTERM');
 }
 
+function findLatestFixture(recordingsDir) {
+  if (!fs.existsSync(recordingsDir)) return '';
+  const candidates = fs.readdirSync(recordingsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith('live_fixture_'))
+    .map((entry) => {
+      const fixtureDir = path.join(recordingsDir, entry.name);
+      const statusPath = path.join(fixtureDir, 'status.json');
+      if (!fs.existsSync(statusPath)) return null;
+      const stat = fs.statSync(fixtureDir);
+      return { fixtureDir, name: entry.name, mtimeMs: stat.mtimeMs };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.name.localeCompare(a.name) || b.mtimeMs - a.mtimeMs);
+  return candidates.length > 0 ? candidates[0].fixtureDir : '';
+}
+
+function selectFixture(opts) {
+  if (opts.synthetic) return '';
+  if (opts.fixtureDir) return opts.fixtureDir;
+  return findLatestFixture(path.join(ROOT_DIR, 'recordings'));
+}
+
 async function fetchText(url) {
   const response = await fetch(url, { cache: 'no-store' });
   const text = await response.text();
@@ -113,7 +143,7 @@ async function waitForHttp(baseUrl, deadlineMs) {
   throw new Error(`receiver HTTP not ready: ${lastError && lastError.message ? lastError.message : lastError}`);
 }
 
-async function waitForMockData(baseUrl, deadlineMs) {
+async function waitForMockData(baseUrl, deadlineMs, source) {
   let lastStatus = null;
   while (Date.now() < deadlineMs) {
     const statusResult = await fetchText(`${baseUrl}/api/status`);
@@ -121,12 +151,15 @@ async function waitForMockData(baseUrl, deadlineMs) {
     const frameResult = await fetch(`${baseUrl}/api/frame_gray.jpg`, { cache: 'no-store' });
     const contentType = frameResult.headers.get('content-type') || '';
     const frameBytes = Buffer.from(await frameResult.arrayBuffer()).length;
-    if (lastStatus.mock_board === 1 && frameResult.ok && contentType.startsWith('image/') && frameBytes > 100) {
+    const statusReady = source === 'synthetic'
+      ? lastStatus.mock_board === 1
+      : lastStatus && Object.keys(lastStatus).length > 0;
+    if (statusReady && frameResult.ok && contentType.startsWith('image/') && frameBytes > 100) {
       return { status: lastStatus, frame: { contentType, frameBytes } };
     }
     await sleep(150);
   }
-  throw new Error(`mock data not visible through API; last mock_board=${lastStatus && lastStatus.mock_board}`);
+  throw new Error(`mock data not visible through API from ${source}; last mock_board=${lastStatus && lastStatus.mock_board}`);
 }
 
 async function main() {
@@ -134,6 +167,8 @@ async function main() {
     throw new Error('This script requires Node.js 18+ because it uses built-in fetch().');
   }
   const opts = parseArgs(process.argv.slice(2));
+  const fixtureDir = selectFixture(opts);
+  const source = fixtureDir ? 'fixture' : 'synthetic';
   const baseUrl = `http://${opts.host}:${opts.httpPort}`;
   const deadlineMs = Date.now() + opts.timeoutMs;
   let server = null;
@@ -156,15 +191,19 @@ async function main() {
       '--duration', '3',
       '--fps', '8'
     ];
-    if (opts.fixtureDir) mockArgs.push('--fixture', opts.fixtureDir);
+    if (fixtureDir) mockArgs.push('--fixture', fixtureDir);
+    console.log(`[smoke_mock_pipeline] source=${fixtureDir ? path.relative(ROOT_DIR, fixtureDir) : 'synthetic'}`);
     mock = spawnNode(mockArgs);
 
-    const result = await waitForMockData(baseUrl, deadlineMs);
+    const result = await waitForMockData(baseUrl, deadlineMs, source);
     const page = await fetchText(`${baseUrl}/`);
     if (!page.text.includes('/shared_receiver_core.js')) {
       throw new Error('main page loaded, but expected frontend script marker is missing');
     }
-    console.log(`\n[smoke_mock_pipeline] ok status.mock_seq=${result.status.mock_seq} frame=${result.frame.contentType} ${result.frame.frameBytes} bytes`);
+    const statusMarker = source === 'synthetic'
+      ? `mock_seq=${result.status.mock_seq}`
+      : `status_keys=${Object.keys(result.status).length}`;
+    console.log(`\n[smoke_mock_pipeline] ok source=${source} ${statusMarker} frame=${result.frame.contentType} ${result.frame.frameBytes} bytes`);
   } finally {
     stopChild(mock);
     stopChild(server);
