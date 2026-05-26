@@ -385,10 +385,12 @@ typedef struct
     int maze_trace_max_points;
     // 迷宫法允许追踪的纵向区域百分比（100=全高）。
     int maze_lower_region_percent;
-    // OTSU 二值化策略：true=按需 OTSU，false=先生成全图二值图。
-    bool demand_otsu_enable;
-    // 按需 OTSU 时是否保留完整二值图缓存。
-    bool demand_otsu_keep_full_binary_cache;
+    // 二值化模式：0=全图OTSU, 1=按需局部均值自适应, 2=全图局部均值自适应。
+    int binarization_mode;
+    // 自适应窗口大小（仅 mode=1），建议奇数 5~9。
+    int adaptive_window_size;
+    // 自适应阈值常数（仅 mode=1），threshold = mean - constant。
+    int adaptive_constant;
     // 是否启用“边线点逆透视 + IPM 边界输出”流程。
     bool enable_inverse_perspective;
     // 逆透视输出宽度。

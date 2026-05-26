@@ -444,10 +444,12 @@ vision_processor_config_t g_vision_processor_config = {
     .maze_trace_max_points = 180,
     // 迷宫法允许追踪的纵向区域百分比，100 表示全高。
     .maze_lower_region_percent = 85,
-    // OTSU 策略：true=按需 OTSU，false=先生成整图二值图。
-    .demand_otsu_enable = true,
-    // 按需 OTSU 时是否保留整图二值缓存，便于调试和发送。
-    .demand_otsu_keep_full_binary_cache = true,
+    // 二值化模式：0=预计算全图二值化，1=按需局部均值自适应阈值。
+    .binarization_mode = 0,
+    // 自适应窗口大小（仅 mode=1），建议奇数 5~9。
+    .adaptive_window_size = 7,
+    // 自适应阈值常数（仅 mode=1），threshold = mean - constant。
+    .adaptive_constant = 10,
     // 是否启用逆透视流程。
     .enable_inverse_perspective = true,
     // 逆透视输出宽度。

@@ -1196,8 +1196,9 @@ bool load_from_path(const std::string &path, std::string *error_message)
 
     if (!require_int(values, &consumed, "vision.processor.maze_trace_max_points", &g_vision_processor_config.maze_trace_max_points, error_message) ||
         !require_int(values, &consumed, "vision.processor.maze_lower_region_percent", &g_vision_processor_config.maze_lower_region_percent, error_message) ||
-        !require_bool(values, &consumed, "vision.processor.demand_otsu_enable", &g_vision_processor_config.demand_otsu_enable, error_message) ||
-        !require_bool(values, &consumed, "vision.processor.demand_otsu_keep_full_binary_cache", &g_vision_processor_config.demand_otsu_keep_full_binary_cache, error_message) ||
+        !require_int(values, &consumed, "vision.processor.binarization_mode", &g_vision_processor_config.binarization_mode, error_message) ||
+        !require_int(values, &consumed, "vision.processor.adaptive_window_size", &g_vision_processor_config.adaptive_window_size, error_message) ||
+        !require_int(values, &consumed, "vision.processor.adaptive_constant", &g_vision_processor_config.adaptive_constant, error_message) ||
         !require_bool(values, &consumed, "vision.processor.enable_inverse_perspective", &g_vision_processor_config.enable_inverse_perspective, error_message) ||
         !require_int(values, &consumed, "vision.processor.ipm_output_width", &g_vision_processor_config.ipm_output_width, error_message) ||
         !require_int(values, &consumed, "vision.processor.ipm_output_height", &g_vision_processor_config.ipm_output_height, error_message))

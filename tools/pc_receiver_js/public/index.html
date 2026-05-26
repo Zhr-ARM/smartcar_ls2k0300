@@ -2423,13 +2423,13 @@
       const hasData = Number.isFinite(leftRows) || Number.isFinite(rightRows) || Number.isFinite(gap);
 
       refs.panel.classList.remove('ready', 'not-ready');
-      refs.panel.classList.add((entryReady || stage2Ready || stage3Ready || exitReady || mainState === 4) ? 'ready' : 'not-ready');
+      refs.panel.classList.add((entryReady || stage2Ready || stage3Ready || exitReady || mainState === 3) ? 'ready' : 'not-ready');
       let crossStateLabel = '十字-cross_1 运行中';
       if (subState === 2) crossStateLabel = '十字-cross_2 运行中';
       if (subState === 3) crossStateLabel = '十字-cross_3 运行中';
       refs.badge.textContent = !hasData
         ? '等待数据'
-        : (mainState === 4
+        : (mainState === 3
             ? crossStateLabel
             : (entryReady ? '满足十字入口' : '未满足十字入口'));
       refs.leftRows.textContent = Number.isFinite(leftRows) ? String(leftRows) : '--';

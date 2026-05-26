@@ -2,6 +2,7 @@
 #include "driver/vision/vision_config.h"
 #include "driver/vision/vision_frame_capture.h"
 #include "driver/vision/vision_line_error_layer.h"
+#include "driver/vision/vision_pixel_classifier.h"
 #include "driver/vision/vision_route_state_machine.h"
 #include "driver/pid/pid_tuning.h"
 
@@ -195,6 +196,7 @@ static uint8 g_image_bgr_full[UVC_HEIGHT * UVC_WIDTH * 3];
 static uint8 g_image_bgr[kProcHeight * kProcWidth * 3];
 static uint8 g_image_gray[kProcHeight * kProcWidth];
 static uint8 g_image_binary_u8[kProcHeight * kProcWidth];
+static uint8 g_adaptive_cache_computed[(kProcHeight * kProcWidth + 7) / 8];
 // 去畸变映射表：输出(去畸变后)像素 -> 输入(原始畸变图)像素。
 static cv::Mat g_undistort_map_x;
 static cv::Mat g_undistort_map_y;
@@ -426,7 +428,6 @@ static int extract_one_point_per_row_from_contour(const maze_point_t *raw_pts,
                                                   maze_point_t *regular_pts,
                                                   int max_regular_pts);
 static int previous_src_centerline_first_x();
-static inline bool pixel_is_white(const uint8 *img, int x, int y, uint8 white_threshold);
 static void filter_binary_image_inplace(uint8 *binary_img);
 static void draw_binary_black_frame(uint8 *binary_img);
 static void resample_boundary_points_equal_spacing_inplace(maze_point_t *pts, int *num, int width, int height, float step_px);
@@ -451,8 +452,7 @@ static void fill_single_line_arrays_from_points(const maze_point_t *pts,
                                                 int height);
 static bool detect_src_straight_boundary_from_dirs(const uint8 *dirs, int count);
 static int count_side_frame_wall_rows_after_index(const maze_point_t *pts, int count, int start_index, bool is_left);
-static bool find_vertical_white_to_black_transition(const uint8 *classify_img,
-                                                    uint8 white_threshold,
+static bool find_vertical_white_to_black_transition(PixelClassifier &classifier,
                                                     int x,
                                                     int start_y,
                                                     int max_scan_rows,
@@ -460,8 +460,7 @@ static bool find_vertical_white_to_black_transition(const uint8 *classify_img,
                                                     int *transition_y);
 static void save_cross_aux_trace_cache(bool is_left, const maze_point_t *pts, const uint8 *dirs, int count);
 static void save_cross_aux_regular_cache(bool is_left, const maze_point_t *pts, int count);
-static bool build_cross_aux_boundary(const uint8 *classify_img,
-                                     uint8 white_threshold,
+static bool build_cross_aux_boundary(PixelClassifier &classifier,
                                      bool wall_is_white,
                                      bool is_left,
                                      int corner_x,
@@ -497,8 +496,7 @@ static bool init_undistort_remap_table();
 static bool init_ipm_forward_matrix();
 static bool ipm_point_to_src_point(int ipm_x, int ipm_y, int *src_x, int *src_y);
 static void get_maze_trace_x_range_clamped(int *x_min, int *x_max);
-static bool find_maze_start_from_row(const uint8 *classify_img,
-                                     uint8 white_threshold,
+static bool find_maze_start_from_row(PixelClassifier &classifier,
                                      bool search_left,
                                      int search_y,
                                      int x_min,
@@ -507,8 +505,7 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
                                      int *start_y,
                                      bool *wall_is_white,
                                      int preferred_center_x);
-static int trace_boundary_eight_neighbor(const uint8 *classify_img,
-                                         uint8 white_threshold,
+static int trace_boundary_eight_neighbor(PixelClassifier &classifier,
                                          bool wall_is_white,
                                          int start_x,
                                          int start_y,
@@ -520,8 +517,7 @@ static int trace_boundary_eight_neighbor(const uint8 *classify_img,
                                          uint8 *dirs,
                                          int max_pts,
                                          int *first_frame_touch_index);
-static int trace_left_boundary_selected_method(const uint8 *classify_img,
-                                               uint8 white_threshold,
+static int trace_left_boundary_selected_method(PixelClassifier &classifier,
                                                bool wall_is_white,
                                                int start_x,
                                                int start_y,
@@ -532,8 +528,7 @@ static int trace_left_boundary_selected_method(const uint8 *classify_img,
                                                uint8 *dirs,
                                                int max_pts,
                                                int *first_frame_touch_index);
-static int trace_right_boundary_selected_method(const uint8 *classify_img,
-                                                uint8 white_threshold,
+static int trace_right_boundary_selected_method(PixelClassifier &classifier,
                                                 bool wall_is_white,
                                                 int start_x,
                                                 int start_y,
@@ -544,8 +539,7 @@ static int trace_right_boundary_selected_method(const uint8 *classify_img,
                                                 uint8 *dirs,
                                                 int max_pts,
                                                 int *first_frame_touch_index);
-static void validate_maze_start_pair(const uint8 *classify_img,
-                                     uint8 white_threshold,
+static void validate_maze_start_pair(PixelClassifier &classifier,
                                      int x_min,
                                      int x_max,
                                      bool *left_ok,
@@ -735,70 +729,6 @@ static void clear_ipm_saved_arrays()
     g_ipm_shift_right_center_count = 0;
 }
 
-static uint8 compute_global_otsu_threshold_u8(const uint8 *gray_img)
-{
-    if (gray_img == nullptr)
-    {
-        return 127;
-    }
-
-    std::array<uint32, 256> histogram{};
-    uint64_t gray_sum = 0;
-    constexpr int kPixelCount = kProcWidth * kProcHeight;
-
-    for (int i = 0; i < kPixelCount; ++i)
-    {
-        uint8 v = gray_img[i];
-        ++histogram[v];
-        gray_sum += static_cast<uint64_t>(v);
-    }
-
-    uint32 weight_bg = 0;
-    uint64_t sum_bg = 0;
-    double best_between_var = -1.0;
-    uint8 best_threshold = 127;
-
-    for (int t = 0; t < 256; ++t)
-    {
-        weight_bg += histogram[t];
-        if (weight_bg == 0)
-        {
-            continue;
-        }
-
-        uint32 weight_fg = static_cast<uint32>(kPixelCount) - weight_bg;
-        if (weight_fg == 0)
-        {
-            break;
-        }
-
-        sum_bg += static_cast<uint64_t>(histogram[t]) * static_cast<uint64_t>(t);
-
-        double mean_bg = static_cast<double>(sum_bg) / static_cast<double>(weight_bg);
-        double mean_fg = static_cast<double>(gray_sum - sum_bg) / static_cast<double>(weight_fg);
-        double diff = mean_bg - mean_fg;
-        double between_var = static_cast<double>(weight_bg) * static_cast<double>(weight_fg) * diff * diff;
-
-        if (between_var > best_between_var)
-        {
-            best_between_var = between_var;
-            best_threshold = static_cast<uint8>(t);
-        }
-    }
-
-    return best_threshold;
-}
-
-static inline bool pixel_is_white(const uint8 *img, int x, int y, uint8 white_threshold)
-{
-    return img[y * kProcWidth + x] > white_threshold;
-}
-
-static inline bool pixel_is_wall(const uint8 *img, int x, int y, uint8 white_threshold, bool wall_is_white)
-{
-    return wall_is_white ? pixel_is_white(img, x, y, white_threshold) : !pixel_is_white(img, x, y, white_threshold);
-}
-
 static void build_binary_image_from_gray_threshold(const uint8 *gray_img, uint8 threshold)
 {
     if (gray_img == nullptr)
@@ -811,6 +741,44 @@ static void build_binary_image_from_gray_threshold(const uint8 *gray_img, uint8 
     for (int i = 0; i < kPixelCount; ++i)
     {
         g_image_binary_u8[i] = (gray_img[i] > threshold) ? static_cast<uint8>(255) : static_cast<uint8>(0);
+    }
+}
+
+static void build_binary_image_adaptive(const uint8 *gray_img, int width, int height,
+                                         int window_size, int constant, uint8 *binary_out)
+{
+    if (gray_img == nullptr || binary_out == nullptr)
+    {
+        return;
+    }
+
+    for (int y = 0; y < height; ++y)
+    {
+        for (int x = 0; x < width; ++x)
+        {
+            const int half = window_size / 2;
+            const int x0 = std::max(0, x - half);
+            const int x1 = std::min(width - 1, x + half);
+            const int y0 = std::max(0, y - half);
+            const int y1 = std::min(height - 1, y + half);
+
+            int sum = 0;
+            for (int yy = y0; yy <= y1; ++yy)
+            {
+                for (int xx = x0; xx <= x1; ++xx)
+                {
+                    sum += gray_img[yy * width + xx];
+                }
+            }
+            const int count = (x1 - x0 + 1) * (y1 - y0 + 1);
+            const int mean = sum / count;
+            int threshold = mean - constant;
+            if (threshold < 0) threshold = 0;
+            if (threshold > 255) threshold = 255;
+
+            const int idx = y * width + x;
+            binary_out[idx] = (gray_img[idx] > static_cast<uint8>(threshold)) ? static_cast<uint8>(255) : static_cast<uint8>(0);
+        }
     }
 }
 
@@ -1209,15 +1177,14 @@ static int count_side_frame_wall_rows_after_index(const maze_point_t *pts, int c
     return std::max(max_rows, current_rows);
 }
 
-static bool find_vertical_white_to_black_transition(const uint8 *classify_img,
-                                                    uint8 white_threshold,
+static bool find_vertical_white_to_black_transition(PixelClassifier &classifier,
                                                     int x,
                                                     int start_y,
                                                     int max_scan_rows,
                                                     int *transition_x,
                                                     int *transition_y)
 {
-    if (classify_img == nullptr)
+    if (classifier.gray == nullptr)
     {
         return false;
     }
@@ -1225,7 +1192,7 @@ static bool find_vertical_white_to_black_transition(const uint8 *classify_img,
     const int clamped_x = std::clamp(x, 1, kProcWidth - 2);
     const int begin_y = std::clamp(start_y, 1, kProcHeight - 2);
     const int scan_rows = std::max(1, max_scan_rows);
-    bool prev_is_white = pixel_is_white(classify_img, clamped_x, begin_y, white_threshold);
+    bool prev_is_white = classifier.is_white(clamped_x, begin_y);
     for (int step = 1; step <= scan_rows; ++step)
     {
         const int y = begin_y - step;
@@ -1233,7 +1200,7 @@ static bool find_vertical_white_to_black_transition(const uint8 *classify_img,
         {
             break;
         }
-        const bool curr_is_white = pixel_is_white(classify_img, clamped_x, y, white_threshold);
+        const bool curr_is_white = classifier.is_white(clamped_x, y);
         if (prev_is_white && !curr_is_white)
         {
             if (transition_x) *transition_x = clamped_x;
@@ -2633,8 +2600,7 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                            int left_num,
                                                            const maze_point_t *right_pts,
                                                            int right_num,
-                                                           const uint8 *classify_img,
-                                                           uint8 classify_white_threshold,
+                                                           PixelClassifier &classifier,
                                                            int y_min,
                                                            int maze_trace_x_min,
                                                            int maze_trace_x_max,
@@ -2870,8 +2836,7 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
     return 0;
 }
 
-static bool find_maze_start_from_row(const uint8 *classify_img,
-                                     uint8 white_threshold,
+static bool find_maze_start_from_row(PixelClassifier &classifier,
                                      bool search_left,
                                      int search_y,
                                      int x_min,
@@ -2881,7 +2846,7 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
                                      bool *wall_is_white,
                                      int preferred_center_x = -1)
 {
-    if (classify_img == nullptr || start_x == nullptr || start_y == nullptr || wall_is_white == nullptr)
+    if (classifier.gray == nullptr || start_x == nullptr || start_y == nullptr || wall_is_white == nullptr)
     {
         return false;
     }
@@ -2909,8 +2874,8 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
     {
         for (int x = center_x; x >= x_min + 1; --x)
         {
-            bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
-            bool outer_white = pixel_is_white(classify_img, x - 1, scan_y, white_threshold);
+            bool inner_white = classifier.is_white(x, scan_y);
+            bool outer_white = classifier.is_white(x - 1, scan_y);
             if (inner_white != outer_white)
             {
                 x_found = x; // 靠近图像中心的一侧
@@ -2924,8 +2889,8 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
     {
         for (int x = center_x; x <= x_max - 1; ++x)
         {
-            bool inner_white = pixel_is_white(classify_img, x, scan_y, white_threshold);
-            bool outer_white = pixel_is_white(classify_img, x + 1, scan_y, white_threshold);
+            bool inner_white = classifier.is_white(x, scan_y);
+            bool outer_white = classifier.is_white(x + 1, scan_y);
             if (inner_white != outer_white)
             {
                 x_found = x; // 靠近图像中心的一侧
@@ -2949,7 +2914,7 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
     int center_step = search_left ? 1 : -1;
     for (int i = 0; i < 8; ++i)
     {
-        bool cur_white = pixel_is_white(classify_img, x_adjust, track_y, white_threshold);
+        bool cur_white = classifier.is_white(x_adjust, track_y);
         if (cur_white == path_is_white)
         {
             break;
@@ -2969,8 +2934,7 @@ static bool find_maze_start_from_row(const uint8 *classify_img,
     return true;
 }
 
-static void validate_maze_start_pair(const uint8 *classify_img,
-                                     uint8 white_threshold,
+static void validate_maze_start_pair(PixelClassifier &classifier,
                                      int x_min,
                                      int x_max,
                                      bool *left_ok,
@@ -2980,8 +2944,7 @@ static void validate_maze_start_pair(const uint8 *classify_img,
                                      int right_start_x,
                                      int right_start_y)
 {
-    (void)classify_img;
-    (void)white_threshold;
+    (void)classifier;
     if (left_ok == nullptr || right_ok == nullptr)
     {
         return;
@@ -2999,13 +2962,12 @@ static void validate_maze_start_pair(const uint8 *classify_img,
     }
 }
 
-static bool single_boundary_side_vote_is_current_side(const uint8 *classify_img,
-                                                       uint8 white_threshold,
+static bool single_boundary_side_vote_is_current_side(PixelClassifier &classifier,
                                                        int start_x,
                                                        int start_y,
                                                        bool sample_left_side)
 {
-    if (classify_img == nullptr)
+    if (classifier.gray == nullptr)
     {
         return true;
     }
@@ -3020,7 +2982,7 @@ static bool single_boundary_side_vote_is_current_side(const uint8 *classify_img,
         {
             continue;
         }
-        if (pixel_is_white(classify_img, x, y, white_threshold))
+        if (classifier.is_white(x, y))
         {
             ++white_count;
         }
@@ -3039,8 +3001,7 @@ static bool single_boundary_side_vote_is_current_side(const uint8 *classify_img,
     return white_count >= black_count;
 }
 
-static int maze_trace_left_hand(const uint8 *classify_img,
-                                uint8 white_threshold,
+static int maze_trace_left_hand(PixelClassifier &classifier,
                                 bool wall_is_white,
                                 int start_x,
                                 int start_y,
@@ -3050,7 +3011,7 @@ static int maze_trace_left_hand(const uint8 *classify_img,
                                 maze_point_t *pts,
                                 int max_pts)
 {
-    if (classify_img == nullptr || pts == nullptr || max_pts <= 0 || start_x <= x_min || start_x >= x_max)
+    if (classifier.gray == nullptr || pts == nullptr || max_pts <= 0 || start_x <= x_min || start_x >= x_max)
     {
         return 0;
     }
@@ -3074,8 +3035,8 @@ static int maze_trace_left_hand(const uint8 *classify_img,
         int flx = x + kDirFrontLeft[dir][0];
         int fly = y + kDirFrontLeft[dir][1];
 
-        bool front_is_wall = pixel_is_wall(classify_img, fx, fy, white_threshold, wall_is_white);
-        bool frontleft_is_wall = pixel_is_wall(classify_img, flx, fly, white_threshold, wall_is_white);
+        bool front_is_wall = classifier.is_wall(fx, fy, wall_is_white);
+        bool frontleft_is_wall = classifier.is_wall(flx, fly, wall_is_white);
 
         if (front_is_wall)
         {
@@ -3120,8 +3081,7 @@ static int maze_trace_left_hand(const uint8 *classify_img,
     return step;
 }
 
-static int maze_trace_right_hand(const uint8 *classify_img,
-                                 uint8 white_threshold,
+static int maze_trace_right_hand(PixelClassifier &classifier,
                                  bool wall_is_white,
                                  int start_x,
                                  int start_y,
@@ -3131,7 +3091,7 @@ static int maze_trace_right_hand(const uint8 *classify_img,
                                  maze_point_t *pts,
                                  int max_pts)
 {
-    if (classify_img == nullptr || pts == nullptr || max_pts <= 0 || start_x <= x_min || start_x >= x_max)
+    if (classifier.gray == nullptr || pts == nullptr || max_pts <= 0 || start_x <= x_min || start_x >= x_max)
     {
         return 0;
     }
@@ -3155,8 +3115,8 @@ static int maze_trace_right_hand(const uint8 *classify_img,
         int frx = x + kDirFrontRight[dir][0];
         int fry = y + kDirFrontRight[dir][1];
 
-        bool front_is_wall = pixel_is_wall(classify_img, fx, fy, white_threshold, wall_is_white);
-        bool frontright_is_wall = pixel_is_wall(classify_img, frx, fry, white_threshold, wall_is_white);
+        bool front_is_wall = classifier.is_wall(fx, fy, wall_is_white);
+        bool frontright_is_wall = classifier.is_wall(frx, fry, wall_is_white);
 
         if (front_is_wall)
         {
@@ -3201,11 +3161,6 @@ static int maze_trace_right_hand(const uint8 *classify_img,
     return step;
 }
 
-static inline bool pixel_is_path(const uint8 *img, int x, int y, uint8 white_threshold, bool wall_is_white)
-{
-    return !pixel_is_wall(img, x, y, white_threshold, wall_is_white);
-}
-
 static bool binary_point_in_trace_range(int x, int y, int y_min, int x_min, int x_max)
 {
     return x > 0 && x < (kProcWidth - 1) &&
@@ -3219,8 +3174,7 @@ static bool point_touches_artificial_frame(int x, int y)
     return x <= 1 || x >= (kProcWidth - 2) || y <= 1;
 }
 
-static int trace_boundary_eight_neighbor(const uint8 *classify_img,
-                                         uint8 white_threshold,
+static int trace_boundary_eight_neighbor(PixelClassifier &classifier,
                                          bool wall_is_white,
                                          int start_x,
                                          int start_y,
@@ -3233,7 +3187,7 @@ static int trace_boundary_eight_neighbor(const uint8 *classify_img,
                                          int max_pts,
                                          int *first_frame_touch_index)
 {
-    if (classify_img == nullptr || pts == nullptr || dirs == nullptr || max_pts <= 0 || start_x < x_min || start_x > x_max)
+    if (classifier.gray == nullptr || pts == nullptr || dirs == nullptr || max_pts <= 0 || start_x < x_min || start_x > x_max)
     {
         if (first_frame_touch_index) *first_frame_touch_index = -1;
         return 0;
@@ -3273,8 +3227,8 @@ static int trace_boundary_eight_neighbor(const uint8 *classify_img,
             {
                 continue;
             }
-            if (pixel_is_wall(classify_img, nx0, ny0, white_threshold, wall_is_white) &&
-                pixel_is_path(classify_img, nx1, ny1, white_threshold, wall_is_white))
+            if (classifier.is_wall(nx0, ny0, wall_is_white) &&
+                classifier.is_path(nx1, ny1, wall_is_white))
             {
                 candidates[candidate_count] = {nx0, ny0};
                 candidate_dirs[candidate_count] = i;
@@ -3320,8 +3274,7 @@ static int trace_boundary_eight_neighbor(const uint8 *classify_img,
     return step;
 }
 
-static int trace_left_boundary_selected_method(const uint8 *classify_img,
-                                               uint8 white_threshold,
+static int trace_left_boundary_selected_method(PixelClassifier &classifier,
                                                bool wall_is_white,
                                                int start_x,
                                                int start_y,
@@ -3337,8 +3290,7 @@ static int trace_left_boundary_selected_method(const uint8 *classify_img,
         static_cast<vision_trace_method_enum>(g_maze_trace_method.load());
     if (method == VISION_TRACE_METHOD_EIGHT_NEIGHBOR)
     {
-        return trace_boundary_eight_neighbor(classify_img,
-                                             white_threshold,
+        return trace_boundary_eight_neighbor(classifier,
                                              wall_is_white,
                                              start_x,
                                              start_y,
@@ -3353,8 +3305,7 @@ static int trace_left_boundary_selected_method(const uint8 *classify_img,
     }
 
     if (first_frame_touch_index) *first_frame_touch_index = -1;
-    return maze_trace_left_hand(classify_img,
-                                white_threshold,
+    return maze_trace_left_hand(classifier,
                                 wall_is_white,
                                 start_x,
                                 start_y,
@@ -3365,8 +3316,7 @@ static int trace_left_boundary_selected_method(const uint8 *classify_img,
                                 max_pts);
 }
 
-static bool build_cross_aux_boundary(const uint8 *classify_img,
-                                     uint8 white_threshold,
+static bool build_cross_aux_boundary(PixelClassifier &classifier,
                                      bool wall_is_white,
                                      bool is_left,
                                      int corner_x,
@@ -3383,14 +3333,13 @@ static bool build_cross_aux_boundary(const uint8 *classify_img,
     if (raw_count) *raw_count = 0;
     if (regular_count) *regular_count = 0;
     if (transition_point) *transition_point = maze_point_t{0, 0};
-    if (classify_img == nullptr || raw_pts == nullptr || raw_dirs == nullptr || regular_pts == nullptr)
+    if (classifier.gray == nullptr || raw_pts == nullptr || raw_dirs == nullptr || regular_pts == nullptr)
     {
         return false;
     }
 
     maze_point_t found_transition{};
-    if (!find_vertical_white_to_black_transition(classify_img,
-                                                 white_threshold,
+    if (!find_vertical_white_to_black_transition(classifier,
                                                  corner_x,
                                                  corner_y,
                                                  g_vision_runtime_config.cross_aux_vertical_scan_max_rows,
@@ -3406,8 +3355,7 @@ static bool build_cross_aux_boundary(const uint8 *classify_img,
     int first_frame_touch_index = -1;
     const int max_trace_count =
         std::clamp(g_vision_runtime_config.cross_aux_trace_max_points, 1, VISION_BOUNDARY_NUM);
-    const int traced_count = trace_boundary_eight_neighbor(classify_img,
-                                                           white_threshold,
+    const int traced_count = trace_boundary_eight_neighbor(classifier,
                                                            wall_is_white,
                                                            found_transition.x,
                                                            found_transition.y,
@@ -3594,8 +3542,7 @@ static int concatenate_boundary_segments(const maze_point_t *segment_a,
     return out_num;
 }
 
-static int trace_right_boundary_selected_method(const uint8 *classify_img,
-                                                uint8 white_threshold,
+static int trace_right_boundary_selected_method(PixelClassifier &classifier,
                                                 bool wall_is_white,
                                                 int start_x,
                                                 int start_y,
@@ -3611,8 +3558,7 @@ static int trace_right_boundary_selected_method(const uint8 *classify_img,
         static_cast<vision_trace_method_enum>(g_maze_trace_method.load());
     if (method == VISION_TRACE_METHOD_EIGHT_NEIGHBOR)
     {
-        return trace_boundary_eight_neighbor(classify_img,
-                                             white_threshold,
+        return trace_boundary_eight_neighbor(classifier,
                                              wall_is_white,
                                              start_x,
                                              start_y,
@@ -3627,8 +3573,7 @@ static int trace_right_boundary_selected_method(const uint8 *classify_img,
     }
 
     if (first_frame_touch_index) *first_frame_touch_index = -1;
-    return maze_trace_right_hand(classify_img,
-                                 white_threshold,
+    return maze_trace_right_hand(classifier,
                                  wall_is_white,
                                  start_x,
                                  start_y,
@@ -4140,10 +4085,34 @@ bool vision_image_processor_process_step()
 
     auto t_otsu_start = t_pre_end;
     uint8 otsu_threshold = 127;
-    if (g_vision_processor_config.demand_otsu_enable)
+
+    PixelClassifier classifier;
+    const int binarization_mode = g_vision_processor_config.binarization_mode;
+
+    if (binarization_mode == VISION_BINARIZATION_ADAPTIVE_MEAN)
     {
-        otsu_threshold = compute_global_otsu_threshold_u8(g_image_gray);
-        build_binary_image_from_gray_threshold(g_image_gray, otsu_threshold);
+        classifier = PixelClassifier::make_adaptive(g_image_gray,
+                                                    kProcWidth,
+                                                    kProcHeight,
+                                                    g_vision_processor_config.adaptive_window_size,
+                                                    g_vision_processor_config.adaptive_constant,
+                                                    g_image_binary_u8,
+                                                    g_adaptive_cache_computed);
+        classifier.reset_cache();
+    }
+    else if (binarization_mode == VISION_BINARIZATION_ADAPTIVE_FULL)
+    {
+        build_binary_image_adaptive(g_image_gray,
+                                    kProcWidth,
+                                    kProcHeight,
+                                    g_vision_processor_config.adaptive_window_size,
+                                    g_vision_processor_config.adaptive_constant,
+                                    g_image_binary_u8);
+        filter_binary_image_inplace(g_image_binary_u8);
+        draw_binary_black_frame(g_image_binary_u8);
+        g_last_otsu_threshold = 127;
+
+        classifier = PixelClassifier::make_precomputed(g_image_gray, g_image_binary_u8, kProcWidth, kProcHeight);
     }
     else
     {
@@ -4151,16 +4120,16 @@ bool vision_image_processor_process_step()
         cv::Mat binary(kProcHeight, kProcWidth, CV_8UC1, g_image_binary_u8);
         const double otsu_value = cv::threshold(gray_ipm, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
         otsu_threshold = static_cast<uint8>(std::clamp(static_cast<int>(std::lround(otsu_value)), 0, 255));
+        filter_binary_image_inplace(g_image_binary_u8);
+        draw_binary_black_frame(g_image_binary_u8);
+        g_last_otsu_threshold = otsu_threshold;
+
+        classifier = PixelClassifier::make_precomputed(g_image_gray, g_image_binary_u8, kProcWidth, kProcHeight);
     }
-    filter_binary_image_inplace(g_image_binary_u8);
-    draw_binary_black_frame(g_image_binary_u8);
-    g_last_otsu_threshold = otsu_threshold;
     auto t_otsu_end = std::chrono::steady_clock::now();
 
     auto t_maze_start = t_otsu_end;
     const int y_min = std::max(1, kProcHeight - (kProcHeight * g_vision_processor_config.maze_lower_region_percent) / 100);
-    const uint8 *classify_img = g_image_binary_u8;
-    uint8 classify_white_threshold = 127;
 
     int left_start_x = 0;
     int left_start_y = 0;
@@ -4298,8 +4267,7 @@ bool vision_image_processor_process_step()
              : fallback_center_x);
     const int left_search_row = maze_start_row;
     const int right_search_row = maze_start_row;
-    bool left_ok = find_maze_start_from_row(classify_img,
-                                            classify_white_threshold,
+    bool left_ok = find_maze_start_from_row(classifier,
                                             true,
                                             left_search_row,
                                             maze_trace_x_min,
@@ -4308,8 +4276,7 @@ bool vision_image_processor_process_step()
                                             &left_start_y,
                                             &left_wall_is_white,
                                             left_search_center_x);
-    bool right_ok = find_maze_start_from_row(classify_img,
-                                             classify_white_threshold,
+    bool right_ok = find_maze_start_from_row(classifier,
                                              false,
                                              right_search_row,
                                              maze_trace_x_min,
@@ -4318,8 +4285,7 @@ bool vision_image_processor_process_step()
                                              &right_start_y,
                                              &right_wall_is_white,
                                              right_search_center_x);
-    validate_maze_start_pair(classify_img,
-                             classify_white_threshold,
+    validate_maze_start_pair(classifier,
                              maze_trace_x_min,
                              maze_trace_x_max,
                              &left_ok,
@@ -4337,8 +4303,7 @@ bool vision_image_processor_process_step()
     // 白点多/相等认为当前边界身份正确；黑点多则改判到对侧。
     if (right_ok && !left_ok)
     {
-        const bool right_is_right = single_boundary_side_vote_is_current_side(classify_img,
-                                                                               classify_white_threshold,
+        const bool right_is_right = single_boundary_side_vote_is_current_side(classifier,
                                                                                right_start_x,
                                                                                right_start_y,
                                                                                true);
@@ -4353,8 +4318,7 @@ bool vision_image_processor_process_step()
     }
     else if (left_ok && !right_ok)
     {
-        const bool left_is_left = single_boundary_side_vote_is_current_side(classify_img,
-                                                                             classify_white_threshold,
+        const bool left_is_left = single_boundary_side_vote_is_current_side(classifier,
                                                                              left_start_x,
                                                                              left_start_y,
                                                                              false);
@@ -4385,8 +4349,7 @@ bool vision_image_processor_process_step()
     if (left_ok)
     {
         const int left_max_pts = std::min(static_cast<int>(left_trace_pts.size()), g_vision_processor_config.maze_trace_max_points);
-        left_trace_num = trace_left_boundary_selected_method(classify_img,
-                                                             classify_white_threshold,
+        left_trace_num = trace_left_boundary_selected_method(classifier,
                                                              left_wall_is_white,
                                                              left_start_x,
                                                              left_start_y,
@@ -4402,8 +4365,7 @@ bool vision_image_processor_process_step()
     if (right_ok)
     {
         const int right_max_pts = std::min(static_cast<int>(right_trace_pts.size()), g_vision_processor_config.maze_trace_max_points);
-        right_trace_num = trace_right_boundary_selected_method(classify_img,
-                                                               classify_white_threshold,
+        right_trace_num = trace_right_boundary_selected_method(classifier,
                                                                right_wall_is_white,
                                                                right_start_x,
                                                                right_start_y,
@@ -4572,8 +4534,7 @@ bool vision_image_processor_process_step()
 
         if (g_cross_lower_left_corner_found.load())
         {
-            if (build_cross_aux_boundary(classify_img,
-                                         classify_white_threshold,
+            if (build_cross_aux_boundary(classifier,
                                          left_wall_is_white,
                                          true,
                                          g_cross_lower_left_corner_x.load(),
@@ -4601,8 +4562,7 @@ bool vision_image_processor_process_step()
         }
         if (g_cross_lower_right_corner_found.load())
         {
-            if (build_cross_aux_boundary(classify_img,
-                                         classify_white_threshold,
+            if (build_cross_aux_boundary(classifier,
                                          right_wall_is_white,
                                          false,
                                          g_cross_lower_right_corner_x.load(),
@@ -5014,8 +4974,7 @@ bool vision_image_processor_process_step()
                 g_cross_left_aux_found.store(false);
                 left_cross_aux_trace_num = 0;
                 left_cross_aux_regular_num = 0;
-                if (build_cross_aux_boundary(classify_img,
-                                             classify_white_threshold,
+                if (build_cross_aux_boundary(classifier,
                                              left_wall_is_white,
                                              true,
                                              frozen_left_corner.x,
@@ -5107,8 +5066,7 @@ bool vision_image_processor_process_step()
                 g_cross_right_aux_found.store(false);
                 right_cross_aux_trace_num = 0;
                 right_cross_aux_regular_num = 0;
-                if (build_cross_aux_boundary(classify_img,
-                                             classify_white_threshold,
+                if (build_cross_aux_boundary(classifier,
                                              right_wall_is_white,
                                              false,
                                              frozen_right_corner.x,
@@ -5461,6 +5419,16 @@ bool vision_image_processor_process_step()
         }
     }
 
+    // 按需自适应模式：巡线完成后，用收集到的阈值均值做全图二值化。
+    if (binarization_mode == VISION_BINARIZATION_ADAPTIVE_MEAN)
+    {
+        const uint8 avg_threshold = classifier.average_threshold();
+        build_binary_image_from_gray_threshold(g_image_gray, avg_threshold);
+        filter_binary_image_inplace(g_image_binary_u8);
+        draw_binary_black_frame(g_image_binary_u8);
+        g_last_otsu_threshold = avg_threshold;
+    }
+
     // 主输出边界使用原图坐标系：左右边线 + 均值中线（无丢线补偿）。
     fill_boundary_arrays_from_maze(left_pts.data(), left_num, right_pts.data(), right_num);
     line_error = 0;
@@ -5476,8 +5444,7 @@ bool vision_image_processor_process_step()
                                                         left_ipm_num,
                                                         right_ipm_pts.data(),
                                                         right_ipm_num,
-                                                        classify_img,
-                                                        classify_white_threshold,
+                                                        classifier,
                                                         y_min,
                                                         maze_trace_x_min,
                                                         maze_trace_x_max,
