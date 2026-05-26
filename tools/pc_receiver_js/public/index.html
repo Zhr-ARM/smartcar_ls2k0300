@@ -3531,17 +3531,17 @@
         updateReplayControls();
         return;
       }
-      const isRecording = sourceRecorder.active();
+      const isRecording = !!(recordingState && recordingState.active);
       startRecordBtn.disabled = isRecording;
       stopRecordBtn.disabled = !isRecording;
       playRecordBtn.disabled = !lastRecording;
-      saveRecordBtn.disabled = !lastRecording || !!(lastRecording && lastRecording.folder);
+      saveRecordBtn.disabled = true;
       if (isRecording) {
         const elapsedSec = Math.max(0, Math.floor((Date.now() - recordingState.startedAtMs) / 1000));
-        recordingMeta.innerHTML = `<span class="recording-dot"></span>录制中 ${elapsedSec}s，全部在网页端本地缓存`;
+        recordingMeta.innerHTML = `<span class="recording-dot"></span>后端录制中 ${elapsedSec}s，UDP/TCP 原始数据正在落盘`;
       } else if (lastRecording) {
         if (lastRecording.folder) {
-          recordingMeta.textContent = `已加载保存目录：${lastRecording.folder}，${lastRecording.durationSec}s`;
+          recordingMeta.textContent = `后端录制已保存：${lastRecording.folder}，${lastRecording.durationSec}s`;
         } else {
           recordingMeta.textContent = `最近一次录制：${lastRecording.frameCount} 条状态快照，${lastRecording.durationSec}s`;
         }
@@ -3710,17 +3710,26 @@
       });
     }
 
+    async function postRecordingControl(path, payload = {}) {
+      const r = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || `request failed ${r.status}`);
+      return j;
+    }
+
     async function startRecording() {
-      if (sourceRecorder.active()) return;
-      sourceRecorder.start();
+      if (recordingState && recordingState.active) return;
+      const started = await postRecordingControl('/api/recordings/backend/start');
       recordingState = {
         active: true,
-        startedAtMs: Date.now(),
-        statusFrames: []
+        startedAtMs: Number(started.started_at_ms) || Date.now(),
+        folder: started.folder || ''
       };
-      clearRecordingTimer();
-      captureRecordingTick();
-      recordingTimer = setInterval(captureRecordingTick, RECORDING_INTERVAL_MS);
+      lastRecording = null;
       updateRecordingUi();
     }
 
@@ -3731,47 +3740,43 @@
       });
     }
 
-    async function stopRecording() {
-      if (!sourceRecorder.active()) return;
-      clearRecordingTimer();
-      const finished = sourceRecorder.stop();
+    async function stopRecording(options = {}) {
+      if (!recordingState || !recordingState.active) return;
+      const stopped = await postRecordingControl('/api/recordings/backend/stop');
       recordingState = null;
       if (lastRecording) revokeRecordingUrls(lastRecording);
-      const payload = window.ReceiverRecording.buildPersistableSourceRecording(finished);
-      payload.session_meta = Object.assign(
-        {},
-        payload.session_meta || {},
-        buildRecordingSessionMeta({
-          recordedViews: [
-            { key: 'gray', title: 'Gray source' },
-            { key: 'binary', title: 'Binary source' },
-            { key: 'rgb', title: 'RGB source' },
-            { key: 'roi64', title: 'ROI64 source' }
-          ]
-        }),
-        { recording_kind: 'source_frames' }
-      );
+      const meta = stopped.meta || {};
 
       lastRecording = {
-        savedAtMs: Date.now(),
-        startedAtMs: payload.recorded_at_ms,
-        durationMs: payload.duration_ms,
-        frameCount: payload.frame_count,
-        durationSec: (payload.duration_ms / 1000).toFixed(1),
-        statusFrames: payload.statuses,
-        sourceFrames: payload.source_frames,
-        sourcePayload: payload,
-        sessionMeta: payload.session_meta
+        savedAtMs: Number(meta.saved_at_ms) || Date.now(),
+        startedAtMs: Number(meta.recorded_at_ms) || Date.now(),
+        durationMs: Number(meta.duration_ms) || 0,
+        frameCount: Number(meta.frame_count) || 0,
+        durationSec: ((Number(meta.duration_ms) || 0) / 1000).toFixed(1),
+        folder: stopped.folder || meta.folder || '',
+        sessionMeta: meta.session_meta || {}
       };
+      savedFolderInput.value = lastRecording.folder || '';
+      savedLoadInfo.textContent =
+        `后端录制完成\nfolder: ${lastRecording.folder}\n时长: ${lastRecording.durationSec}s\nTCP状态: ${lastRecording.frameCount}\nUDP图像帧: ${Number(meta.udp_frame_count) || 0}`;
+      if (Number(meta.udp_packet_bytes) > 0) {
+        savedLoadInfo.textContent += `\nUDP原始包: ${(Number(meta.udp_packet_bytes) / 1024).toFixed(1)} KiB`;
+      }
       updateRecordingUi();
 
-      if (confirm('源数据录制完成，是否立即保存并用统一界面回放？')) {
-        await saveLastRecording();
-        if (lastRecording.folder) {
-          await loadSourceReplayFolder(lastRecording.folder);
-        }
+      if (options && options.silent) return;
+      if (confirm('后端录制完成，是否立即用统一界面回放？')) {
+        await loadSourceReplayFolder(lastRecording.folder);
       }
     }
+
+    window.smartcarRecordingControls = {
+      isReplayMode: () => !!replayMode,
+      isRecording: () => !!(recordingState && recordingState.active),
+      start: () => startRecording(),
+      stop: () => stopRecording({ silent: true }),
+      refresh: () => updateRecordingUi()
+    };
 
     async function playLastRecording() {
       if (!lastRecording) return;
@@ -5251,5 +5256,6 @@
       pullFrames();
     }
   </script>
+  <script src="/project_control.js"></script>
 </body>
 </html>

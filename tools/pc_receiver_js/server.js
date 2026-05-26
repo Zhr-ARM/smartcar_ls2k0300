@@ -80,6 +80,13 @@ const inflightFrames = new Map();
 const udpByteEvents = [];
 const udpFrameEvents = [];
 let boardConnectionStore = loadBoardConnectionStore();
+let backendRecording = null;
+let projectControlState = {
+  last_action: 'idle',
+  last_message: '',
+  last_error: '',
+  last_updated_at_ms: 0
+};
 
 let wss = null;
 
@@ -388,6 +395,178 @@ function execFileAsync(file, args) {
   });
 }
 
+function shellQuote(value) {
+  return `'${String(value || '').replace(/'/g, `'\\''`)}'`;
+}
+
+function buildProjectTarget() {
+  const settings = getBoardConnectionSettings();
+  const host = String(settings.build_target_host || settings.board_ssh_host || '').trim();
+  const user = String(settings.build_target_user || settings.board_ssh_user || 'root').trim();
+  const port = Math.round(Number(settings.build_target_port || settings.board_ssh_port || 22));
+  const appPath = String(settings.build_target_app_path || '/home/root/tst').trim();
+  if (!host) throw new Error('build_target_host 不能为空');
+  if (!user) throw new Error('build_target_user 不能为空');
+  if (!Number.isFinite(port) || port <= 0) throw new Error('build_target_port 无效');
+  if (!appPath) throw new Error('build_target_app_path 不能为空');
+  return {
+    host,
+    user,
+    port,
+    app_path: appPath,
+    executable: './project',
+    pid_file: '.web_project.pid',
+    log_file: 'project_web.log',
+    preset_id: getBoardConnectionStore().active_preset || '',
+    preset_label: settings.label || ''
+  };
+}
+
+function parseProjectControlOutput(text) {
+  const out = {};
+  String(text || '').split(/\r?\n/).forEach((line) => {
+    const idx = line.indexOf('=');
+    if (idx <= 0) return;
+    out[line.slice(0, idx)] = line.slice(idx + 1);
+  });
+  return out;
+}
+
+function buildProjectControlPayload(target, output, extra = {}) {
+  const running = output.running === '1';
+  const pid = output.pid && /^\d+$/.test(output.pid) ? Number(output.pid) : null;
+  return Object.assign({
+    ok: true,
+    running,
+    pid,
+    message: output.message || '',
+    target,
+    last_action: projectControlState.last_action,
+    last_message: projectControlState.last_message,
+    last_error: projectControlState.last_error,
+    last_updated_at_ms: projectControlState.last_updated_at_ms
+  }, extra);
+}
+
+async function execProjectSsh(target, script) {
+  const remote = `${target.user}@${target.host}`;
+  const result = await execFileAsync('ssh', [
+    '-p', String(target.port),
+    '-o', 'BatchMode=yes',
+    '-o', 'ConnectTimeout=5',
+    '-o', 'StrictHostKeyChecking=accept-new',
+    remote,
+    script
+  ]);
+  return parseProjectControlOutput(result.stdout);
+}
+
+async function getProjectStatus() {
+  const target = buildProjectTarget();
+  const appPath = shellQuote(target.app_path);
+  const pidFile = shellQuote(target.pid_file);
+  const script = [
+    `cd ${appPath} 2>/dev/null || { echo running=0; echo pid=; echo message=app_path_not_found; exit 0; }`,
+    `pid=""`,
+    `[ -f ${pidFile} ] && pid="$(cat ${pidFile} 2>/dev/null | tr -dc '0-9' | head -c 20)"`,
+    `if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then`,
+    `  echo running=1`,
+    `  echo pid="$pid"`,
+    `  echo message=running`,
+    `else`,
+    `  echo running=0`,
+    `  echo pid="$pid"`,
+    `  echo message=stopped`,
+    `fi`
+  ].join('\n');
+  const output = await execProjectSsh(target, script);
+  return buildProjectControlPayload(target, output);
+}
+
+async function startProject() {
+  const target = buildProjectTarget();
+  const appPath = shellQuote(target.app_path);
+  const pidFile = shellQuote(target.pid_file);
+  const logFile = shellQuote(target.log_file);
+  const script = [
+    `cd ${appPath} || { echo running=0; echo pid=; echo message=app_path_not_found; exit 0; }`,
+    `pid=""`,
+    `[ -f ${pidFile} ] && pid="$(cat ${pidFile} 2>/dev/null | tr -dc '0-9' | head -c 20)"`,
+    `if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then`,
+    `  echo running=1`,
+    `  echo pid="$pid"`,
+    `  echo message=already_running`,
+    `  exit 0`,
+    `fi`,
+    `[ -x ./project ] || { echo running=0; echo pid=; echo message=project_not_executable; exit 0; }`,
+    `nohup ./project > ${logFile} 2>&1 &`,
+    `pid="$!"`,
+    `echo "$pid" > ${pidFile}`,
+    `sleep 0.2`,
+    `if kill -0 "$pid" 2>/dev/null; then`,
+    `  echo running=1`,
+    `  echo pid="$pid"`,
+    `  echo message=started`,
+    `else`,
+    `  echo running=0`,
+    `  echo pid="$pid"`,
+    `  echo message=start_failed`,
+    `fi`
+  ].join('\n');
+  const output = await execProjectSsh(target, script);
+  projectControlState = {
+    last_action: 'start',
+    last_message: output.message || '',
+    last_error: '',
+    last_updated_at_ms: Date.now()
+  };
+  return buildProjectControlPayload(target, output);
+}
+
+async function stopProject() {
+  const target = buildProjectTarget();
+  const appPath = shellQuote(target.app_path);
+  const pidFile = shellQuote(target.pid_file);
+  const script = [
+    `cd ${appPath} || { echo running=0; echo pid=; echo message=app_path_not_found; exit 0; }`,
+    `pid=""`,
+    `[ -f ${pidFile} ] && pid="$(cat ${pidFile} 2>/dev/null | tr -dc '0-9' | head -c 20)"`,
+    `if [ -z "$pid" ]; then`,
+    `  echo running=0`,
+    `  echo pid=`,
+    `  echo message=no_pid_file`,
+    `  exit 0`,
+    `fi`,
+    `if kill -0 "$pid" 2>/dev/null; then`,
+    `  kill -INT "$pid" 2>/dev/null || true`,
+    `  sleep 0.5`,
+    `  if kill -0 "$pid" 2>/dev/null; then`,
+    `    echo running=1`,
+    `    echo pid="$pid"`,
+    `    echo message=sigint_sent_still_running`,
+    `  else`,
+    `    rm -f ${pidFile}`,
+    `    echo running=0`,
+    `    echo pid="$pid"`,
+    `    echo message=stopped`,
+    `  fi`,
+    `else`,
+    `  rm -f ${pidFile}`,
+    `  echo running=0`,
+    `  echo pid="$pid"`,
+    `  echo message=not_running`,
+    `fi`
+  ].join('\n');
+  const output = await execProjectSsh(target, script);
+  projectControlState = {
+    last_action: 'stop',
+    last_message: output.message || '',
+    last_error: '',
+    last_updated_at_ms: Date.now()
+  };
+  return buildProjectControlPayload(target, output);
+}
+
 function persistLocalConfigToml(tomlText) {
   const targetPath = LOCAL_SMARTCAR_CONFIG_PATH;
   const parentDir = path.dirname(targetPath);
@@ -656,6 +835,191 @@ function listRecordingFolders() {
     .sort((a, b) => b.mtime_ms - a.mtime_ms);
 }
 
+function backendRecordingSnapshot() {
+  if (!backendRecording) return { active: false };
+  return {
+    active: true,
+    folder: backendRecording.folder,
+    started_at_ms: backendRecording.startedAtMs,
+    duration_ms: Date.now() - backendRecording.startedAtMs,
+    status_count: backendRecording.statuses.length,
+    udp_frame_count: backendRecording.udpFrameCount,
+    source_counts: Object.fromEntries(Object.entries(backendRecording.sourceFrames).map(([mode, frames]) => [mode, frames.length]))
+  };
+}
+
+function startBackendRecording(folderHint = '') {
+  if (backendRecording) throw new Error(`recording already active: ${backendRecording.folder}`);
+  ensureRecordingsDir();
+  const folder = sanitizeFolderName(folderHint) || `vision_record_${Date.now()}`;
+  const folderPath = folderPathFromName(folder);
+  if (!folderPath) throw new Error('invalid folder name');
+  if (fs.existsSync(folderPath)) throw new Error(`recording folder already exists: ${folder}`);
+  fs.mkdirSync(folderPath, { recursive: true });
+  fs.mkdirSync(path.join(folderPath, 'raw'), { recursive: true });
+  for (const mode of ['gray', 'binary', 'rgb', 'roi64']) {
+    fs.mkdirSync(path.join(folderPath, 'source_frames', mode), { recursive: true });
+  }
+
+  const startedAtMs = Date.now();
+  backendRecording = {
+    folder,
+    folderPath,
+    startedAtMs,
+    statuses: [],
+    sourceFrames: { gray: [], binary: [], rgb: [], roi64: [] },
+    udpFrameCount: 0,
+    udpWireBytes: 0,
+    udpPacketBytes: 0,
+    tcpStream: fs.createWriteStream(path.join(folderPath, 'raw', 'tcp_status.ndjson'), { flags: 'a' }),
+    udpStream: fs.createWriteStream(path.join(folderPath, 'raw', 'udp_frames.ndjson'), { flags: 'a' }),
+    udpPacketIndexStream: fs.createWriteStream(path.join(folderPath, 'raw', 'udp_packets.ndjson'), { flags: 'a' }),
+    udpPacketBinStream: fs.createWriteStream(path.join(folderPath, 'raw', 'udp_packets.bin'), { flags: 'a' })
+  };
+  return backendRecordingSnapshot();
+}
+
+function closeWriteStream(stream) {
+  return new Promise((resolve) => {
+    if (!stream) {
+      resolve();
+      return;
+    }
+    stream.end(resolve);
+  });
+}
+
+async function stopBackendRecording() {
+  if (!backendRecording) throw new Error('recording is not active');
+  const recording = backendRecording;
+  backendRecording = null;
+  const finishedAtMs = Date.now();
+  await Promise.all([
+    closeWriteStream(recording.tcpStream),
+    closeWriteStream(recording.udpStream),
+    closeWriteStream(recording.udpPacketIndexStream),
+    closeWriteStream(recording.udpPacketBinStream)
+  ]);
+
+  const sortedSourceFrames = {};
+  for (const [mode, frames] of Object.entries(recording.sourceFrames)) {
+    sortedSourceFrames[mode] = frames.slice().sort((a, b) => (
+      (Number(a.client_ts_ms) || 0) - (Number(b.client_ts_ms) || 0)
+    ));
+  }
+  const sortedStatuses = recording.statuses.slice().sort((a, b) => (
+    (Number(a.client_ts_ms) || 0) - (Number(b.client_ts_ms) || 0)
+  ));
+  const statusPayload = {
+    recorded_at_ms: recording.startedAtMs,
+    duration_ms: finishedAtMs - recording.startedAtMs,
+    frame_count: sortedStatuses.length,
+    statuses: sortedStatuses,
+    session_meta: {
+      recording_kind: 'backend_raw_capture',
+      recorded_views: [
+        { key: 'gray', title: 'Gray source' },
+        { key: 'binary', title: 'Binary source' },
+        { key: 'rgb', title: 'RGB source' },
+        { key: 'roi64', title: 'ROI64 source' }
+      ],
+      raw_files: {
+        tcp_status: 'raw/tcp_status.ndjson',
+        udp_frames: 'raw/udp_frames.ndjson',
+        udp_packets_index: 'raw/udp_packets.ndjson',
+        udp_packets_bin: 'raw/udp_packets.bin'
+      }
+    }
+  };
+  const meta = {
+    folder: recording.folder,
+    saved_at_ms: finishedAtMs,
+    recorded_at_ms: recording.startedAtMs,
+    duration_ms: finishedAtMs - recording.startedAtMs,
+    frame_count: sortedStatuses.length,
+    session_meta: statusPayload.session_meta,
+    source_frames: sortedSourceFrames,
+    raw_files: statusPayload.session_meta.raw_files,
+    udp_frame_count: recording.udpFrameCount,
+    udp_wire_bytes: recording.udpWireBytes,
+    udp_packet_bytes: recording.udpPacketBytes
+  };
+  fs.writeFileSync(path.join(recording.folderPath, 'status.json'), JSON.stringify(statusPayload, null, 2), 'utf8');
+  fs.writeFileSync(path.join(recording.folderPath, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
+  return { ok: true, folder: recording.folder, meta };
+}
+
+function recordTcpStatusLine(line, status, remoteAddress) {
+  const recording = backendRecording;
+  if (!recording) return;
+  const nowMs = Date.now();
+  const item = {
+    client_ts_ms: nowMs,
+    remote: remoteAddress || '',
+    line,
+    status
+  };
+  recording.statuses.push({ client_ts_ms: nowMs, status });
+  recording.tcpStream.write(`${JSON.stringify(item)}\n`);
+}
+
+function recordUdpPacket(msg, hdr, rinfo) {
+  const recording = backendRecording;
+  if (!recording) return;
+  const offset = recording.udpPacketBytes;
+  recording.udpPacketBytes += msg.length;
+  recording.udpPacketBinStream.write(msg);
+  recording.udpPacketIndexStream.write(`${JSON.stringify({
+    client_ts_ms: Date.now(),
+    offset,
+    bytes: msg.length,
+    remote_address: rinfo && rinfo.address ? rinfo.address : '',
+    remote_port: rinfo && Number.isFinite(rinfo.port) ? rinfo.port : 0,
+    header: hdr ? {
+      magic: hdr.magic,
+      frame_id: hdr.frameId >>> 0,
+      chunk_idx: hdr.chunkIdx,
+      chunk_total: hdr.chunkTotal,
+      payload_len: hdr.payloadLen,
+      width: hdr.width,
+      height: hdr.height,
+      mode: hdr.mode,
+      format: sanitizeImageFormat(hdr.format)
+    } : null
+  })}\n`);
+}
+
+function recordUdpFrame(hdr, image, wireBytes, accepted) {
+  const recording = backendRecording;
+  if (!recording) return;
+  const mode = modeName(hdr.mode);
+  if (!recording.sourceFrames[mode]) return;
+  const nowMs = Date.now();
+  const mime = contentTypeByImageFormat(sanitizeImageFormat(hdr.format));
+  const ext = imageExtByMime(mime);
+  const seq = String(recording.sourceFrames[mode].length).padStart(6, '0');
+  const file = `source_frames/${mode}/${seq}${ext}`;
+  fs.writeFileSync(path.join(recording.folderPath, file), image);
+  const frameMeta = {
+    file,
+    mode,
+    mime,
+    client_ts_ms: nowMs,
+    frame_id: hdr.frameId >>> 0,
+    width: hdr.width,
+    height: hdr.height
+  };
+  recording.sourceFrames[mode].push(frameMeta);
+  recording.udpFrameCount += 1;
+  recording.udpWireBytes += wireBytes;
+  recording.udpStream.write(`${JSON.stringify(Object.assign({}, frameMeta, {
+    accepted: !!accepted,
+    format: sanitizeImageFormat(hdr.format),
+    chunk_total: hdr.chunkTotal,
+    wire_bytes: wireBytes
+  }))}\n`);
+}
+
 function parseHeader(buf) {
   if (buf.length < HEADER_SIZE) return null;
   const magic = buf.readUInt32BE(0);
@@ -717,9 +1081,10 @@ function shouldAcceptFrame(mode, frameId, nowMs) {
   return false;
 }
 
-function onUdpMessage(msg) {
+function onUdpMessage(msg, rinfo) {
   udpByteEvents.push({ ts: Date.now(), bytes: msg.length });
   const hdr = parseHeader(msg);
+  recordUdpPacket(msg, hdr, rinfo);
   if (!hdr) return;
   if (hdr.magic !== MAGIC) return;
   if (!(hdr.mode in latestByMode)) return;
@@ -755,8 +1120,10 @@ function onUdpMessage(msg) {
     }
     const image = Buffer.concat(ordered);
     const nowMs = Date.now();
-    if (shouldAcceptFrame(hdr.mode, hdr.frameId, nowMs)) {
-      const wireBytes = ordered.reduce((sum, chunk) => sum + chunk.length, 0) + (entry.chunkTotal * HEADER_SIZE);
+    const wireBytes = ordered.reduce((sum, chunk) => sum + chunk.length, 0) + (entry.chunkTotal * HEADER_SIZE);
+    const accepted = shouldAcceptFrame(hdr.mode, hdr.frameId, nowMs);
+    recordUdpFrame(hdr, image, wireBytes, accepted);
+    if (accepted) {
       latestByMode[hdr.mode] = {
         image,
         frameId: hdr.frameId >>> 0,
@@ -880,6 +1247,7 @@ function startTcpReceiver() {
         if (line) {
           try {
             latestStatus = JSON.parse(line);
+            recordTcpStatusLine(line, latestStatus, socket.remoteAddress);
             broadcastWs('status', latestStatus);
           } catch (_) {
             // ignore malformed lines
@@ -952,6 +1320,10 @@ function startHttpServer() {
       serveFile(res, path.join(PUBLIC_DIR, 'config_app.js'), 'application/javascript; charset=utf-8');
       return;
     }
+    if (pathname === '/project_control.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'project_control.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
     if (pathname === '/receiver_frame_source.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'receiver_frame_source.js'), 'application/javascript; charset=utf-8');
       return;
@@ -1018,6 +1390,86 @@ function startHttpServer() {
       buildConfigStatusPayload()
         .then((result) => sendJson(res, 200, result))
         .catch((err) => sendJson(res, 500, { ok: false, message: String(err && err.message ? err.message : err) }));
+      return;
+    }
+
+    if (pathname === '/api/project/status') {
+      getProjectStatus().then((result) => {
+        sendJson(res, 200, result);
+      }).catch((err) => {
+        const message = String(err && err.message ? err.message : err);
+        projectControlState = {
+          last_action: 'status',
+          last_message: '',
+          last_error: message,
+          last_updated_at_ms: Date.now()
+        };
+        let target = null;
+        try {
+          target = buildProjectTarget();
+        } catch (_) {
+          // target details are best effort for status errors
+        }
+        sendJson(res, 200, {
+          ok: false,
+          running: false,
+          pid: null,
+          message,
+          target,
+          last_action: projectControlState.last_action,
+          last_message: projectControlState.last_message,
+          last_error: projectControlState.last_error,
+          last_updated_at_ms: projectControlState.last_updated_at_ms
+        });
+      });
+      return;
+    }
+
+    if (pathname === '/api/project/start' && req.method === 'POST') {
+      startProject().then((result) => {
+        sendJson(res, 200, result);
+      }).catch((err) => {
+        const message = String(err && err.message ? err.message : err);
+        projectControlState = {
+          last_action: 'start',
+          last_message: '',
+          last_error: message,
+          last_updated_at_ms: Date.now()
+        };
+        sendJson(res, 502, {
+          ok: false,
+          running: false,
+          pid: null,
+          message,
+          target: (() => {
+            try { return buildProjectTarget(); } catch (_) { return null; }
+          })()
+        });
+      });
+      return;
+    }
+
+    if (pathname === '/api/project/stop' && req.method === 'POST') {
+      stopProject().then((result) => {
+        sendJson(res, 200, result);
+      }).catch((err) => {
+        const message = String(err && err.message ? err.message : err);
+        projectControlState = {
+          last_action: 'stop',
+          last_message: '',
+          last_error: message,
+          last_updated_at_ms: Date.now()
+        };
+        sendJson(res, 502, {
+          ok: false,
+          running: false,
+          pid: null,
+          message,
+          target: (() => {
+            try { return buildProjectTarget(); } catch (_) { return null; }
+          })()
+        });
+      });
       return;
     }
 
@@ -1218,6 +1670,30 @@ function startHttpServer() {
       return;
     }
 
+    if (pathname === '/api/recordings/backend/status') {
+      sendJson(res, 200, Object.assign({ ok: true }, backendRecordingSnapshot()));
+      return;
+    }
+
+    if (pathname === '/api/recordings/backend/start' && req.method === 'POST') {
+      readJsonBody(req, 64 * 1024).then((payload) => {
+        const snapshot = startBackendRecording(payload && payload.folder ? payload.folder : '');
+        sendJson(res, 200, Object.assign({ ok: true }, snapshot));
+      }).catch((err) => {
+        sendJson(res, 400, { ok: false, error: String(err && err.message ? err.message : err) });
+      });
+      return;
+    }
+
+    if (pathname === '/api/recordings/backend/stop' && req.method === 'POST') {
+      stopBackendRecording().then((result) => {
+        sendJson(res, 200, result);
+      }).catch((err) => {
+        sendJson(res, 400, { ok: false, error: String(err && err.message ? err.message : err) });
+      });
+      return;
+    }
+
     if (pathname === '/api/recordings/save' && req.method === 'POST') {
       readJsonBody(req).then((payload) => {
         const folderHint = sanitizeFolderName(payload.folder || '');
@@ -1313,7 +1789,13 @@ function startHttpServer() {
         && nameParts[0] === 'source_frames'
         && !!normalizeSourceMode(nameParts[1])
         && isSafeRecordingFileName(nameParts[2]);
-      if (!isTopLevelFile && !isSourceFrameFile) {
+      const isRawFile = nameParts.length === 2
+        && nameParts[0] === 'raw'
+        && (nameParts[1] === 'tcp_status.ndjson'
+          || nameParts[1] === 'udp_frames.ndjson'
+          || nameParts[1] === 'udp_packets.ndjson'
+          || nameParts[1] === 'udp_packets.bin');
+      if (!isTopLevelFile && !isSourceFrameFile && !isRawFile) {
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('bad file name');
         return;
