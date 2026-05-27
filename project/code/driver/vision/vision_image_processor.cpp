@@ -450,6 +450,15 @@ static void clear_cross_aux_cache();
 static cross_lower_corner_detection_t detect_cross_lower_corner_from_dirs(const maze_point_t *pts, const uint8 *dirs, int count);
 static void update_cross_lower_corner_detection_cache(const maze_point_t *left_pts, const uint8 *left_dirs, int left_count,
                                                       const maze_point_t *right_pts, const uint8 *right_dirs, int right_count);
+static void update_cross_upper_corner_detection_cache(PixelClassifier &classifier,
+                                                       bool left_wall_is_white,
+                                                       bool right_wall_is_white,
+                                                       const maze_point_t *left_trace_pts,
+                                                       int left_trace_count,
+                                                       const maze_point_t *right_trace_pts,
+                                                       int right_trace_count,
+                                                       int maze_x_min,
+                                                       int maze_x_max);
 static void update_src_trace_frame_wall_cache(const maze_point_t *left_trace_pts,
                                               int left_trace_num,
                                               const maze_point_t *right_trace_pts,
@@ -494,6 +503,11 @@ static bool find_fitted_white_to_black_transition(PixelClassifier &classifier,
                                                   int max_scan_rows,
                                                   int *transition_x,
                                                   int *transition_y);
+static bool find_cross_upper_corner_from_aux_trace(const maze_point_t *trace_pts,
+                                                   const uint8 *trace_dirs,
+                                                   int trace_count,
+                                                   maze_point_t *corner_point,
+                                                   int *corner_index);
 static void save_cross_aux_trace_cache(bool is_left, const maze_point_t *pts, const uint8 *dirs, int count);
 static void save_cross_aux_regular_cache(bool is_left, const maze_point_t *pts, int count);
 static bool build_cross_aux_boundary_from_transition(PixelClassifier &classifier,
@@ -2311,6 +2325,199 @@ static void update_cross_lower_corner_detection_cache(const maze_point_t *left_p
     g_cross_lower_right_corner_y.store(right.point.y);
 }
 
+static void update_cross_upper_corner_detection_cache(PixelClassifier &classifier,
+                                                       bool left_wall_is_white,
+                                                       bool right_wall_is_white,
+                                                       const maze_point_t *left_trace_pts,
+                                                       int left_trace_count,
+                                                       const maze_point_t *right_trace_pts,
+                                                       int right_trace_count,
+                                                       int maze_x_min,
+                                                       int maze_x_max)
+{
+    const int x_offset = std::max(1, g_vision_runtime_config.cross_aux_history_x_offset);
+
+    auto process_side = [&](bool is_left,
+                             bool wall_is_white,
+                             const maze_point_t *trace_pts,
+                             int trace_count) -> void
+    {
+        const bool lower_found = is_left ? g_cross_lower_left_corner_found.load()
+                                         : g_cross_lower_right_corner_found.load();
+        const int lower_x = is_left ? g_cross_lower_left_corner_x.load()
+                                    : g_cross_lower_right_corner_x.load();
+        const int lower_y = is_left ? g_cross_lower_left_corner_y.load()
+                                    : g_cross_lower_right_corner_y.load();
+        const int lower_index = is_left ? g_cross_lower_left_corner_index.load()
+                                        : g_cross_lower_right_corner_index.load();
+
+        std::array<maze_point_t, VISION_BOUNDARY_NUM> aux_trace_pts{};
+        std::array<uint8, VISION_BOUNDARY_NUM> aux_trace_dirs{};
+        std::array<maze_point_t, VISION_BOUNDARY_NUM> aux_regular_pts{};
+        int aux_trace_num = 0;
+        int aux_regular_num = 0;
+        maze_point_t aux_transition{0, 0};
+
+        bool upper_found = false;
+        maze_point_t upper_corner{0, 0};
+        int upper_trace_index = -1;
+
+        // ---- 路径 1: 尝试用历史点重捕获 ----
+        const bool history_valid = is_left ? g_cross_left_aux_last_transition_valid.load()
+                                           : g_cross_right_aux_last_transition_valid.load();
+        if (history_valid)
+        {
+            int hist_x = is_left ? g_cross_left_aux_last_transition_x.load()
+                                 : g_cross_right_aux_last_transition_x.load();
+            const int hist_y = is_left ? g_cross_left_aux_last_transition_y.load()
+                                       : g_cross_right_aux_last_transition_y.load();
+
+            // x 偏移约束：历史点须离上一帧上角点至少 offset 像素（左: hist_x < upper_x - offset，右: hist_x > upper_x + offset）
+            const int prev_upper_x = is_left ? g_cross_left_upper_corner_x.load()
+                                             : g_cross_right_upper_corner_x.load();
+            if (is_left && hist_x >= prev_upper_x - x_offset)
+            {
+                hist_x = prev_upper_x - x_offset;
+            }
+            else if (!is_left && hist_x <= prev_upper_x + x_offset)
+            {
+                hist_x = prev_upper_x + x_offset;
+            }
+
+            maze_point_t reacquired{0, 0};
+            if (find_local_black_to_white_transition(classifier,
+                                                     hist_x,
+                                                     hist_y,
+                                                     g_vision_runtime_config.cross_aux_reacquire_up_px,
+                                                     g_vision_runtime_config.cross_aux_reacquire_down_px,
+                                                     &reacquired.x,
+                                                     &reacquired.y) &&
+                build_cross_aux_boundary_from_transition(classifier,
+                                                         wall_is_white,
+                                                         is_left,
+                                                         reacquired,
+                                                         maze_x_min,
+                                                         maze_x_max,
+                                                         aux_trace_pts.data(),
+                                                         aux_trace_dirs.data(),
+                                                         &aux_trace_num,
+                                                         aux_regular_pts.data(),
+                                                         &aux_regular_num,
+                                                         &aux_transition))
+            {
+                if (find_cross_upper_corner_from_aux_trace(aux_trace_pts.data(),
+                                                           aux_trace_dirs.data(),
+                                                           aux_trace_num,
+                                                           &upper_corner,
+                                                           &upper_trace_index))
+                {
+                    upper_found = true;
+                }
+                else
+                {
+                    // 找到辅助边界但没找到上角点 -> 废弃历史点
+                    if (is_left)
+                    {
+                        g_cross_left_aux_last_transition_valid.store(false);
+                    }
+                    else
+                    {
+                        g_cross_right_aux_last_transition_valid.store(false);
+                    }
+                }
+            }
+        }
+
+        // ---- 路径 2: 从下角点出发重建辅助边界（兜底） ----
+        if (!upper_found && lower_found)
+        {
+            if (build_cross_aux_boundary(classifier,
+                                         wall_is_white,
+                                         is_left,
+                                         lower_x,
+                                         lower_y,
+                                         trace_pts,
+                                         trace_count,
+                                         lower_index,
+                                         maze_x_min,
+                                         maze_x_max,
+                                         aux_trace_pts.data(),
+                                         aux_trace_dirs.data(),
+                                         &aux_trace_num,
+                                         aux_regular_pts.data(),
+                                         &aux_regular_num,
+                                         &aux_transition))
+            {
+                if (find_cross_upper_corner_from_aux_trace(aux_trace_pts.data(),
+                                                           aux_trace_dirs.data(),
+                                                           aux_trace_num,
+                                                           &upper_corner,
+                                                           &upper_trace_index))
+                {
+                    upper_found = true;
+                }
+            }
+        }
+
+        // ---- 写入全局状态 ----
+        if (is_left)
+        {
+            g_cross_left_aux_found.store(upper_found);
+            g_cross_left_upper_corner_found.store(upper_found);
+            if (upper_found)
+            {
+                g_cross_left_aux_transition_x.store(aux_transition.x);
+                g_cross_left_aux_transition_y.store(aux_transition.y);
+                g_cross_left_aux_last_transition_valid.store(true);
+                g_cross_left_aux_last_transition_x.store(aux_transition.x);
+                g_cross_left_aux_last_transition_y.store(aux_transition.y);
+                g_cross_left_upper_corner_index.store(upper_trace_index);
+                g_cross_left_upper_corner_x.store(upper_corner.x);
+                g_cross_left_upper_corner_y.store(upper_corner.y);
+                save_cross_aux_trace_cache(true,
+                                           aux_trace_pts.data(),
+                                           aux_trace_dirs.data(),
+                                           aux_trace_num);
+                save_cross_aux_regular_cache(true,
+                                             aux_regular_pts.data(),
+                                             aux_regular_num);
+            }
+        }
+        else
+        {
+            g_cross_right_aux_found.store(upper_found);
+            g_cross_right_upper_corner_found.store(upper_found);
+            if (upper_found)
+            {
+                g_cross_right_aux_transition_x.store(aux_transition.x);
+                g_cross_right_aux_transition_y.store(aux_transition.y);
+                g_cross_right_aux_last_transition_valid.store(true);
+                g_cross_right_aux_last_transition_x.store(aux_transition.x);
+                g_cross_right_aux_last_transition_y.store(aux_transition.y);
+                g_cross_right_upper_corner_index.store(upper_trace_index);
+                g_cross_right_upper_corner_x.store(upper_corner.x);
+                g_cross_right_upper_corner_y.store(upper_corner.y);
+                save_cross_aux_trace_cache(false,
+                                           aux_trace_pts.data(),
+                                           aux_trace_dirs.data(),
+                                           aux_trace_num);
+                save_cross_aux_regular_cache(false,
+                                             aux_regular_pts.data(),
+                                             aux_regular_num);
+            }
+        }
+    };
+
+    process_side(true,
+                 left_wall_is_white,
+                 left_trace_pts,
+                 left_trace_count);
+    process_side(false,
+                 right_wall_is_white,
+                 right_trace_pts,
+                 right_trace_count);
+}
+
 static bool init_undistort_remap_table()
 {
     if (g_undistort_ready)
@@ -3851,9 +4058,11 @@ static bool find_cross_upper_corner_from_aux_trace(const maze_point_t *trace_pts
         return false;
     }
 
-    for (int i = 0; i + post_check_count < trace_count; ++i)
+    for (int i = 2; i + post_check_count < trace_count; ++i)
     {
         if (trace_dirs[i] != 5) continue;
+
+        if (trace_dirs[i - 2] <= 5 || trace_dirs[i - 1] <= 5) continue;
 
         bool post_dirs_ok = true;
         for (int k = 1; k <= post_check_count; ++k)
@@ -4906,6 +5115,15 @@ bool vision_image_processor_process_step()
                                                   right_trace_pts.data(),
                                                   right_trace_dirs.data(),
                                                   right_corner_trace_num);
+        update_cross_upper_corner_detection_cache(classifier,
+                                                   left_wall_is_white,
+                                                   right_wall_is_white,
+                                                   left_trace_pts.data(),
+                                                   left_corner_trace_num,
+                                                   right_trace_pts.data(),
+                                                   right_corner_trace_num,
+                                                   maze_trace_x_min,
+                                                   maze_trace_x_max);
         update_src_trace_frame_wall_cache(left_trace_pts.data(),
                                           left_corner_trace_num,
                                           right_trace_pts.data(),

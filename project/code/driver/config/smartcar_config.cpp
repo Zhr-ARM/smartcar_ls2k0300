@@ -1179,6 +1179,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_INT(cross_aux_fit_prev_points);
     REQUIRE_RUNTIME_FLOAT(cross_aux_fit_slope_bias);
     REQUIRE_RUNTIME_INT(cross_upper_dir5_post_check_count);
+    REQUIRE_RUNTIME_INT(cross_aux_history_x_offset);
     REQUIRE_RUNTIME_INT(ipm_line_error_source);
     REQUIRE_RUNTIME_INT(ipm_line_error_method);
 

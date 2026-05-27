@@ -361,6 +361,8 @@ typedef struct
     float cross_aux_fit_slope_bias;
     // 十字上角点识别：命中 dir=5 后，后续需连续多少个点满足 dir<=5。
     int cross_upper_dir5_post_check_count;
+    // 十字辅助边界历史点：历史过渡点 x 与同侧上角点 x 之间的最小偏移像素数（左: hist_x < upper_x - offset，右: hist_x > upper_x + offset）。
+    int cross_aux_history_x_offset;
 
     // ==================== 参数区域 2: 偏差计算 ====================
     // 包括 line_error 取点策略与索引范围约束参数。

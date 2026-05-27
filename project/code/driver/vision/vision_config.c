@@ -421,6 +421,8 @@ vision_runtime_config_t g_vision_runtime_config = {
     .cross_aux_fit_slope_bias = 0.15f,
     // 十字上角点：dir=5 后连续 5 个 dir<=5 才算命中。
     .cross_upper_dir5_post_check_count = 5,
+    // 十字辅助边界：历史点须离上角点至少 5 像素。
+    .cross_aux_history_x_offset = 5,
     // ==================== 参数区域 2: 偏差计算 ====================
     // 说明：line_error 取点参数集中在这里。
     // line_error 平移中线偏好源：0=偏好左，1=偏好右，2=无偏好(自动按边界点数)。

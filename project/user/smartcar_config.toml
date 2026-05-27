@@ -201,13 +201,15 @@ cross_aux_trace_upward_rows_max = 30
 # 十字辅助边界重捕获：以上次辅助起点为中心向上搜索的像素数。
 cross_aux_reacquire_up_px = 2
 # 十字辅助边界重捕获：以上次辅助起点为中心向下搜索的像素数。
-cross_aux_reacquire_down_px = 10
+cross_aux_reacquire_down_px = 5
 # 十字辅助边界拟合扫描：参与局部拟合的下角点前置 trace 点数。
 cross_aux_fit_prev_points = 3
 # 十字辅助边界拟合扫描：左侧斜率减、右侧斜率加的外侧偏置量。
-cross_aux_fit_slope_bias = 0.9
+cross_aux_fit_slope_bias = 0.5
 # 十字上角点：命中 dir=5 后，后续需连续多少个点满足 dir<=5。
 cross_upper_dir5_post_check_count = 3
+# 十字辅助边界：历史过渡点与下角点的最小 x 偏移像素数。
+cross_aux_history_x_offset = 3
 # line_error 偏好使用的中线来源。
 # 0=左平移，1=右平移，2=自动。
 ipm_line_error_source = 2
