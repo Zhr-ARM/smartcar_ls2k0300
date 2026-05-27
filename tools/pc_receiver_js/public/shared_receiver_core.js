@@ -980,9 +980,12 @@
     push('cross_lower_corner_pre_min_votes', status.cross_lower_corner_pre_min_votes);
     push('cross_lower_corner_post_min_votes', status.cross_lower_corner_post_min_votes);
     push('cross_lower_corner_transition_max_len', status.cross_lower_corner_transition_max_len);
-    push('cross_lower_corner_transition_max_dir3_count', status.cross_lower_corner_transition_max_dir3_count);
-    push('cross_lower_corner_post_max_dir3_count', status.cross_lower_corner_post_max_dir3_count);
     push('cross_lower_corner_pair_y_diff_max', status.cross_lower_corner_pair_y_diff_max);
+    push('cross_aux_reacquire_up_px', status.cross_aux_reacquire_up_px);
+    push('cross_aux_reacquire_down_px', status.cross_aux_reacquire_down_px);
+    push('cross_aux_fit_prev_points', status.cross_aux_fit_prev_points);
+    push('cross_aux_fit_slope_bias', status.cross_aux_fit_slope_bias);
+    push('cross_upper_dir5_post_check_count', status.cross_upper_dir5_post_check_count);
     if (Array.isArray(status.gray_size)) push('gray_size', formatArrayInline(status.gray_size));
     if (Array.isArray(status.ipm_size)) push('ipm_size', formatArrayInline(status.ipm_size));
     pushCount('left_boundary_count', status.left_boundary);

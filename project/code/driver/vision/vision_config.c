@@ -406,18 +406,21 @@ vision_runtime_config_t g_vision_runtime_config = {
     .route_straight_enter_consecutive_frames = 2,
     // straight 判定：前 N 个点绝对误差和必须小于该值。
     .route_straight_abs_error_sum_max = 20.0f,
-    // cross_1：沿角点同 x 向上找白->黑转变，最多 75 行。
+    // 十字辅助边界：沿同侧下角点同 x 向上找白->黑转变，最多 75 行。
     .cross_aux_vertical_scan_max_rows = 75,
-    // cross_1：辅助边界八邻域最多保存 80 个点。
+    // 十字辅助边界八邻域最多保存 50 个点。
     .cross_aux_trace_max_points = 50,
-    // cross_1：辅助边界最多向上延伸 30 行。
+    // 十字辅助边界最多向上延伸 30 行。
     .cross_aux_trace_upward_rows_max = 30,
-    // cross_2：4->6 跳变前平台要求 3 个连续 dir=4。
-    .cross_upper_dir4_pre_run_len = 3,
-    // cross_2：允许最多 3 个过渡点，值可以落在 4/5/6。
-    .cross_upper_transition_max_len = 3,
-    // cross_2：4->6 跳变后平台要求 3 个连续 dir=6。
-    .cross_upper_dir6_post_run_len = 3,
+    // 十字辅助边界重捕获：上次辅助起点向上 2px、向下 10px 的局部窗口。
+    .cross_aux_reacquire_up_px = 2,
+    .cross_aux_reacquire_down_px = 10,
+    // 十字辅助边界拟合扫描：下角点前 3 个 trace 点参与拟合。
+    .cross_aux_fit_prev_points = 3,
+    // 十字辅助边界拟合扫描：左侧向左、右侧向右的斜率偏置。
+    .cross_aux_fit_slope_bias = 0.15f,
+    // 十字上角点：dir=5 后连续 5 个 dir<=5 才算命中。
+    .cross_upper_dir5_post_check_count = 5,
     // ==================== 参数区域 2: 偏差计算 ====================
     // 说明：line_error 取点参数集中在这里。
     // line_error 平移中线偏好源：0=偏好左，1=偏好右，2=无偏好(自动按边界点数)。

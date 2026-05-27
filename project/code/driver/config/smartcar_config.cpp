@@ -1174,13 +1174,23 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_INT(cross_aux_vertical_scan_max_rows);
     REQUIRE_RUNTIME_INT(cross_aux_trace_max_points);
     REQUIRE_RUNTIME_INT(cross_aux_trace_upward_rows_max);
-    REQUIRE_RUNTIME_INT(cross_upper_dir4_pre_run_len);
-    REQUIRE_RUNTIME_INT(cross_upper_transition_max_len);
-    REQUIRE_RUNTIME_INT(cross_upper_dir6_post_run_len);
+    REQUIRE_RUNTIME_INT(cross_aux_reacquire_up_px);
+    REQUIRE_RUNTIME_INT(cross_aux_reacquire_down_px);
+    REQUIRE_RUNTIME_INT(cross_aux_fit_prev_points);
+    REQUIRE_RUNTIME_FLOAT(cross_aux_fit_slope_bias);
+    REQUIRE_RUNTIME_INT(cross_upper_dir5_post_check_count);
     REQUIRE_RUNTIME_INT(ipm_line_error_source);
     REQUIRE_RUNTIME_INT(ipm_line_error_method);
 
     // 兼容旧版本配置：以下键已弃用，若存在则仅消费避免触发 unknown-keys。
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_dir4_pre_run_len");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_transition_max_len");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_dir6_post_run_len");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_corner_pre_window");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_corner_post_window");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_corner_pre_min_votes");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_corner_post_min_votes");
+    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_corner_transition_max_len");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_fixed_index");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_weighted_point_count");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_point_indices");

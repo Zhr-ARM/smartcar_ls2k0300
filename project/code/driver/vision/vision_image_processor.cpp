@@ -121,6 +121,16 @@ static std::atomic<int> g_cross_left_aux_transition_x(0);
 static std::atomic<int> g_cross_left_aux_transition_y(0);
 static std::atomic<int> g_cross_right_aux_transition_x(0);
 static std::atomic<int> g_cross_right_aux_transition_y(0);
+static std::atomic<bool> g_cross_left_aux_last_transition_valid(false);
+static std::atomic<bool> g_cross_right_aux_last_transition_valid(false);
+static std::atomic<int> g_cross_left_aux_last_transition_x(0);
+static std::atomic<int> g_cross_left_aux_last_transition_y(0);
+static std::atomic<int> g_cross_right_aux_last_transition_x(0);
+static std::atomic<int> g_cross_right_aux_last_transition_y(0);
+static std::atomic<bool> g_cross_left_aux_last_slope_valid(false);
+static std::atomic<bool> g_cross_right_aux_last_slope_valid(false);
+static std::atomic<float> g_cross_left_aux_last_slope(0.0f);
+static std::atomic<float> g_cross_right_aux_last_slope(0.0f);
 static uint16 g_cross_left_aux_trace_x[VISION_BOUNDARY_NUM];
 static uint16 g_cross_left_aux_trace_y[VISION_BOUNDARY_NUM];
 static uint8 g_cross_left_aux_trace_dir[VISION_BOUNDARY_NUM];
@@ -460,13 +470,52 @@ static bool find_vertical_white_to_black_transition(PixelClassifier &classifier,
                                                     int max_scan_rows,
                                                     int *transition_x,
                                                     int *transition_y);
+static bool find_local_black_to_white_transition(PixelClassifier &classifier,
+                                                 int x,
+                                                 int center_y,
+                                                 int up_px,
+                                                 int down_px,
+                                                 int *transition_x,
+                                                 int *transition_y);
+static bool find_sloped_white_to_black_transition(PixelClassifier &classifier,
+                                                  int start_x,
+                                                  int start_y,
+                                                  double slope,
+                                                  int max_scan_rows,
+                                                  int *transition_x,
+                                                  int *transition_y);
+static bool find_fitted_white_to_black_transition(PixelClassifier &classifier,
+                                                  bool is_left,
+                                                  int start_x,
+                                                  int start_y,
+                                                  const maze_point_t *trace_pts,
+                                                  int trace_count,
+                                                  int corner_index,
+                                                  int max_scan_rows,
+                                                  int *transition_x,
+                                                  int *transition_y);
 static void save_cross_aux_trace_cache(bool is_left, const maze_point_t *pts, const uint8 *dirs, int count);
 static void save_cross_aux_regular_cache(bool is_left, const maze_point_t *pts, int count);
+static bool build_cross_aux_boundary_from_transition(PixelClassifier &classifier,
+                                                     bool wall_is_white,
+                                                     bool is_left,
+                                                     const maze_point_t &found_transition,
+                                                     int x_min,
+                                                     int x_max,
+                                                     maze_point_t *raw_pts,
+                                                     uint8 *raw_dirs,
+                                                     int *raw_count,
+                                                     maze_point_t *regular_pts,
+                                                     int *regular_count,
+                                                     maze_point_t *transition_point);
 static bool build_cross_aux_boundary(PixelClassifier &classifier,
                                      bool wall_is_white,
                                      bool is_left,
-                                     int corner_x,
-                                     int corner_y,
+                                     int scan_start_x,
+                                     int scan_start_y,
+                                     const maze_point_t *fit_trace_pts,
+                                     int fit_trace_count,
+                                     int fit_corner_index,
                                      int x_min,
                                      int x_max,
                                      maze_point_t *raw_pts,
@@ -475,13 +524,6 @@ static bool build_cross_aux_boundary(PixelClassifier &classifier,
                                      maze_point_t *regular_pts,
                                      int *regular_count,
                                      maze_point_t *transition_point);
-static bool find_nth_or_last_dir_point_on_trace(const maze_point_t *trace_pts,
-                                                const uint8 *trace_dirs,
-                                                int trace_count,
-                                                uint8 target_dir,
-                                                int nth_match,
-                                                maze_point_t *corner_point,
-                                                int *corner_index);
 static int truncate_regular_boundary_before_point_inplace(maze_point_t *pts,
                                                           int count,
                                                           const maze_point_t &corner_point);
@@ -1251,6 +1293,155 @@ static bool find_vertical_white_to_black_transition(PixelClassifier &classifier,
     }
 
     return false;
+}
+
+static bool find_local_black_to_white_transition(PixelClassifier &classifier,
+                                                 int x,
+                                                 int center_y,
+                                                 int up_px,
+                                                 int down_px,
+                                                 int *transition_x,
+                                                 int *transition_y)
+{
+    if (classifier.gray == nullptr)
+    {
+        return false;
+    }
+
+    const int clamped_x = std::clamp(x, 1, kProcWidth - 2);
+    const int y_start = std::clamp(center_y - std::max(0, up_px), 1, kProcHeight - 2);
+    const int y_end = std::clamp(center_y + std::max(0, down_px), 1, kProcHeight - 2);
+    if (y_end <= y_start)
+    {
+        return false;
+    }
+
+    bool prev_is_black = !classifier.is_white(clamped_x, y_start);
+    for (int y = y_start + 1; y <= y_end; ++y)
+    {
+        const bool curr_is_white = classifier.is_white(clamped_x, y);
+        if (prev_is_black && curr_is_white)
+        {
+            if (transition_x) *transition_x = clamped_x;
+            if (transition_y) *transition_y = y;
+            return true;
+        }
+        prev_is_black = !curr_is_white;
+    }
+
+    return false;
+}
+
+static bool find_sloped_white_to_black_transition(PixelClassifier &classifier,
+                                                  int start_x,
+                                                  int start_y,
+                                                  double slope,
+                                                  int max_scan_rows,
+                                                  int *transition_x,
+                                                  int *transition_y)
+{
+    if (classifier.gray == nullptr || !std::isfinite(slope))
+    {
+        return false;
+    }
+
+    const int begin_x = std::clamp(start_x, 1, kProcWidth - 2);
+    const int begin_y = std::clamp(start_y, 1, kProcHeight - 2);
+    const int scan_rows = std::max(1, max_scan_rows);
+    bool prev_is_white = classifier.is_white(begin_x, begin_y);
+
+    for (int step = 1; step <= scan_rows; ++step)
+    {
+        const int y = begin_y - step;
+        if (y <= 0)
+        {
+            break;
+        }
+        const int x = static_cast<int>(std::lround(static_cast<double>(begin_x) + slope * step));
+        if (x <= 0 || x >= kProcWidth - 1)
+        {
+            break;
+        }
+
+        const bool curr_is_white = classifier.is_white(x, y);
+        if (prev_is_white && !curr_is_white)
+        {
+            if (transition_x) *transition_x = x;
+            if (transition_y) *transition_y = y;
+            return true;
+        }
+        prev_is_white = curr_is_white;
+    }
+
+    return false;
+}
+
+static bool find_fitted_white_to_black_transition(PixelClassifier &classifier,
+                                                  bool is_left,
+                                                  int start_x,
+                                                  int start_y,
+                                                  const maze_point_t *trace_pts,
+                                                  int trace_count,
+                                                  int corner_index,
+                                                  int max_scan_rows,
+                                                  int *transition_x,
+                                                  int *transition_y)
+{
+    if (classifier.gray == nullptr || trace_pts == nullptr || trace_count <= 0)
+    {
+        return false;
+    }
+
+    const int prev_points = std::clamp(g_vision_runtime_config.cross_aux_fit_prev_points, 1, VISION_BOUNDARY_NUM - 1);
+    if (corner_index < prev_points || corner_index >= trace_count)
+    {
+        return false;
+    }
+
+    double sum_up_dx = 0.0;
+    double sum_up2 = 0.0;
+    for (int k = 1; k <= prev_points; ++k)
+    {
+        const maze_point_t &pt = trace_pts[corner_index - k];
+        const double up = static_cast<double>(start_y - pt.y);
+        const double dx = static_cast<double>(pt.x - start_x);
+        if (std::fabs(up) < 1e-6)
+        {
+            continue;
+        }
+        sum_up_dx += up * dx;
+        sum_up2 += up * up;
+    }
+    if (sum_up2 <= 1e-6)
+    {
+        return false;
+    }
+
+    const double fitted_slope = sum_up_dx / sum_up2;
+    const double bias = std::max(0.0f, g_vision_runtime_config.cross_aux_fit_slope_bias);
+    const double biased_slope = is_left ? (fitted_slope - bias) : (fitted_slope + bias);
+    if (!find_sloped_white_to_black_transition(classifier,
+                                               start_x,
+                                               start_y,
+                                               biased_slope,
+                                               max_scan_rows,
+                                               transition_x,
+                                               transition_y))
+    {
+        return false;
+    }
+
+    if (is_left)
+    {
+        g_cross_left_aux_last_slope.store(static_cast<float>(biased_slope));
+        g_cross_left_aux_last_slope_valid.store(true);
+    }
+    else
+    {
+        g_cross_right_aux_last_slope.store(static_cast<float>(biased_slope));
+        g_cross_right_aux_last_slope_valid.store(true);
+    }
+    return true;
 }
 
 static bool find_regular_boundary_jump_cut_point(const maze_point_t *pts,
@@ -3497,8 +3688,11 @@ static int trace_left_boundary_selected_method(PixelClassifier &classifier,
 static bool build_cross_aux_boundary(PixelClassifier &classifier,
                                      bool wall_is_white,
                                      bool is_left,
-                                     int corner_x,
-                                     int corner_y,
+                                     int scan_start_x,
+                                     int scan_start_y,
+                                     const maze_point_t *fit_trace_pts,
+                                     int fit_trace_count,
+                                     int fit_corner_index,
                                      int x_min,
                                      int x_max,
                                      maze_point_t *raw_pts,
@@ -3517,12 +3711,82 @@ static bool build_cross_aux_boundary(PixelClassifier &classifier,
     }
 
     maze_point_t found_transition{};
-    if (!find_vertical_white_to_black_transition(classifier,
-                                                 corner_x,
-                                                 corner_y,
-                                                 g_vision_runtime_config.cross_aux_vertical_scan_max_rows,
-                                                 &found_transition.x,
-                                                 &found_transition.y))
+    const int scan_rows = g_vision_runtime_config.cross_aux_vertical_scan_max_rows;
+    const bool has_fit_input =
+        fit_trace_pts != nullptr && fit_trace_count > 0 && fit_corner_index >= 0;
+    const bool fitted_transition_found =
+        has_fit_input &&
+        find_fitted_white_to_black_transition(classifier,
+                                              is_left,
+                                              scan_start_x,
+                                              scan_start_y,
+                                              fit_trace_pts,
+                                              fit_trace_count,
+                                              fit_corner_index,
+                                              scan_rows,
+                                              &found_transition.x,
+                                              &found_transition.y);
+    const bool last_slope_valid = is_left
+                                      ? g_cross_left_aux_last_slope_valid.load()
+                                      : g_cross_right_aux_last_slope_valid.load();
+    const float last_slope = is_left
+                                 ? g_cross_left_aux_last_slope.load()
+                                 : g_cross_right_aux_last_slope.load();
+    const bool last_slope_transition_found =
+        has_fit_input &&
+        !fitted_transition_found &&
+        last_slope_valid &&
+        find_sloped_white_to_black_transition(classifier,
+                                              scan_start_x,
+                                              scan_start_y,
+                                              last_slope,
+                                              scan_rows,
+                                              &found_transition.x,
+                                              &found_transition.y);
+    const bool vertical_transition_found =
+        !has_fit_input &&
+        find_vertical_white_to_black_transition(classifier,
+                                                scan_start_x,
+                                                scan_start_y,
+                                                scan_rows,
+                                                &found_transition.x,
+                                                &found_transition.y);
+    if (!fitted_transition_found && !last_slope_transition_found && !vertical_transition_found)
+    {
+        return false;
+    }
+
+    return build_cross_aux_boundary_from_transition(classifier,
+                                                    wall_is_white,
+                                                    is_left,
+                                                    found_transition,
+                                                    x_min,
+                                                    x_max,
+                                                    raw_pts,
+                                                    raw_dirs,
+                                                    raw_count,
+                                                    regular_pts,
+                                                    regular_count,
+                                                    transition_point);
+}
+
+static bool build_cross_aux_boundary_from_transition(PixelClassifier &classifier,
+                                                     bool wall_is_white,
+                                                     bool is_left,
+                                                     const maze_point_t &found_transition,
+                                                     int x_min,
+                                                     int x_max,
+                                                     maze_point_t *raw_pts,
+                                                     uint8 *raw_dirs,
+                                                     int *raw_count,
+                                                     maze_point_t *regular_pts,
+                                                     int *regular_count,
+                                                     maze_point_t *transition_point)
+{
+    if (raw_count) *raw_count = 0;
+    if (regular_count) *regular_count = 0;
+    if (transition_point) *transition_point = maze_point_t{0, 0};
+    if (classifier.gray == nullptr || raw_pts == nullptr || raw_dirs == nullptr || regular_pts == nullptr)
     {
         return false;
     }
@@ -3567,44 +3831,43 @@ static bool build_cross_aux_boundary(PixelClassifier &classifier,
     return true;
 }
 
-static bool find_nth_or_last_dir_point_on_trace(const maze_point_t *trace_pts,
-                                                const uint8 *trace_dirs,
-                                                int trace_count,
-                                                uint8 target_dir,
-                                                int nth_match,
-                                                maze_point_t *corner_point,
-                                                int *corner_index)
+static bool find_cross_upper_corner_from_aux_trace(const maze_point_t *trace_pts,
+                                                   const uint8 *trace_dirs,
+                                                   int trace_count,
+                                                   maze_point_t *corner_point,
+                                                   int *corner_index)
 {
     if (corner_point) *corner_point = maze_point_t{0, 0};
     if (corner_index) *corner_index = -1;
-    if (trace_pts == nullptr || trace_dirs == nullptr || trace_count <= 0 || nth_match <= 0)
+    if (trace_pts == nullptr || trace_dirs == nullptr || trace_count <= 0)
     {
         return false;
     }
 
-    int hit_count = 0;
-    int last_hit_index = -1;
-    for (int i = 0; i < trace_count; ++i)
+    const int post_check_count =
+        std::clamp(g_vision_runtime_config.cross_upper_dir5_post_check_count, 1, VISION_BOUNDARY_NUM - 1);
+    if (trace_count <= post_check_count)
     {
-        if (trace_dirs[i] != target_dir)
-        {
-            continue;
-        }
-        last_hit_index = i;
-        hit_count += 1;
-        if (hit_count == nth_match)
-        {
-            if (corner_point) *corner_point = trace_pts[i];
-            if (corner_index) *corner_index = i;
-            return true;
-        }
+        return false;
     }
 
-    // 若不足 nth_match 个目标方向点，则回退到最后一个命中点。
-    if (last_hit_index >= 0)
+    for (int i = 0; i + post_check_count < trace_count; ++i)
     {
-        if (corner_point) *corner_point = trace_pts[last_hit_index];
-        if (corner_index) *corner_index = last_hit_index;
+        if (trace_dirs[i] != 5) continue;
+
+        bool post_dirs_ok = true;
+        for (int k = 1; k <= post_check_count; ++k)
+        {
+            if (trace_dirs[i + k] > 5)
+            {
+                post_dirs_ok = false;
+                break;
+            }
+        }
+        if (!post_dirs_ok) continue;
+
+        if (corner_point) *corner_point = trace_pts[i];
+        if (corner_index) *corner_index = i;
         return true;
     }
 
@@ -4673,9 +4936,7 @@ bool vision_image_processor_process_step()
                                          right_pts.data(),
                                          static_cast<int>(right_pts.size()));
 
-        // 十字下角点跳变精修：模板匹配仅初筛，跳变判据最终决定 found 和角点位置
-        bool left_jump_refined = false;
-        bool right_jump_refined = false;
+        // 十字下角点跳变精修：能精修则更新坐标；精修失败时保留 dir 模板候选作为角点。
         if (g_cross_lower_left_corner_found.load())
         {
             int refined_x = g_cross_lower_left_corner_x.load();
@@ -4689,11 +4950,6 @@ bool vision_image_processor_process_step()
             {
                 g_cross_lower_left_corner_x.store(refined_x);
                 g_cross_lower_left_corner_y.store(refined_y);
-                left_jump_refined = true;
-            }
-            else
-            {
-                g_cross_lower_left_corner_found.store(false);
             }
         }
         if (g_cross_lower_right_corner_found.load())
@@ -4709,20 +4965,15 @@ bool vision_image_processor_process_step()
             {
                 g_cross_lower_right_corner_x.store(refined_x);
                 g_cross_lower_right_corner_y.store(refined_y);
-                right_jump_refined = true;
-            }
-            else
-            {
-                g_cross_lower_right_corner_found.store(false);
             }
         }
 
-        // 重新计算 pair_valid：必须两边跳变精修都成功 + y 差在阈值内
+        // 重新计算 pair_valid：两侧模板候选有效即可，精修只影响坐标精度。
         {
             const int y_diff_max = std::max(0, g_cross_lower_corner_pair_y_diff_max.load());
             const bool pair_valid =
-                left_jump_refined &&
-                right_jump_refined &&
+                g_cross_lower_left_corner_found.load() &&
+                g_cross_lower_right_corner_found.load() &&
                 std::abs(g_cross_lower_left_corner_y.load() - g_cross_lower_right_corner_y.load()) <= y_diff_max;
             g_cross_lower_corner_pair_valid.store(pair_valid);
         }
@@ -4763,25 +5014,38 @@ bool vision_image_processor_process_step()
             }
         }
 
-        if (g_cross_lower_left_corner_found.load())
+        bool left_aux_built = false;
+        const bool left_last_aux_valid = g_cross_left_aux_last_transition_valid.load();
+        if (left_last_aux_valid)
         {
-            if (build_cross_aux_boundary(classifier,
-                                         left_wall_is_white,
-                                         true,
-                                         g_cross_lower_left_corner_x.load(),
-                                         g_cross_lower_left_corner_y.load(),
-                                         maze_trace_x_min,
-                                         maze_trace_x_max,
-                                         left_cross_aux_trace_pts.data(),
-                                         left_cross_aux_trace_dirs.data(),
-                                         &left_cross_aux_trace_num,
-                                         left_cross_aux_regular_pts.data(),
-                                         &left_cross_aux_regular_num,
-                                         &left_cross_aux_transition))
+            maze_point_t reacquired_transition{0, 0};
+            if (find_local_black_to_white_transition(classifier,
+                                                     g_cross_left_aux_last_transition_x.load(),
+                                                     g_cross_left_aux_last_transition_y.load(),
+                                                     g_vision_runtime_config.cross_aux_reacquire_up_px,
+                                                     g_vision_runtime_config.cross_aux_reacquire_down_px,
+                                                     &reacquired_transition.x,
+                                                     &reacquired_transition.y) &&
+                build_cross_aux_boundary_from_transition(classifier,
+                                                         left_wall_is_white,
+                                                         true,
+                                                         reacquired_transition,
+                                                         maze_trace_x_min,
+                                                         maze_trace_x_max,
+                                                         left_cross_aux_trace_pts.data(),
+                                                         left_cross_aux_trace_dirs.data(),
+                                                         &left_cross_aux_trace_num,
+                                                         left_cross_aux_regular_pts.data(),
+                                                         &left_cross_aux_regular_num,
+                                                         &left_cross_aux_transition))
             {
+                left_aux_built = true;
                 g_cross_left_aux_found.store(true);
                 g_cross_left_aux_transition_x.store(left_cross_aux_transition.x);
                 g_cross_left_aux_transition_y.store(left_cross_aux_transition.y);
+                g_cross_left_aux_last_transition_valid.store(true);
+                g_cross_left_aux_last_transition_x.store(left_cross_aux_transition.x);
+                g_cross_left_aux_last_transition_y.store(left_cross_aux_transition.y);
                 save_cross_aux_trace_cache(true,
                                            left_cross_aux_trace_pts.data(),
                                            left_cross_aux_trace_dirs.data(),
@@ -4791,13 +5055,92 @@ bool vision_image_processor_process_step()
                                              left_cross_aux_regular_num);
             }
         }
-        if (g_cross_lower_right_corner_found.load())
+        if (!left_aux_built && g_cross_lower_left_corner_found.load())
+        {
+            if (build_cross_aux_boundary(classifier,
+                                         left_wall_is_white,
+                                         true,
+                                         g_cross_lower_left_corner_x.load(),
+                                         g_cross_lower_left_corner_y.load(),
+                                         left_trace_pts.data(),
+                                         left_corner_trace_num,
+                                         g_cross_lower_left_corner_index.load(),
+                                         maze_trace_x_min,
+                                         maze_trace_x_max,
+                                         left_cross_aux_trace_pts.data(),
+                                         left_cross_aux_trace_dirs.data(),
+                                         &left_cross_aux_trace_num,
+                                         left_cross_aux_regular_pts.data(),
+                                         &left_cross_aux_regular_num,
+                                         &left_cross_aux_transition))
+            {
+                left_aux_built = true;
+                g_cross_left_aux_found.store(true);
+                g_cross_left_aux_transition_x.store(left_cross_aux_transition.x);
+                g_cross_left_aux_transition_y.store(left_cross_aux_transition.y);
+                g_cross_left_aux_last_transition_valid.store(true);
+                g_cross_left_aux_last_transition_x.store(left_cross_aux_transition.x);
+                g_cross_left_aux_last_transition_y.store(left_cross_aux_transition.y);
+                save_cross_aux_trace_cache(true,
+                                           left_cross_aux_trace_pts.data(),
+                                           left_cross_aux_trace_dirs.data(),
+                                           left_cross_aux_trace_num);
+                save_cross_aux_regular_cache(true,
+                                             left_cross_aux_regular_pts.data(),
+                                             left_cross_aux_regular_num);
+            }
+        }
+        bool right_aux_built = false;
+        const bool right_last_aux_valid = g_cross_right_aux_last_transition_valid.load();
+        if (right_last_aux_valid)
+        {
+            maze_point_t reacquired_transition{0, 0};
+            if (find_local_black_to_white_transition(classifier,
+                                                     g_cross_right_aux_last_transition_x.load(),
+                                                     g_cross_right_aux_last_transition_y.load(),
+                                                     g_vision_runtime_config.cross_aux_reacquire_up_px,
+                                                     g_vision_runtime_config.cross_aux_reacquire_down_px,
+                                                     &reacquired_transition.x,
+                                                     &reacquired_transition.y) &&
+                build_cross_aux_boundary_from_transition(classifier,
+                                                         right_wall_is_white,
+                                                         false,
+                                                         reacquired_transition,
+                                                         maze_trace_x_min,
+                                                         maze_trace_x_max,
+                                                         right_cross_aux_trace_pts.data(),
+                                                         right_cross_aux_trace_dirs.data(),
+                                                         &right_cross_aux_trace_num,
+                                                         right_cross_aux_regular_pts.data(),
+                                                         &right_cross_aux_regular_num,
+                                                         &right_cross_aux_transition))
+            {
+                right_aux_built = true;
+                g_cross_right_aux_found.store(true);
+                g_cross_right_aux_transition_x.store(right_cross_aux_transition.x);
+                g_cross_right_aux_transition_y.store(right_cross_aux_transition.y);
+                g_cross_right_aux_last_transition_valid.store(true);
+                g_cross_right_aux_last_transition_x.store(right_cross_aux_transition.x);
+                g_cross_right_aux_last_transition_y.store(right_cross_aux_transition.y);
+                save_cross_aux_trace_cache(false,
+                                           right_cross_aux_trace_pts.data(),
+                                           right_cross_aux_trace_dirs.data(),
+                                           right_cross_aux_trace_num);
+                save_cross_aux_regular_cache(false,
+                                             right_cross_aux_regular_pts.data(),
+                                             right_cross_aux_regular_num);
+            }
+        }
+        if (!right_aux_built && g_cross_lower_right_corner_found.load())
         {
             if (build_cross_aux_boundary(classifier,
                                          right_wall_is_white,
                                          false,
                                          g_cross_lower_right_corner_x.load(),
                                          g_cross_lower_right_corner_y.load(),
+                                         right_trace_pts.data(),
+                                         right_corner_trace_num,
+                                         g_cross_lower_right_corner_index.load(),
                                          maze_trace_x_min,
                                          maze_trace_x_max,
                                          right_cross_aux_trace_pts.data(),
@@ -4807,9 +5150,13 @@ bool vision_image_processor_process_step()
                                          &right_cross_aux_regular_num,
                                          &right_cross_aux_transition))
             {
+                right_aux_built = true;
                 g_cross_right_aux_found.store(true);
                 g_cross_right_aux_transition_x.store(right_cross_aux_transition.x);
                 g_cross_right_aux_transition_y.store(right_cross_aux_transition.y);
+                g_cross_right_aux_last_transition_valid.store(true);
+                g_cross_right_aux_last_transition_x.store(right_cross_aux_transition.x);
+                g_cross_right_aux_last_transition_y.store(right_cross_aux_transition.y);
                 save_cross_aux_trace_cache(false,
                                            right_cross_aux_trace_pts.data(),
                                            right_cross_aux_trace_dirs.data(),
@@ -4817,6 +5164,38 @@ bool vision_image_processor_process_step()
                 save_cross_aux_regular_cache(false,
                                              right_cross_aux_regular_pts.data(),
                                              right_cross_aux_regular_num);
+            }
+        }
+        if (g_cross_left_aux_found.load() && left_cross_aux_regular_num > 0)
+        {
+            maze_point_t left_upper_corner{};
+            int left_upper_trace_index = -1;
+            if (find_cross_upper_corner_from_aux_trace(left_cross_aux_trace_pts.data(),
+                                                       left_cross_aux_trace_dirs.data(),
+                                                       left_cross_aux_trace_num,
+                                                       &left_upper_corner,
+                                                       &left_upper_trace_index))
+            {
+                g_cross_left_upper_corner_found.store(true);
+                g_cross_left_upper_corner_index.store(left_upper_trace_index);
+                g_cross_left_upper_corner_x.store(left_upper_corner.x);
+                g_cross_left_upper_corner_y.store(left_upper_corner.y);
+            }
+        }
+        if (g_cross_right_aux_found.load() && right_cross_aux_regular_num > 0)
+        {
+            maze_point_t right_upper_corner{};
+            int right_upper_trace_index = -1;
+            if (find_cross_upper_corner_from_aux_trace(right_cross_aux_trace_pts.data(),
+                                                       right_cross_aux_trace_dirs.data(),
+                                                       right_cross_aux_trace_num,
+                                                       &right_upper_corner,
+                                                       &right_upper_trace_index))
+            {
+                g_cross_right_upper_corner_found.store(true);
+                g_cross_right_upper_corner_index.store(right_upper_trace_index);
+                g_cross_right_upper_corner_x.store(right_upper_corner.x);
+                g_cross_right_upper_corner_y.store(right_upper_corner.y);
             }
         }
         if (g_cross_lower_left_corner_found.load())
@@ -5057,13 +5436,11 @@ bool vision_image_processor_process_step()
             {
                 maze_point_t left_upper_corner{};
                 int left_upper_trace_index = -1;
-                if (find_nth_or_last_dir_point_on_trace(left_cross_aux_trace_pts.data(),
-                                                        left_cross_aux_trace_dirs.data(),
-                                                        left_cross_aux_trace_num,
-                                                        5,
-                                                        6,
-                                                        &left_upper_corner,
-                                                        &left_upper_trace_index))
+                if (find_cross_upper_corner_from_aux_trace(left_cross_aux_trace_pts.data(),
+                                                           left_cross_aux_trace_dirs.data(),
+                                                           left_cross_aux_trace_num,
+                                                           &left_upper_corner,
+                                                           &left_upper_trace_index))
                 {
                     g_cross_left_upper_corner_found.store(true);
                     g_cross_left_upper_corner_index.store(left_upper_trace_index);
@@ -5123,13 +5500,11 @@ bool vision_image_processor_process_step()
             {
                 maze_point_t right_upper_corner{};
                 int right_upper_trace_index = -1;
-                if (find_nth_or_last_dir_point_on_trace(right_cross_aux_trace_pts.data(),
-                                                        right_cross_aux_trace_dirs.data(),
-                                                        right_cross_aux_trace_num,
-                                                        5,
-                                                        6,
-                                                        &right_upper_corner,
-                                                        &right_upper_trace_index))
+                if (find_cross_upper_corner_from_aux_trace(right_cross_aux_trace_pts.data(),
+                                                           right_cross_aux_trace_dirs.data(),
+                                                           right_cross_aux_trace_num,
+                                                           &right_upper_corner,
+                                                           &right_upper_trace_index))
                 {
                     g_cross_right_upper_corner_found.store(true);
                     g_cross_right_upper_corner_index.store(right_upper_trace_index);
@@ -5189,27 +5564,42 @@ bool vision_image_processor_process_step()
         {
             const bool frozen_left_found = g_cross_stage2_frozen_left_corner_found.load();
             const bool frozen_right_found = g_cross_stage2_frozen_right_corner_found.load();
-            const maze_point_t frozen_left_corner{
-                g_cross_stage2_frozen_left_corner_x.load(),
-                g_cross_stage2_frozen_left_corner_y.load()
-            };
-            const maze_point_t frozen_right_corner{
-                g_cross_stage2_frozen_right_corner_x.load(),
-                g_cross_stage2_frozen_right_corner_y.load()
-            };
 
-            // CROSS_2：使用 CROSS_1 冻结下角点重找上角点；
+            // CROSS_2：从冻结下角点重找辅助线和上角点；
             // 找到后执行“上角点前截断 + 固定起点到上角点补线 + 上角点后段拼接”，未找到该侧置空。
+            g_cross_left_aux_found.store(false);
+            g_cross_right_aux_found.store(false);
+            g_cross_left_aux_transition_x.store(0);
+            g_cross_left_aux_transition_y.store(0);
+            g_cross_right_aux_transition_x.store(0);
+            g_cross_right_aux_transition_y.store(0);
+            g_cross_left_upper_corner_found.store(false);
+            g_cross_right_upper_corner_found.store(false);
+            g_cross_left_upper_corner_index.store(-1);
+            g_cross_right_upper_corner_index.store(-1);
+            g_cross_left_upper_corner_x.store(0);
+            g_cross_left_upper_corner_y.store(0);
+            g_cross_right_upper_corner_x.store(0);
+            g_cross_right_upper_corner_y.store(0);
+            left_cross_aux_trace_num = 0;
+            right_cross_aux_trace_num = 0;
+            left_cross_aux_regular_num = 0;
+            right_cross_aux_regular_num = 0;
+            save_cross_aux_trace_cache(true, nullptr, nullptr, 0);
+            save_cross_aux_trace_cache(false, nullptr, nullptr, 0);
+            save_cross_aux_regular_cache(true, nullptr, 0);
+            save_cross_aux_regular_cache(false, nullptr, 0);
+
             if (frozen_left_found)
             {
-                g_cross_left_aux_found.store(false);
-                left_cross_aux_trace_num = 0;
-                left_cross_aux_regular_num = 0;
                 if (build_cross_aux_boundary(classifier,
                                              left_wall_is_white,
                                              true,
-                                             frozen_left_corner.x,
-                                             frozen_left_corner.y,
+                                             g_cross_stage2_frozen_left_corner_x.load(),
+                                             g_cross_stage2_frozen_left_corner_y.load(),
+                                             nullptr,
+                                             0,
+                                             -1,
                                              maze_trace_x_min,
                                              maze_trace_x_max,
                                              left_cross_aux_trace_pts.data(),
@@ -5222,6 +5612,9 @@ bool vision_image_processor_process_step()
                     g_cross_left_aux_found.store(true);
                     g_cross_left_aux_transition_x.store(left_cross_aux_transition.x);
                     g_cross_left_aux_transition_y.store(left_cross_aux_transition.y);
+                    g_cross_left_aux_last_transition_valid.store(true);
+                    g_cross_left_aux_last_transition_x.store(left_cross_aux_transition.x);
+                    g_cross_left_aux_last_transition_y.store(left_cross_aux_transition.y);
                     save_cross_aux_trace_cache(true,
                                                left_cross_aux_trace_pts.data(),
                                                left_cross_aux_trace_dirs.data(),
@@ -5235,13 +5628,11 @@ bool vision_image_processor_process_step()
                 int left_upper_trace_index = -1;
                 if (g_cross_left_aux_found.load() &&
                     left_cross_aux_regular_num > 0 &&
-                    find_nth_or_last_dir_point_on_trace(left_cross_aux_trace_pts.data(),
-                                                        left_cross_aux_trace_dirs.data(),
-                                                        left_cross_aux_trace_num,
-                                                        5,
-                                                        6,
-                                                        &left_upper_corner,
-                                                        &left_upper_trace_index))
+                    find_cross_upper_corner_from_aux_trace(left_cross_aux_trace_pts.data(),
+                                                           left_cross_aux_trace_dirs.data(),
+                                                           left_cross_aux_trace_num,
+                                                           &left_upper_corner,
+                                                           &left_upper_trace_index))
                 {
                     g_cross_left_upper_corner_found.store(true);
                     g_cross_left_upper_corner_index.store(left_upper_trace_index);
@@ -5294,14 +5685,14 @@ bool vision_image_processor_process_step()
 
             if (frozen_right_found)
             {
-                g_cross_right_aux_found.store(false);
-                right_cross_aux_trace_num = 0;
-                right_cross_aux_regular_num = 0;
                 if (build_cross_aux_boundary(classifier,
                                              right_wall_is_white,
                                              false,
-                                             frozen_right_corner.x,
-                                             frozen_right_corner.y,
+                                             g_cross_stage2_frozen_right_corner_x.load(),
+                                             g_cross_stage2_frozen_right_corner_y.load(),
+                                             nullptr,
+                                             0,
+                                             -1,
                                              maze_trace_x_min,
                                              maze_trace_x_max,
                                              right_cross_aux_trace_pts.data(),
@@ -5314,6 +5705,9 @@ bool vision_image_processor_process_step()
                     g_cross_right_aux_found.store(true);
                     g_cross_right_aux_transition_x.store(right_cross_aux_transition.x);
                     g_cross_right_aux_transition_y.store(right_cross_aux_transition.y);
+                    g_cross_right_aux_last_transition_valid.store(true);
+                    g_cross_right_aux_last_transition_x.store(right_cross_aux_transition.x);
+                    g_cross_right_aux_last_transition_y.store(right_cross_aux_transition.y);
                     save_cross_aux_trace_cache(false,
                                                right_cross_aux_trace_pts.data(),
                                                right_cross_aux_trace_dirs.data(),
@@ -5327,13 +5721,11 @@ bool vision_image_processor_process_step()
                 int right_upper_trace_index = -1;
                 if (g_cross_right_aux_found.load() &&
                     right_cross_aux_regular_num > 0 &&
-                    find_nth_or_last_dir_point_on_trace(right_cross_aux_trace_pts.data(),
-                                                        right_cross_aux_trace_dirs.data(),
-                                                        right_cross_aux_trace_num,
-                                                        5,
-                                                        6,
-                                                        &right_upper_corner,
-                                                        &right_upper_trace_index))
+                    find_cross_upper_corner_from_aux_trace(right_cross_aux_trace_pts.data(),
+                                                           right_cross_aux_trace_dirs.data(),
+                                                           right_cross_aux_trace_num,
+                                                           &right_upper_corner,
+                                                           &right_upper_trace_index))
                 {
                     g_cross_right_upper_corner_found.store(true);
                     g_cross_right_upper_corner_index.store(right_upper_trace_index);

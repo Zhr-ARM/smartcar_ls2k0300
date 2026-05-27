@@ -131,9 +131,9 @@ ipm_centerline_curvature_step = 3
 # 斑马线检测总开关。
 zebra_cross_detection_enabled = false
 # 双边都丢线时是否保留上一帧平移中线。
-keep_last_centerline_on_double_loss = true
+keep_last_centerline_on_double_loss = false
 # 十字状态识别开关。
-route_cross_detection_enabled = true
+route_cross_detection_enabled = false
 # normal 进入 cross ：最小二乘拟合点数（角点 + 前 N-1 个点）。
 route_cross_entry_corner_fit_points = 5
 # normal 进入 cross ：从角点向前延伸的点数。
@@ -192,18 +192,22 @@ route_straight_min_centerline_points = 35
 route_straight_enter_consecutive_frames = 2
 # straight 判定中固定窗口（前 N 点）绝对误差和上限。
 route_straight_abs_error_sum_max = 50.0
-# cross_1 中辅助点同 x 向上扫描白黑转变的最大行数。
+# cross_1 中辅助点从起始行边界点同 x 向上扫描白黑转变的最大行数。
 cross_aux_vertical_scan_max_rows = 75
 # cross_1 辅助八邻域边界允许的最大点数。
 cross_aux_trace_max_points = 50
 # cross_1 辅助边界向上延伸的最大行数。
 cross_aux_trace_upward_rows_max = 30
-# cross_2 中 4->6 跳变前平台要求的连续 dir=4 点数。
-cross_upper_dir4_pre_run_len = 3
-# cross_2 中 4->6 跳变允许的过渡区最大长度。
-cross_upper_transition_max_len = 3
-# cross_2 中 4->6 跳变后平台要求的连续 dir=6 点数。
-cross_upper_dir6_post_run_len = 3
+# 十字辅助边界重捕获：以上次辅助起点为中心向上搜索的像素数。
+cross_aux_reacquire_up_px = 2
+# 十字辅助边界重捕获：以上次辅助起点为中心向下搜索的像素数。
+cross_aux_reacquire_down_px = 10
+# 十字辅助边界拟合扫描：参与局部拟合的下角点前置 trace 点数。
+cross_aux_fit_prev_points = 3
+# 十字辅助边界拟合扫描：左侧斜率减、右侧斜率加的外侧偏置量。
+cross_aux_fit_slope_bias = 0.9
+# 十字上角点：命中 dir=5 后，后续需连续多少个点满足 dir<=5。
+cross_upper_dir5_post_check_count = 3
 # line_error 偏好使用的中线来源。
 # 0=左平移，1=右平移，2=自动。
 ipm_line_error_source = 2

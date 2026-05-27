@@ -345,18 +345,22 @@ typedef struct
     int route_straight_enter_consecutive_frames;
     // straight 判定：固定窗口（前 N 个点）绝对误差和上限。
     float route_straight_abs_error_sum_max;
-    // cross_1：从下角点沿同一 x 向上找“白->黑”转变时，最多向上扫描多少行。
+    // 十字辅助边界：从同侧下角点沿同一 x 向上找“白->黑”转变时，最多向上扫描多少行。
     int cross_aux_vertical_scan_max_rows;
-    // cross_1：辅助边界八邻域巡线最大点数。
+    // 十字辅助边界八邻域巡线最大点数。
     int cross_aux_trace_max_points;
-    // cross_1：辅助边界最多向上延伸多少行。
+    // 十字辅助边界最多向上延伸多少行。
     int cross_aux_trace_upward_rows_max;
-    // cross_2：4->6 跳变中，前平台连续 dir=4 的最少点数。
-    int cross_upper_dir4_pre_run_len;
-    // cross_2：4->6 跳变中，允许的过渡区最大长度。
-    int cross_upper_transition_max_len;
-    // cross_2：4->6 跳变中，后平台连续 dir=6 的最少点数。
-    int cross_upper_dir6_post_run_len;
+    // 十字辅助边界重捕获：以上次辅助起点为中心向上搜索的像素数。
+    int cross_aux_reacquire_up_px;
+    // 十字辅助边界重捕获：以上次辅助起点为中心向下搜索的像素数。
+    int cross_aux_reacquire_down_px;
+    // 十字辅助边界拟合扫描：参与局部拟合的下角点前置 trace 点数。
+    int cross_aux_fit_prev_points;
+    // 十字辅助边界拟合扫描：左侧斜率减、右侧斜率加的外侧偏置量。
+    float cross_aux_fit_slope_bias;
+    // 十字上角点识别：命中 dir=5 后，后续需连续多少个点满足 dir<=5。
+    int cross_upper_dir5_post_check_count;
 
     // ==================== 参数区域 2: 偏差计算 ====================
     // 包括 line_error 取点策略与索引范围约束参数。

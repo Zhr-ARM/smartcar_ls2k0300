@@ -856,13 +856,19 @@
     #ipmCard { order: 6; }
     #ipmRawCard { order: 7; }
     #slowdownCard { order: 8; }
-    #leftTraceDirCard, #rightTraceDirCard { grid-column: span 6; }
+    #leftTraceDirCard, #rightTraceDirCard,
+    #leftAuxTraceDirCard, #rightAuxTraceDirCard { grid-column: span 6; }
     #leftTraceDirCard { order: 9; }
     #rightTraceDirCard { order: 10; }
-    #leftTraceDirZoomCard, #rightTraceDirZoomCard { grid-column: span 6; }
-    #leftTraceDirZoomCard { order: 11; }
-    #rightTraceDirZoomCard { order: 12; }
-    #pidStatusCard { grid-column: span 12; order: 13; }
+    #leftAuxTraceDirCard { order: 11; }
+    #rightAuxTraceDirCard { order: 12; }
+    #leftTraceDirZoomCard, #rightTraceDirZoomCard,
+    #leftAuxTraceDirZoomCard, #rightAuxTraceDirZoomCard { grid-column: span 6; }
+    #leftTraceDirZoomCard { order: 13; }
+    #rightTraceDirZoomCard { order: 14; }
+    #leftAuxTraceDirZoomCard { order: 15; }
+    #rightAuxTraceDirZoomCard { order: 16; }
+    #pidStatusCard { grid-column: span 12; order: 17; }
     #statusCard { grid-column: span 12; order: 20; }
     #statusCard pre { max-height: 520px; }
     @media (max-width: 1400px) {
@@ -876,11 +882,15 @@
       #ipmCard,
       #ipmRawCard,
       #slowdownCard,
-      #leftTraceDirCard,
-      #rightTraceDirCard,
-      #leftTraceDirZoomCard,
-      #rightTraceDirZoomCard,
-      #pidStatusCard {
+	      #leftTraceDirCard,
+	      #rightTraceDirCard,
+	      #leftAuxTraceDirCard,
+	      #rightAuxTraceDirCard,
+	      #leftTraceDirZoomCard,
+	      #rightTraceDirZoomCard,
+	      #leftAuxTraceDirZoomCard,
+	      #rightAuxTraceDirZoomCard,
+	      #pidStatusCard {
         grid-column: span 12;
       }
       #grayCard, #binaryCard {
@@ -916,11 +926,15 @@
       #ipmCard,
       #ipmRawCard,
       #slowdownCard,
-      #leftTraceDirCard,
-      #rightTraceDirCard,
-      #leftTraceDirZoomCard,
-      #rightTraceDirZoomCard,
-      #pidStatusCard { grid-column: auto; }
+	      #leftTraceDirCard,
+	      #rightTraceDirCard,
+	      #leftAuxTraceDirCard,
+	      #rightAuxTraceDirCard,
+	      #leftTraceDirZoomCard,
+	      #rightTraceDirZoomCard,
+	      #leftAuxTraceDirZoomCard,
+	      #rightAuxTraceDirZoomCard,
+	      #pidStatusCard { grid-column: auto; }
       .route-state-top,
       .route-state-counters {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1077,10 +1091,14 @@
     #statusCard,
     #pidStatusCard,
     #routeStateCard,
-    #leftTraceDirCard,
-    #rightTraceDirCard,
-    #leftTraceDirZoomCard,
-    #rightTraceDirZoomCard {
+	    #leftTraceDirCard,
+	    #rightTraceDirCard,
+	    #leftAuxTraceDirCard,
+	    #rightAuxTraceDirCard,
+	    #leftTraceDirZoomCard,
+	    #rightTraceDirZoomCard,
+	    #leftAuxTraceDirZoomCard,
+	    #rightAuxTraceDirZoomCard {
       grid-column: auto;
       order: initial;
     }
@@ -1713,6 +1731,18 @@
                 <canvas id="rightTraceDirCanvas" width="480" height="220"></canvas>
               </div>
             </div>
+            <div class="card" id="leftAuxTraceDirCard">
+              <div class="title">左辅助边界 dir 图（横轴=索引，纵轴=dir）</div>
+              <div class="view">
+                <canvas id="leftAuxTraceDirCanvas" width="480" height="220"></canvas>
+              </div>
+            </div>
+            <div class="card" id="rightAuxTraceDirCard">
+              <div class="title">右辅助边界 dir 图（横轴=索引，纵轴=dir）</div>
+              <div class="view">
+                <canvas id="rightAuxTraceDirCanvas" width="480" height="220"></canvas>
+              </div>
+            </div>
             <div class="card" id="leftTraceDirZoomCard">
               <div class="title">左八邻域 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
               <div class="meta" id="leftTraceDirZoomMeta">等待 dir 数据</div>
@@ -1725,6 +1755,20 @@
               <div class="meta" id="rightTraceDirZoomMeta">等待 dir 数据</div>
               <div class="view">
                 <canvas id="rightTraceDirZoomCanvas" width="720" height="260"></canvas>
+              </div>
+            </div>
+            <div class="card" id="leftAuxTraceDirZoomCard">
+              <div class="title">左辅助边界 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
+              <div class="meta" id="leftAuxTraceDirZoomMeta">等待 dir 数据</div>
+              <div class="view">
+                <canvas id="leftAuxTraceDirZoomCanvas" width="720" height="260"></canvas>
+              </div>
+            </div>
+            <div class="card" id="rightAuxTraceDirZoomCard">
+              <div class="title">右辅助边界 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
+              <div class="meta" id="rightAuxTraceDirZoomMeta">等待 dir 数据</div>
+              <div class="view">
+                <canvas id="rightAuxTraceDirZoomCanvas" width="720" height="260"></canvas>
               </div>
             </div>
           </div>
@@ -1990,10 +2034,18 @@
     const leftTraceDirCtx = leftTraceDirCanvas.getContext('2d');
     const rightTraceDirCanvas = document.getElementById('rightTraceDirCanvas');
     const rightTraceDirCtx = rightTraceDirCanvas.getContext('2d');
+    const leftAuxTraceDirCanvas = document.getElementById('leftAuxTraceDirCanvas');
+    const leftAuxTraceDirCtx = leftAuxTraceDirCanvas.getContext('2d');
+    const rightAuxTraceDirCanvas = document.getElementById('rightAuxTraceDirCanvas');
+    const rightAuxTraceDirCtx = rightAuxTraceDirCanvas.getContext('2d');
     const leftTraceDirZoomCanvas = document.getElementById('leftTraceDirZoomCanvas');
     const leftTraceDirZoomCtx = leftTraceDirZoomCanvas.getContext('2d');
     const rightTraceDirZoomCanvas = document.getElementById('rightTraceDirZoomCanvas');
     const rightTraceDirZoomCtx = rightTraceDirZoomCanvas.getContext('2d');
+    const leftAuxTraceDirZoomCanvas = document.getElementById('leftAuxTraceDirZoomCanvas');
+    const leftAuxTraceDirZoomCtx = leftAuxTraceDirZoomCanvas.getContext('2d');
+    const rightAuxTraceDirZoomCanvas = document.getElementById('rightAuxTraceDirZoomCanvas');
+    const rightAuxTraceDirZoomCtx = rightAuxTraceDirZoomCanvas.getContext('2d');
     const rgbPixelInfo = getElementOrCreate('rgbPixelInfo');
     const grayPixelInfo = document.getElementById('grayPixelInfo');
     const binaryPixelInfo = document.getElementById('binaryPixelInfo');
@@ -2129,10 +2181,16 @@
     const playbackPidSlowdownCards = document.getElementById('playbackPidSlowdownCards');
     const leftTraceDirCard = document.getElementById('leftTraceDirCard');
     const rightTraceDirCard = document.getElementById('rightTraceDirCard');
+    const leftAuxTraceDirCard = document.getElementById('leftAuxTraceDirCard');
+    const rightAuxTraceDirCard = document.getElementById('rightAuxTraceDirCard');
     const leftTraceDirZoomCard = document.getElementById('leftTraceDirZoomCard');
     const rightTraceDirZoomCard = document.getElementById('rightTraceDirZoomCard');
+    const leftAuxTraceDirZoomCard = document.getElementById('leftAuxTraceDirZoomCard');
+    const rightAuxTraceDirZoomCard = document.getElementById('rightAuxTraceDirZoomCard');
     const leftTraceDirZoomMeta = document.getElementById('leftTraceDirZoomMeta');
     const rightTraceDirZoomMeta = document.getElementById('rightTraceDirZoomMeta');
+    const leftAuxTraceDirZoomMeta = document.getElementById('leftAuxTraceDirZoomMeta');
+    const rightAuxTraceDirZoomMeta = document.getElementById('rightAuxTraceDirZoomMeta');
     const playbackStatus = document.getElementById('playbackStatus');
     const playbackGrid = document.getElementById('playbackGrid');
     const paramModal = document.getElementById('paramModal');
@@ -2208,7 +2266,9 @@
     const SPEED_SCHEME_MODE = 'yaw_rate_change';
     const traceDirZoomState = {
       left: { hoverIndex: null },
-      right: { hoverIndex: null }
+      right: { hoverIndex: null },
+      leftAux: { hoverIndex: null },
+      rightAux: { hoverIndex: null }
     };
     const localWorker = null;
 
@@ -2253,8 +2313,12 @@
       receiverCore.setElementVisible(ipmRawCard, active);
       receiverCore.setElementVisible(leftTraceDirCard, active && toggleTraceDirCharts.checked);
       receiverCore.setElementVisible(rightTraceDirCard, active && toggleTraceDirCharts.checked);
+      receiverCore.setElementVisible(leftAuxTraceDirCard, active && toggleTraceDirCharts.checked);
+      receiverCore.setElementVisible(rightAuxTraceDirCard, active && toggleTraceDirCharts.checked);
       receiverCore.setElementVisible(leftTraceDirZoomCard, active && toggleTraceDirCharts.checked);
       receiverCore.setElementVisible(rightTraceDirZoomCard, active && toggleTraceDirCharts.checked);
+      receiverCore.setElementVisible(leftAuxTraceDirZoomCard, active && toggleTraceDirCharts.checked);
+      receiverCore.setElementVisible(rightAuxTraceDirZoomCard, active && toggleTraceDirCharts.checked);
     }
 
     function shouldUseLocalCompute() {
@@ -3064,9 +3128,11 @@
       push(cornerRows, 'cross_aux_vertical_scan_max_rows', status.cross_aux_vertical_scan_max_rows);
       push(cornerRows, 'cross_aux_trace_max_points', status.cross_aux_trace_max_points);
       push(cornerRows, 'cross_aux_trace_upward_rows_max', status.cross_aux_trace_upward_rows_max);
-      push(cornerRows, 'cross_upper_dir4_pre_run_len', status.cross_upper_dir4_pre_run_len);
-      push(cornerRows, 'cross_upper_transition_max_len', status.cross_upper_transition_max_len);
-      push(cornerRows, 'cross_upper_dir6_post_run_len', status.cross_upper_dir6_post_run_len);
+      push(cornerRows, 'cross_aux_reacquire_up_px', status.cross_aux_reacquire_up_px);
+      push(cornerRows, 'cross_aux_reacquire_down_px', status.cross_aux_reacquire_down_px);
+      push(cornerRows, 'cross_aux_fit_prev_points', status.cross_aux_fit_prev_points);
+      push(cornerRows, 'cross_aux_fit_slope_bias', status.cross_aux_fit_slope_bias);
+      push(cornerRows, 'cross_upper_dir5_post_check_count', status.cross_upper_dir5_post_check_count);
       addSection('角点与直边', cornerRows);
 
       const arrayRows = [];
@@ -4303,7 +4369,13 @@
 
     function updateTraceDirHoverFromEvent(canvas, event, sideKey) {
       const status = getRenderStatus();
-      const values = getTraceDirSeries(status, sideKey === 'left' ? 'eight_left_trace_dir' : 'eight_right_trace_dir');
+      const dirKeyBySide = {
+        left: 'eight_left_trace_dir',
+        right: 'eight_right_trace_dir',
+        leftAux: 'cross_left_aux_trace_dir',
+        rightAux: 'cross_right_aux_trace_dir'
+      };
+      const values = getTraceDirSeries(status, dirKeyBySide[sideKey] || 'eight_left_trace_dir');
       if (!values.length) {
         traceDirZoomState[sideKey].hoverIndex = null;
         return;
@@ -4334,8 +4406,12 @@
     function drawTraceDirCharts(status) {
       setCardVisible(leftTraceDirCard, showTraceDirCharts);
       setCardVisible(rightTraceDirCard, showTraceDirCharts);
+      setCardVisible(leftAuxTraceDirCard, showTraceDirCharts);
+      setCardVisible(rightAuxTraceDirCard, showTraceDirCharts);
       setCardVisible(leftTraceDirZoomCard, showTraceDirCharts);
       setCardVisible(rightTraceDirZoomCard, showTraceDirCharts);
+      setCardVisible(leftAuxTraceDirZoomCard, showTraceDirCharts);
+      setCardVisible(rightAuxTraceDirZoomCard, showTraceDirCharts);
       if (!showTraceDirCharts) return;
       drawTraceDirChart(leftTraceDirCanvas,
                         leftTraceDirCtx,
@@ -4353,6 +4429,22 @@
                         status.cross_lower_right_corner_index,
                         status.cross_lower_corner_pair_valid,
                         'right');
+      drawTraceDirChart(leftAuxTraceDirCanvas,
+                        leftAuxTraceDirCtx,
+                        getTraceDirSeries(status, 'cross_left_aux_trace_dir'),
+                        '#0ea5e9',
+                        'Left Aux',
+                        status.cross_left_upper_corner_index,
+                        status.cross_left_upper_corner_found,
+                        'leftAux');
+      drawTraceDirChart(rightAuxTraceDirCanvas,
+                        rightAuxTraceDirCtx,
+                        getTraceDirSeries(status, 'cross_right_aux_trace_dir'),
+                        '#10b981',
+                        'Right Aux',
+                        status.cross_right_upper_corner_index,
+                        status.cross_right_upper_corner_found,
+                        'rightAux');
       drawTraceDirZoomChart(leftTraceDirZoomCanvas,
                             leftTraceDirZoomCtx,
                             leftTraceDirZoomMeta,
@@ -4371,6 +4463,24 @@
                             status.cross_lower_right_corner_index,
                             status.cross_lower_corner_pair_valid,
                             'right');
+      drawTraceDirZoomChart(leftAuxTraceDirZoomCanvas,
+                            leftAuxTraceDirZoomCtx,
+                            leftAuxTraceDirZoomMeta,
+                            getTraceDirSeries(status, 'cross_left_aux_trace_dir'),
+                            '#0ea5e9',
+                            'Left Aux',
+                            status.cross_left_upper_corner_index,
+                            status.cross_left_upper_corner_found,
+                            'leftAux');
+      drawTraceDirZoomChart(rightAuxTraceDirZoomCanvas,
+                            rightAuxTraceDirZoomCtx,
+                            rightAuxTraceDirZoomMeta,
+                            getTraceDirSeries(status, 'cross_right_aux_trace_dir'),
+                            '#10b981',
+                            'Right Aux',
+                            status.cross_right_upper_corner_index,
+                            status.cross_right_upper_corner_found,
+                            'rightAux');
     }
 
     function renderGrayFrameFromSource(source, w, h, sourceMode) {
@@ -4598,8 +4708,11 @@
     }
 
     function drawBinaryTraceOverlay(status) {
-      const routeSubState = Number(status && status.route_sub_state);
-      const showCrossAux = routeSubState === 1;
+      const showCrossAux =
+        Array.isArray(status.cross_left_aux_trace) ||
+        Array.isArray(status.cross_right_aux_trace) ||
+        Array.isArray(status.cross_left_aux_regular) ||
+        Array.isArray(status.cross_right_aux_regular);
       drawSeries(binaryCtx, status.eight_left_trace || [], '#ff4d4f', 2, 1);
       drawSeries(binaryCtx, status.eight_right_trace || [], '#c084fc', 2, 1);
       drawSeries(binaryCtx, status.left_boundary || [], '#38bdf8', 2, 1);
@@ -4607,18 +4720,18 @@
       drawSeries(binaryCtx, status.left_circle_guide_line || [], '#f59e0b', 2, 1);
       drawSeries(binaryCtx, status.right_circle_guide_line || [], '#f97316', 2, 1);
       if (showCrossAux) {
-        drawSeries(binaryCtx, status.cross_left_aux_trace || [], '#e11d48', 2, 1);
-        drawSeries(binaryCtx, status.cross_right_aux_trace || [], '#14b8a6', 2, 1);
-        drawSeries(binaryCtx, status.cross_left_aux_regular || [], '#fb7185', 2, 1);
-        drawSeries(binaryCtx, status.cross_right_aux_regular || [], '#2dd4bf', 2, 1);
+        drawSeries(binaryCtx, status.cross_left_aux_trace || [], '#0ea5e9', 2, 0.8);
+        drawSeries(binaryCtx, status.cross_right_aux_trace || [], '#10b981', 2, 0.8);
+        drawSeries(binaryCtx, status.cross_left_aux_regular || [], '#7dd3fc', 1.5, 0.8);
+        drawSeries(binaryCtx, status.cross_right_aux_regular || [], '#86efac', 1.5, 0.8);
       }
 
       const leftTouch = getTraceTouchPoint(status.eight_left_trace, status.eight_left_first_frame_touch_index, status.eight_left_first_frame_touch_point);
       const rightTouch = getTraceTouchPoint(status.eight_right_trace, status.eight_right_first_frame_touch_index, status.eight_right_first_frame_touch_point);
       drawPointSet(binaryCtx, leftTouch ? [leftTouch] : [], '#facc15', 3);
       drawPointSet(binaryCtx, rightTouch ? [rightTouch] : [], '#facc15', 3);
-      drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_left_corner_point, 'L下角', status.cross_lower_corner_pair_valid);
-      drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_right_corner_point, 'R下角', status.cross_lower_corner_pair_valid);
+      drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_left_corner_point, 'L下角', status.cross_lower_left_corner_found);
+      drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_right_corner_point, 'R下角', status.cross_lower_right_corner_found);
       if (showCrossAux) {
         drawCrossLowerCornerPoint(binaryCtx, status.cross_left_aux_transition_point, 'L辅起', status.cross_left_aux_found);
         drawCrossLowerCornerPoint(binaryCtx, status.cross_right_aux_transition_point, 'R辅起', status.cross_right_aux_found);
@@ -4629,25 +4742,39 @@
       drawBoundaryStraightLabel(binaryCtx, isActiveFlag(status.right_boundary_straight), 'R直边', binaryCanvas.width - 6, 14, 'right');
     }
 
-    function drawCrossLowerCornerPoint(ctx, point, label, pairValid) {
-      if (!Array.isArray(point) || point.length < 2) return;
+    const cornerPalette = {
+      lowerLeft: '#f97316',
+      lowerRight: '#facc15',
+      upperLeft: '#a855f7',
+      upperRight: '#ef4444',
+      auxLeft: '#0ea5e9',
+      auxRight: '#10b981'
+    };
+
+    function drawCornerMarker(ctx, point, color, active) {
+      if (!Array.isArray(point) || point.length < 2 || !active) return;
       const x = Number(point[0]);
       const y = Number(point[1]);
       if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
-      const fill = pairValid ? '#fb923c' : '#fde047';
-      ctx.fillStyle = fill;
-      ctx.strokeStyle = '#111827';
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#020617';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+    }
 
-      ctx.font = '10px "Noto Sans SC", "Microsoft YaHei", sans-serif';
-      ctx.textBaseline = 'bottom';
-      ctx.fillStyle = fill;
-      ctx.fillText(label, Math.min(binaryCanvas.width - 28, x + 5), Math.max(10, y - 4));
+    function drawCrossLowerCornerPoint(ctx, point, label, active) {
+      const color = label === 'L下角' ? cornerPalette.lowerLeft
+        : label === 'R下角' ? cornerPalette.lowerRight
+        : label === 'L上角' ? cornerPalette.upperLeft
+        : label === 'R上角' ? cornerPalette.upperRight
+        : label === 'L辅起' ? cornerPalette.auxLeft
+        : label === 'R辅起' ? cornerPalette.auxRight
+        : '#f8fafc';
+      drawCornerMarker(ctx, point, color, active);
     }
 
     function drawBoundaryStraightLabel(ctx, active, label, anchorX, anchorY, side) {
@@ -4696,8 +4823,9 @@
     }
 
     function binaryTraceHoverText(status, x, y) {
-      const routeSubState = Number(status && status.route_sub_state);
-      const showCrossAux = routeSubState === 1;
+      const showCrossAux =
+        Array.isArray(status.cross_left_aux_trace) ||
+        Array.isArray(status.cross_right_aux_trace);
       const candidates = [
         {
           label: '原始巡线:L',
@@ -5233,6 +5361,8 @@
     });
     bindTraceDirZoomHandlers(leftTraceDirCanvas, 'left');
     bindTraceDirZoomHandlers(rightTraceDirCanvas, 'right');
+    bindTraceDirZoomHandlers(leftAuxTraceDirCanvas, 'leftAux');
+    bindTraceDirZoomHandlers(rightAuxTraceDirCanvas, 'rightAux');
     if (toggleLocalCompute) {
       toggleLocalCompute.checked = false;
       toggleLocalCompute.disabled = true;

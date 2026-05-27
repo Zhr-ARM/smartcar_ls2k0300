@@ -1571,9 +1571,11 @@ static void send_tcp_status()
     append_int(true, "cross_aux_vertical_scan_max_rows", g_vision_runtime_config.cross_aux_vertical_scan_max_rows);
     append_int(true, "cross_aux_trace_max_points", g_vision_runtime_config.cross_aux_trace_max_points);
     append_int(true, "cross_aux_trace_upward_rows_max", g_vision_runtime_config.cross_aux_trace_upward_rows_max);
-    append_int(true, "cross_upper_dir4_pre_run_len", g_vision_runtime_config.cross_upper_dir4_pre_run_len);
-    append_int(true, "cross_upper_transition_max_len", g_vision_runtime_config.cross_upper_transition_max_len);
-    append_int(true, "cross_upper_dir6_post_run_len", g_vision_runtime_config.cross_upper_dir6_post_run_len);
+    append_int(true, "cross_aux_reacquire_up_px", g_vision_runtime_config.cross_aux_reacquire_up_px);
+    append_int(true, "cross_aux_reacquire_down_px", g_vision_runtime_config.cross_aux_reacquire_down_px);
+    append_int(true, "cross_aux_fit_prev_points", g_vision_runtime_config.cross_aux_fit_prev_points);
+    append_float(true, "cross_aux_fit_slope_bias", g_vision_runtime_config.cross_aux_fit_slope_bias);
+    append_int(true, "cross_upper_dir5_post_check_count", g_vision_runtime_config.cross_upper_dir5_post_check_count);
     append_bool(true, "cross_lower_left_corner_found", cross_lower_left_found);
     append_bool(true, "cross_lower_right_corner_found", cross_lower_right_found);
     append_bool(true, "cross_lower_corner_pair_valid", cross_lower_pair_valid);
