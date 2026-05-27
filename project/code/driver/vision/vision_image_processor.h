@@ -274,8 +274,8 @@ void vision_image_processor_get_cross_stage2_frozen_lower_corner_state(bool *lef
                                                                        bool *right_found,
                                                                        int *right_x,
                                                                        int *right_y);
-void vision_image_processor_get_cross_route_debug_state(int *left_corner_post_frame_wall_rows,
-                                                        int *right_corner_post_frame_wall_rows,
+void vision_image_processor_get_cross_route_debug_state(int *left_corner_extrapolate_white,
+                                                        int *right_corner_extrapolate_white,
                                                         int *start_boundary_gap_x);
 void vision_image_processor_get_src_trace_frame_wall_state(bool *left_has_frame_wall,
                                                            bool *right_has_frame_wall);

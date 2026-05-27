@@ -112,8 +112,8 @@ static std::atomic<int> g_cross_lower_left_corner_x(0);
 static std::atomic<int> g_cross_lower_left_corner_y(0);
 static std::atomic<int> g_cross_lower_right_corner_x(0);
 static std::atomic<int> g_cross_lower_right_corner_y(0);
-static std::atomic<int> g_cross_left_corner_post_frame_wall_rows(0);
-static std::atomic<int> g_cross_right_corner_post_frame_wall_rows(0);
+static std::atomic<int> g_cross_left_corner_extrapolate_white(0);
+static std::atomic<int> g_cross_right_corner_extrapolate_white(0);
 static std::atomic<int> g_cross_start_boundary_gap_x(0);
 static std::atomic<bool> g_cross_left_aux_found(false);
 static std::atomic<bool> g_cross_right_aux_found(false);
@@ -281,6 +281,8 @@ static std::atomic<int> g_cross_lower_corner_pre_min_votes(g_vision_runtime_conf
 static std::atomic<int> g_cross_lower_corner_post_min_votes(g_vision_runtime_config.cross_lower_corner_post_min_votes);
 static std::atomic<int> g_cross_lower_corner_transition_max_len(g_vision_runtime_config.cross_lower_corner_transition_max_len);
 static std::atomic<int> g_cross_lower_corner_pair_y_diff_max(g_vision_runtime_config.cross_lower_corner_pair_y_diff_max);
+static std::atomic<int> g_cross_lower_corner_jump_window(g_vision_runtime_config.cross_lower_corner_jump_window);
+static std::atomic<float> g_cross_lower_corner_jump_ratio(g_vision_runtime_config.cross_lower_corner_jump_ratio);
 static std::atomic<int> g_maze_trace_x_min(g_vision_processor_config.default_maze_trace_x_min);
 static std::atomic<int> g_maze_trace_x_max(g_vision_processor_config.default_maze_trace_x_max);
 // 去畸变开关（默认开启）。
@@ -451,7 +453,7 @@ static void fill_single_line_arrays_from_points(const maze_point_t *pts,
                                                 int width,
                                                 int height);
 static bool detect_src_straight_boundary_from_dirs(const uint8 *dirs, int count);
-static int count_side_frame_wall_rows_after_index(const maze_point_t *pts, int count, int start_index, bool is_left);
+static int count_extrapolate_white(const maze_point_t *pts, int count, int corner_index);
 static bool find_vertical_white_to_black_transition(PixelClassifier &classifier,
                                                     int x,
                                                     int start_y,
@@ -886,8 +888,8 @@ static void clear_cross_lower_corner_detection_cache()
     g_cross_lower_left_corner_y.store(0);
     g_cross_lower_right_corner_x.store(0);
     g_cross_lower_right_corner_y.store(0);
-    g_cross_left_corner_post_frame_wall_rows.store(0);
-    g_cross_right_corner_post_frame_wall_rows.store(0);
+    g_cross_left_corner_extrapolate_white.store(0);
+    g_cross_right_corner_extrapolate_white.store(0);
     g_cross_start_boundary_gap_x.store(0);
 }
 
@@ -1144,37 +1146,75 @@ static int count_leading_side_frame_wall_rows(const maze_point_t *pts, int count
     return rows;
 }
 
-static int count_side_frame_wall_rows_after_index(const maze_point_t *pts, int count, int start_index, bool is_left)
+static int count_extrapolate_white(const maze_point_t *pts, int count, int corner_index)
 {
-    if (pts == nullptr || count <= 0 || start_index < 0 || start_index >= count)
+    const int fit_points =
+        std::clamp(g_vision_runtime_config.route_cross_entry_corner_fit_points, 2, VISION_BOUNDARY_NUM);
+    if (pts == nullptr || count <= 0 || corner_index < fit_points - 1 || corner_index >= count)
     {
         return 0;
     }
 
-    int current_rows = 0;
-    int max_rows = 0;
-    int prev_y = std::numeric_limits<int>::max();
-    for (int i = start_index + 1; i < count; ++i)
+    // 最小二乘法拟合 x = a*y + b，取角点及前面 fit_points-1 个点
+    double sum_x = 0.0, sum_y = 0.0, sum_xy = 0.0, sum_y2 = 0.0;
+    const int start_idx = corner_index - (fit_points - 1);
+    for (int i = start_idx; i <= corner_index; ++i)
     {
-        const int x = pts[i].x;
-        const int y = pts[i].y;
-        const bool on_side_frame = is_left ? (x <= 1) : (x >= (kProcWidth - 2));
-        if (!on_side_frame)
-        {
-            max_rows = std::max(max_rows, current_rows);
-            current_rows = 0;
-            prev_y = std::numeric_limits<int>::max();
-            continue;
-        }
-        if (y == prev_y)
-        {
-            continue;
-        }
-        ++current_rows;
-        prev_y = y;
+        const double xi = static_cast<double>(pts[i].x);
+        const double yi = static_cast<double>(pts[i].y);
+        sum_x += xi;
+        sum_y += yi;
+        sum_xy += xi * yi;
+        sum_y2 += yi * yi;
     }
 
-    return std::max(max_rows, current_rows);
+    const double n = static_cast<double>(fit_points);
+    const double denom = n * sum_y2 - sum_y * sum_y;
+    if (std::abs(denom) < 1e-9)
+    {
+        return 0;
+    }
+
+    const double a = (n * sum_xy - sum_x * sum_y) / denom;
+    const double b = (sum_x - a * sum_y) / n;
+
+    // 从角点向前延伸，统计连续白点
+    const int extrap_count =
+        std::clamp(g_vision_runtime_config.route_cross_entry_corner_extrapolate_count, 1, VISION_BOUNDARY_NUM);
+    const int corner_y = pts[corner_index].y;
+    int max_consecutive = 0;
+    int current_consecutive = 0;
+
+    for (int j = 1; j <= extrap_count; ++j)
+    {
+        const int y_pred = corner_y - j; // 向前 = 向上（y 减小）
+        if (y_pred < 0 || y_pred >= kProcHeight)
+        {
+            current_consecutive = 0;
+            continue;
+        }
+        const int x_pred = static_cast<int>(std::lround(a * static_cast<double>(y_pred) + b));
+        if (x_pred < 0 || x_pred >= kProcWidth)
+        {
+            current_consecutive = 0;
+            continue;
+        }
+
+        if (g_image_binary_u8[y_pred * kProcWidth + x_pred] == 255)
+        {
+            ++current_consecutive;
+            if (current_consecutive > max_consecutive)
+            {
+                max_consecutive = current_consecutive;
+            }
+        }
+        else
+        {
+            current_consecutive = 0;
+        }
+    }
+
+    return max_consecutive;
 }
 
 static bool find_vertical_white_to_black_transition(PixelClassifier &classifier,
@@ -1813,6 +1853,144 @@ static int pick_cross_lower_corner_index_near_transition(const uint8 *dirs,
         }
     }
     return post_start;
+}
+
+// 在规则边界窗口内用幅度跳变判据找跳变点。
+// 计算窗口内所有 dx 绝对值的中位数作为 baseline，第一个 dx > baseline * ratio 的位置即为跳变点。
+// is_left 约束跳变方向：左边界 x 必须骤减（边界向内=向左），右边界 x 必须骤增（边界向内=向右）。
+// 返回 true 表示找到，corner_pt 被填充。
+static bool find_boundary_jump_by_magnitude(const maze_point_t *pts, int start, int end, bool is_left, maze_point_t *corner_pt)
+{
+    if (pts == nullptr || corner_pt == nullptr || end - start < 3)
+    {
+        return false;
+    }
+
+    const int window_len = end - start;
+
+    std::vector<int> dx_abs;
+    dx_abs.reserve(window_len - 1);
+    for (int i = start; i < end - 1; ++i)
+    {
+        dx_abs.push_back(std::abs(pts[i + 1].x - pts[i].x));
+    }
+
+    if (dx_abs.empty())
+    {
+        return false;
+    }
+
+    std::sort(dx_abs.begin(), dx_abs.end());
+    const int baseline = dx_abs[dx_abs.size() / 2];
+    if (baseline <= 0)
+    {
+        return false;
+    }
+
+    const float ratio = g_cross_lower_corner_jump_ratio.load();
+    const float threshold = static_cast<float>(baseline) * ratio;
+
+    for (int i = start; i < end - 1; ++i)
+    {
+        const int dx = pts[i + 1].x - pts[i].x;
+        const bool correct_direction = is_left ? (dx < 0) : (dx > 0);
+        if (correct_direction && static_cast<float>(std::abs(dx)) > threshold)
+        {
+            *corner_pt = pts[i];
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// 在规则边界窗口内用正负号翻转判据找跳变点。
+// 连续跳过 dx=0 的项后，找到第一个指定方向的 sign(dx) 翻转的位置，pts[i] 即为翻转前的点。
+// is_left 约束翻转方向：左边界 +→−（边界向内=向左），右边界 −→+（边界向内=向右）。
+// 返回 true 表示找到，corner_pt 被填充。
+static bool find_boundary_jump_by_sign_flip(const maze_point_t *pts, int start, int end, bool is_left, maze_point_t *corner_pt)
+{
+    if (pts == nullptr || corner_pt == nullptr || end - start < 3)
+    {
+        return false;
+    }
+
+    int prev_sign = 0;
+
+    for (int i = start; i < end - 1; ++i)
+    {
+        const int dx = pts[i + 1].x - pts[i].x;
+        if (dx == 0)
+        {
+            continue;
+        }
+        const int sign = (dx > 0) ? 1 : -1;
+
+        if (prev_sign != 0 && sign != prev_sign)
+        {
+            // 方向约束：左边界 +→−，右边界 −→+
+            const bool correct_flip = is_left ? (prev_sign > 0 && sign < 0) : (prev_sign < 0 && sign > 0);
+            if (correct_flip)
+            {
+                *corner_pt = pts[i];
+                return true;
+            }
+        }
+        prev_sign = sign;
+    }
+
+    return false;
+}
+
+// 在规则边界上精修十字下角点位置。
+// 先在粗角点 y 附近找对应规则边界点，前后各取 jump_window 个点形成窗口，
+// 再依次用幅度跳变、符号翻转判据在窗口内找跳变点。
+// is_left 传递给判据以约束跳变/翻转方向。
+// 返回 true 表示精修成功（corner_x/corner_y 已更新）。
+static bool refine_cross_lower_corner_on_regular_boundary(
+    const maze_point_t *regular_pts,
+    int regular_num,
+    int rough_corner_y,
+    bool is_left,
+    int *corner_x,
+    int *corner_y)
+{
+    if (regular_pts == nullptr || regular_num < 3 || corner_x == nullptr || corner_y == nullptr)
+    {
+        return false;
+    }
+
+    int center_idx = 0;
+    int best_dy = 999999;
+    for (int i = 0; i < regular_num; ++i)
+    {
+        const int dy = std::abs(regular_pts[i].y - rough_corner_y);
+        if (dy < best_dy)
+        {
+            best_dy = dy;
+            center_idx = i;
+        }
+    }
+
+    const int half_win = std::max(1, g_cross_lower_corner_jump_window.load());
+    const int win_start = std::max(0, center_idx - half_win);
+    const int win_end = std::min(regular_num, center_idx + half_win + 1);
+
+    if (win_end - win_start < 3)
+    {
+        return false;
+    }
+
+    maze_point_t jump_pt{0, 0};
+    if (find_boundary_jump_by_magnitude(regular_pts, win_start, win_end, is_left, &jump_pt) ||
+        find_boundary_jump_by_sign_flip(regular_pts, win_start, win_end, is_left, &jump_pt))
+    {
+        *corner_x = jump_pt.x;
+        *corner_y = jump_pt.y;
+        return true;
+    }
+
+    return false;
 }
 
 static cross_lower_corner_detection_t detect_cross_lower_corner_from_dirs(const maze_point_t *pts,
@@ -4181,8 +4359,8 @@ bool vision_image_processor_process_step()
     int right_start_frame_wall_rows = 0;
     int left_boundary_count_signal = 0;
     int right_boundary_count_signal = 0;
-    int left_corner_post_frame_wall_rows = 0;
-    int right_corner_post_frame_wall_rows = 0;
+    int left_corner_extrapolate_white = 0;
+    int right_corner_extrapolate_white = 0;
     int start_boundary_gap_x = 0;
     int left_cross_aux_trace_num = 0;
     int right_cross_aux_trace_num = 0;
@@ -4494,19 +4672,72 @@ bool vision_image_processor_process_step()
                                          right_regular_num,
                                          right_pts.data(),
                                          static_cast<int>(right_pts.size()));
+
+        // 十字下角点跳变精修：模板匹配仅初筛，跳变判据最终决定 found 和角点位置
+        bool left_jump_refined = false;
+        bool right_jump_refined = false;
+        if (g_cross_lower_left_corner_found.load())
+        {
+            int refined_x = g_cross_lower_left_corner_x.load();
+            int refined_y = g_cross_lower_left_corner_y.load();
+            if (refine_cross_lower_corner_on_regular_boundary(left_regular_pts.data(),
+                                                               left_regular_num,
+                                                               refined_y,
+                                                               true,
+                                                               &refined_x,
+                                                               &refined_y))
+            {
+                g_cross_lower_left_corner_x.store(refined_x);
+                g_cross_lower_left_corner_y.store(refined_y);
+                left_jump_refined = true;
+            }
+            else
+            {
+                g_cross_lower_left_corner_found.store(false);
+            }
+        }
+        if (g_cross_lower_right_corner_found.load())
+        {
+            int refined_x = g_cross_lower_right_corner_x.load();
+            int refined_y = g_cross_lower_right_corner_y.load();
+            if (refine_cross_lower_corner_on_regular_boundary(right_regular_pts.data(),
+                                                               right_regular_num,
+                                                               refined_y,
+                                                               false,
+                                                               &refined_x,
+                                                               &refined_y))
+            {
+                g_cross_lower_right_corner_x.store(refined_x);
+                g_cross_lower_right_corner_y.store(refined_y);
+                right_jump_refined = true;
+            }
+            else
+            {
+                g_cross_lower_right_corner_found.store(false);
+            }
+        }
+
+        // 重新计算 pair_valid：必须两边跳变精修都成功 + y 差在阈值内
+        {
+            const int y_diff_max = std::max(0, g_cross_lower_corner_pair_y_diff_max.load());
+            const bool pair_valid =
+                left_jump_refined &&
+                right_jump_refined &&
+                std::abs(g_cross_lower_left_corner_y.load() - g_cross_lower_right_corner_y.load()) <= y_diff_max;
+            g_cross_lower_corner_pair_valid.store(pair_valid);
+        }
+
         left_boundary_count_signal = left_regular_num;
         right_boundary_count_signal = right_regular_num;
         start_boundary_gap_x = (left_num > 0 && right_num > 0) ? (right_pts[0].x - left_pts[0].x) : 0;
-        left_corner_post_frame_wall_rows = count_side_frame_wall_rows_after_index(left_trace_pts.data(),
-                                                                                  left_trace_num,
-                                                                                  g_cross_lower_left_corner_index.load(),
-                                                                                  true);
-        right_corner_post_frame_wall_rows = count_side_frame_wall_rows_after_index(right_trace_pts.data(),
-                                                                                   right_trace_num,
-                                                                                   g_cross_lower_right_corner_index.load(),
-                                                                                   false);
-        g_cross_left_corner_post_frame_wall_rows.store(left_corner_post_frame_wall_rows);
-        g_cross_right_corner_post_frame_wall_rows.store(right_corner_post_frame_wall_rows);
+        left_corner_extrapolate_white = count_extrapolate_white(left_trace_pts.data(),
+                                                                left_trace_num,
+                                                                g_cross_lower_left_corner_index.load());
+        right_corner_extrapolate_white = count_extrapolate_white(right_trace_pts.data(),
+                                                                   right_trace_num,
+                                                                   g_cross_lower_right_corner_index.load());
+        g_cross_left_corner_extrapolate_white.store(left_corner_extrapolate_white);
+        g_cross_right_corner_extrapolate_white.store(right_corner_extrapolate_white);
         g_cross_start_boundary_gap_x.store(start_boundary_gap_x);
 
         const bool cross1_state_active_before_trace =
@@ -4749,12 +4980,12 @@ bool vision_image_processor_process_step()
     route_input.left_corner_y = g_cross_lower_left_corner_y.load();
     route_input.left_corner_src_y = g_cross_lower_left_corner_y.load();
     route_input.left_corner_index = g_cross_lower_left_corner_index.load();
-    route_input.left_corner_post_frame_wall_rows = left_corner_post_frame_wall_rows;
+    route_input.left_corner_extrapolate_white = left_corner_extrapolate_white;
     route_input.right_corner_x = g_cross_lower_right_corner_x.load();
     route_input.right_corner_y = g_cross_lower_right_corner_y.load();
     route_input.right_corner_src_y = g_cross_lower_right_corner_y.load();
     route_input.right_corner_index = g_cross_lower_right_corner_index.load();
-    route_input.right_corner_post_frame_wall_rows = right_corner_post_frame_wall_rows;
+    route_input.right_corner_extrapolate_white = right_corner_extrapolate_white;
     route_input.left_has_frame_wall = g_src_left_trace_has_frame_wall.load();
     route_input.right_has_frame_wall = g_src_right_trace_has_frame_wall.load();
     route_input.left_start_frame_wall_rows = left_start_frame_wall_rows;
@@ -6130,12 +6361,12 @@ void vision_image_processor_get_cross_stage2_frozen_lower_corner_state(bool *lef
     if (right_y) *right_y = g_cross_stage2_frozen_right_corner_y.load();
 }
 
-void vision_image_processor_get_cross_route_debug_state(int *left_corner_post_frame_wall_rows,
-                                                        int *right_corner_post_frame_wall_rows,
+void vision_image_processor_get_cross_route_debug_state(int *left_corner_extrapolate_white,
+                                                        int *right_corner_extrapolate_white,
                                                         int *start_boundary_gap_x)
 {
-    if (left_corner_post_frame_wall_rows) *left_corner_post_frame_wall_rows = g_cross_left_corner_post_frame_wall_rows.load();
-    if (right_corner_post_frame_wall_rows) *right_corner_post_frame_wall_rows = g_cross_right_corner_post_frame_wall_rows.load();
+    if (left_corner_extrapolate_white) *left_corner_extrapolate_white = g_cross_left_corner_extrapolate_white.load();
+    if (right_corner_extrapolate_white) *right_corner_extrapolate_white = g_cross_right_corner_extrapolate_white.load();
     if (start_boundary_gap_x) *start_boundary_gap_x = g_cross_start_boundary_gap_x.load();
 }
 

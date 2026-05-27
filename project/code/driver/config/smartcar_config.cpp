@@ -1108,6 +1108,8 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_BOOL(cross_lower_corner_extrapolate_enabled);
     REQUIRE_RUNTIME_INT(cross_lower_corner_extrapolate_min_y);
     REQUIRE_RUNTIME_INT(cross_lower_corner_extrapolate_y_span);
+    REQUIRE_RUNTIME_INT(cross_lower_corner_jump_window);
+    REQUIRE_RUNTIME_FLOAT(cross_lower_corner_jump_ratio);
     REQUIRE_RUNTIME_INT(src_boundary_straight_check_count);
     REQUIRE_RUNTIME_FLOAT(src_boundary_straight_dir45_ratio_min);
     REQUIRE_RUNTIME_BOOL(undistort_enabled);
@@ -1139,7 +1141,9 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_BOOL(zebra_cross_detection_enabled);
     REQUIRE_RUNTIME_BOOL(keep_last_centerline_on_double_loss);
     REQUIRE_RUNTIME_BOOL(route_cross_detection_enabled);
-    REQUIRE_RUNTIME_INT(route_cross_entry_corner_post_frame_wall_rows_min);
+    REQUIRE_RUNTIME_INT(route_cross_entry_corner_fit_points);
+    REQUIRE_RUNTIME_INT(route_cross_entry_corner_extrapolate_count);
+    REQUIRE_RUNTIME_INT(route_cross_entry_corner_extrapolate_white_min);
     REQUIRE_RUNTIME_INT(route_cross_stage2_enter_start_frame_wall_rows_min);
     REQUIRE_RUNTIME_INT(route_cross_stage1_enter_corner_y_min);
     REQUIRE_RUNTIME_INT(route_cross_exit_start_gap_x_max);

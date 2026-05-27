@@ -210,6 +210,10 @@ typedef struct
     int cross_lower_corner_extrapolate_min_y;
     // 十字下角点补线向上的延伸长度（按 y 行数计算）。
     int cross_lower_corner_extrapolate_y_span;
+    // 十字下角点跳变精修：规则边界搜索窗口半宽（点数）。
+    int cross_lower_corner_jump_window;
+    // 十字下角点跳变精修：x跳变幅度判据的倍率阈值。
+    float cross_lower_corner_jump_ratio;
     // 原图直边判断：检查边界数组前多少个点的 dir。
     int src_boundary_straight_check_count;
     // 原图直边判断：前 N 个点中 dir=4/5 的最小占比阈值，范围 [0,1]。
@@ -281,9 +285,12 @@ typedef struct
     bool keep_last_centerline_on_double_loss;
     // 状态机十字识别开关：true=允许进入十字状态，false=禁用十字识别。
     bool route_cross_detection_enabled;
-    // normal / straight 进入 cross 的条件：
-    // 双侧角点后沿边框连续行数都必须 >= 该值。
-    int route_cross_entry_corner_post_frame_wall_rows_min;
+    // normal 进入 cross 的条件：最小二乘拟合所用的点数（角点 + 前 N-1 个点）。
+    int route_cross_entry_corner_fit_points;
+    // normal 进入 cross 的条件：从角点向前延伸的点数。
+    int route_cross_entry_corner_extrapolate_count;
+    // normal 进入 cross 的条件：延伸点中连续白点的最小个数。
+    int route_cross_entry_corner_extrapolate_white_min;
     // cross_1 -> cross_2 的“起始行已经贴边”阈值。
     // 当前设计里 1 表示起始行一旦用到边框边界就触发。
     int route_cross_stage2_enter_start_frame_wall_rows_min;

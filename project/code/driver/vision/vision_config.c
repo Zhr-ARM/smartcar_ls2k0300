@@ -284,6 +284,10 @@ vision_runtime_config_t g_vision_runtime_config = {
     .cross_lower_corner_extrapolate_min_y = 35,
     // 十字下角点补线向上的延伸长度（按 y 行数计算）。
     .cross_lower_corner_extrapolate_y_span = 30,
+    // 十字下角点跳变精修：规则边界搜索窗口半宽，默认±10个点。
+    .cross_lower_corner_jump_window = 10,
+    // 十字下角点跳变精修：dx 超过 baseline 的倍率才认为是跳变。
+    .cross_lower_corner_jump_ratio = 2.0f,
     // 原图直边判断：检查边界数组前 60 个点。
     .src_boundary_straight_check_count = 80,
     // 原图直边判断：前 N 个点中 90% 以上为 dir=4/5 判定为直边。
@@ -350,8 +354,12 @@ vision_runtime_config_t g_vision_runtime_config = {
     .keep_last_centerline_on_double_loss = true,
     // 状态机十字识别开关。
     .route_cross_detection_enabled = true,
-    // 双侧角点后沿边框连续行数都至少达到 5，才允许 normal/straight 进入 cross。
-    .route_cross_entry_corner_post_frame_wall_rows_min = 5,
+    // 最小二乘拟合点数（角点 + 前 N-1 个点），默认 5。
+    .route_cross_entry_corner_fit_points = 5,
+    // 从角点向前延伸的点数，默认 8。
+    .route_cross_entry_corner_extrapolate_count = 8,
+    // 延伸点中连续白点的最小个数，默认 5。
+    .route_cross_entry_corner_extrapolate_white_min = 5,
     // cross_1 -> cross_2：起始巡线行一旦碰到边框边界就认为进入 cross_2 条件成立。
     .route_cross_stage2_enter_start_frame_wall_rows_min = 1,
     // cross_1 -> cross_2：任一角点 y 达到该阈值即允许进入下一阶段。

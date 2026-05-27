@@ -89,14 +89,14 @@ static bool cross_entry_ready(const vision_route_state_input_t *input)
         return false;
     }
 
-    const int min_frame_wall_rows =
-        std::max(1, g_vision_runtime_config.route_cross_entry_corner_post_frame_wall_rows_min);
+    const int min_white =
+        std::max(1, g_vision_runtime_config.route_cross_entry_corner_extrapolate_white_min);
     return input->left_corner_found &&
            input->right_corner_found &&
            input->left_corner_index >= 0 &&
            input->right_corner_index >= 0 &&
-           input->left_corner_post_frame_wall_rows >= min_frame_wall_rows &&
-           input->right_corner_post_frame_wall_rows >= min_frame_wall_rows;
+           input->left_corner_extrapolate_white >= min_white &&
+           input->right_corner_extrapolate_white >= min_white;
 }
 
 static bool cross_stage2_ready(const vision_route_state_input_t *input)

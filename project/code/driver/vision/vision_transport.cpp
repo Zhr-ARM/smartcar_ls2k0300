@@ -808,11 +808,11 @@ static void send_tcp_status()
     };
     const int cross_left_aux_dir5_count = count_dir_hits(cross_left_aux_trace_dir, cross_left_aux_trace_num, 5);
     const int cross_right_aux_dir5_count = count_dir_hits(cross_right_aux_trace_dir, cross_right_aux_trace_num, 5);
-    int cross_left_corner_post_frame_wall_rows = 0;
-    int cross_right_corner_post_frame_wall_rows = 0;
+    int cross_left_corner_extrapolate_white = 0;
+    int cross_right_corner_extrapolate_white = 0;
     int cross_start_boundary_gap_x = 0;
-    vision_image_processor_get_cross_route_debug_state(&cross_left_corner_post_frame_wall_rows,
-                                                       &cross_right_corner_post_frame_wall_rows,
+    vision_image_processor_get_cross_route_debug_state(&cross_left_corner_extrapolate_white,
+                                                       &cross_right_corner_extrapolate_white,
                                                        &cross_start_boundary_gap_x);
     bool src_left_trace_has_frame_wall = false;
     bool src_right_trace_has_frame_wall = false;
@@ -1376,8 +1376,8 @@ static void send_tcp_status()
         g_vision_runtime_config.route_cross_detection_enabled &&
         cross_lower_left_found &&
         cross_lower_right_found &&
-        cross_left_corner_post_frame_wall_rows >= g_vision_runtime_config.route_cross_entry_corner_post_frame_wall_rows_min &&
-        cross_right_corner_post_frame_wall_rows >= g_vision_runtime_config.route_cross_entry_corner_post_frame_wall_rows_min;
+        cross_left_corner_extrapolate_white >= g_vision_runtime_config.route_cross_entry_corner_extrapolate_white_min &&
+        cross_right_corner_extrapolate_white >= g_vision_runtime_config.route_cross_entry_corner_extrapolate_white_min;
     const bool cross_state_stage2_ready_now =
         ((cross_lower_left_found && cross_lower_left_y >= g_vision_runtime_config.route_cross_stage1_enter_corner_y_min) ||
          (cross_lower_right_found && cross_lower_right_y >= g_vision_runtime_config.route_cross_stage1_enter_corner_y_min));
@@ -1391,10 +1391,12 @@ static void send_tcp_status()
     append_bool(true, "cross_state_stage2_ready_now", cross_state_stage2_ready_now);
     append_bool(true, "cross_state_stage3_ready_now", cross_state_stage3_ready_now);
     append_bool(true, "cross_state_exit_ready_now", cross_state_exit_ready_now);
-    append_int(true, "cross_left_corner_post_frame_wall_rows", cross_left_corner_post_frame_wall_rows);
-    append_int(true, "cross_right_corner_post_frame_wall_rows", cross_right_corner_post_frame_wall_rows);
+    append_int(true, "cross_left_corner_extrapolate_white", cross_left_corner_extrapolate_white);
+    append_int(true, "cross_right_corner_extrapolate_white", cross_right_corner_extrapolate_white);
     append_int(true, "cross_start_boundary_gap_x", cross_start_boundary_gap_x);
-    append_int(true, "route_cross_entry_corner_post_frame_wall_rows_min", g_vision_runtime_config.route_cross_entry_corner_post_frame_wall_rows_min);
+    append_int(true, "route_cross_entry_corner_fit_points", g_vision_runtime_config.route_cross_entry_corner_fit_points);
+    append_int(true, "route_cross_entry_corner_extrapolate_count", g_vision_runtime_config.route_cross_entry_corner_extrapolate_count);
+    append_int(true, "route_cross_entry_corner_extrapolate_white_min", g_vision_runtime_config.route_cross_entry_corner_extrapolate_white_min);
     append_int(true, "route_cross_stage2_enter_start_frame_wall_rows_min", g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min);
     append_int(true, "route_cross_stage1_enter_corner_y_min", g_vision_runtime_config.route_cross_stage1_enter_corner_y_min);
     append_int(true, "route_cross_exit_start_gap_x_max", g_vision_runtime_config.route_cross_exit_start_gap_x_max);

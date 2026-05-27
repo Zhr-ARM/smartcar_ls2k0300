@@ -51,8 +51,8 @@ typedef struct
     int right_corner_y;
     int right_corner_src_y;
     int right_corner_index;
-    int left_corner_post_frame_wall_rows;
-    int right_corner_post_frame_wall_rows;
+    int left_corner_extrapolate_white;
+    int right_corner_extrapolate_white;
     bool left_straight;
     bool right_straight;
     bool left_has_frame_wall;
