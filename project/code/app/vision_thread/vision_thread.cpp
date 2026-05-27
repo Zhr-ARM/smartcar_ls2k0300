@@ -7,10 +7,14 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <pthread.h>
 #include <thread>
 
 namespace
 {
+// 视觉线程优先级：高于巡线线程(5)，保证帧处理不被抢占。
+constexpr int32 VISION_THREAD_PRIORITY = 10;
+
 std::thread g_vision_thread;
 std::atomic<bool> g_vision_running(false);
 std::atomic<uint32> g_vision_process_fps(0);
@@ -65,6 +69,13 @@ static void vision_perf_print_and_reset(vision_perf_accum_t &acc, int64_t window
 
 void vision_loop()
 {
+    struct sched_param sp;
+    sp.sched_priority = VISION_THREAD_PRIORITY;
+    if (0 != pthread_setschedparam(pthread_self(), SCHED_RR, &sp))
+    {
+        printf("vision set sched SCHED_RR prio=%d failed, fallback to current policy\r\n", VISION_THREAD_PRIORITY);
+    }
+
     vision_perf_accum_t perf_acc;
     auto perf_window_start = std::chrono::steady_clock::now();
 

@@ -21,9 +21,9 @@
 namespace
 {
 // 控制周期：1ms(1000Hz)。巡线环频率高于电机速度环(5ms)的整数倍，能持续给出平滑转向目标。
-constexpr int32 LINE_FOLLOW_PERIOD_MS = 11;
-// 调度优先级：巡线线程作为中高优先级实时任务执行。
-constexpr int32 LINE_FOLLOW_THREAD_PRIORITY = 8;
+constexpr int32 LINE_FOLLOW_PERIOD_MS = 1;
+// 调度优先级：SCHED_RR prio=5，低于视觉线程(10)，保证视觉优先拿到 CPU。
+constexpr int32 LINE_FOLLOW_THREAD_PRIORITY = 5;
 constexpr int32 LINE_FOLLOW_MAIN_STATE_SWITCH_BEEP_MS = 200;
 constexpr float LINE_FOLLOW_LOOP_DT_SECONDS = LINE_FOLLOW_PERIOD_MS / 1000.0f;
 constexpr float IMU_NOMINAL_DT_SECONDS = 0.005f;
@@ -672,9 +672,9 @@ void line_follow_loop()
 {
     struct sched_param sp; // 用于设置当前线程调度的参数结构体
     sp.sched_priority = LINE_FOLLOW_THREAD_PRIORITY;
-    if (0 != pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp))
+    if (0 != pthread_setschedparam(pthread_self(), SCHED_RR, &sp))
     {
-        printf("line_follow set sched failed, fallback to current policy\r\n");
+        printf("line_follow set sched SCHED_RR prio=%d failed, fallback to current policy\r\n", LINE_FOLLOW_THREAD_PRIORITY);
     }
 
     refresh_thread_info();

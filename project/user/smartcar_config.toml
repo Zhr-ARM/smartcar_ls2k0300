@@ -259,7 +259,7 @@ data_profile = 0
 # 网页端 TCP 状态发送总开关。
 tcp_enabled = true
 # PC 接收端 IP 地址。
-server_ip = "192.168.3.9"
+server_ip = "192.168.3.11"
 # PC 接收端 UDP 视频端口。
 video_port = 10000
 # PC 接收端 TCP 状态端口。
@@ -377,7 +377,7 @@ ipm_size = true
 # 逐飞助手 UDP 通道开关。
 enabled = false
 # 逐飞助手接收端 IP。
-server_ip = "192.168.3.9"
+server_ip = "192.168.3.11"
 # 逐飞助手接收端端口。
 server_port = 8899
 
@@ -515,11 +515,11 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 150.0
+base_speed = 100.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # NORMAL 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 11.5
+position_dynamic_kp_base = 7.7
 # NORMAL 档位置环动态 Kp 下限。
 position_dynamic_kp_min = 0.0
 # NORMAL 档位置环动态 Kp 上限。
@@ -535,7 +535,7 @@ position_dynamic_kp_high_a = 0.0
 # NORMAL 档位置环 Ki。
 position_ki = 0.0
 # NORMAL 档位置环 Kd 基础值。
-position_kd = 0.5
+position_kd = 0.05
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
@@ -550,7 +550,7 @@ yaw_rate_ref_from_track_point_gain_dps = 12.0
 # NORMAL 档目标横摆角速度限幅。
 yaw_rate_ref_limit_dps = 360.0
 # NORMAL 档角速度环 Kp。
-yaw_rate_kp = 0.0
+yaw_rate_kp = 0.5
 # NORMAL 档角速度环动态 Kp 一次项系数。
 yaw_rate_dynamic_kp_quad_a = 0.0
 # NORMAL 档角速度环动态 Kp 下限。
