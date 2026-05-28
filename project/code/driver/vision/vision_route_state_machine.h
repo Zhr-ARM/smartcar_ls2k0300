@@ -7,16 +7,12 @@ typedef enum
 {
     VISION_ROUTE_MAIN_NORMAL = 0,
     VISION_ROUTE_MAIN_CIRCLE,
-    VISION_ROUTE_MAIN_STRAIGHT,
-    VISION_ROUTE_MAIN_CROSS
+    VISION_ROUTE_MAIN_STRAIGHT
 } vision_route_main_state_enum;
 
 typedef enum
 {
     VISION_ROUTE_SUB_NONE = 0,
-    VISION_ROUTE_SUB_CROSS_1,
-    VISION_ROUTE_SUB_CROSS_2,
-    VISION_ROUTE_SUB_CROSS_3,
     VISION_ROUTE_SUB_CIRCLE_LEFT_1,
     VISION_ROUTE_SUB_CIRCLE_LEFT_2,
     VISION_ROUTE_SUB_CIRCLE_LEFT_3,
@@ -51,15 +47,12 @@ typedef struct
     int right_corner_y;
     int right_corner_src_y;
     int right_corner_index;
-    int left_corner_extrapolate_white;
-    int right_corner_extrapolate_white;
     bool left_straight;
     bool right_straight;
     bool left_has_frame_wall;
     bool right_has_frame_wall;
     int left_start_frame_wall_rows;
     int right_start_frame_wall_rows;
-    int start_boundary_gap_x;
     int left_boundary_count;
     int right_boundary_count;
     int selected_centerline_count;
@@ -76,7 +69,6 @@ typedef struct
     vision_route_sub_state_enum sub_state;
     int preferred_source;
     uint32 encoder_since_state_enter;
-    int cross_loss_count;
     int left_loss_count;
     int left_gain_count;
     int right_loss_count;
@@ -90,6 +82,5 @@ vision_route_main_state_enum vision_route_state_machine_main_state();
 vision_route_sub_state_enum vision_route_state_machine_sub_state();
 int vision_route_state_machine_preferred_source();
 uint32 vision_route_state_machine_encoder_since_state_enter();
-int vision_route_state_machine_cross_loss_count();
 
 #endif

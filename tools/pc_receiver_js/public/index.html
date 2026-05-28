@@ -1774,6 +1774,35 @@
           </div>
         </details>
         <details class="detail-panel">
+          <summary>历史角点 7x7 ROI 二值图（初始位置，未平移）</summary>
+          <div class="detail-panel-body">
+            <div class="card" id="leftHistoryRoi7x7Card">
+              <div class="title">左侧 7x7 ROI（史上角点初始窗口）</div>
+              <div class="meta" id="leftHistoryRoi7x7Meta">等待数据</div>
+              <div class="view" style="display:flex;align-items:center;gap:8px;">
+                <canvas id="leftHistoryRoi7x7Canvas" width="140" height="140"></canvas>
+                <div style="font-size:11px;color:var(--console-dim);line-height:1.6;">
+                  <div>■ = 黑(0)</div>
+                  <div>□ = 白(255)</div>
+                  <div><span style="color:#fbbf24">■</span> = 越界(128)</div>
+                </div>
+              </div>
+            </div>
+            <div class="card" id="rightHistoryRoi7x7Card">
+              <div class="title">右侧 7x7 ROI（史上角点初始窗口）</div>
+              <div class="meta" id="rightHistoryRoi7x7Meta">等待数据</div>
+              <div class="view" style="display:flex;align-items:center;gap:8px;">
+                <canvas id="rightHistoryRoi7x7Canvas" width="140" height="140"></canvas>
+                <div style="font-size:11px;color:var(--console-dim);line-height:1.6;">
+                  <div>■ = 黑(0)</div>
+                  <div>□ = 白(255)</div>
+                  <div><span style="color:#fbbf24">■</span> = 越界(128)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+        <details class="detail-panel">
           <summary>原始状态全文</summary>
           <div class="detail-panel-body single">
             <div class="card" id="statusCard">
@@ -2046,6 +2075,12 @@
     const leftAuxTraceDirZoomCtx = leftAuxTraceDirZoomCanvas.getContext('2d');
     const rightAuxTraceDirZoomCanvas = document.getElementById('rightAuxTraceDirZoomCanvas');
     const rightAuxTraceDirZoomCtx = rightAuxTraceDirZoomCanvas.getContext('2d');
+    const leftHistoryRoi7x7Canvas = document.getElementById('leftHistoryRoi7x7Canvas');
+    const leftHistoryRoi7x7Ctx = leftHistoryRoi7x7Canvas.getContext('2d');
+    const rightHistoryRoi7x7Canvas = document.getElementById('rightHistoryRoi7x7Canvas');
+    const rightHistoryRoi7x7Ctx = rightHistoryRoi7x7Canvas.getContext('2d');
+    const leftHistoryRoi7x7Meta = document.getElementById('leftHistoryRoi7x7Meta');
+    const rightHistoryRoi7x7Meta = document.getElementById('rightHistoryRoi7x7Meta');
     const rgbPixelInfo = getElementOrCreate('rgbPixelInfo');
     const grayPixelInfo = document.getElementById('grayPixelInfo');
     const binaryPixelInfo = document.getElementById('binaryPixelInfo');
@@ -2951,6 +2986,7 @@
         renderPidStatusPanel(renderStatus);
         drawIpmBoundaries(renderStatus);
         drawTraceDirCharts(renderStatus);
+        drawHistoryRoi7x7(renderStatus);
       };
     }
 
@@ -3516,6 +3552,7 @@
       renderInferFrame(renderStatus || {});
       drawIpmBoundaries(renderStatus || {});
       drawTraceDirCharts(renderStatus || {});
+      drawHistoryRoi7x7(renderStatus || {});
       if (hasValue(renderStatus && renderStatus.ipm_centerline_source)) {
         ipmCenterlineSourceLabel.style.display = '';
         ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(renderStatus.ipm_centerline_source);
@@ -4483,6 +4520,99 @@
                             'rightAux');
     }
 
+    function drawHistoryRoi7x7(status) {
+      const cellSize = 20;
+      const gridSize = 7;
+      const canvasWidth = cellSize * gridSize;
+      const canvasHeight = cellSize * gridSize;
+
+      function renderSide(canvas, ctx, metaEl, dataKey, cornerKey, sourceKey, sideLabel) {
+        const raw = Array.isArray(status[dataKey]) ? status[dataKey] : [];
+        const hasData = raw.length === gridSize * gridSize;
+        const cornerArr = Array.isArray(status[cornerKey]) ? status[cornerKey] : [];
+        const hasCorner = cornerArr.length === 2 && cornerArr[0] >= 0 && cornerArr[1] >= 0;
+        const sourceMap = {'-1':'未找到', '0':'历史跟踪', '1':'辅助边界', '2':'下角点重构'};
+        const sourceLabel = sourceMap[String(status[sourceKey])] || '未知';
+        metaEl.textContent = sideLabel + (hasData ? ' — 有数据' : ' — 等待数据') + '  检测:' + sourceLabel;
+        if (hasCorner && hasData) {
+          metaEl.textContent += '  角点@(' + cornerArr[0] + ',' + cornerArr[1] + ')';
+        }
+
+        if (canvas.width !== canvasWidth) canvas.width = canvasWidth;
+        if (canvas.height !== canvasHeight) canvas.height = canvasHeight;
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        if (!hasData) {
+          ctx.fillStyle = '#475569';
+          ctx.font = '12px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('无数据', canvasWidth / 2, canvasHeight / 2);
+          ctx.textAlign = 'start';
+          return;
+        }
+
+        for (let row = 0; row < gridSize; ++row) {
+          for (let col = 0; col < gridSize; ++col) {
+            const val = Number(raw[row * gridSize + col]);
+            const x = col * cellSize;
+            const y = row * cellSize;
+            if (val === 0) {
+              ctx.fillStyle = '#000000';
+            } else if (val === 255) {
+              ctx.fillStyle = '#ffffff';
+            } else if (val === 128) {
+              ctx.fillStyle = '#fbbf24';
+            } else {
+              ctx.fillStyle = '#6366f1';
+            }
+            ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+          }
+        }
+
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= gridSize; ++i) {
+          const pos = i * cellSize;
+          ctx.beginPath();
+          ctx.moveTo(pos, 0);
+          ctx.lineTo(pos, canvasHeight);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(0, pos);
+          ctx.lineTo(canvasWidth, pos);
+          ctx.stroke();
+        }
+
+        if (hasCorner) {
+          const cx = cornerArr[0], cy = cornerArr[1];
+          if (cx >= 0 && cx < gridSize && cy >= 0 && cy < gridSize) {
+            const mx = cx * cellSize + cellSize / 2;
+            const my = cy * cellSize + cellSize / 2;
+            const r = cellSize / 2 - 1;
+            ctx.beginPath();
+            ctx.arc(mx, my, r, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(mx, my, r - 2, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#22d3ee';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+      }
+
+      renderSide(leftHistoryRoi7x7Canvas, leftHistoryRoi7x7Ctx, leftHistoryRoi7x7Meta,
+                  'cross_left_history_roi_7x7', 'cross_left_history_roi_corner',
+                  'cross_left_upper_corner_source', '左侧 7x7 ROI');
+      renderSide(rightHistoryRoi7x7Canvas, rightHistoryRoi7x7Ctx, rightHistoryRoi7x7Meta,
+                  'cross_right_history_roi_7x7', 'cross_right_history_roi_corner',
+                  'cross_right_upper_corner_source', '右侧 7x7 ROI');
+    }
+
     function renderGrayFrameFromSource(source, w, h, sourceMode) {
       if (!source || !w || !h) return;
       if (rawGrayCanvas.width !== w) rawGrayCanvas.width = w;
@@ -5181,6 +5311,7 @@
         if (isFull || shouldUseLocalCompute()) {
           drawIpmBoundaries(renderStatus);
           drawTraceDirCharts(renderStatus);
+          drawHistoryRoi7x7(renderStatus);
           if (hasValue(renderStatus.ipm_centerline_source)) {
             ipmCenterlineSourceLabel.style.display = '';
             ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(renderStatus.ipm_centerline_source);

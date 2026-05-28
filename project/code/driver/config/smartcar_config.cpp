@@ -1105,9 +1105,6 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_INT(cross_lower_corner_post_min_votes);
     REQUIRE_RUNTIME_INT(cross_lower_corner_transition_max_len);
     REQUIRE_RUNTIME_INT(cross_lower_corner_pair_y_diff_max);
-    REQUIRE_RUNTIME_BOOL(cross_lower_corner_extrapolate_enabled);
-    REQUIRE_RUNTIME_INT(cross_lower_corner_extrapolate_min_y);
-    REQUIRE_RUNTIME_INT(cross_lower_corner_extrapolate_y_span);
     REQUIRE_RUNTIME_INT(cross_lower_corner_jump_window);
     REQUIRE_RUNTIME_FLOAT(cross_lower_corner_jump_ratio);
     REQUIRE_RUNTIME_INT(src_boundary_straight_check_count);
@@ -1140,19 +1137,6 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_INT(ipm_centerline_curvature_step);
     REQUIRE_RUNTIME_BOOL(zebra_cross_detection_enabled);
     REQUIRE_RUNTIME_BOOL(keep_last_centerline_on_double_loss);
-    REQUIRE_RUNTIME_BOOL(route_cross_detection_enabled);
-    REQUIRE_RUNTIME_INT(route_cross_entry_corner_fit_points);
-    REQUIRE_RUNTIME_INT(route_cross_entry_corner_extrapolate_count);
-    REQUIRE_RUNTIME_INT(route_cross_entry_corner_extrapolate_white_min);
-    REQUIRE_RUNTIME_INT(route_cross_stage2_enter_start_frame_wall_rows_min);
-    REQUIRE_RUNTIME_INT(route_cross_stage1_enter_corner_y_min);
-    REQUIRE_RUNTIME_INT(route_cross_exit_start_gap_x_max);
-    REQUIRE_RUNTIME_INT(route_cross_stage3_jump_x_threshold_px);
-    REQUIRE_RUNTIME_INT(route_cross_stage3_cut_forward_points);
-    REQUIRE_RUNTIME_INT(route_cross_stage3_left_anchor_x);
-    REQUIRE_RUNTIME_INT(route_cross_stage3_left_anchor_y);
-    REQUIRE_RUNTIME_INT(route_cross_stage3_right_anchor_x);
-    REQUIRE_RUNTIME_INT(route_cross_stage3_right_anchor_y);
     REQUIRE_RUNTIME_BOOL(route_circle_detection_enabled);
     REQUIRE_RUNTIME_INT(route_circle_entry_min_boundary_count);
     REQUIRE_RUNTIME_INT(route_circle_entry_corner_tail_margin);
@@ -1182,16 +1166,6 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_INT(cross_aux_history_x_offset);
     REQUIRE_RUNTIME_INT(ipm_line_error_source);
     REQUIRE_RUNTIME_INT(ipm_line_error_method);
-
-    // 兼容旧版本配置：以下键已弃用，若存在则仅消费避免触发 unknown-keys。
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_dir4_pre_run_len");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_transition_max_len");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_dir6_post_run_len");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_corner_pre_window");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_corner_post_window");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_corner_pre_min_votes");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_corner_post_min_votes");
-    consume_optional_key_if_present(values, &consumed, "vision.runtime.cross_upper_corner_transition_max_len");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_fixed_index");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_weighted_point_count");
     consume_optional_key_if_present(values, &consumed, "vision.runtime.ipm_line_error_point_indices");

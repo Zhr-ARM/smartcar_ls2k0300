@@ -276,7 +276,6 @@ const char *route_main_state_name(int route_main_state)
         case VISION_ROUTE_MAIN_NORMAL:       return "NORMAL";
         case VISION_ROUTE_MAIN_CIRCLE:       return "CIRCLE";
         case VISION_ROUTE_MAIN_STRAIGHT:     return "STRAIGHT_DISABLED";
-        case VISION_ROUTE_MAIN_CROSS:        return "CROSS_REPAIR";
         default:                             return "UNKNOWN_MAIN";
     }
 }
@@ -286,9 +285,6 @@ const char *route_sub_state_name(int route_sub_state)
     switch (route_sub_state)
     {
         case VISION_ROUTE_SUB_NONE:                 return "NONE";
-        case VISION_ROUTE_SUB_CROSS_1:              return "CROSS_1";
-        case VISION_ROUTE_SUB_CROSS_2:              return "CROSS_2";
-        case VISION_ROUTE_SUB_CROSS_3:              return "CROSS_3";
         case VISION_ROUTE_SUB_CIRCLE_LEFT_1:        return "CIRCLE_LEFT_1";
         case VISION_ROUTE_SUB_CIRCLE_LEFT_2:        return "CIRCLE_LEFT_2";
         case VISION_ROUTE_SUB_CIRCLE_LEFT_3:        return "CIRCLE_LEFT_3";

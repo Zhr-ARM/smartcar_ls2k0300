@@ -204,12 +204,6 @@ typedef struct
     int cross_lower_corner_transition_max_len;
     // 十字下角点识别：左右候选角点 y 坐标最大允许差，超出则双边稳定标志无效。
     int cross_lower_corner_pair_y_diff_max;
-    // 普通原图下角点处理：截断后是否使用角点前边界拟合直线，并向角点上方补一段。
-    bool cross_lower_corner_extrapolate_enabled;
-    // 十字补线触发的下角点最小 y 阈值，只有角点 y 严格大于该值才补线。
-    int cross_lower_corner_extrapolate_min_y;
-    // 十字下角点补线向上的延伸长度（按 y 行数计算）。
-    int cross_lower_corner_extrapolate_y_span;
     // 十字下角点跳变精修：规则边界搜索窗口半宽（点数）。
     int cross_lower_corner_jump_window;
     // 十字下角点跳变精修：x跳变幅度判据的倍率阈值。
@@ -283,31 +277,6 @@ typedef struct
     bool zebra_cross_detection_enabled;
     // 双边都丢线时是否保持上一帧平移中线数组。
     bool keep_last_centerline_on_double_loss;
-    // 状态机十字识别开关：true=允许进入十字状态，false=禁用十字识别。
-    bool route_cross_detection_enabled;
-    // normal 进入 cross 的条件：最小二乘拟合所用的点数（角点 + 前 N-1 个点）。
-    int route_cross_entry_corner_fit_points;
-    // normal 进入 cross 的条件：从角点向前延伸的点数。
-    int route_cross_entry_corner_extrapolate_count;
-    // normal 进入 cross 的条件：延伸点中连续白点的最小个数。
-    int route_cross_entry_corner_extrapolate_white_min;
-    // cross_1 -> cross_2 的“起始行已经贴边”阈值。
-    // 当前设计里 1 表示起始行一旦用到边框边界就触发。
-    int route_cross_stage2_enter_start_frame_wall_rows_min;
-    // cross_1 -> cross_2 的角点 y 最小阈值（任一侧满足即可）。
-    int route_cross_stage1_enter_corner_y_min;
-    // cross_2 -> normal 的起始左右边界 x 差最大阈值（px）。
-    int route_cross_exit_start_gap_x_max;
-    // cross_3 规则边界跳变检测阈值（相邻点 x 差）。
-    int route_cross_stage3_jump_x_threshold_px;
-    // cross_3 命中跳变后向前推进的点数。
-    int route_cross_stage3_cut_forward_points;
-    // cross_3 左侧桥接锚点（原图坐标）。
-    int route_cross_stage3_left_anchor_x;
-    int route_cross_stage3_left_anchor_y;
-    // cross_3 右侧桥接锚点（原图坐标）。
-    int route_cross_stage3_right_anchor_x;
-    int route_cross_stage3_right_anchor_y;
     // 状态机圆环识别开关：true=允许进入圆环状态，false=禁用圆环识别。
     bool route_circle_detection_enabled;
     // 圆环入口判定：对侧边界最少点数，同时角点索引需距离边界尾部至少保留该余量。

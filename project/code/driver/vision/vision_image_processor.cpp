@@ -112,9 +112,6 @@ static std::atomic<int> g_cross_lower_left_corner_x(0);
 static std::atomic<int> g_cross_lower_left_corner_y(0);
 static std::atomic<int> g_cross_lower_right_corner_x(0);
 static std::atomic<int> g_cross_lower_right_corner_y(0);
-static std::atomic<int> g_cross_left_corner_extrapolate_white(0);
-static std::atomic<int> g_cross_right_corner_extrapolate_white(0);
-static std::atomic<int> g_cross_start_boundary_gap_x(0);
 static std::atomic<bool> g_cross_left_aux_found(false);
 static std::atomic<bool> g_cross_right_aux_found(false);
 static std::atomic<int> g_cross_left_aux_transition_x(0);
@@ -153,13 +150,18 @@ static std::atomic<int> g_cross_left_upper_corner_x(0);
 static std::atomic<int> g_cross_left_upper_corner_y(0);
 static std::atomic<int> g_cross_right_upper_corner_x(0);
 static std::atomic<int> g_cross_right_upper_corner_y(0);
-// CROSS_2 使用的“冻结下角点”（由 CROSS_1 记录并在进入 CROSS_2 时固化）。
-static std::atomic<bool> g_cross_stage2_frozen_left_corner_found(false);
-static std::atomic<bool> g_cross_stage2_frozen_right_corner_found(false);
-static std::atomic<int> g_cross_stage2_frozen_left_corner_x(0);
-static std::atomic<int> g_cross_stage2_frozen_left_corner_y(0);
-static std::atomic<int> g_cross_stage2_frozen_right_corner_x(0);
-static std::atomic<int> g_cross_stage2_frozen_right_corner_y(0);
+// 上角点检测来源: -1=未检测, 0=历史跟踪, 1=辅助边界, 2=下角点重构
+static std::atomic<int> g_cross_left_upper_corner_source(-1);
+static std::atomic<int> g_cross_right_upper_corner_source(-1);
+// 7x7 历史角点 ROI 二值图（用于网页调试显示）
+static std::array<uint8, 49> g_cross_left_history_roi_7x7{};
+static std::array<uint8, 49> g_cross_right_history_roi_7x7{};
+static std::atomic<bool> g_cross_left_history_roi_7x7_valid{false};
+static std::atomic<bool> g_cross_right_history_roi_7x7_valid{false};
+static std::atomic<int> g_cross_left_history_roi_corner_x(-1);
+static std::atomic<int> g_cross_left_history_roi_corner_y(-1);
+static std::atomic<int> g_cross_right_history_roi_corner_x(-1);
+static std::atomic<int> g_cross_right_history_roi_corner_y(-1);
 static std::atomic<bool> g_src_left_trace_has_frame_wall(false);
 static std::atomic<bool> g_src_right_trace_has_frame_wall(false);
 static std::atomic<int> g_src_left_start_frame_wall_rows(0);
@@ -472,7 +474,6 @@ static void fill_single_line_arrays_from_points(const maze_point_t *pts,
                                                 int width,
                                                 int height);
 static bool detect_src_straight_boundary_from_dirs(const uint8 *dirs, int count);
-static int count_extrapolate_white(const maze_point_t *pts, int count, int corner_index);
 static bool find_vertical_white_to_black_transition(PixelClassifier &classifier,
                                                     int x,
                                                     int start_y,
@@ -543,9 +544,6 @@ static bool build_cross_aux_boundary(PixelClassifier &classifier,
                                      maze_point_t *regular_pts,
                                      int *regular_count,
                                      maze_point_t *transition_point);
-static int truncate_regular_boundary_before_point_inplace(maze_point_t *pts,
-                                                          int count,
-                                                          const maze_point_t &corner_point);
 static int concatenate_boundary_segments(const maze_point_t *segment_a,
                                          int count_a,
                                          const maze_point_t *segment_b,
@@ -616,10 +614,6 @@ static int truncate_boundary_at_cross_lower_corner_inplace(maze_point_t *pts,
                                                            int corner_x,
                                                            int corner_y,
                                                            int max_pts);
-static bool fit_src_boundary_slope_by_y_below_corner(const maze_point_t *pts,
-                                                     int num,
-                                                     int corner_y,
-                                                     float *slope);
 static bool find_raw_boundary_x_at_row(const maze_point_t *pts, int count, int target_y, int *x_out);
 static bool circle_entry_raw_boundary_gap_ready(const maze_point_t *left_raw_pts,
                                                 int left_raw_num,
@@ -893,11 +887,6 @@ static void draw_binary_black_frame(uint8 *binary_img)
         binary_img[y * kProcWidth + (kProcWidth - 2)] = 0;
         binary_img[y * kProcWidth + (kProcWidth - 1)] = 0;
     }
-    for (int x = 0; x < kProcWidth; ++x)
-    {
-        binary_img[x] = 0;
-        binary_img[kProcWidth + x] = 0;
-    }
 }
 
 static void clear_eight_neighbor_trace_cache()
@@ -949,9 +938,6 @@ static void clear_cross_lower_corner_detection_cache()
     g_cross_lower_left_corner_y.store(0);
     g_cross_lower_right_corner_x.store(0);
     g_cross_lower_right_corner_y.store(0);
-    g_cross_left_corner_extrapolate_white.store(0);
-    g_cross_right_corner_extrapolate_white.store(0);
-    g_cross_start_boundary_gap_x.store(0);
 }
 
 static void clear_cross_aux_cache()
@@ -962,14 +948,6 @@ static void clear_cross_aux_cache()
     g_cross_left_aux_transition_y.store(0);
     g_cross_right_aux_transition_x.store(0);
     g_cross_right_aux_transition_y.store(0);
-    g_cross_left_upper_corner_found.store(false);
-    g_cross_right_upper_corner_found.store(false);
-    g_cross_left_upper_corner_index.store(-1);
-    g_cross_right_upper_corner_index.store(-1);
-    g_cross_left_upper_corner_x.store(0);
-    g_cross_left_upper_corner_y.store(0);
-    g_cross_right_upper_corner_x.store(0);
-    g_cross_right_upper_corner_y.store(0);
     std::fill_n(g_cross_left_aux_trace_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_cross_left_aux_trace_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_cross_left_aux_trace_dir, VISION_BOUNDARY_NUM, static_cast<uint8>(255));
@@ -1207,77 +1185,6 @@ static int count_leading_side_frame_wall_rows(const maze_point_t *pts, int count
     return rows;
 }
 
-static int count_extrapolate_white(const maze_point_t *pts, int count, int corner_index)
-{
-    const int fit_points =
-        std::clamp(g_vision_runtime_config.route_cross_entry_corner_fit_points, 2, VISION_BOUNDARY_NUM);
-    if (pts == nullptr || count <= 0 || corner_index < fit_points - 1 || corner_index >= count)
-    {
-        return 0;
-    }
-
-    // 最小二乘法拟合 x = a*y + b，取角点及前面 fit_points-1 个点
-    double sum_x = 0.0, sum_y = 0.0, sum_xy = 0.0, sum_y2 = 0.0;
-    const int start_idx = corner_index - (fit_points - 1);
-    for (int i = start_idx; i <= corner_index; ++i)
-    {
-        const double xi = static_cast<double>(pts[i].x);
-        const double yi = static_cast<double>(pts[i].y);
-        sum_x += xi;
-        sum_y += yi;
-        sum_xy += xi * yi;
-        sum_y2 += yi * yi;
-    }
-
-    const double n = static_cast<double>(fit_points);
-    const double denom = n * sum_y2 - sum_y * sum_y;
-    if (std::abs(denom) < 1e-9)
-    {
-        return 0;
-    }
-
-    const double a = (n * sum_xy - sum_x * sum_y) / denom;
-    const double b = (sum_x - a * sum_y) / n;
-
-    // 从角点向前延伸，统计连续白点
-    const int extrap_count =
-        std::clamp(g_vision_runtime_config.route_cross_entry_corner_extrapolate_count, 1, VISION_BOUNDARY_NUM);
-    const int corner_y = pts[corner_index].y;
-    int max_consecutive = 0;
-    int current_consecutive = 0;
-
-    for (int j = 1; j <= extrap_count; ++j)
-    {
-        const int y_pred = corner_y - j; // 向前 = 向上（y 减小）
-        if (y_pred < 0 || y_pred >= kProcHeight)
-        {
-            current_consecutive = 0;
-            continue;
-        }
-        const int x_pred = static_cast<int>(std::lround(a * static_cast<double>(y_pred) + b));
-        if (x_pred < 0 || x_pred >= kProcWidth)
-        {
-            current_consecutive = 0;
-            continue;
-        }
-
-        if (g_image_binary_u8[y_pred * kProcWidth + x_pred] == 255)
-        {
-            ++current_consecutive;
-            if (current_consecutive > max_consecutive)
-            {
-                max_consecutive = current_consecutive;
-            }
-        }
-        else
-        {
-            current_consecutive = 0;
-        }
-    }
-
-    return max_consecutive;
-}
-
 static bool find_vertical_white_to_black_transition(PixelClassifier &classifier,
                                                     int x,
                                                     int start_y,
@@ -1463,37 +1370,6 @@ static bool find_fitted_white_to_black_transition(PixelClassifier &classifier,
     return true;
 }
 
-static bool find_regular_boundary_jump_cut_point(const maze_point_t *pts,
-                                                 int count,
-                                                 int x_diff_threshold,
-                                                 int cut_forward_points,
-                                                 maze_point_t *cut_point,
-                                                 int *cut_index)
-{
-    if (cut_point) *cut_point = maze_point_t{0, 0};
-    if (cut_index) *cut_index = -1;
-    if (pts == nullptr || count < 2)
-    {
-        return false;
-    }
-
-    const int safe_count = std::clamp(count, 0, VISION_BOUNDARY_NUM);
-    for (int i = 1; i < safe_count; ++i)
-    {
-        const int dx = std::abs(pts[i].x - pts[i - 1].x);
-        if (dx <= x_diff_threshold)
-        {
-            continue;
-        }
-
-        const int index = std::clamp(i + std::max(0, cut_forward_points), 0, safe_count - 1);
-        if (cut_point) *cut_point = pts[index];
-        if (cut_index) *cut_index = index;
-        return true;
-    }
-
-    return false;
-}
 
 static bool find_raw_boundary_x_at_row(const maze_point_t *pts, int count, int target_y, int *x_out)
 {
@@ -1699,43 +1575,6 @@ static int build_line_points_between(const maze_point_t &a,
     return out_num;
 }
 
-static int build_line_points_between_with_y_step(const maze_point_t &a,
-                                                 const maze_point_t &b,
-                                                 int y_step,
-                                                 maze_point_t *out_pts,
-                                                 int max_out_pts)
-{
-    if (out_pts == nullptr || max_out_pts <= 0)
-    {
-        return 0;
-    }
-
-    const int safe_step = std::max(1, y_step);
-    const int min_y = std::min(a.y, b.y);
-    const int max_y = std::max(a.y, b.y);
-    int out_num = 0;
-    for (int y = max_y; y >= min_y && out_num < max_out_pts; y -= safe_step)
-    {
-        float t = 0.0f;
-        if (a.y != b.y)
-        {
-            t = static_cast<float>(y - a.y) / static_cast<float>(b.y - a.y);
-        }
-        const float xf = static_cast<float>(a.x) + t * static_cast<float>(b.x - a.x);
-        out_pts[out_num++] = {std::clamp(static_cast<int>(std::lround(xf)), 0, kProcWidth - 1), y};
-    }
-
-    if (out_num < max_out_pts)
-    {
-        const maze_point_t end_point{std::clamp(b.x, 0, kProcWidth - 1), std::clamp(b.y, 0, kProcHeight - 1)};
-        if (out_num <= 0 || out_pts[out_num - 1].x != end_point.x || out_pts[out_num - 1].y != end_point.y)
-        {
-            out_pts[out_num++] = end_point;
-        }
-    }
-
-    return out_num;
-}
 
 static int find_first_frame_touch_index_with_margin(const maze_point_t *pts, int num, int margin_px)
 {
@@ -1923,53 +1762,6 @@ static int build_circle_stage5_boundary_with_corner_slope_guide(const maze_point
     }
 
     return final_num;
-}
-
-static int build_cross_stage3_anchor_cut_boundary(const maze_point_t *regular_pts,
-                                                  int regular_num,
-                                                  const maze_point_t &anchor,
-                                                  int jump_x_threshold_px,
-                                                  int cut_forward_points,
-                                                  maze_point_t *out_pts,
-                                                  int max_out_pts)
-{
-    if (regular_pts == nullptr || regular_num <= 0 || out_pts == nullptr || max_out_pts <= 0)
-    {
-        return 0;
-    }
-
-    maze_point_t cut_point{};
-    int cut_index = -1;
-    if (!find_regular_boundary_jump_cut_point(regular_pts,
-                                              regular_num,
-                                              jump_x_threshold_px,
-                                              cut_forward_points,
-                                              &cut_point,
-                                              &cut_index))
-    {
-        return 0;
-    }
-
-    std::array<maze_point_t, VISION_BOUNDARY_NUM> tail_pts{};
-    const int tail_num = copy_boundary_points(regular_pts + cut_index,
-                                              regular_num - cut_index,
-                                              tail_pts.data(),
-                                              static_cast<int>(tail_pts.size()));
-    std::array<maze_point_t, VISION_BOUNDARY_NUM> bridge_pts{};
-    const int bridge_num = build_line_points_between(anchor,
-                                                     cut_point,
-                                                     bridge_pts.data(),
-                                                     static_cast<int>(bridge_pts.size()));
-    std::array<maze_point_t, VISION_BOUNDARY_NUM> combined_pts{};
-    const int combined_num = concatenate_boundary_segments(bridge_pts.data(),
-                                                           bridge_num,
-                                                           tail_pts.data(),
-                                                           tail_num,
-                                                           nullptr,
-                                                           0,
-                                                           combined_pts.data(),
-                                                           static_cast<int>(combined_pts.size()));
-    return copy_boundary_points(combined_pts.data(), combined_num, out_pts, max_out_pts);
 }
 
 [[maybe_unused]] static void overwrite_boundary_rows_with_points(maze_point_t *pts,
@@ -2366,6 +2158,7 @@ static void update_cross_upper_corner_detection_cache(PixelClassifier &classifie
         bool upper_found = false;
         maze_point_t upper_corner{0, 0};
         int upper_trace_index = -1;
+        int detect_source = -1;  // 0=历史跟踪, 1=辅助边界, 2=下角点重构, -1=未找到
 
         // ---- 路径 0: 7x7 正方形历史角点跟踪（最快） ----
         const bool prev_upper_found = is_left
@@ -2388,13 +2181,14 @@ static void update_cross_upper_corner_detection_cache(PixelClassifier &classifie
             {
                 upper_found = true;
                 upper_trace_index = -1;
+                detect_source = 0;
             }
         }
 
         // ---- 路径 1: 尝试用历史点重捕获 ----
         const bool history_valid = is_left ? g_cross_left_aux_last_transition_valid.load()
                                            : g_cross_right_aux_last_transition_valid.load();
-        if (history_valid)
+        if (!upper_found && history_valid)
         {
             int hist_x = is_left ? g_cross_left_aux_last_transition_x.load()
                                  : g_cross_right_aux_last_transition_x.load();
@@ -2441,6 +2235,7 @@ static void update_cross_upper_corner_detection_cache(PixelClassifier &classifie
                                                            &upper_trace_index))
                 {
                     upper_found = true;
+                    detect_source = 1;
                 }
                 else
                 {
@@ -2484,6 +2279,7 @@ static void update_cross_upper_corner_detection_cache(PixelClassifier &classifie
                                                            &upper_trace_index))
                 {
                     upper_found = true;
+                    detect_source = 2;
                 }
             }
         }
@@ -2494,6 +2290,7 @@ static void update_cross_upper_corner_detection_cache(PixelClassifier &classifie
         {
             g_cross_left_aux_found.store(has_aux);
             g_cross_left_upper_corner_found.store(upper_found);
+            g_cross_left_upper_corner_source.store(detect_source);
             if (upper_found)
             {
                 g_cross_left_upper_corner_index.store(upper_trace_index);
@@ -2520,6 +2317,7 @@ static void update_cross_upper_corner_detection_cache(PixelClassifier &classifie
         {
             g_cross_right_aux_found.store(has_aux);
             g_cross_right_upper_corner_found.store(upper_found);
+            g_cross_right_upper_corner_source.store(detect_source);
             if (upper_found)
             {
                 g_cross_right_upper_corner_index.store(upper_trace_index);
@@ -3783,7 +3581,7 @@ static bool binary_point_in_trace_range(int x, int y, int y_min, int x_min, int 
 
 static bool point_touches_artificial_frame(int x, int y)
 {
-    return x <= 1 || x >= (kProcWidth - 2) || y <= 1;
+    return x <= 1 || x >= (kProcWidth - 2);
 }
 
 static int trace_boundary_eight_neighbor(PixelClassifier &classifier,
@@ -4083,6 +3881,13 @@ static bool detect_upper_corner_from_history(PixelClassifier &classifier,
     if (corner_point) *corner_point = maze_point_t{0, 0};
     if (classifier.binary == nullptr) return false;
 
+    {
+        std::atomic<int> &cx = is_left ? g_cross_left_history_roi_corner_x : g_cross_right_history_roi_corner_x;
+        std::atomic<int> &cy = is_left ? g_cross_left_history_roi_corner_y : g_cross_right_history_roi_corner_y;
+        cx.store(-1);
+        cy.store(-1);
+    }
+
     const int img_w = VISION_DOWNSAMPLED_WIDTH;
     const int img_h = VISION_DOWNSAMPLED_HEIGHT;
     const int half = g_vision_runtime_config.cross_upper_history_square_half;
@@ -4103,6 +3908,45 @@ static bool detect_upper_corner_from_history(PixelClassifier &classifier,
         sy = prev_corner_y - half;
     }
 
+    // 捕获初始 7x7 ROI 二值图（网页调试用，不随迭代平移）
+    const int roi_origin_x = sx;
+    const int roi_origin_y = sy;
+    {
+        std::array<uint8, 49> &roi = is_left ? g_cross_left_history_roi_7x7 : g_cross_right_history_roi_7x7;
+        std::atomic<bool> &valid = is_left ? g_cross_left_history_roi_7x7_valid : g_cross_right_history_roi_7x7_valid;
+        for (int dy = 0; dy < side; ++dy)
+        {
+            for (int dx = 0; dx < side; ++dx)
+            {
+                const int px = sx + dx;
+                const int py = sy + dy;
+                if (px >= 0 && px < img_w && py >= 0 && py < img_h)
+                    roi[dy * side + dx] = classifier.binary[py * img_w + px];
+                else
+                    roi[dy * side + dx] = 128;
+            }
+        }
+        valid.store(true);
+    }
+
+    // 记录初始预期角点在 ROI 内的位置（搜索失败时也能在网页上看到参考位置）
+    {
+        std::atomic<int> &cx = is_left ? g_cross_left_history_roi_corner_x : g_cross_right_history_roi_corner_x;
+        std::atomic<int> &cy = is_left ? g_cross_left_history_roi_corner_y : g_cross_right_history_roi_corner_y;
+        if (is_left)
+        {
+            cx.store(black_n);
+        }
+        else
+        {
+            cx.store(side - 1 - black_n);
+        }
+        cy.store(black_n);
+    }
+
+    const uint8 *binary = classifier.binary;
+    const int stride = img_w;
+
     for (int iter = 0; iter < max_iter; ++iter)
     {
         if (sx < 0 || sy < 0 || sx + side > img_w || sy + side > img_h)
@@ -4110,94 +3954,108 @@ static bool detect_upper_corner_from_history(PixelClassifier &classifier,
             return false;
         }
 
-        const uint8 *binary = classifier.binary;
-        const int stride = img_w;
+        const int side_col_x = is_left ? sx : (sx + side - 1);
 
+        // ---- 1. 找顶行跳变 ----
+        int top_trans_x = -1; // 跳变后第一个"另一色"像素的 x（图像坐标）
         if (is_left)
         {
-            bool top_ok = true;
-            for (int i = 0; i < black_n && top_ok; ++i)
-                if (binary[sy * stride + sx + i] != 0) top_ok = false;
-            for (int i = black_n; i < side && top_ok; ++i)
-                if (binary[sy * stride + sx + i] != 255) top_ok = false;
-
-            bool left_ok = true;
-            for (int i = 0; i < black_n && left_ok; ++i)
-                if (binary[(sy + i) * stride + sx] != 0) left_ok = false;
-            for (int i = black_n; i < side && left_ok; ++i)
-                if (binary[(sy + i) * stride + sx] != 255) left_ok = false;
-
-            if (top_ok && left_ok)
+            // 左角点：顶行黑→白 (0→255)
+            for (int i = 1; i < side; ++i)
             {
-                if (corner_point)
+                if (binary[sy * stride + sx + i - 1] == 0 &&
+                    binary[sy * stride + sx + i] == 255)
                 {
-                    corner_point->x = sx + black_n;
-                    corner_point->y = sy + black_n;
+                    top_trans_x = sx + i; // 第一个白像素
+                    break;
                 }
-                return true;
             }
-
-            bool top_all_black = true, top_all_white = true;
-            for (int i = 0; i < side; ++i)
-            {
-                if (binary[sy * stride + sx + i] != 0)   top_all_black = false;
-                if (binary[sy * stride + sx + i] != 255) top_all_white = false;
-            }
-            if (top_all_black)       sx += shift;
-            else if (top_all_white)  sx -= shift;
-
-            bool left_all_black = true, left_all_white = true;
-            for (int i = 0; i < side; ++i)
-            {
-                if (binary[(sy + i) * stride + sx] != 0)   left_all_black = false;
-                if (binary[(sy + i) * stride + sx] != 255) left_all_white = false;
-            }
-            if (left_all_black)       sy += shift;
-            else if (left_all_white)  sy -= shift;
         }
         else
         {
-            const int right_x = sx + side - 1;
-
-            bool top_ok = true;
-            for (int i = 0; i < side - black_n && top_ok; ++i)
-                if (binary[sy * stride + sx + i] != 255) top_ok = false;
-            for (int i = side - black_n; i < side && top_ok; ++i)
-                if (binary[sy * stride + sx + i] != 0) top_ok = false;
-
-            bool right_ok = true;
-            for (int i = 0; i < black_n && right_ok; ++i)
-                if (binary[(sy + i) * stride + right_x] != 0) right_ok = false;
-            for (int i = black_n; i < side && right_ok; ++i)
-                if (binary[(sy + i) * stride + right_x] != 255) right_ok = false;
-
-            if (top_ok && right_ok)
+            // 右角点：顶行白→黑 (255→0)
+            for (int i = 1; i < side; ++i)
             {
-                if (corner_point)
+                if (binary[sy * stride + sx + i - 1] == 255 &&
+                    binary[sy * stride + sx + i] == 0)
                 {
-                    corner_point->x = sx + (side - 1 - black_n);
-                    corner_point->y = sy + black_n;
+                    top_trans_x = sx + i - 1; // 最后一个白像素
+                    break;
                 }
-                return true;
             }
+        }
 
-            bool top_all_black = true, top_all_white = true;
-            for (int i = 0; i < side; ++i)
+        // ---- 2. 找侧列跳变（黑→白，向下） ----
+        int side_trans_y = -1;
+        for (int i = 1; i < side; ++i)
+        {
+            if (binary[(sy + i - 1) * stride + side_col_x] == 0 &&
+                binary[(sy + i) * stride + side_col_x] == 255)
             {
-                if (binary[sy * stride + sx + i] != 0)   top_all_black = false;
-                if (binary[sy * stride + sx + i] != 255) top_all_white = false;
+                side_trans_y = sy + i; // 第一个白像素
+                break;
             }
-            if (top_all_black)       sx -= shift;
-            else if (top_all_white)  sx += shift;
+        }
 
-            bool right_all_black = true, right_all_white = true;
-            for (int i = 0; i < side; ++i)
+        // ---- 3. 两边都找到跳变 → 角点确定 ----
+        if (top_trans_x >= 0 && side_trans_y >= 0)
+        {
+            if (corner_point)
             {
-                if (binary[(sy + i) * stride + right_x] != 0)   right_all_black = false;
-                if (binary[(sy + i) * stride + right_x] != 255) right_all_white = false;
+                corner_point->x = top_trans_x;
+                corner_point->y = side_trans_y;
             }
-            if (right_all_black)       sy += shift;
-            else if (right_all_white)  sy -= shift;
+            {
+                std::atomic<int> &cx = is_left ? g_cross_left_history_roi_corner_x : g_cross_right_history_roi_corner_x;
+                std::atomic<int> &cy = is_left ? g_cross_left_history_roi_corner_y : g_cross_right_history_roi_corner_y;
+                cx.store(top_trans_x - roi_origin_x);
+                cy.store(side_trans_y - roi_origin_y);
+            }
+            return true;
+        }
+
+        // ---- 4. 交替微调窗口位置 ----
+        const bool try_x = (iter % 2 == 0); // 偶数轮调水平，奇数轮调垂直
+
+        if (try_x && top_trans_x < 0)
+        {
+            // 顶行没找到跳变 → 调 sx
+            int black_cnt = 0;
+            for (int i = 0; i < side; ++i)
+                if (binary[sy * stride + sx + i] == 0) ++black_cnt;
+            const bool mostly_black = (black_cnt > side / 2);
+
+            if (is_left)
+                sx += mostly_black ? shift : -shift;  // 黑多→角点在右，白多→角点在左
+            else
+                sx += mostly_black ? -shift : shift;  // 黑多→角点在左，白多→角点在右
+        }
+        else if (!try_x && side_trans_y < 0)
+        {
+            // 侧列没找到跳变 → 调 sy
+            int black_cnt = 0;
+            for (int i = 0; i < side; ++i)
+                if (binary[(sy + i) * stride + side_col_x] == 0) ++black_cnt;
+            sy += (black_cnt > side / 2) ? shift : -shift; // 黑多→角点在下，白多→角点在上
+        }
+        else if (try_x && side_trans_y < 0)
+        {
+            // 本轮想调水平但顶行已有跳变 → 改调垂直
+            int black_cnt = 0;
+            for (int i = 0; i < side; ++i)
+                if (binary[(sy + i) * stride + side_col_x] == 0) ++black_cnt;
+            sy += (black_cnt > side / 2) ? shift : -shift;
+        }
+        else if (!try_x && top_trans_x < 0)
+        {
+            // 本轮想调垂直但侧列已有跳变 → 改调水平
+            int black_cnt = 0;
+            for (int i = 0; i < side; ++i)
+                if (binary[sy * stride + sx + i] == 0) ++black_cnt;
+            if (is_left)
+                sx += (black_cnt > side / 2) ? shift : -shift;
+            else
+                sx += (black_cnt > side / 2) ? -shift : shift;
         }
     }
 
@@ -4283,40 +4141,6 @@ static bool find_nth_dir_point_from_trace_end(const maze_point_t *trace_pts,
     return false;
 }
 
-static int truncate_regular_boundary_before_point_inplace(maze_point_t *pts,
-                                                          int count,
-                                                          const maze_point_t &corner_point)
-{
-    if (pts == nullptr || count <= 0)
-    {
-        return 0;
-    }
-
-    int start_index = -1;
-    for (int i = 0; i < count; ++i)
-    {
-        if (pts[i].y <= corner_point.y)
-        {
-            start_index = i;
-            break;
-        }
-    }
-    if (start_index <= 0)
-    {
-        return count;
-    }
-
-    const int remain = count - start_index;
-    if (remain <= 0)
-    {
-        return 0;
-    }
-    for (int i = 0; i < remain; ++i)
-    {
-        pts[i] = pts[start_index + i];
-    }
-    return remain;
-}
 
 static int concatenate_boundary_segments(const maze_point_t *segment_a,
                                          int count_a,
@@ -4581,102 +4405,6 @@ static int rebuild_boundary_points_from_row_table(const std::array<int, kProcHei
     return out_num;
 }
 
-static bool fit_src_boundary_slope_by_y_below_corner(const maze_point_t *pts,
-                                                     int num,
-                                                     int corner_y,
-                                                     float *slope)
-{
-    if (pts == nullptr || slope == nullptr || num <= 0)
-    {
-        return false;
-    }
-
-    double sum_y = 0.0;
-    double sum_x = 0.0;
-    double sum_yx = 0.0;
-    double sum_y2 = 0.0;
-    int fit_num = 0;
-    for (int i = 0; i < num && fit_num < kCrossLowerFitPointCount; ++i)
-    {
-        // 每行数组按 y 从大到小排列；仅使用角点下方（更靠近车体）的边界点估计方向。
-        if (pts[i].y <= corner_y)
-        {
-            continue;
-        }
-
-        const double y = static_cast<double>(pts[i].y);
-        const double x = static_cast<double>(pts[i].x);
-        sum_y += y;
-        sum_x += x;
-        sum_yx += y * x;
-        sum_y2 += y * y;
-        ++fit_num;
-    }
-
-    if (fit_num < kCrossLowerFitMinPointCount)
-    {
-        return false;
-    }
-
-    const double denom = static_cast<double>(fit_num) * sum_y2 - sum_y * sum_y;
-    if (std::fabs(denom) < 1e-6)
-    {
-        return false;
-    }
-
-    const double k = (static_cast<double>(fit_num) * sum_yx - sum_y * sum_x) / denom;
-    *slope = static_cast<float>(k);
-    return true;
-}
-
-static int extrapolate_cross_lower_boundary_inplace(maze_point_t *pts,
-                                                    int num,
-                                                    int corner_x,
-                                                    int corner_y,
-                                                    int max_pts)
-{
-    if (pts == nullptr || num <= 0 || max_pts <= 0)
-    {
-        return num;
-    }
-
-    float slope = 0.0f;
-    if (!fit_src_boundary_slope_by_y_below_corner(pts, num, corner_y, &slope))
-    {
-        return num;
-    }
-
-    const float intercept = static_cast<float>(corner_x) - slope * static_cast<float>(corner_y);
-
-    num = truncate_boundary_at_cross_lower_corner_inplace(pts, num, corner_x, corner_y, max_pts);
-    if (num <= 0)
-    {
-        return num;
-    }
-
-    std::array<int, kProcHeight> border_x{};
-    border_x.fill(-1);
-    for (int i = 0; i < num; ++i)
-    {
-        const int y = std::clamp(pts[i].y, 0, kProcHeight - 1);
-        if (y <= 0 || y >= kProcHeight - 1)
-        {
-            continue;
-        }
-        border_x[y] = std::clamp(pts[i].x, 0, kProcWidth - 1);
-    }
-
-    const int extrapolate_y_span = std::max(0, g_vision_runtime_config.cross_lower_corner_extrapolate_y_span);
-    const int start_y = std::clamp(corner_y, 1, kProcHeight - 2);
-    const int end_y = std::clamp(corner_y - extrapolate_y_span, 1, kProcHeight - 2);
-    for (int y = start_y - 1; y >= end_y; --y)
-    {
-        const int x = static_cast<int>(std::lround(slope * static_cast<float>(y) + intercept));
-        border_x[y] = std::clamp(x, 0, kProcWidth - 1);
-    }
-
-    return rebuild_boundary_points_from_row_table(border_x, pts, std::min(max_pts, VISION_BOUNDARY_NUM));
-}
 
 static int truncate_boundary_at_cross_lower_corner_inplace(maze_point_t *pts,
                                                            int num,
@@ -4970,8 +4698,6 @@ bool vision_image_processor_process_step()
     std::array<maze_point_t, VISION_BOUNDARY_NUM> right_pts{};
     std::array<maze_point_t, VISION_BOUNDARY_NUM> left_ipm_pts{};
     std::array<maze_point_t, VISION_BOUNDARY_NUM> right_ipm_pts{};
-    std::array<maze_point_t, VISION_BOUNDARY_NUM> left_cross_base_pts{};
-    std::array<maze_point_t, VISION_BOUNDARY_NUM> right_cross_base_pts{};
     std::array<maze_point_t, VISION_BOUNDARY_NUM> left_cross_aux_trace_pts{};
     std::array<maze_point_t, VISION_BOUNDARY_NUM> right_cross_aux_trace_pts{};
     std::array<uint8, VISION_BOUNDARY_NUM> left_cross_aux_trace_dirs{};
@@ -4997,27 +4723,12 @@ bool vision_image_processor_process_step()
     int right_start_frame_wall_rows = 0;
     int left_boundary_count_signal = 0;
     int right_boundary_count_signal = 0;
-    int left_corner_extrapolate_white = 0;
-    int right_corner_extrapolate_white = 0;
-    int start_boundary_gap_x = 0;
     int left_cross_aux_trace_num = 0;
     int right_cross_aux_trace_num = 0;
     int left_cross_aux_regular_num = 0;
     int right_cross_aux_regular_num = 0;
-    int left_cross_base_num = 0;
-    int right_cross_base_num = 0;
     bool left_start_row_used_frame_deleted = false;
     bool right_start_row_used_frame_deleted = false;
-    bool cross1_last_left_corner_found = g_cross_stage2_frozen_left_corner_found.load();
-    bool cross1_last_right_corner_found = g_cross_stage2_frozen_right_corner_found.load();
-    maze_point_t cross1_last_left_corner{
-        g_cross_stage2_frozen_left_corner_x.load(),
-        g_cross_stage2_frozen_left_corner_y.load()
-    };
-    maze_point_t cross1_last_right_corner{
-        g_cross_stage2_frozen_right_corner_x.load(),
-        g_cross_stage2_frozen_right_corner_y.load()
-    };
     maze_point_t left_cross_aux_transition{0, 0};
     maze_point_t right_cross_aux_transition{0, 0};
     clear_eight_neighbor_trace_cache();
@@ -5046,22 +4757,6 @@ bool vision_image_processor_process_step()
     const bool right_circle_stage6_active =
         (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE) &&
         (route_snapshot_before_trace.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_6);
-    const bool cross3_state_active_before_trace =
-        (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CROSS) &&
-        (route_snapshot_before_trace.sub_state == VISION_ROUTE_SUB_CROSS_3);
-    if (route_snapshot_before_trace.main_state != VISION_ROUTE_MAIN_CROSS)
-    {
-        g_cross_stage2_frozen_left_corner_found.store(false);
-        g_cross_stage2_frozen_right_corner_found.store(false);
-        g_cross_stage2_frozen_left_corner_x.store(0);
-        g_cross_stage2_frozen_left_corner_y.store(0);
-        g_cross_stage2_frozen_right_corner_x.store(0);
-        g_cross_stage2_frozen_right_corner_y.store(0);
-        cross1_last_left_corner_found = false;
-        cross1_last_right_corner_found = false;
-        cross1_last_left_corner = maze_point_t{0, 0};
-        cross1_last_right_corner = maze_point_t{0, 0};
-    }
     if (left_circle_stage6_active || right_circle_stage6_active)
     {
         maze_start_row = std::clamp(std::min(maze_start_row, g_vision_runtime_config.route_circle_stage6_maze_start_row),
@@ -5241,40 +4936,32 @@ bool vision_image_processor_process_step()
             right_trace_first_touch_y_work = right_trace_pts[right_first_frame_touch_index].y;
         }
 
-        if (!cross3_state_active_before_trace)
-        {
-            const int left_trimmed_prefix_rows = trim_initial_artificial_frame_prefix_inplace(left_trace_pts.data(),
-                                                                                               left_trace_dirs.data(),
-                                                                                               &left_trace_num);
-            const int right_trimmed_prefix_rows = trim_initial_artificial_frame_prefix_inplace(right_trace_pts.data(),
-                                                                                                right_trace_dirs.data(),
-                                                                                                &right_trace_num);
-            // “起始行没巡到线”定义：起始沿边框巡线，且该前缀在主流程中被整段删空。
-            left_start_row_used_frame_deleted =
-                (left_trimmed_prefix_rows > 0) &&
-                (left_trace_num <= 0) &&
-                (left_trace_raw_num > 0) &&
-                point_touches_artificial_frame(left_trace_pts_raw[0].x, left_trace_pts_raw[0].y);
-            right_start_row_used_frame_deleted =
-                (right_trimmed_prefix_rows > 0) &&
-                (right_trace_num <= 0) &&
-                (right_trace_raw_num > 0) &&
-                point_touches_artificial_frame(right_trace_pts_raw[0].x, right_trace_pts_raw[0].y);
-        }
+        const int left_trimmed_prefix_rows = trim_initial_artificial_frame_prefix_inplace(left_trace_pts.data(),
+                                                                                           left_trace_dirs.data(),
+                                                                                           &left_trace_num);
+        const int right_trimmed_prefix_rows = trim_initial_artificial_frame_prefix_inplace(right_trace_pts.data(),
+                                                                                            right_trace_dirs.data(),
+                                                                                            &right_trace_num);
+        left_start_row_used_frame_deleted =
+            (left_trimmed_prefix_rows > 0) &&
+            (left_trace_num <= 0) &&
+            (left_trace_raw_num > 0) &&
+            point_touches_artificial_frame(left_trace_pts_raw[0].x, left_trace_pts_raw[0].y);
+        right_start_row_used_frame_deleted =
+            (right_trimmed_prefix_rows > 0) &&
+            (right_trace_num <= 0) &&
+            (right_trace_raw_num > 0) &&
+            point_touches_artificial_frame(right_trace_pts_raw[0].x, right_trace_pts_raw[0].y);
         const int left_trimmed_first_frame_touch_index = find_first_artificial_frame_touch_index(left_trace_pts.data(),
                                                                                                  left_trace_num);
         const int right_trimmed_first_frame_touch_index = find_first_artificial_frame_touch_index(right_trace_pts.data(),
                                                                                                    right_trace_num);
-        const int left_corner_trace_num = cross3_state_active_before_trace
-                                              ? left_trace_num
-                                              : trace_num_for_ipm_artificial_frame_policy(left_trace_pts.data(),
-                                                                                          left_trace_num,
-                                                                                          left_trimmed_first_frame_touch_index);
-        const int right_corner_trace_num = cross3_state_active_before_trace
-                                               ? right_trace_num
-                                               : trace_num_for_ipm_artificial_frame_policy(right_trace_pts.data(),
-                                                                                           right_trace_num,
-                                                                                           right_trimmed_first_frame_touch_index);
+        const int left_corner_trace_num = trace_num_for_ipm_artificial_frame_policy(left_trace_pts.data(),
+                                                                                     left_trace_num,
+                                                                                     left_trimmed_first_frame_touch_index);
+        const int right_corner_trace_num = trace_num_for_ipm_artificial_frame_policy(right_trace_pts.data(),
+                                                                                      right_trace_num,
+                                                                                      right_trimmed_first_frame_touch_index);
         update_cross_lower_corner_detection_cache(left_trace_pts.data(),
                                                   left_trace_dirs.data(),
                                                   left_corner_trace_num,
@@ -5364,39 +5051,6 @@ bool vision_image_processor_process_step()
 
         left_boundary_count_signal = left_regular_num;
         right_boundary_count_signal = right_regular_num;
-        start_boundary_gap_x = (left_num > 0 && right_num > 0) ? (right_pts[0].x - left_pts[0].x) : 0;
-        left_corner_extrapolate_white = count_extrapolate_white(left_trace_pts.data(),
-                                                                left_trace_num,
-                                                                g_cross_lower_left_corner_index.load());
-        right_corner_extrapolate_white = count_extrapolate_white(right_trace_pts.data(),
-                                                                   right_trace_num,
-                                                                   g_cross_lower_right_corner_index.load());
-        g_cross_left_corner_extrapolate_white.store(left_corner_extrapolate_white);
-        g_cross_right_corner_extrapolate_white.store(right_corner_extrapolate_white);
-        g_cross_start_boundary_gap_x.store(start_boundary_gap_x);
-
-        const bool cross1_state_active_before_trace =
-            (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CROSS) &&
-            (route_snapshot_before_trace.sub_state == VISION_ROUTE_SUB_CROSS_1);
-        if (cross1_state_active_before_trace)
-        {
-            if (g_cross_lower_left_corner_found.load())
-            {
-                cross1_last_left_corner_found = true;
-                cross1_last_left_corner = maze_point_t{
-                    g_cross_lower_left_corner_x.load(),
-                    g_cross_lower_left_corner_y.load()
-                };
-            }
-            if (g_cross_lower_right_corner_found.load())
-            {
-                cross1_last_right_corner_found = true;
-                cross1_last_right_corner = maze_point_t{
-                    g_cross_lower_right_corner_x.load(),
-                    g_cross_lower_right_corner_y.load()
-                };
-            }
-        }
 
         // 历史正方形跟踪已找到上角点时，跳过辅助边界构建，避免覆盖历史跟踪结果。
         const bool left_history_upper_ready = g_cross_left_upper_corner_found.load() && !g_cross_left_aux_found.load();
@@ -5598,10 +5252,6 @@ bool vision_image_processor_process_step()
                                                                        g_cross_lower_left_corner_x.load(),
                                                                        g_cross_lower_left_corner_y.load(),
                                                                        static_cast<int>(left_pts.size()));
-            left_cross_base_num = copy_boundary_points(left_pts.data(),
-                                                       left_num,
-                                                       left_cross_base_pts.data(),
-                                                       static_cast<int>(left_cross_base_pts.size()));
         }
         if (g_cross_lower_right_corner_found.load())
         {
@@ -5610,53 +5260,6 @@ bool vision_image_processor_process_step()
                                                                         g_cross_lower_right_corner_x.load(),
                                                                         g_cross_lower_right_corner_y.load(),
                                                                         static_cast<int>(right_pts.size()));
-            right_cross_base_num = copy_boundary_points(right_pts.data(),
-                                                        right_num,
-                                                        right_cross_base_pts.data(),
-                                                        static_cast<int>(right_cross_base_pts.size()));
-        }
-        const bool cross_state_active =
-            (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CROSS);
-        const bool cross1_state_active = cross1_state_active_before_trace;
-        const bool circle_state_active_before_trace =
-            (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE);
-        const bool lower_corner_extrapolate_enabled =
-            g_vision_runtime_config.cross_lower_corner_extrapolate_enabled &&
-            !cross_state_active &&
-            circle_state_active_before_trace;
-        const bool skip_left_auto_extrapolate =
-            !lower_corner_extrapolate_enabled || (cross1_state_active && g_cross_left_aux_found.load());
-        const bool skip_right_auto_extrapolate =
-            !lower_corner_extrapolate_enabled || (cross1_state_active && g_cross_right_aux_found.load());
-        if (!skip_left_auto_extrapolate && left_num > 0)
-        {
-            const int extrapolate_min_y = g_vision_runtime_config.cross_lower_corner_extrapolate_min_y;
-            const bool left_corner_valid =
-                g_cross_lower_left_corner_found.load() &&
-                (g_cross_lower_left_corner_y.load() > extrapolate_min_y);
-            if (left_corner_valid)
-            {
-                left_num = extrapolate_cross_lower_boundary_inplace(left_pts.data(),
-                                                                    left_num,
-                                                                    g_cross_lower_left_corner_x.load(),
-                                                                    g_cross_lower_left_corner_y.load(),
-                                                                    static_cast<int>(left_pts.size()));
-            }
-        }
-        if (!skip_right_auto_extrapolate && right_num > 0)
-        {
-            const int extrapolate_min_y = g_vision_runtime_config.cross_lower_corner_extrapolate_min_y;
-            const bool right_corner_valid =
-                g_cross_lower_right_corner_found.load() &&
-                (g_cross_lower_right_corner_y.load() > extrapolate_min_y);
-            if (right_corner_valid)
-            {
-                right_num = extrapolate_cross_lower_boundary_inplace(right_pts.data(),
-                                                                     right_num,
-                                                                     g_cross_lower_right_corner_x.load(),
-                                                                     g_cross_lower_right_corner_y.load(),
-                                                                     static_cast<int>(right_pts.size()));
-            }
         }
     }
     else
@@ -5752,17 +5355,14 @@ bool vision_image_processor_process_step()
     route_input.left_corner_y = g_cross_lower_left_corner_y.load();
     route_input.left_corner_src_y = g_cross_lower_left_corner_y.load();
     route_input.left_corner_index = g_cross_lower_left_corner_index.load();
-    route_input.left_corner_extrapolate_white = left_corner_extrapolate_white;
     route_input.right_corner_x = g_cross_lower_right_corner_x.load();
     route_input.right_corner_y = g_cross_lower_right_corner_y.load();
     route_input.right_corner_src_y = g_cross_lower_right_corner_y.load();
     route_input.right_corner_index = g_cross_lower_right_corner_index.load();
-    route_input.right_corner_extrapolate_white = right_corner_extrapolate_white;
     route_input.left_has_frame_wall = g_src_left_trace_has_frame_wall.load();
     route_input.right_has_frame_wall = g_src_right_trace_has_frame_wall.load();
     route_input.left_start_frame_wall_rows = left_start_frame_wall_rows;
     route_input.right_start_frame_wall_rows = right_start_frame_wall_rows;
-    route_input.start_boundary_gap_x = start_boundary_gap_x;
     route_input.left_straight = g_src_left_boundary_straight_detected.load();
     route_input.right_straight = g_src_right_boundary_straight_detected.load();
     route_input.left_boundary_count = left_boundary_count_signal;
@@ -5784,597 +5384,6 @@ bool vision_image_processor_process_step()
     vision_route_state_machine_update(&route_input);
     const vision_route_state_snapshot_t route_snapshot = vision_route_state_machine_snapshot();
     apply_line_error_profile_if_needed(route_snapshot);
-
-    const bool cross2_entered_this_frame =
-        (route_snapshot.main_state == VISION_ROUTE_MAIN_CROSS) &&
-        (route_snapshot.sub_state == VISION_ROUTE_SUB_CROSS_2) &&
-        !((route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CROSS) &&
-          (route_snapshot_before_trace.sub_state == VISION_ROUTE_SUB_CROSS_2));
-    if (cross2_entered_this_frame)
-    {
-        g_cross_stage2_frozen_left_corner_found.store(cross1_last_left_corner_found);
-        g_cross_stage2_frozen_right_corner_found.store(cross1_last_right_corner_found);
-        g_cross_stage2_frozen_left_corner_x.store(cross1_last_left_corner.x);
-        g_cross_stage2_frozen_left_corner_y.store(cross1_last_left_corner.y);
-        g_cross_stage2_frozen_right_corner_x.store(cross1_last_right_corner.x);
-        g_cross_stage2_frozen_right_corner_y.store(cross1_last_right_corner.y);
-    }
-    else if ((route_snapshot.main_state == VISION_ROUTE_MAIN_CROSS) &&
-             (route_snapshot.sub_state == VISION_ROUTE_SUB_CROSS_1))
-    {
-        // 在 CROSS_1 持续刷新“最后角点”缓存，供后续 CROSS_2 冻结使用。
-        g_cross_stage2_frozen_left_corner_found.store(cross1_last_left_corner_found);
-        g_cross_stage2_frozen_right_corner_found.store(cross1_last_right_corner_found);
-        g_cross_stage2_frozen_left_corner_x.store(cross1_last_left_corner.x);
-        g_cross_stage2_frozen_left_corner_y.store(cross1_last_left_corner.y);
-        g_cross_stage2_frozen_right_corner_x.store(cross1_last_right_corner.x);
-        g_cross_stage2_frozen_right_corner_y.store(cross1_last_right_corner.y);
-    }
-
-    if (route_snapshot.main_state == VISION_ROUTE_MAIN_CROSS)
-    {
-        if (route_snapshot.sub_state == VISION_ROUTE_SUB_CROSS_1)
-        {
-            // CROSS_1 约束：某侧下角点未命中时，直接丢弃该侧边界，避免错误补线延续。
-            if (!g_cross_lower_left_corner_found.load())
-            {
-                left_num = 0;
-            }
-            if (!g_cross_lower_right_corner_found.load())
-            {
-                right_num = 0;
-            }
-
-            if (g_cross_left_aux_found.load() && left_cross_aux_regular_num > 0)
-            {
-                maze_point_t left_upper_corner{};
-                int left_upper_trace_index = -1;
-                if (find_cross_upper_corner_from_aux_trace(left_cross_aux_trace_pts.data(),
-                                                           left_cross_aux_trace_dirs.data(),
-                                                           left_cross_aux_trace_num,
-                                                           &left_upper_corner,
-                                                           &left_upper_trace_index))
-                {
-                    g_cross_left_upper_corner_found.store(true);
-                    g_cross_left_upper_corner_index.store(left_upper_trace_index);
-                    g_cross_left_upper_corner_x.store(left_upper_corner.x);
-                    g_cross_left_upper_corner_y.store(left_upper_corner.y);
-
-                    std::array<maze_point_t, VISION_BOUNDARY_NUM> left_aux_tail{};
-                    const int left_aux_tail_num = copy_boundary_points(left_cross_aux_regular_pts.data(),
-                                                                       left_cross_aux_regular_num,
-                                                                       left_aux_tail.data(),
-                                                                       static_cast<int>(left_aux_tail.size()));
-                    const int left_aux_tail_truncated_num =
-                        truncate_regular_boundary_before_point_inplace(left_aux_tail.data(),
-                                                                      left_aux_tail_num,
-                                                                      left_upper_corner);
-
-                    std::array<maze_point_t, VISION_BOUNDARY_NUM> left_bridge_pts{};
-                    const maze_point_t left_lower_corner{
-                        g_cross_lower_left_corner_x.load(),
-                        g_cross_lower_left_corner_y.load()
-                    };
-                    const int left_bridge_num = build_line_points_between_with_y_step(left_lower_corner,
-                                                                                      left_upper_corner,
-                                                                                      2,
-                                                                                      left_bridge_pts.data(),
-                                                                                      static_cast<int>(left_bridge_pts.size()));
-
-                    std::array<maze_point_t, VISION_BOUNDARY_NUM> left_combined_pts{};
-                    const maze_point_t *left_base_pts = (left_cross_base_num > 0) ? left_cross_base_pts.data() : left_pts.data();
-                    const int left_base_num = (left_cross_base_num > 0) ? left_cross_base_num : left_num;
-                    const int left_combined_num = concatenate_boundary_segments(left_base_pts,
-                                                                                left_base_num,
-                                                                                left_bridge_pts.data(),
-                                                                                left_bridge_num,
-                                                                                left_aux_tail.data(),
-                                                                                left_aux_tail_truncated_num,
-                                                                                left_combined_pts.data(),
-                                                                                static_cast<int>(left_combined_pts.size()));
-                    left_num = copy_boundary_points(left_combined_pts.data(),
-                                                    left_combined_num,
-                                                    left_pts.data(),
-                                                    static_cast<int>(left_pts.size()));
-                }
-                else
-                {
-                    // CROSS_1 中若辅助线已建立但上角点未命中，则回退到下角点截断后的基底边界，
-                    // 避免错误桥接/外推结果继续保留并送入 IPM。
-                    const maze_point_t *left_base_pts = (left_cross_base_num > 0) ? left_cross_base_pts.data() : left_pts.data();
-                    const int left_base_num = (left_cross_base_num > 0) ? left_cross_base_num : left_num;
-                    left_num = copy_boundary_points(left_base_pts,
-                                                    left_base_num,
-                                                    left_pts.data(),
-                                                    static_cast<int>(left_pts.size()));
-                }
-            }
-            else if (g_cross_left_upper_corner_found.load())
-            {
-                // 历史正方形跟踪路径：有上角点但无辅助边界 → base + bridge (无 aux_tail)
-                const maze_point_t left_upper_corner{
-                    g_cross_left_upper_corner_x.load(),
-                    g_cross_left_upper_corner_y.load()
-                };
-                std::array<maze_point_t, VISION_BOUNDARY_NUM> left_bridge_pts{};
-                const maze_point_t left_lower_corner{
-                    g_cross_lower_left_corner_x.load(),
-                    g_cross_lower_left_corner_y.load()
-                };
-                const int left_bridge_num = build_line_points_between_with_y_step(left_lower_corner,
-                                                                                    left_upper_corner,
-                                                                                    2,
-                                                                                    left_bridge_pts.data(),
-                                                                                    static_cast<int>(left_bridge_pts.size()));
-                const maze_point_t *left_base_pts = (left_cross_base_num > 0) ? left_cross_base_pts.data() : left_pts.data();
-                const int left_base_num = (left_cross_base_num > 0) ? left_cross_base_num : left_num;
-                std::array<maze_point_t, VISION_BOUNDARY_NUM> left_combined_pts{};
-                const int left_combined_num = concatenate_boundary_segments(left_base_pts,
-                                                                              left_base_num,
-                                                                              left_bridge_pts.data(),
-                                                                              left_bridge_num,
-                                                                              nullptr,
-                                                                              0,
-                                                                              left_combined_pts.data(),
-                                                                              static_cast<int>(left_combined_pts.size()));
-                left_num = copy_boundary_points(left_combined_pts.data(),
-                                                  left_combined_num,
-                                                  left_pts.data(),
-                                                  static_cast<int>(left_pts.size()));
-            }
-            if (g_cross_right_aux_found.load() && right_cross_aux_regular_num > 0)
-            {
-                maze_point_t right_upper_corner{};
-                int right_upper_trace_index = -1;
-                if (find_cross_upper_corner_from_aux_trace(right_cross_aux_trace_pts.data(),
-                                                           right_cross_aux_trace_dirs.data(),
-                                                           right_cross_aux_trace_num,
-                                                           &right_upper_corner,
-                                                           &right_upper_trace_index))
-                {
-                    g_cross_right_upper_corner_found.store(true);
-                    g_cross_right_upper_corner_index.store(right_upper_trace_index);
-                    g_cross_right_upper_corner_x.store(right_upper_corner.x);
-                    g_cross_right_upper_corner_y.store(right_upper_corner.y);
-
-                    std::array<maze_point_t, VISION_BOUNDARY_NUM> right_aux_tail{};
-                    const int right_aux_tail_num = copy_boundary_points(right_cross_aux_regular_pts.data(),
-                                                                        right_cross_aux_regular_num,
-                                                                        right_aux_tail.data(),
-                                                                        static_cast<int>(right_aux_tail.size()));
-                    const int right_aux_tail_truncated_num =
-                        truncate_regular_boundary_before_point_inplace(right_aux_tail.data(),
-                                                                      right_aux_tail_num,
-                                                                      right_upper_corner);
-
-                    std::array<maze_point_t, VISION_BOUNDARY_NUM> right_bridge_pts{};
-                    const maze_point_t right_lower_corner{
-                        g_cross_lower_right_corner_x.load(),
-                        g_cross_lower_right_corner_y.load()
-                    };
-                    const int right_bridge_num = build_line_points_between_with_y_step(right_lower_corner,
-                                                                                       right_upper_corner,
-                                                                                       2,
-                                                                                       right_bridge_pts.data(),
-                                                                                       static_cast<int>(right_bridge_pts.size()));
-
-                    std::array<maze_point_t, VISION_BOUNDARY_NUM> right_combined_pts{};
-                    const maze_point_t *right_base_pts = (right_cross_base_num > 0) ? right_cross_base_pts.data() : right_pts.data();
-                    const int right_base_num = (right_cross_base_num > 0) ? right_cross_base_num : right_num;
-                    const int right_combined_num = concatenate_boundary_segments(right_base_pts,
-                                                                                 right_base_num,
-                                                                                 right_bridge_pts.data(),
-                                                                                 right_bridge_num,
-                                                                                 right_aux_tail.data(),
-                                                                                 right_aux_tail_truncated_num,
-                                                                                 right_combined_pts.data(),
-                                                                                 static_cast<int>(right_combined_pts.size()));
-                    right_num = copy_boundary_points(right_combined_pts.data(),
-                                                     right_combined_num,
-                                                     right_pts.data(),
-                                                     static_cast<int>(right_pts.size()));
-                }
-                else
-                {
-                    // 同左侧：上角点未命中时回退到右侧 cross base。
-                    const maze_point_t *right_base_pts = (right_cross_base_num > 0) ? right_cross_base_pts.data() : right_pts.data();
-                    const int right_base_num = (right_cross_base_num > 0) ? right_cross_base_num : right_num;
-                    right_num = copy_boundary_points(right_base_pts,
-                                                     right_base_num,
-                                                     right_pts.data(),
-                                                     static_cast<int>(right_pts.size()));
-                }
-            }
-            else if (g_cross_right_upper_corner_found.load())
-            {
-                // 历史正方形跟踪路径：有上角点但无辅助边界 → base + bridge (无 aux_tail)
-                const maze_point_t right_upper_corner{
-                    g_cross_right_upper_corner_x.load(),
-                    g_cross_right_upper_corner_y.load()
-                };
-                std::array<maze_point_t, VISION_BOUNDARY_NUM> right_bridge_pts{};
-                const maze_point_t right_lower_corner{
-                    g_cross_lower_right_corner_x.load(),
-                    g_cross_lower_right_corner_y.load()
-                };
-                const int right_bridge_num = build_line_points_between_with_y_step(right_lower_corner,
-                                                                                     right_upper_corner,
-                                                                                     2,
-                                                                                     right_bridge_pts.data(),
-                                                                                     static_cast<int>(right_bridge_pts.size()));
-                const maze_point_t *right_base_pts = (right_cross_base_num > 0) ? right_cross_base_pts.data() : right_pts.data();
-                const int right_base_num = (right_cross_base_num > 0) ? right_cross_base_num : right_num;
-                std::array<maze_point_t, VISION_BOUNDARY_NUM> right_combined_pts{};
-                const int right_combined_num = concatenate_boundary_segments(right_base_pts,
-                                                                               right_base_num,
-                                                                               right_bridge_pts.data(),
-                                                                               right_bridge_num,
-                                                                               nullptr,
-                                                                               0,
-                                                                               right_combined_pts.data(),
-                                                                               static_cast<int>(right_combined_pts.size()));
-                right_num = copy_boundary_points(right_combined_pts.data(),
-                                                   right_combined_num,
-                                                   right_pts.data(),
-                                                   static_cast<int>(right_pts.size()));
-            }
-        }
-        else if (route_snapshot.sub_state == VISION_ROUTE_SUB_CROSS_2)
-        {
-            const bool frozen_left_found = g_cross_stage2_frozen_left_corner_found.load();
-            const bool frozen_right_found = g_cross_stage2_frozen_right_corner_found.load();
-
-            // 保存上一帧上角点位置，供历史正方形跟踪使用（reset 之前）
-            const bool prev_left_upper_found = g_cross_left_upper_corner_found.load();
-            const bool prev_right_upper_found = g_cross_right_upper_corner_found.load();
-            const int prev_left_upper_x = g_cross_left_upper_corner_x.load();
-            const int prev_left_upper_y = g_cross_left_upper_corner_y.load();
-            const int prev_right_upper_x = g_cross_right_upper_corner_x.load();
-            const int prev_right_upper_y = g_cross_right_upper_corner_y.load();
-
-            // CROSS_2：从冻结下角点重找辅助线和上角点；
-            // 找到后执行“上角点前截断 + 固定起点到上角点补线 + 上角点后段拼接”，未找到该侧置空。
-            g_cross_left_aux_found.store(false);
-            g_cross_right_aux_found.store(false);
-            g_cross_left_aux_transition_x.store(0);
-            g_cross_left_aux_transition_y.store(0);
-            g_cross_right_aux_transition_x.store(0);
-            g_cross_right_aux_transition_y.store(0);
-            g_cross_left_upper_corner_found.store(false);
-            g_cross_right_upper_corner_found.store(false);
-            g_cross_left_upper_corner_index.store(-1);
-            g_cross_right_upper_corner_index.store(-1);
-            g_cross_left_upper_corner_x.store(0);
-            g_cross_left_upper_corner_y.store(0);
-            g_cross_right_upper_corner_x.store(0);
-            g_cross_right_upper_corner_y.store(0);
-            left_cross_aux_trace_num = 0;
-            right_cross_aux_trace_num = 0;
-            left_cross_aux_regular_num = 0;
-            right_cross_aux_regular_num = 0;
-            save_cross_aux_trace_cache(true, nullptr, nullptr, 0);
-            save_cross_aux_trace_cache(false, nullptr, nullptr, 0);
-            save_cross_aux_regular_cache(true, nullptr, 0);
-            save_cross_aux_regular_cache(false, nullptr, 0);
-
-            if (frozen_left_found)
-            {
-                bool left_done = false;
-
-                // 尝试 7x7 正方形历史跟踪
-                if (g_vision_runtime_config.cross_upper_history_enabled && prev_left_upper_found)
-                {
-                    maze_point_t left_upper_corner{};
-                    if (detect_upper_corner_from_history(classifier,
-                                                          true,
-                                                          prev_left_upper_x,
-                                                          prev_left_upper_y,
-                                                          &left_upper_corner))
-                    {
-                        left_done = true;
-                        g_cross_left_upper_corner_found.store(true);
-                        g_cross_left_upper_corner_x.store(left_upper_corner.x);
-                        g_cross_left_upper_corner_y.store(left_upper_corner.y);
-
-                        const maze_point_t left_start{
-                            std::clamp(20, 0, kProcWidth - 1),
-                            std::clamp(100, 1, kProcHeight - 2)
-                        };
-                        std::array<maze_point_t, VISION_BOUNDARY_NUM> left_guide_pts{};
-                        const int left_guide_num = build_line_points_between(left_start,
-                                                                               left_upper_corner,
-                                                                               left_guide_pts.data(),
-                                                                               static_cast<int>(left_guide_pts.size()));
-                        std::array<maze_point_t, VISION_BOUNDARY_NUM> left_combined_pts{};
-                        const int left_combined_num = concatenate_boundary_segments(left_guide_pts.data(),
-                                                                                      left_guide_num,
-                                                                                      nullptr,
-                                                                                      0,
-                                                                                      nullptr,
-                                                                                      0,
-                                                                                      left_combined_pts.data(),
-                                                                                      static_cast<int>(left_combined_pts.size()));
-                        left_num = copy_boundary_points(left_combined_pts.data(),
-                                                          left_combined_num,
-                                                          left_pts.data(),
-                                                          static_cast<int>(left_pts.size()));
-                    }
-                }
-
-                if (!left_done)
-                {
-                    if (build_cross_aux_boundary(classifier,
-                                                 left_wall_is_white,
-                                                 true,
-                                                 g_cross_stage2_frozen_left_corner_x.load(),
-                                                 g_cross_stage2_frozen_left_corner_y.load(),
-                                                 nullptr,
-                                                 0,
-                                                 -1,
-                                                 maze_trace_x_min,
-                                                 maze_trace_x_max,
-                                                 left_cross_aux_trace_pts.data(),
-                                                 left_cross_aux_trace_dirs.data(),
-                                                 &left_cross_aux_trace_num,
-                                                 left_cross_aux_regular_pts.data(),
-                                                 &left_cross_aux_regular_num,
-                                                 &left_cross_aux_transition))
-                    {
-                        g_cross_left_aux_found.store(true);
-                        g_cross_left_aux_transition_x.store(left_cross_aux_transition.x);
-                        g_cross_left_aux_transition_y.store(left_cross_aux_transition.y);
-                        g_cross_left_aux_last_transition_valid.store(true);
-                        g_cross_left_aux_last_transition_x.store(left_cross_aux_transition.x);
-                        g_cross_left_aux_last_transition_y.store(left_cross_aux_transition.y);
-                        save_cross_aux_trace_cache(true,
-                                                   left_cross_aux_trace_pts.data(),
-                                                   left_cross_aux_trace_dirs.data(),
-                                                   left_cross_aux_trace_num);
-                        save_cross_aux_regular_cache(true,
-                                                     left_cross_aux_regular_pts.data(),
-                                                     left_cross_aux_regular_num);
-                    }
-
-                    maze_point_t left_upper_corner{};
-                    int left_upper_trace_index = -1;
-                    if (g_cross_left_aux_found.load() &&
-                        left_cross_aux_regular_num > 0 &&
-                        find_cross_upper_corner_from_aux_trace(left_cross_aux_trace_pts.data(),
-                                                               left_cross_aux_trace_dirs.data(),
-                                                               left_cross_aux_trace_num,
-                                                               &left_upper_corner,
-                                                               &left_upper_trace_index))
-                    {
-                        g_cross_left_upper_corner_found.store(true);
-                        g_cross_left_upper_corner_index.store(left_upper_trace_index);
-                        g_cross_left_upper_corner_x.store(left_upper_corner.x);
-                        g_cross_left_upper_corner_y.store(left_upper_corner.y);
-
-                        std::array<maze_point_t, VISION_BOUNDARY_NUM> left_after_upper_pts{};
-                        const int left_after_upper_num = copy_boundary_points(left_cross_aux_regular_pts.data(),
-                                                                              left_cross_aux_regular_num,
-                                                                              left_after_upper_pts.data(),
-                                                                              static_cast<int>(left_after_upper_pts.size()));
-                        const int left_after_upper_truncated_num =
-                            truncate_regular_boundary_before_point_inplace(left_after_upper_pts.data(),
-                                                                          left_after_upper_num,
-                                                                          left_upper_corner);
-
-                        const maze_point_t left_start{
-                            std::clamp(20, 0, kProcWidth - 1),
-                            std::clamp(100, 1, kProcHeight - 2)
-                        };
-                        std::array<maze_point_t, VISION_BOUNDARY_NUM> left_guide_pts{};
-                        const int left_guide_num = build_line_points_between(left_start,
-                                                                             left_upper_corner,
-                                                                             left_guide_pts.data(),
-                                                                             static_cast<int>(left_guide_pts.size()));
-                        std::array<maze_point_t, VISION_BOUNDARY_NUM> left_combined_pts{};
-                        const int left_combined_num = concatenate_boundary_segments(left_guide_pts.data(),
-                                                                                    left_guide_num,
-                                                                                    left_after_upper_pts.data(),
-                                                                                    left_after_upper_truncated_num,
-                                                                                    nullptr,
-                                                                                    0,
-                                                                                    left_combined_pts.data(),
-                                                                                    static_cast<int>(left_combined_pts.size()));
-                        left_num = copy_boundary_points(left_combined_pts.data(),
-                                                        left_combined_num,
-                                                        left_pts.data(),
-                                                        static_cast<int>(left_pts.size()));
-                    }
-                    else
-                    {
-                        left_num = 0;
-                    }
-                }
-            }
-            else
-            {
-                left_num = 0;
-            }
-
-            if (frozen_right_found)
-            {
-                bool right_done = false;
-
-                if (g_vision_runtime_config.cross_upper_history_enabled && prev_right_upper_found)
-                {
-                    maze_point_t right_upper_corner{};
-                    if (detect_upper_corner_from_history(classifier,
-                                                          false,
-                                                          prev_right_upper_x,
-                                                          prev_right_upper_y,
-                                                          &right_upper_corner))
-                    {
-                        right_done = true;
-                        g_cross_right_upper_corner_found.store(true);
-                        g_cross_right_upper_corner_x.store(right_upper_corner.x);
-                        g_cross_right_upper_corner_y.store(right_upper_corner.y);
-
-                        const maze_point_t right_start{
-                            std::clamp(140, 0, kProcWidth - 1),
-                            std::clamp(100, 1, kProcHeight - 2)
-                        };
-                        std::array<maze_point_t, VISION_BOUNDARY_NUM> right_guide_pts{};
-                        const int right_guide_num = build_line_points_between(right_start,
-                                                                                right_upper_corner,
-                                                                                right_guide_pts.data(),
-                                                                                static_cast<int>(right_guide_pts.size()));
-                        std::array<maze_point_t, VISION_BOUNDARY_NUM> right_combined_pts{};
-                        const int right_combined_num = concatenate_boundary_segments(right_guide_pts.data(),
-                                                                                       right_guide_num,
-                                                                                       nullptr,
-                                                                                       0,
-                                                                                       nullptr,
-                                                                                       0,
-                                                                                       right_combined_pts.data(),
-                                                                                       static_cast<int>(right_combined_pts.size()));
-                        right_num = copy_boundary_points(right_combined_pts.data(),
-                                                           right_combined_num,
-                                                           right_pts.data(),
-                                                           static_cast<int>(right_pts.size()));
-                    }
-                }
-
-                if (!right_done)
-                {
-                    if (build_cross_aux_boundary(classifier,
-                                                 right_wall_is_white,
-                                                 false,
-                                                 g_cross_stage2_frozen_right_corner_x.load(),
-                                                 g_cross_stage2_frozen_right_corner_y.load(),
-                                                 nullptr,
-                                                 0,
-                                                 -1,
-                                                 maze_trace_x_min,
-                                                 maze_trace_x_max,
-                                                 right_cross_aux_trace_pts.data(),
-                                                 right_cross_aux_trace_dirs.data(),
-                                                 &right_cross_aux_trace_num,
-                                                 right_cross_aux_regular_pts.data(),
-                                                 &right_cross_aux_regular_num,
-                                                 &right_cross_aux_transition))
-                    {
-                        g_cross_right_aux_found.store(true);
-                        g_cross_right_aux_transition_x.store(right_cross_aux_transition.x);
-                        g_cross_right_aux_transition_y.store(right_cross_aux_transition.y);
-                        g_cross_right_aux_last_transition_valid.store(true);
-                        g_cross_right_aux_last_transition_x.store(right_cross_aux_transition.x);
-                        g_cross_right_aux_last_transition_y.store(right_cross_aux_transition.y);
-                        save_cross_aux_trace_cache(false,
-                                                   right_cross_aux_trace_pts.data(),
-                                                   right_cross_aux_trace_dirs.data(),
-                                                   right_cross_aux_trace_num);
-                        save_cross_aux_regular_cache(false,
-                                                     right_cross_aux_regular_pts.data(),
-                                                     right_cross_aux_regular_num);
-                    }
-
-                    maze_point_t right_upper_corner{};
-                    int right_upper_trace_index = -1;
-                    if (g_cross_right_aux_found.load() &&
-                        right_cross_aux_regular_num > 0 &&
-                        find_cross_upper_corner_from_aux_trace(right_cross_aux_trace_pts.data(),
-                                                               right_cross_aux_trace_dirs.data(),
-                                                               right_cross_aux_trace_num,
-                                                               &right_upper_corner,
-                                                               &right_upper_trace_index))
-                    {
-                        g_cross_right_upper_corner_found.store(true);
-                        g_cross_right_upper_corner_index.store(right_upper_trace_index);
-                        g_cross_right_upper_corner_x.store(right_upper_corner.x);
-                        g_cross_right_upper_corner_y.store(right_upper_corner.y);
-
-                        std::array<maze_point_t, VISION_BOUNDARY_NUM> right_after_upper_pts{};
-                        const int right_after_upper_num = copy_boundary_points(right_cross_aux_regular_pts.data(),
-                                                                               right_cross_aux_regular_num,
-                                                                               right_after_upper_pts.data(),
-                                                                               static_cast<int>(right_after_upper_pts.size()));
-                        const int right_after_upper_truncated_num =
-                            truncate_regular_boundary_before_point_inplace(right_after_upper_pts.data(),
-                                                                          right_after_upper_num,
-                                                                          right_upper_corner);
-
-                        const maze_point_t right_start{
-                            std::clamp(140, 0, kProcWidth - 1),
-                            std::clamp(100, 1, kProcHeight - 2)
-                        };
-                        std::array<maze_point_t, VISION_BOUNDARY_NUM> right_guide_pts{};
-                        const int right_guide_num = build_line_points_between(right_start,
-                                                                              right_upper_corner,
-                                                                              right_guide_pts.data(),
-                                                                              static_cast<int>(right_guide_pts.size()));
-                        std::array<maze_point_t, VISION_BOUNDARY_NUM> right_combined_pts{};
-                        const int right_combined_num = concatenate_boundary_segments(right_guide_pts.data(),
-                                                                                     right_guide_num,
-                                                                                     right_after_upper_pts.data(),
-                                                                                     right_after_upper_truncated_num,
-                                                                                     nullptr,
-                                                                                     0,
-                                                                                     right_combined_pts.data(),
-                                                                                     static_cast<int>(right_combined_pts.size()));
-                        right_num = copy_boundary_points(right_combined_pts.data(),
-                                                         right_combined_num,
-                                                         right_pts.data(),
-                                                         static_cast<int>(right_pts.size()));
-                    }
-                    else
-                    {
-                        right_num = 0;
-                    }
-                }
-            }
-            else
-            {
-                right_num = 0;
-            }
-        }
-        else if (route_snapshot.sub_state == VISION_ROUTE_SUB_CROSS_3)
-        {
-            const int jump_x_threshold_px = std::max(1, g_vision_runtime_config.route_cross_stage3_jump_x_threshold_px);
-            const int cut_forward_points = std::max(0, g_vision_runtime_config.route_cross_stage3_cut_forward_points);
-            const maze_point_t left_anchor{
-                std::clamp(g_vision_runtime_config.route_cross_stage3_left_anchor_x, 0, kProcWidth - 1),
-                std::clamp(g_vision_runtime_config.route_cross_stage3_left_anchor_y, 0, kProcHeight - 1)
-            };
-            const maze_point_t right_anchor{
-                std::clamp(g_vision_runtime_config.route_cross_stage3_right_anchor_x, 0, kProcWidth - 1),
-                std::clamp(g_vision_runtime_config.route_cross_stage3_right_anchor_y, 0, kProcHeight - 1)
-            };
-
-            // CROSS_3 裁减优先使用当前工作边界（已包含前序截断/修正），
-            // 仅在当前工作边界为空时回退到 regular 边界。
-            const maze_point_t *left_stage3_src = (left_num > 0) ? left_pts.data() : left_regular_pts.data();
-            const int left_stage3_src_num = (left_num > 0) ? left_num : left_regular_num;
-            const maze_point_t *right_stage3_src = (right_num > 0) ? right_pts.data() : right_regular_pts.data();
-            const int right_stage3_src_num = (right_num > 0) ? right_num : right_regular_num;
-
-            const int left_stage3_num = build_cross_stage3_anchor_cut_boundary(left_stage3_src,
-                                                                                left_stage3_src_num,
-                                                                                left_anchor,
-                                                                                jump_x_threshold_px,
-                                                                                cut_forward_points,
-                                                                                left_pts.data(),
-                                                                                static_cast<int>(left_pts.size()));
-            if (left_stage3_num > 0)
-            {
-                left_num = left_stage3_num;
-            }
-
-            const int right_stage3_num = build_cross_stage3_anchor_cut_boundary(right_stage3_src,
-                                                                                 right_stage3_src_num,
-                                                                                 right_anchor,
-                                                                                 jump_x_threshold_px,
-                                                                                 cut_forward_points,
-                                                                                 right_pts.data(),
-                                                                                 static_cast<int>(right_pts.size()));
-            if (right_stage3_num > 0)
-            {
-                right_num = right_stage3_num;
-            }
-        }
-    }
 
     if (route_snapshot_is_left_circle(route_snapshot))
     {
@@ -7292,28 +6301,35 @@ void vision_image_processor_get_cross_upper_corner_state(bool *left_found,
     if (right_y) *right_y = g_cross_right_upper_corner_y.load();
 }
 
-void vision_image_processor_get_cross_stage2_frozen_lower_corner_state(bool *left_found,
-                                                                       int *left_x,
-                                                                       int *left_y,
-                                                                       bool *right_found,
-                                                                       int *right_x,
-                                                                       int *right_y)
+void vision_image_processor_get_cross_history_roi_7x7(bool is_left,
+                                                       bool *valid,
+                                                       const uint8 **data,
+                                                       int *corner_x,
+                                                       int *corner_y)
 {
-    if (left_found) *left_found = g_cross_stage2_frozen_left_corner_found.load();
-    if (left_x) *left_x = g_cross_stage2_frozen_left_corner_x.load();
-    if (left_y) *left_y = g_cross_stage2_frozen_left_corner_y.load();
-    if (right_found) *right_found = g_cross_stage2_frozen_right_corner_found.load();
-    if (right_x) *right_x = g_cross_stage2_frozen_right_corner_x.load();
-    if (right_y) *right_y = g_cross_stage2_frozen_right_corner_y.load();
+    if (is_left)
+    {
+        if (valid) *valid = g_cross_left_history_roi_7x7_valid.load();
+        if (data) *data = g_cross_left_history_roi_7x7.data();
+        if (corner_x) *corner_x = g_cross_left_history_roi_corner_x.load();
+        if (corner_y) *corner_y = g_cross_left_history_roi_corner_y.load();
+    }
+    else
+    {
+        if (valid) *valid = g_cross_right_history_roi_7x7_valid.load();
+        if (data) *data = g_cross_right_history_roi_7x7.data();
+        if (corner_x) *corner_x = g_cross_right_history_roi_corner_x.load();
+        if (corner_y) *corner_y = g_cross_right_history_roi_corner_y.load();
+    }
 }
 
-void vision_image_processor_get_cross_route_debug_state(int *left_corner_extrapolate_white,
-                                                        int *right_corner_extrapolate_white,
-                                                        int *start_boundary_gap_x)
+void vision_image_processor_get_cross_upper_corner_source(bool is_left, int *source)
 {
-    if (left_corner_extrapolate_white) *left_corner_extrapolate_white = g_cross_left_corner_extrapolate_white.load();
-    if (right_corner_extrapolate_white) *right_corner_extrapolate_white = g_cross_right_corner_extrapolate_white.load();
-    if (start_boundary_gap_x) *start_boundary_gap_x = g_cross_start_boundary_gap_x.load();
+    if (source)
+    {
+        *source = is_left ? g_cross_left_upper_corner_source.load()
+                          : g_cross_right_upper_corner_source.load();
+    }
 }
 
 void vision_image_processor_get_src_trace_frame_wall_state(bool *left_has_frame_wall,
@@ -7387,11 +6403,6 @@ int vision_image_processor_route_preferred_source()
 uint32 vision_image_processor_route_encoder_since_state_enter()
 {
     return vision_route_state_machine_encoder_since_state_enter();
-}
-
-int vision_image_processor_route_cross_loss_count()
-{
-    return vision_route_state_machine_cross_loss_count();
 }
 
 int vision_image_processor_route_left_loss_count()

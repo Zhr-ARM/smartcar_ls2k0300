@@ -278,12 +278,6 @@ vision_runtime_config_t g_vision_runtime_config = {
     .cross_lower_corner_transition_max_len = 4,
     // 左右下角点 y 坐标最大差值：用于判断双下角点是否稳定同时成立。
     .cross_lower_corner_pair_y_diff_max = 30,
-    // 普通原图下角点处理：默认开启“截断后拟合直线并向上补一段”。
-    .cross_lower_corner_extrapolate_enabled = false,
-    // 十字补线触发的下角点最小 y 阈值。
-    .cross_lower_corner_extrapolate_min_y = 35,
-    // 十字下角点补线向上的延伸长度（按 y 行数计算）。
-    .cross_lower_corner_extrapolate_y_span = 30,
     // 十字下角点跳变精修：规则边界搜索窗口半宽，默认±10个点。
     .cross_lower_corner_jump_window = 10,
     // 十字下角点跳变精修：dx 超过 baseline 的倍率才认为是跳变。
@@ -352,30 +346,6 @@ vision_runtime_config_t g_vision_runtime_config = {
     .zebra_cross_detection_enabled = false,
     // 双边都丢线时保留上一帧平移中线，避免 line_error 直接掉回 0。
     .keep_last_centerline_on_double_loss = true,
-    // 状态机十字识别开关。
-    .route_cross_detection_enabled = true,
-    // 最小二乘拟合点数（角点 + 前 N-1 个点），默认 5。
-    .route_cross_entry_corner_fit_points = 5,
-    // 从角点向前延伸的点数，默认 8。
-    .route_cross_entry_corner_extrapolate_count = 8,
-    // 延伸点中连续白点的最小个数，默认 5。
-    .route_cross_entry_corner_extrapolate_white_min = 5,
-    // cross_1 -> cross_2：起始巡线行一旦碰到边框边界就认为进入 cross_2 条件成立。
-    .route_cross_stage2_enter_start_frame_wall_rows_min = 1,
-    // cross_1 -> cross_2：任一角点 y 达到该阈值即允许进入下一阶段。
-    .route_cross_stage1_enter_corner_y_min = 75,
-    // cross_2 -> normal：左右起始边界 x 差小于 150 视为驶出十字。
-    .route_cross_exit_start_gap_x_max = 155,
-    // cross_3：规则边界跳变阈值（相邻 x 差）。
-    .route_cross_stage3_jump_x_threshold_px = 15,
-    // cross_3：命中跳变后向前推进点数。
-    .route_cross_stage3_cut_forward_points = 2,
-    // cross_3 左侧桥接锚点。
-    .route_cross_stage3_left_anchor_x = 15,
-    .route_cross_stage3_left_anchor_y = 100,
-    // cross_3 右侧桥接锚点。
-    .route_cross_stage3_right_anchor_x = 145,
-    .route_cross_stage3_right_anchor_y = 100,
     // 状态机圆环识别开关。
     .route_circle_detection_enabled = true,
     // 圆环入口判定：对侧边界最少点数。

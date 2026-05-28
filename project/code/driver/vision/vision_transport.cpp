@@ -770,12 +770,6 @@ static void send_tcp_status()
     int cross_right_upper_index = -1;
     int cross_right_upper_x = 0;
     int cross_right_upper_y = 0;
-    bool cross_stage2_frozen_left_found = false;
-    int cross_stage2_frozen_left_x = 0;
-    int cross_stage2_frozen_left_y = 0;
-    bool cross_stage2_frozen_right_found = false;
-    int cross_stage2_frozen_right_x = 0;
-    int cross_stage2_frozen_right_y = 0;
     vision_image_processor_get_cross_upper_corner_state(&cross_left_upper_found,
                                                         &cross_left_upper_index,
                                                         &cross_left_upper_x,
@@ -784,12 +778,6 @@ static void send_tcp_status()
                                                         &cross_right_upper_index,
                                                         &cross_right_upper_x,
                                                         &cross_right_upper_y);
-    vision_image_processor_get_cross_stage2_frozen_lower_corner_state(&cross_stage2_frozen_left_found,
-                                                                      &cross_stage2_frozen_left_x,
-                                                                      &cross_stage2_frozen_left_y,
-                                                                      &cross_stage2_frozen_right_found,
-                                                                      &cross_stage2_frozen_right_x,
-                                                                      &cross_stage2_frozen_right_y);
     auto count_dir_hits = [](const uint8 *dirs, uint16 count, uint8 target_dir) -> int {
         if (dirs == nullptr || count == 0)
         {
@@ -808,12 +796,6 @@ static void send_tcp_status()
     };
     const int cross_left_aux_dir5_count = count_dir_hits(cross_left_aux_trace_dir, cross_left_aux_trace_num, 5);
     const int cross_right_aux_dir5_count = count_dir_hits(cross_right_aux_trace_dir, cross_right_aux_trace_num, 5);
-    int cross_left_corner_extrapolate_white = 0;
-    int cross_right_corner_extrapolate_white = 0;
-    int cross_start_boundary_gap_x = 0;
-    vision_image_processor_get_cross_route_debug_state(&cross_left_corner_extrapolate_white,
-                                                       &cross_right_corner_extrapolate_white,
-                                                       &cross_start_boundary_gap_x);
     bool src_left_trace_has_frame_wall = false;
     bool src_right_trace_has_frame_wall = false;
     bool src_left_boundary_straight = false;
@@ -1366,46 +1348,10 @@ static void send_tcp_status()
     append_int(true, "route_sub_state", vision_image_processor_route_sub_state());
     append_int(true, "route_preferred_source", vision_image_processor_route_preferred_source());
     append_int(true, "route_encoder_since_enter", static_cast<int>(vision_image_processor_route_encoder_since_state_enter()));
-    append_int(true, "route_cross_loss_count", vision_image_processor_route_cross_loss_count());
     append_int(true, "route_left_loss_count", vision_image_processor_route_left_loss_count());
     append_int(true, "route_left_gain_count", vision_image_processor_route_left_gain_count());
     append_int(true, "route_right_loss_count", vision_image_processor_route_right_loss_count());
     append_int(true, "route_right_gain_count", vision_image_processor_route_right_gain_count());
-    append_bool(true, "route_cross_detection_enabled", g_vision_runtime_config.route_cross_detection_enabled);
-    const bool cross_state_entry_ready_now =
-        g_vision_runtime_config.route_cross_detection_enabled &&
-        cross_lower_left_found &&
-        cross_lower_right_found &&
-        cross_left_corner_extrapolate_white >= g_vision_runtime_config.route_cross_entry_corner_extrapolate_white_min &&
-        cross_right_corner_extrapolate_white >= g_vision_runtime_config.route_cross_entry_corner_extrapolate_white_min;
-    const bool cross_state_stage2_ready_now =
-        ((cross_lower_left_found && cross_lower_left_y >= g_vision_runtime_config.route_cross_stage1_enter_corner_y_min) ||
-         (cross_lower_right_found && cross_lower_right_y >= g_vision_runtime_config.route_cross_stage1_enter_corner_y_min));
-    const bool cross_state_stage3_ready_now =
-        (src_left_start_frame_wall_rows >= g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min &&
-         src_right_start_frame_wall_rows >= g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min);
-    const bool cross_state_exit_ready_now =
-        (cross_start_boundary_gap_x > 0) &&
-        (cross_start_boundary_gap_x < g_vision_runtime_config.route_cross_exit_start_gap_x_max);
-    append_bool(true, "cross_state_entry_ready_now", cross_state_entry_ready_now);
-    append_bool(true, "cross_state_stage2_ready_now", cross_state_stage2_ready_now);
-    append_bool(true, "cross_state_stage3_ready_now", cross_state_stage3_ready_now);
-    append_bool(true, "cross_state_exit_ready_now", cross_state_exit_ready_now);
-    append_int(true, "cross_left_corner_extrapolate_white", cross_left_corner_extrapolate_white);
-    append_int(true, "cross_right_corner_extrapolate_white", cross_right_corner_extrapolate_white);
-    append_int(true, "cross_start_boundary_gap_x", cross_start_boundary_gap_x);
-    append_int(true, "route_cross_entry_corner_fit_points", g_vision_runtime_config.route_cross_entry_corner_fit_points);
-    append_int(true, "route_cross_entry_corner_extrapolate_count", g_vision_runtime_config.route_cross_entry_corner_extrapolate_count);
-    append_int(true, "route_cross_entry_corner_extrapolate_white_min", g_vision_runtime_config.route_cross_entry_corner_extrapolate_white_min);
-    append_int(true, "route_cross_stage2_enter_start_frame_wall_rows_min", g_vision_runtime_config.route_cross_stage2_enter_start_frame_wall_rows_min);
-    append_int(true, "route_cross_stage1_enter_corner_y_min", g_vision_runtime_config.route_cross_stage1_enter_corner_y_min);
-    append_int(true, "route_cross_exit_start_gap_x_max", g_vision_runtime_config.route_cross_exit_start_gap_x_max);
-    append_int(true, "route_cross_stage3_jump_x_threshold_px", g_vision_runtime_config.route_cross_stage3_jump_x_threshold_px);
-    append_int(true, "route_cross_stage3_cut_forward_points", g_vision_runtime_config.route_cross_stage3_cut_forward_points);
-    append_int(true, "route_cross_stage3_left_anchor_x", g_vision_runtime_config.route_cross_stage3_left_anchor_x);
-    append_int(true, "route_cross_stage3_left_anchor_y", g_vision_runtime_config.route_cross_stage3_left_anchor_y);
-    append_int(true, "route_cross_stage3_right_anchor_x", g_vision_runtime_config.route_cross_stage3_right_anchor_x);
-    append_int(true, "route_cross_stage3_right_anchor_y", g_vision_runtime_config.route_cross_stage3_right_anchor_y);
     append_bool(true, "route_circle_detection_enabled", g_vision_runtime_config.route_circle_detection_enabled);
     append_int(true, "route_circle_entry_min_boundary_count", g_vision_runtime_config.route_circle_entry_min_boundary_count);
     append_int(true, "route_circle_entry_corner_tail_margin", g_vision_runtime_config.route_circle_entry_corner_tail_margin);
@@ -1599,14 +1545,27 @@ static void send_tcp_status()
     append_int(true, "cross_right_upper_corner_index", cross_right_upper_index);
     append_int_array(cross_left_upper_found, "cross_left_upper_corner_point", {cross_left_upper_x, cross_left_upper_y});
     append_int_array(cross_right_upper_found, "cross_right_upper_corner_point", {cross_right_upper_x, cross_right_upper_y});
-    append_bool(true, "cross_stage2_frozen_left_corner_found", cross_stage2_frozen_left_found);
-    append_bool(true, "cross_stage2_frozen_right_corner_found", cross_stage2_frozen_right_found);
-    append_int_array(cross_stage2_frozen_left_found,
-                     "cross_stage2_frozen_left_corner_point",
-                     {cross_stage2_frozen_left_x, cross_stage2_frozen_left_y});
-    append_int_array(cross_stage2_frozen_right_found,
-                     "cross_stage2_frozen_right_corner_point",
-                     {cross_stage2_frozen_right_x, cross_stage2_frozen_right_y});
+    {
+        bool left_roi_valid = false;
+        const uint8 *left_roi_data = nullptr;
+        int left_roi_cx = -1, left_roi_cy = -1;
+        vision_image_processor_get_cross_history_roi_7x7(true, &left_roi_valid, &left_roi_data, &left_roi_cx, &left_roi_cy);
+        append_u8_array(left_roi_valid, "cross_left_history_roi_7x7", left_roi_data, 49);
+        append_int_array(left_roi_valid, "cross_left_history_roi_corner", {left_roi_cx, left_roi_cy});
+        int left_upper_source = -1;
+        vision_image_processor_get_cross_upper_corner_source(true, &left_upper_source);
+        append_int(true, "cross_left_upper_corner_source", left_upper_source);
+
+        bool right_roi_valid = false;
+        const uint8 *right_roi_data = nullptr;
+        int right_roi_cx = -1, right_roi_cy = -1;
+        vision_image_processor_get_cross_history_roi_7x7(false, &right_roi_valid, &right_roi_data, &right_roi_cx, &right_roi_cy);
+        append_u8_array(right_roi_valid, "cross_right_history_roi_7x7", right_roi_data, 49);
+        append_int_array(right_roi_valid, "cross_right_history_roi_corner", {right_roi_cx, right_roi_cy});
+        int right_upper_source = -1;
+        vision_image_processor_get_cross_upper_corner_source(false, &right_upper_source);
+        append_int(true, "cross_right_upper_corner_source", right_upper_source);
+    }
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_left_boundary,
                   "ipm_left_boundary", ipm_x1, ipm_y1, ipm_left_dot_num, kIpmCanvasWidth, kIpmCanvasHeight);
     append_points(g_vision_runtime_config.udp_web_tcp_send_ipm_right_boundary,
