@@ -423,6 +423,12 @@ vision_runtime_config_t g_vision_runtime_config = {
     .cross_upper_dir5_post_check_count = 5,
     // 十字辅助边界：历史点须离上角点至少 5 像素。
     .cross_aux_history_x_offset = 5,
+    // 7×7 正方形历史跟踪：默认开启，边长 7，边上 2 黑，最多迭代 5 次，每次移 3 像素。
+    .cross_upper_history_enabled = true,
+    .cross_upper_history_square_half = 3,
+    .cross_upper_history_black_pixels = 2,
+    .cross_upper_history_max_iterations = 5,
+    .cross_upper_history_shift_px = 3,
     // ==================== 参数区域 2: 偏差计算 ====================
     // 说明：line_error 取点参数集中在这里。
     // line_error 平移中线偏好源：0=偏好左，1=偏好右，2=无偏好(自动按边界点数)。

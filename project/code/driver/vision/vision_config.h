@@ -363,6 +363,16 @@ typedef struct
     int cross_upper_dir5_post_check_count;
     // 十字辅助边界历史点：历史过渡点 x 与同侧上角点 x 之间的最小偏移像素数（左: hist_x < upper_x - offset，右: hist_x > upper_x + offset）。
     int cross_aux_history_x_offset;
+    // 7×7 正方形历史角点跟踪：开关。
+    bool cross_upper_history_enabled;
+    // 7×7 正方形半边长（3 → 边长 7）。
+    int cross_upper_history_square_half;
+    // 7×7 正方形边上预期黑像素数。
+    int cross_upper_history_black_pixels;
+    // 7×7 正方形最大平移迭代次数。
+    int cross_upper_history_max_iterations;
+    // 7×7 正方形每次平移像素数。
+    int cross_upper_history_shift_px;
 
     // ==================== 参数区域 2: 偏差计算 ====================
     // 包括 line_error 取点策略与索引范围约束参数。
