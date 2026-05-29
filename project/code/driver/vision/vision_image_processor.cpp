@@ -4438,6 +4438,92 @@ static int truncate_boundary_at_cross_lower_corner_inplace(maze_point_t *pts,
     return rebuild_boundary_points_from_row_table(border_x, pts, std::min(max_pts, VISION_BOUNDARY_NUM));
 }
 
+static int complete_boundary_with_corners(maze_point_t *pts,
+                                          int num,
+                                          bool upper_found, int upper_x, int upper_y,
+                                          bool lower_found, int lower_x, int lower_y,
+                                          int max_pts,
+                                          bool is_left, int start_row)
+{
+    if (pts == nullptr || max_pts <= 0)
+    {
+        return 0;
+    }
+
+    if (upper_found && lower_found)
+    {
+        int out_num = 0;
+
+        for (int i = 0; i < num && out_num < max_pts; ++i)
+        {
+            if (pts[i].y > lower_y)
+            {
+                pts[out_num++] = pts[i];
+            }
+        }
+
+        const int min_y = std::min(upper_y, lower_y);
+        const int max_y = std::max(upper_y, lower_y);
+        for (int y = max_y; y >= min_y && out_num < max_pts; --y)
+        {
+            float t = 0.0f;
+            if (upper_y != lower_y)
+            {
+                t = static_cast<float>(y - lower_y) / static_cast<float>(upper_y - lower_y);
+            }
+            const float xf = static_cast<float>(lower_x) + t * static_cast<float>(upper_x - lower_x);
+            pts[out_num++] = {std::clamp(static_cast<int>(std::lround(xf)), 0, kProcWidth - 1), y};
+        }
+
+        return out_num;
+    }
+
+    if (upper_found && !lower_found)
+    {
+        // 巡线起始行该侧最边上5个点中，至少4个为白才补线。
+        const int sr = std::clamp(start_row, 1, kProcHeight - 2);
+        int white_count = 0;
+        for (int i = 0; i < 5; ++i)
+        {
+            const int cx = is_left ? (1 + i) : (kProcWidth - 2 - i);
+            const int cy = sr;
+            if (g_image_binary_u8[cy * kProcWidth + cx] == 255)
+            {
+                ++white_count;
+            }
+        }
+        if (white_count < 4)
+        {
+            return num;
+        }
+
+        int ipm_cx = 0, ipm_cy = 0;
+        if (src_point_to_ipm_point(upper_x, upper_y, &ipm_cx, &ipm_cy))
+        {
+            int bottom_x = 0, bottom_y = 0;
+            if (ipm_point_to_src_point(ipm_cx, kIpmOutputHeight - 1, &bottom_x, &bottom_y))
+            {
+                const maze_point_t bottom_pt = {std::clamp(bottom_x, 0, kProcWidth - 1),
+                                                std::clamp(bottom_y, 1, kProcHeight - 2)};
+                const maze_point_t upper_pt = {std::clamp(upper_x, 0, kProcWidth - 1),
+                                               std::clamp(upper_y, 1, kProcHeight - 2)};
+                return build_line_points_between(bottom_pt, upper_pt, pts, max_pts);
+            }
+        }
+
+        int out_num = 0;
+        const int start_y = kProcHeight - 2;
+        const int end_y = std::max(1, upper_y);
+        for (int y = start_y; y >= end_y && out_num < max_pts; --y)
+        {
+            pts[out_num++] = {std::clamp(upper_x, 0, kProcWidth - 1), y};
+        }
+        return out_num;
+    }
+
+    return num;
+}
+
 static int copy_boundary_points(const maze_point_t *src, int src_num, maze_point_t *dst, int max_dst)
 {
     if (src == nullptr || dst == nullptr || src_num <= 0 || max_dst <= 0)
@@ -5346,6 +5432,27 @@ bool vision_image_processor_process_step()
         }
     }
     auto t_maze_trace_end = std::chrono::steady_clock::now();
+
+    left_num = complete_boundary_with_corners(left_pts.data(),
+                                               left_num,
+                                               g_cross_left_upper_corner_found.load(),
+                                               g_cross_left_upper_corner_x.load(),
+                                               g_cross_left_upper_corner_y.load(),
+                                               g_cross_lower_left_corner_found.load(),
+                                               g_cross_lower_left_corner_x.load(),
+                                               g_cross_lower_left_corner_y.load(),
+                                               static_cast<int>(left_pts.size()),
+                                               true, maze_start_row);
+    right_num = complete_boundary_with_corners(right_pts.data(),
+                                                right_num,
+                                                g_cross_right_upper_corner_found.load(),
+                                                g_cross_right_upper_corner_x.load(),
+                                                g_cross_right_upper_corner_y.load(),
+                                                g_cross_lower_right_corner_found.load(),
+                                                g_cross_lower_right_corner_x.load(),
+                                                g_cross_lower_right_corner_y.load(),
+                                                static_cast<int>(right_pts.size()),
+                                                false, maze_start_row);
 
     vision_route_state_input_t route_input{};
     route_input.base_preferred_source = g_ipm_line_error_preferred_source.load();
