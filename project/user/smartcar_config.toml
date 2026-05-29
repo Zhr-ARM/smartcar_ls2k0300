@@ -29,7 +29,7 @@ client_sender_enabled = false
 screen_display_enabled = false
 # 迷宫法起始搜索行。
 # 值越大越靠近图像底部。
-maze_start_row = 90
+maze_start_row = 60
 # 原图巡线方法。
 # 0=迷宫法，1=八邻域法。
 maze_trace_method = 1
@@ -143,7 +143,7 @@ route_circle_stage_frame_wall_rows_enter = 30
 # 圆环状态 3 进入下一阶段的对侧起始贴边连续行数阈值。
 route_circle_stage3_frame_wall_rows_trigger = 70
 # 圆环状态 6 抬高迷宫法搜线起始行的上限（行号越小越靠上）。
-route_circle_stage6_maze_start_row = 80
+route_circle_stage6_maze_start_row = 60
 # 圆环状态 circle4/5 的目标中线相对左边界偏移。
 route_circle_center_target_offset_from_left_px = 15.0
 # 圆环补线中贴边连续段的最小长度阈值。
@@ -368,7 +368,7 @@ server_port = 8899
 maze_trace_max_points = 180
 # 迷宫法允许追踪的纵向区域百分比。
 # 100 表示全高。
-maze_lower_region_percent = 85
+maze_lower_region_percent = 100
 # 二值化模式。
 # 0=全图OTSU, 1=按需局部均值自适应, 2=全图局部均值自适应。
 binarization_mode = 0
