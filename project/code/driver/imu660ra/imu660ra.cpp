@@ -54,7 +54,7 @@ bool Imu660raDriver::init()
         else if ('\0' != imu_dev_name[0])
         {
             char message[sizeof(last_error_)] = {0};
-            snprintf(message, sizeof(message), "检测到未适配的 IMU 设备: %s", imu_dev_name);
+            snprintf(message, sizeof(message), "检测到 IIO 设备但不是 IMU660RA: %s", imu_dev_name);
             set_error(message);
         }
         else

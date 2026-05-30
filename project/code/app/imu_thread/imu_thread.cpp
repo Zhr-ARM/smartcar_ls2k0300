@@ -11,6 +11,8 @@ namespace
 constexpr int32 IMU_PERIOD_MS = 5;
 // 调度优先级：低于速度环(10)和巡线线程(8)，但高于普通后台线程。
 constexpr int32 IMU_THREAD_PRIORITY = 7;
+constexpr int32 IMU_INIT_RETRY_TIMEOUT_MS = 3000;
+constexpr int32 IMU_INIT_RETRY_INTERVAL_MS = 100;
 constexpr float IMU_RAD_TO_DEG = 57.2957795f;
 
 std::thread g_imu_thread;
@@ -64,10 +66,35 @@ const char *imu_type_name(uint8 type)
 
 void print_imu_device_summary(const char *stage, bool success, const char *reason)
 {
-    printf("[IMU INIT] stage=%s result=%s reason=%s type=%s(0x%02X) name=%s dir=%s\r\n",
+    printf("[IMU INIT] stage=%s result=%s reason=%s detail=%s type=%s(0x%02X) name=%s dir=%s\r\n",
            safe_cstr(stage),
            success ? "ok" : "fail",
            safe_cstr(reason),
+           safe_cstr(imu_probe_reason),
+           imu_type_name(imu_type),
+           static_cast<unsigned int>(imu_type),
+           safe_cstr(imu_dev_name),
+           safe_cstr(imu_device_dir));
+}
+
+int32 imu_init_max_attempts()
+{
+    return std::max<int32>(1, (IMU_INIT_RETRY_TIMEOUT_MS / IMU_INIT_RETRY_INTERVAL_MS) + 1);
+}
+
+bool should_print_imu_retry(int32 attempt, int32 max_attempts)
+{
+    return (1 == attempt) || (max_attempts == attempt) || (0 == (attempt % 5));
+}
+
+void print_imu_retry_summary(int32 attempt, int32 max_attempts, const char *reason)
+{
+    printf("[IMU INIT] stage=driver_init result=retry attempt=%d/%d wait_ms=%d reason=%s detail=%s type=%s(0x%02X) name=%s dir=%s\r\n",
+           attempt,
+           max_attempts,
+           IMU_INIT_RETRY_INTERVAL_MS,
+           safe_cstr(reason),
+           safe_cstr(imu_probe_reason),
            imu_type_name(imu_type),
            static_cast<unsigned int>(imu_type),
            safe_cstr(imu_dev_name),
@@ -237,15 +264,44 @@ bool imu_thread_init()
         return true;
     }
 
-    printf("[IMU INIT] begin sample_period_ms=%d mode=gyro_z_only\r\n",
-           IMU_PERIOD_MS);
+    const int32 max_attempts = imu_init_max_attempts();
+    printf("[IMU INIT] begin sample_period_ms=%d mode=gyro_z_only init_retry_timeout_ms=%d retry_interval_ms=%d\r\n",
+           IMU_PERIOD_MS,
+           IMU_INIT_RETRY_TIMEOUT_MS,
+           IMU_INIT_RETRY_INTERVAL_MS);
 
-    if (!imu660ra_driver.init())
+    int32 init_attempt = 1;
+    for (; init_attempt <= max_attempts; ++init_attempt)
+    {
+        if (imu660ra_driver.init())
+        {
+            break;
+        }
+
+        if (init_attempt < max_attempts)
+        {
+            const char *error = imu660ra_driver.last_error();
+            if (should_print_imu_retry(init_attempt, max_attempts))
+            {
+                print_imu_retry_summary(init_attempt, max_attempts, safe_cstr(error));
+            }
+            system_delay_ms(IMU_INIT_RETRY_INTERVAL_MS);
+        }
+    }
+
+    if (init_attempt > max_attempts)
     {
         const char *error = imu660ra_driver.last_error();
         print_imu_device_summary("driver_init", false, safe_cstr(error));
         print_imu_init_hint(imu_type);
         return false;
+    }
+    if (init_attempt > 1)
+    {
+        printf("[IMU INIT] stage=driver_init result=ok recovered_attempt=%d/%d waited_ms=%d\r\n",
+               init_attempt,
+               max_attempts,
+               (init_attempt - 1) * IMU_INIT_RETRY_INTERVAL_MS);
     }
     print_imu_device_summary("driver_init", true, "device probe and first update ok");
     print_imu_scale_summary();

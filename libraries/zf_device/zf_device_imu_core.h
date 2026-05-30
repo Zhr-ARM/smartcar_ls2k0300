@@ -30,6 +30,7 @@ enum path_index
 
 #define IMU_SYSFS_PATH_MAX_LEN   (128)
 #define IMU_DEVICE_NAME_MAX_LEN  (32)
+#define IMU_PROBE_REASON_MAX_LEN (256)
 
 extern int16 imu_acc_x,  imu_acc_y,  imu_acc_z;
 extern int16 imu_gyro_x, imu_gyro_y, imu_gyro_z;
@@ -37,6 +38,7 @@ extern int16 imu_mag_x,  imu_mag_y,  imu_mag_z;
 
 extern char imu_device_dir[IMU_SYSFS_PATH_MAX_LEN];
 extern char imu_dev_name[IMU_DEVICE_NAME_MAX_LEN];
+extern char imu_probe_reason[IMU_PROBE_REASON_MAX_LEN];
 extern char imu_file_path[9][IMU_SYSFS_PATH_MAX_LEN];
 extern uint8 imu_type;
 
