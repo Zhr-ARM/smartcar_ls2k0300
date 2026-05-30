@@ -1,5 +1,6 @@
 {
     "cmake.sourceDirectory": "/home/lucy/loongcar/smartcar_ls2k0300/project/user",
     "cmake.buildDirectory": "/home/zhr/2k0300/test1/project/out",
-    "C_Cpp.default.compileCommands": "/home/zhr/2k0300/test1/project/out/compile_commands.json"
+    "C_Cpp.default.compileCommands": "/home/zhr/2k0300/test1/project/out/compile_commands.json",
+    "cmake.ignoreCMakeListsMissing": true
 }
