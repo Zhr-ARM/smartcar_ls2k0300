@@ -2427,6 +2427,7 @@
     }
 
     function getSelectedSrcCenterline(status) {
+      if (Array.isArray(status.src_centerline_selected_resampled) && status.src_centerline_selected_resampled.length > 0) return status.src_centerline_selected_resampled;
       if (Array.isArray(status.src_centerline_selected_shift)) return status.src_centerline_selected_shift;
       if (status.ipm_centerline_source === 1) return status.src_centerline_from_right_shift || [];
       return status.src_centerline_from_left_shift || [];
@@ -4662,6 +4663,8 @@
         const meanCenterline = getMeanCenterlineFromBoundaries(renderStatus);
         drawSeries(grayCtx, meanCenterline, '#facc15', 2, 1);
       }
+      const srcCenterline = getSelectedSrcCenterline(renderStatus);
+      drawSeries(grayCtx, srcCenterline, '#ec4899', 2, 1);
       renderInferFrame(renderStatus);
       renderBinaryFromGray();
       requestLocalCompute();
@@ -4849,6 +4852,7 @@
       drawSeries(binaryCtx, status.right_boundary || [], '#22c55e', 2, 1);
       drawSeries(binaryCtx, status.left_circle_guide_line || [], '#f59e0b', 2, 1);
       drawSeries(binaryCtx, status.right_circle_guide_line || [], '#f97316', 2, 1);
+      drawSeries(binaryCtx, getSelectedSrcCenterline(status), '#ec4899', 2, 1);
       if (showCrossAux) {
         drawSeries(binaryCtx, status.cross_left_aux_trace || [], '#0ea5e9', 2, 0.8);
         drawSeries(binaryCtx, status.cross_right_aux_trace || [], '#10b981', 2, 0.8);

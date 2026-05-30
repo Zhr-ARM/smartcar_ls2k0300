@@ -306,6 +306,9 @@ void vision_image_processor_get_ipm_shifted_centerline_from_right(uint16 **x, ui
 // 将左右偏移中线从 IPM 坐标回投到原图后的结果。
 void vision_image_processor_get_src_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_src_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
+// 逐行重采样后的回投中线（每行唯一 x）。
+void vision_image_processor_get_src_shifted_center_resampled_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
+void vision_image_processor_get_src_shifted_center_resampled_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
 
 // 红色实心矩形检测结果（坐标与尺寸）。
 // set_* 接口由 infer 模块写入，get_* 接口供发送/UI读取。

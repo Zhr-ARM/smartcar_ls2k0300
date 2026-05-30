@@ -845,6 +845,14 @@ static void send_tcp_status()
     uint16 *src_center_right_y = nullptr;
     uint16 src_center_right_num = 0;
     vision_image_processor_get_src_shifted_centerline_from_right(&src_center_right_x, &src_center_right_y, &src_center_right_num);
+    uint16 *src_center_resampled_left_x = nullptr;
+    uint16 *src_center_resampled_left_y = nullptr;
+    uint16 src_center_resampled_left_num = 0;
+    vision_image_processor_get_src_shifted_center_resampled_from_left(&src_center_resampled_left_x, &src_center_resampled_left_y, &src_center_resampled_left_num);
+    uint16 *src_center_resampled_right_x = nullptr;
+    uint16 *src_center_resampled_right_y = nullptr;
+    uint16 src_center_resampled_right_num = 0;
+    vision_image_processor_get_src_shifted_center_resampled_from_right(&src_center_resampled_right_x, &src_center_resampled_right_y, &src_center_resampled_right_num);
     bool ipm_track_valid = false;
     int ipm_track_index = -1;
     int ipm_track_x = 0;
@@ -1597,6 +1605,16 @@ static void send_tcp_status()
                   selected_src_center_x,
                   selected_src_center_y,
                   selected_src_center_num,
+                  VISION_DOWNSAMPLED_WIDTH,
+                  VISION_DOWNSAMPLED_HEIGHT);
+    uint16 *selected_src_center_resampled_x = selected_is_right ? src_center_resampled_right_x : src_center_resampled_left_x;
+    uint16 *selected_src_center_resampled_y = selected_is_right ? src_center_resampled_right_y : src_center_resampled_left_y;
+    uint16 selected_src_center_resampled_num = selected_is_right ? src_center_resampled_right_num : src_center_resampled_left_num;
+    append_points(true,
+                  "src_centerline_selected_resampled",
+                  selected_src_center_resampled_x,
+                  selected_src_center_resampled_y,
+                  selected_src_center_resampled_num,
                   VISION_DOWNSAMPLED_WIDTH,
                   VISION_DOWNSAMPLED_HEIGHT);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_count,

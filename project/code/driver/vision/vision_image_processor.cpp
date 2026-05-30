@@ -200,6 +200,13 @@ static int g_src_shift_left_center_count = 0;
 static uint16 g_src_shift_right_center_x[VISION_BOUNDARY_NUM];
 static uint16 g_src_shift_right_center_y[VISION_BOUNDARY_NUM];
 static int g_src_shift_right_center_count = 0;
+// 逐行重采样后的回投中线（每行唯一 x）。
+static uint16 g_src_shift_left_center_resampled_x[VISION_BOUNDARY_NUM];
+static uint16 g_src_shift_left_center_resampled_y[VISION_BOUNDARY_NUM];
+static int g_src_shift_left_center_resampled_count = 0;
+static uint16 g_src_shift_right_center_resampled_x[VISION_BOUNDARY_NUM];
+static uint16 g_src_shift_right_center_resampled_y[VISION_BOUNDARY_NUM];
+static int g_src_shift_right_center_resampled_count = 0;
 
 // 图像缓存：
 // - g_image_bgr_full: full 采集分辨率原图（当前 320x240）；
@@ -3006,6 +3013,94 @@ static void resample_boundary_points_equal_spacing_inplace(maze_point_t *pts, in
     *num = out;
 }
 
+// 对回投到原图的 IPM 中线做距离过滤 + 线性补点。
+// 阶段一：过滤间距 <2px 的过密点，保留间距 >=2 的稀疏点集。
+// 阶段二：对间距 >=2 的相邻线段线性插值补点，使最终每段间距 ∈[1,2)。
+static void resample_src_centerline_rowwise(const maze_point_t *pts, int count,
+                                             uint16 *out_xs, uint16 *out_ys, int *out_count)
+{
+    *out_count = 0;
+    if (pts == nullptr || count < 2 || out_xs == nullptr || out_ys == nullptr)
+    {
+        return;
+    }
+
+    const int n = std::min(count, VISION_BOUNDARY_NUM);
+
+    // 阶段一：逐点扫描，距离上一保留点 >= 2px 才保留。
+    struct kept_t
+    {
+        int x, y;
+    };
+    std::array<kept_t, VISION_BOUNDARY_NUM> kept{};
+    kept[0].x = pts[0].x;
+    kept[0].y = pts[0].y;
+    int kept_cnt = 1;
+    for (int i = 1; i < n; ++i)
+    {
+        const int dx = pts[i].x - kept[kept_cnt - 1].x;
+        const int dy = pts[i].y - kept[kept_cnt - 1].y;
+        const float dist = std::sqrt(static_cast<float>(dx * dx + dy * dy));
+        if (dist >= 2.0f && kept_cnt < VISION_BOUNDARY_NUM)
+        {
+            kept[kept_cnt].x = pts[i].x;
+            kept[kept_cnt].y = pts[i].y;
+            ++kept_cnt;
+        }
+    }
+
+    if (kept_cnt < 2)
+    {
+        return;
+    }
+
+    // 阶段二：相邻保留点间距 >=2 时，线性插值补点，每段间距 ∈[1,2)。
+    int out_cnt = 0;
+    out_xs[out_cnt] = static_cast<uint16>(std::clamp(kept[0].x, 0, kProcWidth - 1));
+    out_ys[out_cnt] = static_cast<uint16>(kept[0].y);
+    ++out_cnt;
+
+    for (int i = 1; i < kept_cnt && out_cnt < VISION_BOUNDARY_NUM; ++i)
+    {
+        const int x0 = kept[i - 1].x;
+        const int y0 = kept[i - 1].y;
+        const int x1 = kept[i].x;
+        const int y1 = kept[i].y;
+        const int dx = x1 - x0;
+        const int dy = y1 - y0;
+        const float d = std::sqrt(static_cast<float>(dx * dx + dy * dy));
+
+        if (d < 2.0f)
+        {
+            // 间距已在 [0,2) 内，直接输出下一保留点。
+            out_xs[out_cnt] = static_cast<uint16>(std::clamp(x1, 0, kProcWidth - 1));
+            out_ys[out_cnt] = static_cast<uint16>(y1);
+            ++out_cnt;
+            continue;
+        }
+
+        // 插入 floor(d)-1 个中间点，每小段长度 d/floor(d) ∈[1,2)。
+        const int n_seg = static_cast<int>(std::floor(d));
+        for (int j = 1; j < n_seg && out_cnt < VISION_BOUNDARY_NUM; ++j)
+        {
+            const float t = static_cast<float>(j) / static_cast<float>(n_seg);
+            const int ix = static_cast<int>(std::lround(static_cast<float>(x0) + t * static_cast<float>(dx)));
+            const int iy = static_cast<int>(std::lround(static_cast<float>(y0) + t * static_cast<float>(dy)));
+            out_xs[out_cnt] = static_cast<uint16>(std::clamp(ix, 0, kProcWidth - 1));
+            out_ys[out_cnt] = static_cast<uint16>(iy);
+            ++out_cnt;
+        }
+        // 输出当前保留点本身。
+        if (out_cnt < VISION_BOUNDARY_NUM)
+        {
+            out_xs[out_cnt] = static_cast<uint16>(std::clamp(x1, 0, kProcWidth - 1));
+            out_ys[out_cnt] = static_cast<uint16>(y1);
+            ++out_cnt;
+        }
+    }
+    *out_count = out_cnt;
+}
+
 static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *left_pts,
                                                            int left_num,
                                                            const maze_point_t *right_pts,
@@ -3060,6 +3155,28 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
         return out;
     }();
     const int prev_src_shift_right_center_count = g_src_shift_right_center_count;
+    const std::array<uint16, VISION_BOUNDARY_NUM> prev_src_shift_left_center_resampled_x = [&]() {
+        std::array<uint16, VISION_BOUNDARY_NUM> out{};
+        std::copy_n(g_src_shift_left_center_resampled_x, VISION_BOUNDARY_NUM, out.data());
+        return out;
+    }();
+    const std::array<uint16, VISION_BOUNDARY_NUM> prev_src_shift_left_center_resampled_y = [&]() {
+        std::array<uint16, VISION_BOUNDARY_NUM> out{};
+        std::copy_n(g_src_shift_left_center_resampled_y, VISION_BOUNDARY_NUM, out.data());
+        return out;
+    }();
+    const int prev_src_shift_left_center_resampled_count = g_src_shift_left_center_resampled_count;
+    const std::array<uint16, VISION_BOUNDARY_NUM> prev_src_shift_right_center_resampled_x = [&]() {
+        std::array<uint16, VISION_BOUNDARY_NUM> out{};
+        std::copy_n(g_src_shift_right_center_resampled_x, VISION_BOUNDARY_NUM, out.data());
+        return out;
+    }();
+    const std::array<uint16, VISION_BOUNDARY_NUM> prev_src_shift_right_center_resampled_y = [&]() {
+        std::array<uint16, VISION_BOUNDARY_NUM> out{};
+        std::copy_n(g_src_shift_right_center_resampled_y, VISION_BOUNDARY_NUM, out.data());
+        return out;
+    }();
+    const int prev_src_shift_right_center_resampled_count = g_src_shift_right_center_resampled_count;
     clear_ipm_saved_arrays();
 
     std::array<maze_point_t, VISION_BOUNDARY_NUM> left_ipm{};
@@ -3191,6 +3308,11 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                             &g_src_shift_right_center_count,
                                             kProcWidth,
                                             kProcHeight);
+        resample_src_centerline_rowwise(src_center_selected.data(),
+                                        src_center_selected_num,
+                                        g_src_shift_right_center_resampled_x,
+                                        g_src_shift_right_center_resampled_y,
+                                        &g_src_shift_right_center_resampled_count);
     }
     else
     {
@@ -3208,6 +3330,11 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                             &g_src_shift_left_center_count,
                                             kProcWidth,
                                             kProcHeight);
+        resample_src_centerline_rowwise(src_center_selected.data(),
+                                        src_center_selected_num,
+                                        g_src_shift_left_center_resampled_x,
+                                        g_src_shift_left_center_resampled_y,
+                                        &g_src_shift_left_center_resampled_count);
     }
     vision_line_error_layer_set_source(selected_is_right ? static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT)
                                                          : static_cast<int>(VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT));
@@ -3226,6 +3353,12 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
         std::copy_n(prev_src_shift_right_center_x.data(), VISION_BOUNDARY_NUM, g_src_shift_right_center_x);
         std::copy_n(prev_src_shift_right_center_y.data(), VISION_BOUNDARY_NUM, g_src_shift_right_center_y);
         g_src_shift_right_center_count = prev_src_shift_right_center_count;
+        std::copy_n(prev_src_shift_left_center_resampled_x.data(), VISION_BOUNDARY_NUM, g_src_shift_left_center_resampled_x);
+        std::copy_n(prev_src_shift_left_center_resampled_y.data(), VISION_BOUNDARY_NUM, g_src_shift_left_center_resampled_y);
+        g_src_shift_left_center_resampled_count = prev_src_shift_left_center_resampled_count;
+        std::copy_n(prev_src_shift_right_center_resampled_x.data(), VISION_BOUNDARY_NUM, g_src_shift_right_center_resampled_x);
+        std::copy_n(prev_src_shift_right_center_resampled_y.data(), VISION_BOUNDARY_NUM, g_src_shift_right_center_resampled_y);
+        g_src_shift_right_center_resampled_count = prev_src_shift_right_center_resampled_count;
     }
 
     fill_boundary_arrays_from_points_to_target(left_proc.data(),
@@ -4450,7 +4583,7 @@ static int complete_boundary_with_corners(maze_point_t *pts,
         return 0;
     }
 
-    if (upper_found && lower_found)
+    if (upper_found && lower_found && upper_y < lower_y && (lower_y - upper_y) > 2)
     {
         int out_num = 0;
 
@@ -4462,8 +4595,8 @@ static int complete_boundary_with_corners(maze_point_t *pts,
             }
         }
 
-        const int min_y = std::min(upper_y, lower_y);
-        const int max_y = std::max(upper_y, lower_y);
+        const int min_y = upper_y;
+        const int max_y = lower_y;
         for (int y = max_y; y >= min_y && out_num < max_pts; --y)
         {
             float t = 0.0f;
@@ -6563,6 +6696,20 @@ void vision_image_processor_get_src_shifted_centerline_from_right(uint16 **x, ui
     if (x) *x = g_src_shift_right_center_x;
     if (y) *y = g_src_shift_right_center_y;
     if (dot_num) *dot_num = static_cast<uint16>(g_src_shift_right_center_count);
+}
+
+void vision_image_processor_get_src_shifted_center_resampled_from_left(uint16 **x, uint16 **y, uint16 *dot_num)
+{
+    if (x) *x = g_src_shift_left_center_resampled_x;
+    if (y) *y = g_src_shift_left_center_resampled_y;
+    if (dot_num) *dot_num = static_cast<uint16>(g_src_shift_left_center_resampled_count);
+}
+
+void vision_image_processor_get_src_shifted_center_resampled_from_right(uint16 **x, uint16 **y, uint16 *dot_num)
+{
+    if (x) *x = g_src_shift_right_center_resampled_x;
+    if (y) *y = g_src_shift_right_center_resampled_y;
+    if (dot_num) *dot_num = static_cast<uint16>(g_src_shift_right_center_resampled_count);
 }
 
 void vision_image_processor_get_red_rect(bool *found, int *x, int *y, int *w, int *h, int *cx, int *cy)
