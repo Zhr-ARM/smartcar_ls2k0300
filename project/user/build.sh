@@ -18,6 +18,7 @@ TARGET_CONFIG_PATH="/home/root/tst/smartcar_config.toml"
 MAKE_JOBS="12"
 CAMERA_CAPTURE_WIDTH="320"
 CAMERA_CAPTURE_FORMAT="yuy2"
+CAMERA_FPS="90"
 ENABLE_NCNN="1"
 
 print_usage() {
@@ -221,6 +222,7 @@ echo "[BUILD] APP 目标路径: ${TARGET_APP_PATH}"
 echo "[BUILD] 配置目标路径: ${TARGET_CONFIG_PATH}"
 echo "[BUILD] 摄像头采图宽度: ${CAMERA_CAPTURE_WIDTH} (UVC_RES_PRESET=${UVC_RES_PRESET})"
 echo "[BUILD] 摄像头输出格式: ${CAMERA_CAPTURE_FORMAT} (UVC_FORMAT_PRESET=${UVC_FORMAT_PRESET})"
+echo "[BUILD] 摄像头帧率: ${CAMERA_FPS} FPS"
 echo "[BUILD] NCNN 编译开关: ${ENABLE_NCNN}"
 
 node "$SYNC_TOML_SCRIPT" "$CONNECTION_PRESETS_FILE" "$TARGET_PRESET" "$SCRIPT_DIR/smartcar_config.toml" || {
@@ -243,7 +245,7 @@ find . -mindepth 1 ! -name "本文件夹作用.txt" -exec rm -rf {} + || {
     exit 1
 }
 
-cmake ../user -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUVC_RES_PRESET="${UVC_RES_PRESET}" -DUVC_FORMAT_PRESET="${UVC_FORMAT_PRESET}" -DENABLE_NCNN="${ENABLE_NCNN}" || {
+cmake ../user -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUVC_RES_PRESET="${UVC_RES_PRESET}" -DUVC_FORMAT_PRESET="${UVC_FORMAT_PRESET}" -DUVC_FPS="${CAMERA_FPS}" -DENABLE_NCNN="${ENABLE_NCNN}" || {
     echo "cmake 命令执行失败。"
     exit 1
 }

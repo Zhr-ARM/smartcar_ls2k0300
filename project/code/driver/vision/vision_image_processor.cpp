@@ -38,6 +38,9 @@ static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
 static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
 static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
 static constexpr int kCropOffsetY = 30;
+static constexpr int kCropW = UVC_WIDTH;
+static constexpr int kCropH = UVC_HEIGHT / 2;
+static constexpr int kCropY = UVC_HEIGHT / 4;
 
 static inline int scale_by_width(int ref_px)
 {
@@ -209,9 +212,11 @@ static uint16 g_src_shift_right_center_resampled_y[VISION_BOUNDARY_NUM];
 static int g_src_shift_right_center_resampled_count = 0;
 
 // 图像缓存：
-// - g_image_bgr_full: full 采集分辨率原图（当前 320x240）；
-// - g_image_bgr/g_image_gray/g_image_binary_u8: 降采样处理图（固定 160x120）。
+// - g_image_bgr_full: full 采集分辨率原图（320x240 或 160x120）；
+// - g_image_bgr_crop: full 分辨率裁剪图（320x120 或 160x60），保留 BGR 色彩；
+// - g_image_bgr/g_image_gray/g_image_binary_u8: 处理分辨率图（固定 160x60）。
 static uint8 g_image_bgr_full[UVC_HEIGHT * UVC_WIDTH * 3];
+static uint8 g_image_bgr_crop[kCropH * kCropW * 3];
 static uint8 g_image_bgr[kProcHeight * kProcWidth * 3];
 static uint8 g_image_gray[kProcHeight * kProcWidth];
 static uint8 g_image_binary_u8[kProcHeight * kProcWidth];
@@ -4797,33 +4802,33 @@ bool vision_image_processor_process_step()
     auto t_pre_start = t1;
 
     // 处理分辨率固定为 160x60。
-    // 获取 160x120 全分辨率帧 -> 裁剪 y=30..89 共 60 行 -> 输入后续视觉处理。
+    // 新管道：full → crop(kCropW×kCropH BGR) → resize(160x60 BGR) → gray(160x60)
     cv::Mat bgr_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr_full);
+    cv::Mat bgr_crop(kCropH, kCropW, CV_8UC3, g_image_bgr_crop);
     cv::Mat bgr(kProcHeight, kProcWidth, CV_8UC3, g_image_bgr);
+
+    // 步骤 1：从 full 裁剪到底部一半 → g_image_bgr_crop
+    bgr_full(cv::Rect(0, kCropY, kCropW, kCropH)).copyTo(bgr_crop);
 
     if (g_undistort_enabled.load() && init_undistort_remap_table())
     {
-        // init_undistort_remap_table 已构建 60x160 映射并包含 crop 偏移，
-        // remap 直接输出裁剪+去畸变结果，无需再裁剪。
+        // 去畸变路径：remap 直接从 full→proc（去畸变表内含 crop 偏移）
         cv::remap(bgr_full, bgr, g_undistort_map_x, g_undistort_map_y,
                   cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
     }
     else
     {
-        static constexpr int kCropY = kCropOffsetY;
-        cv::Mat bgr_at_full_height;
-        if (UVC_WIDTH == 160 && UVC_HEIGHT == 120)
+        if (kCropW == kProcWidth && kCropH == kProcHeight)
         {
-            bgr_at_full_height = bgr_full;
+            // 160x120 模式：裁剪尺寸 == 处理尺寸，直接复制
+            bgr_crop.copyTo(bgr);
         }
         else
         {
-            bgr_at_full_height = cv::Mat(120, 160, CV_8UC3);
-            cv::resize(bgr_full, bgr_at_full_height, cv::Size(160, 120), 0.0, 0.0, cv::INTER_AREA);
+            // 320x240 模式：INTER_AREA 降采样 320x120→160x60
+            cv::resize(bgr_crop, bgr, cv::Size(kProcWidth, kProcHeight),
+                       0.0, 0.0, cv::INTER_AREA);
         }
-
-        cv::Mat crop_roi = bgr_at_full_height(cv::Rect(0, kCropY, kProcWidth, kProcHeight));
-        crop_roi.copyTo(bgr);
     }
     cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
@@ -6407,6 +6412,11 @@ const uint8 *vision_image_processor_bgr_image()
 const uint8 *vision_image_processor_bgr_full_image()
 {
     return g_image_bgr_full;
+}
+
+const uint8 *vision_image_processor_bgr_crop_image()
+{
+    return g_image_bgr_crop;
 }
 
 const uint8 *vision_image_processor_gray_downsampled_image()

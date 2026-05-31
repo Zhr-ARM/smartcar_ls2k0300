@@ -24,10 +24,13 @@ set_property(CACHE UVC_FORMAT_PRESET PROPERTY STRINGS "0" "1")
 if(NOT (UVC_FORMAT_PRESET STREQUAL "0" OR UVC_FORMAT_PRESET STREQUAL "1"))
     message(FATAL_ERROR "Invalid UVC_FORMAT_PRESET=${UVC_FORMAT_PRESET}, expected 0 or 1")
 endif()
+set(UVC_FPS "90" CACHE STRING "UVC camera FPS")
 add_compile_definitions(UVC_RES_PRESET=${UVC_RES_PRESET})
 add_compile_definitions(UVC_FORMAT_PRESET=${UVC_FORMAT_PRESET})
+add_compile_definitions(UVC_FPS=${UVC_FPS})
 message(STATUS "UVC_RES_PRESET=${UVC_RES_PRESET} (0=160x120, 1=320x240)")
 message(STATUS "UVC_FORMAT_PRESET=${UVC_FORMAT_PRESET} (0=YUY2, 1=MJPG)")
+message(STATUS "UVC_FPS=${UVC_FPS}")
 
 # 获取当前 CMakeLists.txt 文件所在目录的完整路径
 set(CURRENT_DIR ${CMAKE_CURRENT_LIST_DIR})

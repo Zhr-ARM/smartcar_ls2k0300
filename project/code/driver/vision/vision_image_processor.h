@@ -218,6 +218,9 @@ const uint8 *vision_image_processor_gray_image();
 const uint8 *vision_image_processor_binary_u8_image();
 const uint8 *vision_image_processor_bgr_image();
 const uint8 *vision_image_processor_bgr_full_image();
+// 裁剪 BGR 彩图（320x120 或 160x60），保留相机原始色彩信息。
+// 用途：供 ncnn 推理、红框检测等需要高于 160x60 分辨率的模块使用。
+const uint8 *vision_image_processor_bgr_crop_image();
 // 降采样接口与主接口一致（当前输入即处理分辨率）
 const uint8 *vision_image_processor_gray_downsampled_image();
 const uint8 *vision_image_processor_binary_downsampled_u8_image();
