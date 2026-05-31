@@ -110,6 +110,48 @@ typedef struct
     int ncnn_class_count;  // 当前返回的类别数。
     char ncnn_labels[VISION_NCNN_MAX_CLASSES][VISION_NCNN_LABEL_MAX_LEN]; // 各类别标签。
     float ncnn_probs[VISION_NCNN_MAX_CLASSES]; // 各类别概率。
+    // 目标板检测调试信息（crop 320×120 或 160×60 坐标系）。
+    bool board_debug_valid;
+    char board_fail_reason[VISION_NCNN_LABEL_MAX_LEN];
+    float board_dist_ipm;      // 红色提示矩形下底边命中点沿中线累计 IPM 距离。
+    int board_bottom_cx;     // 目标物下底边中点 x。
+    int board_bottom_cy;     // 目标物下底边中点 y。
+    int board_hit_x;         // 红色提示矩形下底边命中点 x（proc 坐标系）。
+    int board_hit_y;         // 红色提示矩形下底边命中点 y（proc 坐标系）。
+    int board_height_px;     // 目标物高度（crop 像素）。
+    int board_width_px;      // 目标物宽度（crop 像素）。
+    int board_corner_bl_x;   // 左下角 x。
+    int board_corner_bl_y;   // 左下角 y。
+    int board_corner_br_x;   // 右下角 x。
+    int board_corner_br_y;   // 右下角 y。
+    int board_corner_tr_x;   // 右上角 x。
+    int board_corner_tr_y;   // 右上角 y。
+    int board_corner_tl_x;   // 左上角 x。
+    int board_corner_tl_y;   // 左上角 y。
+    // IPM 坐标系：上下底边中点 + 四角点。
+    int board_ipm_bottom_x;
+    int board_ipm_bottom_y;
+    int board_ipm_top_x;
+    int board_ipm_top_y;
+    int board_ipm_red_bottom_x;
+    int board_ipm_red_bottom_y;
+    int board_ipm_bl_x;
+    int board_ipm_bl_y;
+    int board_ipm_br_x;
+    int board_ipm_br_y;
+    int board_ipm_tr_x;
+    int board_ipm_tr_y;
+    int board_ipm_tl_x;
+    int board_ipm_tl_y;
+    // 回投原图角点（proc 坐标系）。
+    int board_src_bl_x;
+    int board_src_bl_y;
+    int board_src_br_x;
+    int board_src_br_y;
+    int board_src_tr_x;
+    int board_src_tr_y;
+    int board_src_tl_x;
+    int board_src_tl_y;
 } vision_infer_async_result_t;
 
 // 作用：初始化异步推理模块并启动 worker 线程。

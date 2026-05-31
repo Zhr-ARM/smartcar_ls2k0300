@@ -61,16 +61,11 @@ vision_runtime_config_t g_vision_runtime_config = {
         "medicine",
         "telescope",
     },
-    // 红框检测和 ROI 裁剪默认参数，对齐 data_gen fine_crop_debug.py。
-    .red_roi_h_span = 12,
-    .red_roi_s_min = 50,
-    .red_roi_v_min = 50,
-    .red_roi_close_iter = 1,
-    .red_roi_open_iter = 1,
-    .red_roi_area_min = 50,
-    .red_roi_ratio_w = 1.2f,
-    .red_roi_ratio_h = 1.2f,
-    .red_roi_offset_ratio = 0.0f,
+    // 目标板检测默认参数（沿中线搜索 + IPM 空间两段推算）。
+    .red_roi_red_to_target_bottom_k = 0.0f,
+    .red_roi_red_to_target_bottom_b = 0.0f,
+    .red_roi_target_height_k = -0.3f,
+    .red_roi_target_height_b = 25.0f,
     // 逐飞客户端发送开关。
     // 车载屏显示开关。
     .screen_display_enabled = false,

@@ -189,21 +189,16 @@ label_count = 6
 labels = ["ambulance", "armored_car", "bomb", "gun", "medicine", "telescope"]
 
 [vision.runtime.red_roi]
-# HSV 红色 Hue 半宽，匹配 [0,h_span] 和 [180-h_span,180]。
-h_span = 12
-# HSV 饱和度/亮度下限。
-s_min = 50
-v_min = 50
-# 3x3 形态学 close/open 迭代次数。
-close_iter = 1
-open_iter = 1
-# 最大红色轮廓的最小面积阈值。
-area_min = 50
-# 基于 320x240 full 图红框宽度推导 ncnn ROI 的宽/高比例。
-ratio_w = 1.2
-ratio_h = 1.2
-# ROI 底部锚点从红框底部上抬的比例。
-offset_ratio = 0.0
+# 红色提示矩形下底边中点到目标物下底边中点的距离斜率（IPM 空间）。
+# gap_ipm = k * dist_ipm + b。
+red_to_target_bottom_k = 0.0
+# 红色提示矩形下底边中点到目标物下底边中点的距离截距（IPM 像素）。
+red_to_target_bottom_b = 1.0
+# 目标物高度一次函数斜率（IPM 空间）。
+# height_ipm = k * dist_ipm + b。
+target_height_k = -0.1
+# 目标物高度一次函数截距（IPM 像素）。
+target_height_b = 8.0
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
@@ -217,7 +212,7 @@ send_gray_jpeg = true
 # 0=JPEG，1=PNG，2=BMP。
 gray_image_format = 0
 # 是否发送二值图。
-send_binary_jpeg = false
+send_binary_jpeg = true
 # 二值图发送格式。
 # 0=JPEG，1=PNG，2=BMP。
 binary_image_format = 0

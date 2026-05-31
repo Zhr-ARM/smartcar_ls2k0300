@@ -951,15 +951,10 @@ bool load_from_path(const std::string &path, std::string *error_message)
         !require_int(values, &consumed, "vision.runtime.ncnn.input_height", &g_vision_runtime_config.ncnn_input_height, error_message) ||
         !require_size_t(values, &consumed, "vision.runtime.ncnn.label_count", &ncnn_label_count, error_message) ||
         !require_string_array(values, &consumed, "vision.runtime.ncnn.labels", &g_string_storage.ncnn_labels, g_vision_runtime_config.ncnn_labels, &g_vision_runtime_config.ncnn_label_count, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.red_roi.h_span", &g_vision_runtime_config.red_roi_h_span, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.red_roi.s_min", &g_vision_runtime_config.red_roi_s_min, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.red_roi.v_min", &g_vision_runtime_config.red_roi_v_min, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.red_roi.close_iter", &g_vision_runtime_config.red_roi_close_iter, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.red_roi.open_iter", &g_vision_runtime_config.red_roi_open_iter, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.red_roi.area_min", &g_vision_runtime_config.red_roi_area_min, error_message) ||
-        !require_float(values, &consumed, "vision.runtime.red_roi.ratio_w", &g_vision_runtime_config.red_roi_ratio_w, error_message) ||
-        !require_float(values, &consumed, "vision.runtime.red_roi.ratio_h", &g_vision_runtime_config.red_roi_ratio_h, error_message) ||
-        !require_float(values, &consumed, "vision.runtime.red_roi.offset_ratio", &g_vision_runtime_config.red_roi_offset_ratio, error_message) ||
+        !require_float(values, &consumed, "vision.runtime.red_roi.red_to_target_bottom_k", &g_vision_runtime_config.red_roi_red_to_target_bottom_k, error_message) ||
+        !require_float(values, &consumed, "vision.runtime.red_roi.red_to_target_bottom_b", &g_vision_runtime_config.red_roi_red_to_target_bottom_b, error_message) ||
+        !require_float(values, &consumed, "vision.runtime.red_roi.target_height_k", &g_vision_runtime_config.red_roi_target_height_k, error_message) ||
+        !require_float(values, &consumed, "vision.runtime.red_roi.target_height_b", &g_vision_runtime_config.red_roi_target_height_b, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.screen_display_enabled", &g_vision_runtime_config.screen_display_enabled, error_message))
     {
         return false;
@@ -969,19 +964,6 @@ bool load_from_path(const std::string &path, std::string *error_message)
         *error_message = "vision.runtime.ncnn.label_count does not match labels array length";
         return false;
     }
-    if (g_vision_runtime_config.red_roi_h_span < 0 || g_vision_runtime_config.red_roi_h_span > 90 ||
-        g_vision_runtime_config.red_roi_s_min < 0 || g_vision_runtime_config.red_roi_s_min > 255 ||
-        g_vision_runtime_config.red_roi_v_min < 0 || g_vision_runtime_config.red_roi_v_min > 255 ||
-        g_vision_runtime_config.red_roi_close_iter < 0 || g_vision_runtime_config.red_roi_open_iter < 0 ||
-        g_vision_runtime_config.red_roi_area_min < 1 ||
-        g_vision_runtime_config.red_roi_ratio_w <= 0.0f ||
-        g_vision_runtime_config.red_roi_ratio_h <= 0.0f ||
-        g_vision_runtime_config.red_roi_offset_ratio < 0.0f)
-    {
-        *error_message = "vision.runtime.red_roi contains invalid value";
-        return false;
-    }
-
     if (!require_bool(values, &consumed, "vision.runtime.web.enabled", &g_vision_runtime_config.udp_web_enabled, error_message) ||
         !require_int(values, &consumed, "vision.runtime.web.max_fps", &udp_web_max_fps, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.web.send_gray_jpeg", &g_vision_runtime_config.udp_web_send_gray_jpeg, error_message) ||

@@ -34,6 +34,12 @@ struct infer_job_t
     // 异步任务输入：处理分辨率 BGR + full 分辨率 BGR。
     cv::Mat proc_bgr;
     cv::Mat full_bgr;
+    // 二值图快照（160×60 uint8，每帧深拷贝）。
+    uint8 binary_u8[VISION_DOWNSAMPLED_HEIGHT * VISION_DOWNSAMPLED_WIDTH];
+    // src 中线快照（每帧深拷贝）。
+    uint16 center_x[VISION_DOWNSAMPLED_HEIGHT * 2];
+    uint16 center_y[VISION_DOWNSAMPLED_HEIGHT * 2];
+    uint16 center_count;
 };
 
 struct infer_worker_result_t
@@ -57,6 +63,49 @@ struct infer_worker_result_t
     std::string ncnn_top_label;
     std::vector<std::string> ncnn_labels;
     std::vector<float> ncnn_probs;
+    // 目标板检测调试信息（crop 坐标系）。
+    bool board_debug_valid = false;
+    std::string board_fail_reason = "not_run";
+    float board_dist_ipm = 0.0f;
+    int board_bottom_cx = 0;
+    int board_bottom_cy = 0;
+    // 下底边命中点（proc 坐标系，供网页端二值图中线标注）。
+    int board_hit_x = 0;
+    int board_hit_y = 0;
+    int board_height_px = 0;
+    int board_width_px = 0;
+    int board_corner_bl_x = 0;
+    int board_corner_bl_y = 0;
+    int board_corner_br_x = 0;
+    int board_corner_br_y = 0;
+    int board_corner_tr_x = 0;
+    int board_corner_tr_y = 0;
+    int board_corner_tl_x = 0;
+    int board_corner_tl_y = 0;
+    // IPM 坐标系：上下底边中点 + 四角点。
+    int board_ipm_bottom_x = 0;
+    int board_ipm_bottom_y = 0;
+    int board_ipm_top_x = 0;
+    int board_ipm_top_y = 0;
+    int board_ipm_red_bottom_x = 0;
+    int board_ipm_red_bottom_y = 0;
+    int board_ipm_bl_x = 0;
+    int board_ipm_bl_y = 0;
+    int board_ipm_br_x = 0;
+    int board_ipm_br_y = 0;
+    int board_ipm_tr_x = 0;
+    int board_ipm_tr_y = 0;
+    int board_ipm_tl_x = 0;
+    int board_ipm_tl_y = 0;
+    // 回投原图角点（proc 坐标系，供灰度图标注）。
+    int board_src_bl_x = 0;
+    int board_src_bl_y = 0;
+    int board_src_br_x = 0;
+    int board_src_br_y = 0;
+    int board_src_tr_x = 0;
+    int board_src_tr_y = 0;
+    int board_src_tl_x = 0;
+    int board_src_tl_y = 0;
 };
 
 // 推理运行态（原 vision_ncnn 逻辑并入）。
@@ -76,88 +125,528 @@ static infer_worker_result_t g_latest_infer_result;
 static bool g_latest_infer_result_valid = false;
 static uint32 g_latest_infer_result_seq = 0;
 
-static cv::Rect build_ncnn_roi_from_red_rect(int red_x,
-                                             int red_y,
-                                             int red_w,
-                                             int red_h,
-                                             int image_width,
-                                             int image_height)
+// 作用：沿 src 中线搜索，在二值图中找到第一个黑色像素点，作为目标板下底边中点。
+// 对相邻中线点之间的连线逐像素采样，每个采样像素仍是单点黑白判定。
+static bool detect_bottom_edge_via_centerline(const uint16 *center_x,
+                                              const uint16 *center_y,
+                                              uint16 center_count,
+                                              const uint8 *binary_u8,
+                                              int *out_bottom_index,
+                                              int *out_bottom_x,
+                                              int *out_bottom_y)
 {
-    const float ratio_w = std::max(0.01f, g_vision_runtime_config.red_roi_ratio_w);
-    const float ratio_h = std::max(0.01f, g_vision_runtime_config.red_roi_ratio_h);
-    const float offset_ratio = std::max(0.0f, g_vision_runtime_config.red_roi_offset_ratio);
-    const int bw = std::max(1, red_w);
-    const int lift = static_cast<int>(std::lround(static_cast<float>(bw) * offset_ratio));
-    const int anchor_y = red_y + red_h - lift;
-    const int roi_w = std::max(3, static_cast<int>(std::lround(static_cast<float>(bw) * ratio_w)));
-    const int roi_h = std::max(3, static_cast<int>(std::lround(static_cast<float>(bw) * ratio_h)));
-    int roi_x = static_cast<int>(std::lround(static_cast<float>(red_x) + (static_cast<float>(bw - roi_w) * 0.5f)));
-    int roi_y = anchor_y - roi_h;
+    if (center_x == nullptr || center_y == nullptr || binary_u8 == nullptr ||
+        out_bottom_index == nullptr || out_bottom_x == nullptr || out_bottom_y == nullptr ||
+        center_count == 0)
+    {
+        return false;
+    }
 
-    roi_x = std::clamp(roi_x, 0, std::max(0, image_width - roi_w));
-    roi_y = std::clamp(roi_y, 0, std::max(0, image_height - roi_h));
-    return cv::Rect(roi_x, roi_y, roi_w, roi_h) & cv::Rect(0, 0, image_width, image_height);
+    constexpr int kSearchStartIndex = 0;
+
+    auto try_hit = [&](int index, int x, int y) -> bool {
+        if (x < 0 || x >= kProcWidth || y < 0 || y >= kProcHeight)
+        {
+            return false;
+        }
+
+        if (binary_u8[y * kProcWidth + x] != 0)
+        {
+            return false;
+        }
+
+        *out_bottom_index = index;
+        *out_bottom_x = x;
+        *out_bottom_y = y;
+        return true;
+    };
+
+    int prev_x = static_cast<int>(center_x[kSearchStartIndex]);
+    int prev_y = static_cast<int>(center_y[kSearchStartIndex]);
+    if (try_hit(kSearchStartIndex, prev_x, prev_y))
+    {
+        return true;
+    }
+
+    for (int i = kSearchStartIndex + 1; i < static_cast<int>(center_count); ++i)
+    {
+        const int curr_x = static_cast<int>(center_x[i]);
+        const int curr_y = static_cast<int>(center_y[i]);
+
+        int x = prev_x;
+        int y = prev_y;
+        const int dx = std::abs(curr_x - prev_x);
+        const int dy = std::abs(curr_y - prev_y);
+        const int sx = (prev_x < curr_x) ? 1 : -1;
+        const int sy = (prev_y < curr_y) ? 1 : -1;
+        int err = dx - dy;
+
+        while (x != curr_x || y != curr_y)
+        {
+            const int e2 = 2 * err;
+            if (e2 > -dy)
+            {
+                err -= dy;
+                x += sx;
+            }
+            if (e2 < dx)
+            {
+                err += dx;
+                y += sy;
+            }
+
+            if (try_hit(i, x, y))
+            {
+                return true;
+            }
+        }
+
+        prev_x = curr_x;
+        prev_y = curr_y;
+    }
+
+    return false;
 }
 
-// 作用：按 data_gen fine_crop_debug.py 的 HSV 双红区间算法找最大红色轮廓。
-static bool detect_red_rectangle_bbox(const cv::Mat &bgr, cv::Rect *bbox, int *area_px)
+static void current_crop_geometry(int *crop_y, int *crop_w, int *crop_h)
 {
-    if (bbox == nullptr || area_px == nullptr || bgr.empty() || bgr.type() != CV_8UC3)
+    const int d = std::max(1, g_vision_processor_config.crop_denominator);
+    const int top = std::clamp(g_vision_processor_config.crop_top, 0, d - 1);
+    const int bottom = std::clamp(g_vision_processor_config.crop_bottom, top + 1, d);
+
+    if (crop_y != nullptr)
     {
-        return false;
+        *crop_y = (kFullHeight * top) / d;
     }
-
-    cv::Mat hsv;
-    cv::cvtColor(bgr, hsv, cv::COLOR_BGR2HSV);
-    const int h_span = std::clamp(g_vision_runtime_config.red_roi_h_span, 0, 90);
-    const int s_min = std::clamp(g_vision_runtime_config.red_roi_s_min, 0, 255);
-    const int v_min = std::clamp(g_vision_runtime_config.red_roi_v_min, 0, 255);
-
-    cv::Mat mask1;
-    cv::Mat mask2;
-    cv::Mat mask;
-    cv::inRange(hsv, cv::Scalar(0, s_min, v_min), cv::Scalar(h_span, 255, 255), mask1);
-    cv::inRange(hsv, cv::Scalar(180 - h_span, s_min, v_min), cv::Scalar(180, 255, 255), mask2);
-    cv::bitwise_or(mask1, mask2, mask);
-
-    const cv::Mat kernel = cv::Mat::ones(3, 3, CV_8U);
-    const int close_iter = std::max(0, g_vision_runtime_config.red_roi_close_iter);
-    const int open_iter = std::max(0, g_vision_runtime_config.red_roi_open_iter);
-    if (close_iter > 0)
+    if (crop_w != nullptr)
     {
-        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel, cv::Point(-1, -1), close_iter);
+        *crop_w = kFullWidth;
     }
-    if (open_iter > 0)
+    if (crop_h != nullptr)
     {
-        cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel, cv::Point(-1, -1), open_iter);
+        *crop_h = std::max(1, (kFullHeight * (bottom - top)) / d);
     }
+}
 
-    std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-    if (contours.empty())
-    {
-        return false;
-    }
+// 作用：proc 坐标 → crop 相对坐标换算（无 full 图 y 偏移）。
+// crop 图尺寸来自 vision.processor.crop，与主处理链保持一致。
+static void proc_to_crop(int proc_x, int proc_y, int *crop_x, int *crop_y)
+{
+    int crop_w = 0;
+    int crop_h = 0;
+    current_crop_geometry(nullptr, &crop_w, &crop_h);
+    *crop_x = proc_x * crop_w / kProcWidth;
+    *crop_y = proc_y * crop_h / kProcHeight;
+}
 
-    int best_index = -1;
-    double best_area = 0.0;
-    for (int i = 0; i < static_cast<int>(contours.size()); ++i)
+// 作用：推进中线 IPM 累计距离，返回从 start_index 到 end_index 的累计 IPM 欧氏距离。
+// 同时将 end_index 处的 IPM 坐标写入 out_ipm_x/out_ipm_y。
+static double accumulate_ipm_distance(const uint16 *center_x,
+                                      const uint16 *center_y,
+                                      uint16 center_count,
+                                      int start_index,
+                                      int end_index,
+                                      int *out_ipm_x,
+                                      int *out_ipm_y)
+{
+    double dist = 0.0;
+    int prev_ipm_x = 0;
+    int prev_ipm_y = 0;
+    bool has_prev = false;
+
+    const int safe_end = std::min(static_cast<int>(center_count) - 1, end_index);
+    for (int i = start_index; i <= safe_end; ++i)
     {
-        const double area = cv::contourArea(contours[i]);
-        if (area > best_area)
+        int ipm_x = 0;
+        int ipm_y = 0;
+        if (!vision_image_processor_src_to_ipm_point(static_cast<int>(center_x[i]),
+                                                     static_cast<int>(center_y[i]),
+                                                     &ipm_x,
+                                                     &ipm_y))
         {
-            best_area = area;
-            best_index = i;
+            continue;
+        }
+
+        if (has_prev)
+        {
+            const double dx = static_cast<double>(ipm_x - prev_ipm_x);
+            const double dy = static_cast<double>(ipm_y - prev_ipm_y);
+            dist += std::sqrt(dx * dx + dy * dy);
+        }
+
+        prev_ipm_x = ipm_x;
+        prev_ipm_y = ipm_y;
+        has_prev = true;
+
+        if (i == safe_end && out_ipm_x != nullptr && out_ipm_y != nullptr)
+        {
+            *out_ipm_x = ipm_x;
+            *out_ipm_y = ipm_y;
         }
     }
 
-    if (best_index < 0 || best_area <= static_cast<double>(std::max(1, g_vision_runtime_config.red_roi_area_min)))
+    return dist;
+}
+
+static bool walk_ipm_centerline_distance(const infer_job_t &job,
+                                         int next_index,
+                                         int start_ipm_x,
+                                         int start_ipm_y,
+                                         double distance_ipm,
+                                         int *out_ipm_x,
+                                         int *out_ipm_y,
+                                         int *out_next_index)
+{
+    if (out_ipm_x == nullptr || out_ipm_y == nullptr || out_next_index == nullptr ||
+        next_index < 0 || distance_ipm < 0.0)
     {
         return false;
     }
 
-    *bbox = cv::boundingRect(contours[best_index]) & cv::Rect(0, 0, bgr.cols, bgr.rows);
-    *area_px = static_cast<int>(std::lround(best_area));
+    if (distance_ipm <= 0.0)
+    {
+        *out_ipm_x = start_ipm_x;
+        *out_ipm_y = start_ipm_y;
+        *out_next_index = std::min(next_index, std::max(0, static_cast<int>(job.center_count) - 1));
+        return true;
+    }
+
+    if (next_index >= static_cast<int>(job.center_count))
+    {
+        return false;
+    }
+
+    double walked = 0.0;
+    int prev_x = start_ipm_x;
+    int prev_y = start_ipm_y;
+    int last_x = start_ipm_x;
+    int last_y = start_ipm_y;
+    int last_index = next_index;
+
+    for (int i = next_index; i < static_cast<int>(job.center_count); ++i)
+    {
+        int ipm_x = 0;
+        int ipm_y = 0;
+        if (!vision_image_processor_src_to_ipm_point(static_cast<int>(job.center_x[i]),
+                                                     static_cast<int>(job.center_y[i]),
+                                                     &ipm_x,
+                                                     &ipm_y))
+        {
+            continue;
+        }
+
+        const double dx = static_cast<double>(ipm_x - prev_x);
+        const double dy = static_cast<double>(ipm_y - prev_y);
+        const double seg = std::sqrt(dx * dx + dy * dy);
+        if (walked + seg >= distance_ipm)
+        {
+            const double remaining = distance_ipm - walked;
+            const double t = (seg > 0.0) ? (remaining / seg) : 0.0;
+            *out_ipm_x = static_cast<int>(std::lround(static_cast<double>(prev_x) + dx * t));
+            *out_ipm_y = static_cast<int>(std::lround(static_cast<double>(prev_y) + dy * t));
+            *out_next_index = i;
+            return true;
+        }
+
+        walked += seg;
+        prev_x = ipm_x;
+        prev_y = ipm_y;
+        last_x = ipm_x;
+        last_y = ipm_y;
+        last_index = i + 1;
+    }
+
+    if (walked < distance_ipm * 0.5)
+    {
+        return false;
+    }
+
+    *out_ipm_x = last_x;
+    *out_ipm_y = last_y;
+    *out_next_index = std::min(last_index, static_cast<int>(job.center_count) - 1);
+    return true;
+}
+
+// 作用：沿中线搜索 + IPM 空间推算 + 四角点回投原图 + perspective warp 提取 ROI。
+// 返回 true 表示成功检测到目标板并提取了 ROI。
+static bool detect_and_extract_target_board(const infer_job_t &job,
+                                            infer_worker_result_t *result,
+                                            cv::Mat *warped_roi_out)
+{
+    if (result == nullptr || warped_roi_out == nullptr)
+    {
+        return false;
+    }
+    result->board_fail_reason = "unknown";
+
+    // ---- 步骤 1：沿 src 中线在二值图中搜索下底边中点 ----
+    int bottom_index = -1;
+    int bottom_src_x = 0;
+    int bottom_src_y = 0;
+    if (!detect_bottom_edge_via_centerline(job.center_x,
+                                           job.center_y,
+                                           job.center_count,
+                                           job.binary_u8,
+                                           &bottom_index,
+                                           &bottom_src_x,
+                                           &bottom_src_y))
+    {
+        result->board_fail_reason = (job.center_count == 0) ? "no_centerline" : "no_black_hit";
+        return false;
+    }
+
+    // ---- 步骤 2：src 中线 index 0→bottom_index 转 IPM，累计距离 ----
+    int bottom_ipm_x = 0;
+    int bottom_ipm_y = 0;
+    const double dist_ipm = accumulate_ipm_distance(job.center_x,
+                                                    job.center_y,
+                                                    job.center_count,
+                                                    0,
+                                                    bottom_index,
+                                                    &bottom_ipm_x,
+                                                    &bottom_ipm_y);
+
+    // ---- 步骤 3：在 IPM 空间推算目标物下底边中点 ----
+    const double target_bottom_gap_ipm =
+        static_cast<double>(g_vision_runtime_config.red_roi_red_to_target_bottom_k) * dist_ipm +
+        static_cast<double>(g_vision_runtime_config.red_roi_red_to_target_bottom_b);
+    if (target_bottom_gap_ipm < 0.0)
+    {
+        result->board_fail_reason = "target_bottom_gap_invalid";
+        return false;
+    }
+
+    int target_bottom_ipm_x = bottom_ipm_x;
+    int target_bottom_ipm_y = bottom_ipm_y;
+    int target_bottom_next_index = bottom_index + 1;
+    if (!walk_ipm_centerline_distance(job,
+                                      bottom_index + 1,
+                                      bottom_ipm_x,
+                                      bottom_ipm_y,
+                                      target_bottom_gap_ipm,
+                                      &target_bottom_ipm_x,
+                                      &target_bottom_ipm_y,
+                                      &target_bottom_next_index))
+    {
+        result->board_fail_reason = "target_bottom_centerline_too_short";
+        return false;
+    }
+
+    // ---- 步骤 4：在 IPM 空间推算目标物上底边中点 ----
+    const double target_height_ipm =
+        static_cast<double>(g_vision_runtime_config.red_roi_target_height_k) * dist_ipm +
+        static_cast<double>(g_vision_runtime_config.red_roi_target_height_b);
+    if (target_height_ipm <= 0.0)
+    {
+        result->board_fail_reason = "target_height_invalid";
+        return false;
+    }
+
+    int top_ipm_x = target_bottom_ipm_x;
+    int top_ipm_y = target_bottom_ipm_y;
+    int top_next_index = target_bottom_next_index;
+    if (!walk_ipm_centerline_distance(job,
+                                      target_bottom_next_index,
+                                      target_bottom_ipm_x,
+                                      target_bottom_ipm_y,
+                                      target_height_ipm,
+                                      &top_ipm_x,
+                                      &top_ipm_y,
+                                      &top_next_index))
+    {
+        result->board_fail_reason = "target_top_centerline_too_short";
+        return false;
+    }
+    (void)top_next_index;
+
+    // ---- 步骤 5：在 IPM 空间计算目标物正方形四个角点 ----
+    const double dx_ipm = static_cast<double>(top_ipm_x - target_bottom_ipm_x);
+    const double dy_ipm = static_cast<double>(top_ipm_y - target_bottom_ipm_y);
+    const double H_ipm = std::sqrt(dx_ipm * dx_ipm + dy_ipm * dy_ipm);
+    if (H_ipm < 1.0)
+    {
+        result->board_fail_reason = "height_too_small";
+        return false;
+    }
+    const double W_ipm = H_ipm;
+    const double px = -dy_ipm / H_ipm * (W_ipm * 0.5);
+    const double py = dx_ipm / H_ipm * (W_ipm * 0.5);
+
+    struct { double x; double y; } ipm_corners[4] = {
+        {static_cast<double>(target_bottom_ipm_x) - px, static_cast<double>(target_bottom_ipm_y) - py}, // bl
+        {static_cast<double>(target_bottom_ipm_x) + px, static_cast<double>(target_bottom_ipm_y) + py}, // br
+        {static_cast<double>(top_ipm_x)    + px, static_cast<double>(top_ipm_y)    + py}, // tr
+        {static_cast<double>(top_ipm_x)    - px, static_cast<double>(top_ipm_y)    - py}, // tl
+    };
+
+    // ---- 步骤 6：四角点回投 crop 图（320×crop_h 或 160×crop_h）----
+    int crop_y_offset = 0;
+    int crop_w = 0;
+    int crop_h = 0;
+    current_crop_geometry(&crop_y_offset, &crop_w, &crop_h);
+
+    cv::Point2f src_quad[4];
+    int crop_min_x = crop_w;
+    int crop_min_y = crop_h;
+    int crop_max_x = 0;
+    int crop_max_y = 0;
+    for (int i = 0; i < 4; ++i)
+    {
+        int src_x = 0;
+        int src_y = 0;
+        if (!vision_image_processor_ipm_to_src_point(
+                static_cast<int>(std::lround(ipm_corners[i].x)),
+                static_cast<int>(std::lround(ipm_corners[i].y)),
+                &src_x,
+                &src_y))
+        {
+            result->board_fail_reason = "corner_project_failed";
+            return false;
+        }
+        int cx = 0;
+        int cy = 0;
+        proc_to_crop(src_x, src_y, &cx, &cy);
+        src_quad[i] = cv::Point2f(static_cast<float>(cx), static_cast<float>(cy));
+
+        if (cx < crop_min_x) crop_min_x = cx;
+        if (cy < crop_min_y) crop_min_y = cy;
+        if (cx > crop_max_x) crop_max_x = cx;
+        if (cy > crop_max_y) crop_max_y = cy;
+    }
+
+    // ---- 填充红框信息（axis-aligned bounding rect，输出 full 坐标系）----
+    cv::Rect aabb_crop;
+    {
+        aabb_crop = cv::Rect(crop_min_x, crop_min_y,
+                             std::max(1, crop_max_x - crop_min_x),
+                             std::max(1, crop_max_y - crop_min_y));
+        aabb_crop &= cv::Rect(0, 0, crop_w, crop_h);
+        const cv::Rect aabb_full(aabb_crop.x,
+                                 aabb_crop.y + crop_y_offset,
+                                 aabb_crop.width,
+                                 aabb_crop.height);
+        result->found = true;
+        result->red_x = aabb_full.x;
+        result->red_y = aabb_full.y;
+        result->red_w = aabb_full.width;
+        result->red_h = aabb_full.height;
+        result->red_cx = aabb_full.x + aabb_full.width / 2;
+        result->red_cy = aabb_full.y + aabb_full.height / 2;
+        result->red_area = aabb_full.width * aabb_full.height;
+        result->ncnn_roi_full = aabb_full;
+    }
+
+    // ---- 填充调试信息 ----
+    {
+        // 下底边命中点（proc 坐标）。
+        result->board_hit_x = bottom_src_x;
+        result->board_hit_y = bottom_src_y;
+
+        // 目标物下底边中点（crop 坐标）。
+        int bottom_cx = 0;
+        int bottom_cy = 0;
+        int target_bottom_src_x = 0;
+        int target_bottom_src_y = 0;
+        if (vision_image_processor_ipm_to_src_point(target_bottom_ipm_x,
+                                                    target_bottom_ipm_y,
+                                                    &target_bottom_src_x,
+                                                    &target_bottom_src_y))
+        {
+            proc_to_crop(target_bottom_src_x, target_bottom_src_y, &bottom_cx, &bottom_cy);
+        }
+        result->board_bottom_cx = bottom_cx;
+        result->board_bottom_cy = bottom_cy;
+
+        // 上底边中点（crop 坐标）。
+        int top_src_x = 0;
+        int top_src_y = 0;
+        if (vision_image_processor_ipm_to_src_point(top_ipm_x, top_ipm_y, &top_src_x, &top_src_y))
+        {
+            int top_cx = 0;
+            int top_cy = 0;
+            proc_to_crop(top_src_x, top_src_y, &top_cx, &top_cy);
+            const double dh = static_cast<double>(top_cy - bottom_cy);
+            const double dw = static_cast<double>(top_cx - bottom_cx);
+            result->board_height_px = static_cast<int>(std::lround(std::sqrt(dh * dh + dw * dw)));
+        }
+        result->board_width_px = result->board_height_px;
+
+        // 四个角点（crop 坐标，顺序 bl / br / tr / tl）。
+        result->board_corner_bl_x = static_cast<int>(std::lround(src_quad[0].x));
+        result->board_corner_bl_y = static_cast<int>(std::lround(src_quad[0].y));
+        result->board_corner_br_x = static_cast<int>(std::lround(src_quad[1].x));
+        result->board_corner_br_y = static_cast<int>(std::lround(src_quad[1].y));
+        result->board_corner_tr_x = static_cast<int>(std::lround(src_quad[2].x));
+        result->board_corner_tr_y = static_cast<int>(std::lround(src_quad[2].y));
+        result->board_corner_tl_x = static_cast<int>(std::lround(src_quad[3].x));
+        result->board_corner_tl_y = static_cast<int>(std::lround(src_quad[3].y));
+
+        // IPM 坐标系：上下底边中点。
+        result->board_dist_ipm = static_cast<float>(dist_ipm);
+        result->board_ipm_red_bottom_x = bottom_ipm_x;
+        result->board_ipm_red_bottom_y = bottom_ipm_y;
+        result->board_ipm_bottom_x = target_bottom_ipm_x;
+        result->board_ipm_bottom_y = target_bottom_ipm_y;
+        result->board_ipm_top_x = top_ipm_x;
+        result->board_ipm_top_y = top_ipm_y;
+
+        // IPM 坐标系：四角点（顺序 bl / br / tr / tl）。
+        result->board_ipm_bl_x = static_cast<int>(std::lround(ipm_corners[0].x));
+        result->board_ipm_bl_y = static_cast<int>(std::lround(ipm_corners[0].y));
+        result->board_ipm_br_x = static_cast<int>(std::lround(ipm_corners[1].x));
+        result->board_ipm_br_y = static_cast<int>(std::lround(ipm_corners[1].y));
+        result->board_ipm_tr_x = static_cast<int>(std::lround(ipm_corners[2].x));
+        result->board_ipm_tr_y = static_cast<int>(std::lround(ipm_corners[2].y));
+        result->board_ipm_tl_x = static_cast<int>(std::lround(ipm_corners[3].x));
+        result->board_ipm_tl_y = static_cast<int>(std::lround(ipm_corners[3].y));
+
+        // 回投原图角点（proc 坐标系，供灰度图标注，顺序 bl / br / tr / tl）。
+        {
+            int sx = 0, sy = 0;
+            if (vision_image_processor_ipm_to_src_point(
+                    static_cast<int>(std::lround(ipm_corners[0].x)),
+                    static_cast<int>(std::lround(ipm_corners[0].y)), &sx, &sy))
+            { result->board_src_bl_x = sx; result->board_src_bl_y = sy; }
+            if (vision_image_processor_ipm_to_src_point(
+                    static_cast<int>(std::lround(ipm_corners[1].x)),
+                    static_cast<int>(std::lround(ipm_corners[1].y)), &sx, &sy))
+            { result->board_src_br_x = sx; result->board_src_br_y = sy; }
+            if (vision_image_processor_ipm_to_src_point(
+                    static_cast<int>(std::lround(ipm_corners[2].x)),
+                    static_cast<int>(std::lround(ipm_corners[2].y)), &sx, &sy))
+            { result->board_src_tr_x = sx; result->board_src_tr_y = sy; }
+            if (vision_image_processor_ipm_to_src_point(
+                    static_cast<int>(std::lround(ipm_corners[3].x)),
+                    static_cast<int>(std::lround(ipm_corners[3].y)), &sx, &sy))
+            { result->board_src_tl_x = sx; result->board_src_tl_y = sy; }
+        }
+
+        result->board_debug_valid = true;
+        result->board_fail_reason = "ok";
+    }
+
+    // ---- 步骤 6：裁剪 crop 图 + warpPerspective → 64×64 ----
+    const cv::Point2f dst_quad[4] = {
+        cv::Point2f(0.0f,           64.0f),          // bl → dst bottom-left
+        cv::Point2f(64.0f,          64.0f),          // br → dst bottom-right
+        cv::Point2f(64.0f,          0.0f),           // tr → dst top-right
+        cv::Point2f(0.0f,           0.0f),           // tl → dst top-left
+    };
+    cv::Mat M = cv::getPerspectiveTransform(src_quad, dst_quad);
+
+    // 从 full 图裁出与主处理链一致的 crop 区域作为 warp 源图。
+    cv::Mat crop_bgr;
+    if (!job.full_bgr.empty())
+    {
+        crop_bgr = job.full_bgr(cv::Rect(0, crop_y_offset, crop_w, crop_h));
+    }
+    else
+    {
+        crop_bgr = job.proc_bgr;
+    }
+    cv::warpPerspective(crop_bgr, *warped_roi_out, M, cv::Size(64, 64),
+                        cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+
     return true;
 }
 
@@ -270,59 +759,35 @@ static void run_infer_worker()
             }
             job.proc_bgr = g_infer_job.proc_bgr;
             job.full_bgr = g_infer_job.full_bgr;
+            std::memcpy(job.binary_u8, g_infer_job.binary_u8, sizeof(job.binary_u8));
+            job.center_count = g_infer_job.center_count;
+            std::memcpy(job.center_x, g_infer_job.center_x, job.center_count * sizeof(uint16));
+            std::memcpy(job.center_y, g_infer_job.center_y, job.center_count * sizeof(uint16));
             g_infer_job_ready = false;
         }
 
         infer_worker_result_t result{};
         result.ncnn_enabled = g_ncnn_enabled.load();
         auto detect_start = std::chrono::steady_clock::now();
-        cv::Rect red_bbox;
-        int red_area = 0;
-        const cv::Mat &detect_bgr = !job.full_bgr.empty() ? job.full_bgr : job.proc_bgr;
-        const int detect_width = detect_bgr.cols;
-        const int detect_height = detect_bgr.rows;
-        const bool found = detect_red_rectangle_bbox(detect_bgr, &red_bbox, &red_area);
+
+        cv::Mat warped_roi;
+        const bool found = detect_and_extract_target_board(job, &result, &warped_roi);
+
         auto detect_end = std::chrono::steady_clock::now();
         result.red_detect_us = static_cast<uint32>(
             std::chrono::duration_cast<std::chrono::microseconds>(detect_end - detect_start).count());
 
-        if (found)
+        if (found && g_ncnn_enabled.load() && !warped_roi.empty())
         {
-            red_bbox &= cv::Rect(0, 0, detect_width, detect_height);
-            result.found = true;
-            result.red_x = red_bbox.x;
-            result.red_y = red_bbox.y;
-            result.red_w = red_bbox.width;
-            result.red_h = red_bbox.height;
-            result.red_cx = red_bbox.x + red_bbox.width / 2;
-            result.red_cy = red_bbox.y + red_bbox.height / 2;
-            result.red_area = red_area;
-
-            result.ncnn_roi_full = build_ncnn_roi_from_red_rect(result.red_x,
-                                                                result.red_y,
-                                                                result.red_w,
-                                                                result.red_h,
-                                                                detect_width,
-                                                                detect_height);
-
-            if (g_ncnn_enabled.load())
-            {
-                cv::Rect safe_roi = result.ncnn_roi_full & cv::Rect(0, 0, detect_width, detect_height);
-                if (safe_roi.width > 0 && safe_roi.height > 0)
-                {
-                    cv::Mat roi_bgr;
-                    roi_bgr = detect_bgr(safe_roi).clone();
-                    result.ncnn_infer_valid = ncnn_step(reinterpret_cast<const uint8 *>(roi_bgr.data),
-                                                        roi_bgr.cols,
-                                                        roi_bgr.rows,
-                                                        &result.ncnn_top_class_id,
-                                                        &result.ncnn_top_score,
-                                                        &result.ncnn_top_label,
-                                                        &result.ncnn_labels,
-                                                        &result.ncnn_probs,
-                                                        &result.ncnn_infer_us);
-                }
-            }
+            result.ncnn_infer_valid = ncnn_step(reinterpret_cast<const uint8 *>(warped_roi.data),
+                                                warped_roi.cols,
+                                                warped_roi.rows,
+                                                &result.ncnn_top_class_id,
+                                                &result.ncnn_top_score,
+                                                &result.ncnn_top_label,
+                                                &result.ncnn_labels,
+                                                &result.ncnn_probs,
+                                                &result.ncnn_infer_us);
         }
 
         {
@@ -722,6 +1187,44 @@ void vision_infer_async_submit_frame(const uint8 *bgr_proc_data,
         {
             g_infer_job.full_bgr.release();
         }
+
+        // 快照二值图（160×60 uint8）。
+        const uint8 *binary = vision_image_processor_binary_downsampled_u8_image();
+        if (binary != nullptr)
+        {
+            std::memcpy(g_infer_job.binary_u8, binary, sizeof(g_infer_job.binary_u8));
+        }
+        else
+        {
+            std::memset(g_infer_job.binary_u8, 255, sizeof(g_infer_job.binary_u8));
+        }
+
+        // 快照 src 中线（与 line_error / 网页显示一致的当前选中版本）。
+        {
+            uint16 *cx = nullptr;
+            uint16 *cy = nullptr;
+            uint16 count = 0;
+            if (vision_image_processor_ipm_line_error_source() == VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT)
+            {
+                vision_image_processor_get_src_shifted_centerline_from_right(&cx, &cy, &count);
+            }
+            else
+            {
+                vision_image_processor_get_src_shifted_centerline_from_left(&cx, &cy, &count);
+            }
+            if (cx != nullptr && cy != nullptr && count > 0)
+            {
+                const uint16 safe_count = std::min<uint16>(count, static_cast<uint16>(sizeof(g_infer_job.center_x) / sizeof(uint16)));
+                g_infer_job.center_count = safe_count;
+                std::memcpy(g_infer_job.center_x, cx, safe_count * sizeof(uint16));
+                std::memcpy(g_infer_job.center_y, cy, safe_count * sizeof(uint16));
+            }
+            else
+            {
+                g_infer_job.center_count = 0;
+            }
+        }
+
         g_infer_job_ready = true;
     }
     g_infer_cv.notify_one();
@@ -782,5 +1285,46 @@ bool vision_infer_async_fetch_latest(vision_infer_async_result_t *out)
                                        : std::to_string(i);
         std::snprintf(out->ncnn_labels[i], sizeof(out->ncnn_labels[i]), "%s", label.c_str());
     }
+    // 目标板检测调试信息。
+    out->board_debug_valid = result.board_debug_valid;
+    std::memset(out->board_fail_reason, 0, sizeof(out->board_fail_reason));
+    std::snprintf(out->board_fail_reason, sizeof(out->board_fail_reason), "%s", result.board_fail_reason.c_str());
+    out->board_dist_ipm = result.board_dist_ipm;
+    out->board_bottom_cx = result.board_bottom_cx;
+    out->board_bottom_cy = result.board_bottom_cy;
+    out->board_hit_x = result.board_hit_x;
+    out->board_hit_y = result.board_hit_y;
+    out->board_height_px = result.board_height_px;
+    out->board_width_px = result.board_width_px;
+    out->board_corner_bl_x = result.board_corner_bl_x;
+    out->board_corner_bl_y = result.board_corner_bl_y;
+    out->board_corner_br_x = result.board_corner_br_x;
+    out->board_corner_br_y = result.board_corner_br_y;
+    out->board_corner_tr_x = result.board_corner_tr_x;
+    out->board_corner_tr_y = result.board_corner_tr_y;
+    out->board_corner_tl_x = result.board_corner_tl_x;
+    out->board_corner_tl_y = result.board_corner_tl_y;
+    out->board_ipm_bottom_x = result.board_ipm_bottom_x;
+    out->board_ipm_bottom_y = result.board_ipm_bottom_y;
+    out->board_ipm_top_x = result.board_ipm_top_x;
+    out->board_ipm_top_y = result.board_ipm_top_y;
+    out->board_ipm_red_bottom_x = result.board_ipm_red_bottom_x;
+    out->board_ipm_red_bottom_y = result.board_ipm_red_bottom_y;
+    out->board_ipm_bl_x = result.board_ipm_bl_x;
+    out->board_ipm_bl_y = result.board_ipm_bl_y;
+    out->board_ipm_br_x = result.board_ipm_br_x;
+    out->board_ipm_br_y = result.board_ipm_br_y;
+    out->board_ipm_tr_x = result.board_ipm_tr_x;
+    out->board_ipm_tr_y = result.board_ipm_tr_y;
+    out->board_ipm_tl_x = result.board_ipm_tl_x;
+    out->board_ipm_tl_y = result.board_ipm_tl_y;
+    out->board_src_bl_x = result.board_src_bl_x;
+    out->board_src_bl_y = result.board_src_bl_y;
+    out->board_src_br_x = result.board_src_br_x;
+    out->board_src_br_y = result.board_src_br_y;
+    out->board_src_tr_x = result.board_src_tr_x;
+    out->board_src_tr_y = result.board_src_tr_y;
+    out->board_src_tl_x = result.board_src_tl_x;
+    out->board_src_tl_y = result.board_src_tl_y;
     return true;
 }

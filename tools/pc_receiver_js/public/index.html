@@ -1208,34 +1208,97 @@
     }
     .roi64-card {
       margin-top: 10px;
-      padding: 12px;
-      background: linear-gradient(180deg, #141a21 0%, #0e1319 100%);
+      padding: 10px;
+      background:
+        linear-gradient(90deg, rgba(51, 214, 196, 0.08), transparent 42%),
+        linear-gradient(180deg, #141a21 0%, #0e1319 100%);
       border: 1px solid var(--console-line);
       border-radius: 6px;
-      text-align: center;
     }
     .roi64-title {
-      color: var(--console-muted);
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--console-text);
       font-size: 11px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       margin-bottom: 8px;
     }
-    .roi64-card canvas {
+    .roi64-title span {
+      color: var(--console-cyan);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .roi64-layout {
+      display: grid;
+      grid-template-columns: 116px minmax(0, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+    .roi64-left {
+      display: grid;
+      align-content: start;
+      justify-items: center;
+      gap: 6px;
+      text-align: center;
+    }
+    .roi64-left canvas {
       display: block;
-      margin: 0 auto;
-      width: 64px;
-      height: 64px;
+      width: 112px;
+      height: 112px;
       image-rendering: pixelated;
+      image-rendering: crisp-edges;
       border-radius: 4px;
-      border: 1px solid var(--console-line-soft);
+      border: 1px solid rgba(51, 214, 196, 0.45);
       background: #000;
+      box-shadow: 0 0 0 1px rgba(2, 6, 23, 0.7), 0 10px 22px rgba(0, 0, 0, 0.26);
     }
     .roi64-hint {
-      margin-top: 8px;
       color: var(--console-dim);
       font-size: 10px;
       line-height: 1.35;
+      max-width: 112px;
+    }
+    .roi64-right {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 5px;
+      align-content: start;
+    }
+    .roi64-debug-row {
+      min-width: 0;
+      padding: 5px 6px;
+      border: 1px solid rgba(42, 52, 63, 0.72);
+      border-radius: 4px;
+      background: rgba(8, 10, 13, 0.48);
+    }
+    .roi64-debug-label {
+      color: var(--console-dim);
+      display: block;
+      font-size: 9px;
+      line-height: 1.15;
+      margin-bottom: 3px;
+      white-space: nowrap;
+    }
+    .roi64-debug-value {
+      color: var(--console-text);
+      display: block;
+      font-size: 10px;
+      line-height: 1.2;
+      font-family: "Noto Sans Mono CJK SC", monospace;
+      text-align: left;
+      word-break: break-word;
+    }
+    .roi64-debug-row.primary {
+      border-color: rgba(51, 214, 196, 0.5);
+      background: rgba(51, 214, 196, 0.07);
+    }
+    .roi64-debug-row.wide {
+      grid-column: span 2;
     }
     .state-detail-panel {
       margin-top: 10px;
@@ -1621,9 +1684,27 @@
           </div>
         </div>
         <div class="roi64-card">
-          <div class="roi64-title">ROI 64×64</div>
-          <canvas id="roi64Canvas" width="64" height="64"></canvas>
-          <div class="roi64-hint" id="roi64Hint">还没有可显示的 ROI64 图像。</div>
+          <div class="roi64-title">ROI / 目标板几何 <span>64×64 resized preview</span></div>
+          <div class="roi64-layout">
+            <div class="roi64-left">
+              <canvas id="roi64Canvas" width="64" height="64"></canvas>
+              <div class="roi64-hint" id="roi64Hint">还没有可显示的 ROI64 图像。</div>
+            </div>
+            <div class="roi64-right" id="roi64Debug">
+              <div class="roi64-debug-row primary"><span class="roi64-debug-label">红框</span><span class="roi64-debug-value" id="roi64DbRedFound">--</span></div>
+              <div class="roi64-debug-row primary"><span class="roi64-debug-label">dist_ipm</span><span class="roi64-debug-value" id="roi64DbDistIpm">--</span></div>
+              <div class="roi64-debug-row wide"><span class="roi64-debug-label">失败原因</span><span class="roi64-debug-value" id="roi64DbFailReason">--</span></div>
+              <div class="roi64-debug-row"><span class="roi64-debug-label">红框下底 IPM</span><span class="roi64-debug-value" id="roi64DbIpmRedBottom">--</span></div>
+              <div class="roi64-debug-row"><span class="roi64-debug-label">目标下底 IPM</span><span class="roi64-debug-value" id="roi64DbIpmBottom">--</span></div>
+              <div class="roi64-debug-row"><span class="roi64-debug-label">目标上底 IPM</span><span class="roi64-debug-value" id="roi64DbIpmTop">--</span></div>
+              <div class="roi64-debug-row"><span class="roi64-debug-label">目标下底 crop</span><span class="roi64-debug-value" id="roi64DbBottom">--</span></div>
+              <div class="roi64-debug-row"><span class="roi64-debug-label">红框命中 proc</span><span class="roi64-debug-value" id="roi64DbHit">--</span></div>
+              <div class="roi64-debug-row"><span class="roi64-debug-label">目标尺寸</span><span class="roi64-debug-value" id="roi64DbSize">--</span></div>
+              <div class="roi64-debug-row"><span class="roi64-debug-label">BL crop</span><span class="roi64-debug-value" id="roi64DbCornerBL">--</span></div>
+              <div class="roi64-debug-row"><span class="roi64-debug-label">BR crop</span><span class="roi64-debug-value" id="roi64DbCornerBR">--</span></div>
+              <div class="roi64-debug-row"><span class="roi64-debug-label">TR/TL crop</span><span class="roi64-debug-value" id="roi64DbCornerTop">--</span></div>
+            </div>
+          </div>
         </div>
         <details class="detail-panel state-detail-panel">
           <summary>状态机判定细节</summary>
@@ -2125,6 +2206,18 @@
     const inferMetaGrid = getElementOrCreate('inferMetaGrid');
     const inferProbList = getElementOrCreate('inferProbList');
     const roi64Hint = getElementOrCreate('roi64Hint');
+    const roi64DbRedFound = getElementOrCreate('roi64DbRedFound');
+    const roi64DbFailReason = getElementOrCreate('roi64DbFailReason');
+    const roi64DbDistIpm = getElementOrCreate('roi64DbDistIpm');
+    const roi64DbIpmRedBottom = getElementOrCreate('roi64DbIpmRedBottom');
+    const roi64DbIpmBottom = getElementOrCreate('roi64DbIpmBottom');
+    const roi64DbIpmTop = getElementOrCreate('roi64DbIpmTop');
+    const roi64DbBottom = getElementOrCreate('roi64DbBottom');
+    const roi64DbHit = getElementOrCreate('roi64DbHit');
+    const roi64DbSize = getElementOrCreate('roi64DbSize');
+    const roi64DbCornerBL = getElementOrCreate('roi64DbCornerBL');
+    const roi64DbCornerBR = getElementOrCreate('roi64DbCornerBR');
+    const roi64DbCornerTop = getElementOrCreate('roi64DbCornerTop');
     const pidCommonList = document.getElementById('pidCommonList');
     const pidCommonFullList = document.getElementById('pidCommonFullList');
     const pidLeftList = document.getElementById('pidLeftList');
@@ -2325,11 +2418,16 @@
     let localComputeEnabled = false;
     let localWorkerBusy = false;
     let grayFrameReady = false;
+    let binaryFrameReady = false;
     let rgbFrameReady = false;
     let roi64FrameReady = false;
     let grayFetchSeq = 0;
+    let binaryFetchSeq = 0;
     let grayFetchInFlight = false;
+    let binaryFetchInFlight = false;
+    let binaryFetchRetryAtMs = 0;
     let lastReplayGrayUrl = '';
+    let lastReplayBinaryUrl = '';
     let lastReplayRgbUrl = '';
     let lastReplayRoi64Url = '';
     let activeGraySource = 'none';
@@ -3125,6 +3223,7 @@
       push(detectRows, 'target_board_no_red_count', status.target_board_no_red_count);
       push(detectRows, 'target_board_offset_px', status.target_board_offset_px);
       push(detectRows, 'ipm_center_target_offset_px', status.ipm_center_target_offset_px);
+      push(detectRows, 'board_fail_reason', status.board_fail_reason);
       addSection('检测结果', detectRows);
 
       const trackRows = [];
@@ -4072,6 +4171,42 @@
         ctx.arc(cx, cy, 1, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      // 目标板 IPM 覆盖：上下底边中点 + 四角点连线。
+      if (isBool01(status.board_debug_valid)) {
+        const ipmBl = Array.isArray(status.board_ipm_bl) ? status.board_ipm_bl : null;
+        const ipmBr = Array.isArray(status.board_ipm_br) ? status.board_ipm_br : null;
+        const ipmTr = Array.isArray(status.board_ipm_tr) ? status.board_ipm_tr : null;
+        const ipmTl = Array.isArray(status.board_ipm_tl) ? status.board_ipm_tl : null;
+        const ipmBottom = Array.isArray(status.board_ipm_bottom) ? status.board_ipm_bottom : null;
+        const ipmTop = Array.isArray(status.board_ipm_top) ? status.board_ipm_top : null;
+
+        const corners = [ipmBl, ipmBr, ipmTr, ipmTl, ipmBl].filter(Boolean);
+        if (corners.length >= 4) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(Math.floor(corners[0][0]) + 0.5, Math.floor(corners[0][1]) + 0.5);
+          for (let ci = 1; ci < corners.length; ++ci) {
+            ctx.lineTo(Math.floor(corners[ci][0]) + 0.5, Math.floor(corners[ci][1]) + 0.5);
+          }
+          ctx.stroke();
+        }
+
+        // 四角点：黄色 1px。
+        [ipmBl, ipmBr, ipmTr, ipmTl].forEach(function(pt) {
+          if (!pt) return;
+          ctx.fillStyle = '#ffff00';
+          ctx.fillRect(Math.floor(pt[0]), Math.floor(pt[1]), 1, 1);
+        });
+
+        // 上下底边中点：蓝色 1px。
+        [ipmBottom, ipmTop].forEach(function(pt) {
+          if (!pt) return;
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(Math.floor(pt[0]), Math.floor(pt[1]), 1, 1);
+        });
+      }
     }
 
     function drawIpmBoundaries(status) {
@@ -4701,8 +4836,41 @@
       }
       const srcCenterline = getSelectedSrcCenterline(renderStatus);
       drawSeries(grayCtx, srcCenterline, '#ec4899', 2, 1);
+
+      // 下底边命中点：黄色 1px，覆盖在最上层。
+      if (isBool01(renderStatus.board_debug_valid) &&
+          Number.isFinite(Number(renderStatus.board_hit_x)) &&
+          Number.isFinite(Number(renderStatus.board_hit_y))) {
+        grayCtx.fillStyle = '#ffff00';
+        grayCtx.fillRect(Math.floor(Number(renderStatus.board_hit_x)), Math.floor(Number(renderStatus.board_hit_y)), 1, 1);
+      }
+
+      // 回投原图角点（proc 坐标系）：黄色 1px + 白色连线。
+      if (isBool01(renderStatus.board_debug_valid)) {
+        var srcBl = Array.isArray(renderStatus.board_src_bl) ? renderStatus.board_src_bl : null;
+        var srcBr = Array.isArray(renderStatus.board_src_br) ? renderStatus.board_src_br : null;
+        var srcTr = Array.isArray(renderStatus.board_src_tr) ? renderStatus.board_src_tr : null;
+        var srcTl = Array.isArray(renderStatus.board_src_tl) ? renderStatus.board_src_tl : null;
+        var srcPts = [srcBl, srcBr, srcTr, srcTl, srcBl].filter(Boolean);
+        if (srcPts.length >= 4) {
+          grayCtx.strokeStyle = '#ffffff';
+          grayCtx.lineWidth = 1;
+          grayCtx.beginPath();
+          grayCtx.moveTo(Math.floor(srcPts[0][0]) + 0.5, Math.floor(srcPts[0][1]) + 0.5);
+          for (var si = 1; si < srcPts.length; ++si) {
+            grayCtx.lineTo(Math.floor(srcPts[si][0]) + 0.5, Math.floor(srcPts[si][1]) + 0.5);
+          }
+          grayCtx.stroke();
+        }
+        [srcBl, srcBr, srcTr, srcTl].forEach(function(pt) {
+          if (!pt) return;
+          grayCtx.fillStyle = '#ffff00';
+          grayCtx.fillRect(Math.floor(pt[0]), Math.floor(pt[1]), 1, 1);
+        });
+      }
+
       renderInferFrame(renderStatus);
-      renderBinaryFromGray();
+      if (!binaryFrameReady) renderBinaryFromGray();
       requestLocalCompute();
     }
 
@@ -4771,18 +4939,35 @@
     }
 
     function renderRoi64Frame(status) {
+      const fmtPoint = (pt) => Array.isArray(pt) && pt.length >= 2 ? '(' + pt[0] + ', ' + pt[1] + ')' : '--';
+      const fmtMaybePoint = (x, y) => dbValid ? '(' + x + ', ' + y + ')' : '--';
       roi64Ctx.clearRect(0, 0, roi64Canvas.width, roi64Canvas.height);
       if (roi64FrameReady && roi64Img.complete && roi64Img.naturalWidth > 0) {
         roi64Ctx.imageSmoothingEnabled = false;
         roi64Ctx.drawImage(roi64Img, 0, 0, roi64Canvas.width, roi64Canvas.height);
-        roi64Hint.textContent = '当前送入 ncnn 的 ROI 已缩放到 64x64。';
-        return;
+        roi64Hint.textContent = 'full 图 ROI 裁剪后缩放到 64×64，界面放大显示。';
+      } else {
+        roi64Ctx.fillStyle = '#000000';
+        roi64Ctx.fillRect(0, 0, roi64Canvas.width, roi64Canvas.height);
+        roi64Hint.textContent = isBool01(status && status.roi_valid)
+          ? 'ROI 已有效，但 ROI64 图像还未收到。'
+          : '还没有可显示的 ROI64 图像。';
       }
-      roi64Ctx.fillStyle = '#000000';
-      roi64Ctx.fillRect(0, 0, roi64Canvas.width, roi64Canvas.height);
-      roi64Hint.textContent = isBool01(status && status.roi_valid)
-        ? 'ROI 已有效，但 ROI64 图像还未收到。'
-        : '还没有可显示的 ROI64 图像。';
+
+      // 调试信息。
+      const dbValid = isBool01(status && status.board_debug_valid);
+      roi64DbRedFound.textContent = isBool01(status && status.red_found) ? '找到' : '未找到';
+      roi64DbFailReason.textContent = status && status.board_fail_reason ? String(status.board_fail_reason) : '--';
+      roi64DbDistIpm.textContent = dbValid && typeof status.board_dist_ipm === 'number' ? status.board_dist_ipm.toFixed(2) : '--';
+      roi64DbIpmRedBottom.textContent = dbValid ? fmtPoint(status.board_ipm_red_bottom) : '--';
+      roi64DbIpmBottom.textContent = dbValid ? fmtPoint(status.board_ipm_bottom) : '--';
+      roi64DbIpmTop.textContent = dbValid ? fmtPoint(status.board_ipm_top) : '--';
+      roi64DbBottom.textContent = fmtMaybePoint(status && status.board_bottom_cx, status && status.board_bottom_cy);
+      roi64DbHit.textContent = fmtMaybePoint(status && status.board_hit_x, status && status.board_hit_y);
+      roi64DbSize.textContent = dbValid ? String(status.board_width_px) + '×' + String(status.board_height_px) + ' px' : '--';
+      roi64DbCornerBL.textContent = dbValid ? fmtPoint(status.board_corner_bl) : '--';
+      roi64DbCornerBR.textContent = dbValid ? fmtPoint(status.board_corner_br) : '--';
+      roi64DbCornerTop.textContent = dbValid ? 'TR ' + fmtPoint(status.board_corner_tr) + ' / TL ' + fmtPoint(status.board_corner_tl) : '--';
     }
 
     function renderInferFrame(status) {
@@ -4803,17 +4988,6 @@
       } else {
         inferCtx.fillStyle = '#000000';
         inferCtx.fillRect(0, 0, w, h);
-      }
-
-      if (Array.isArray(status.red) && status.red.length >= 4 && isBool01(status.red_found)) {
-        inferCtx.strokeStyle = '#ff4d4f';
-        inferCtx.lineWidth = 1.5;
-        inferCtx.strokeRect(Number(status.red[0]), Number(status.red[1]), Number(status.red[2]), Number(status.red[3]));
-      }
-      if (Array.isArray(status.roi) && status.roi.length >= 4 && isBool01(status.roi_valid)) {
-        inferCtx.strokeStyle = '#22c55e';
-        inferCtx.lineWidth = 1.5;
-        inferCtx.strokeRect(Number(status.roi[0]), Number(status.roi[1]), Number(status.roi[2]), Number(status.roi[3]));
       }
 
       const topLabel = typeof status.ncnn_top_label === 'string' ? status.ncnn_top_label.trim() : '';
@@ -4839,6 +5013,16 @@
       renderInferMeta(status);
       renderInferProbList(status);
       renderRoi64Frame(status);
+    }
+
+    function renderBinaryFrameFromSource(source, w, h) {
+      if (!source || !w || !h) return;
+      setCardVisible(binaryCard, true);
+      binaryTitle.textContent = '二值图（下位机发送）';
+      if (binaryCanvas.width !== w) binaryCanvas.width = w;
+      if (binaryCanvas.height !== h) binaryCanvas.height = h;
+      binaryCtx.drawImage(source, 0, 0, w, h);
+      drawBinaryTraceOverlay(getRenderStatus() || {});
     }
 
     function renderBinaryFromGray() {
@@ -4910,6 +5094,16 @@
       drawCrossLowerCornerPoint(binaryCtx, status.cross_right_upper_corner_point, 'R上角', status.cross_right_upper_corner_found);
       drawBoundaryStraightLabel(binaryCtx, isActiveFlag(status.left_boundary_straight), 'L直边', 6, 14, 'left');
       drawBoundaryStraightLabel(binaryCtx, isActiveFlag(status.right_boundary_straight), 'R直边', binaryCanvas.width - 6, 14, 'right');
+
+      // 下底边命中点：黄色 1px 像素点，覆盖在最上层。
+      if (isBool01(status.board_debug_valid) &&
+          Number.isFinite(Number(status.board_hit_x)) &&
+          Number.isFinite(Number(status.board_hit_y))) {
+        const hx = Number(status.board_hit_x);
+        const hy = Number(status.board_hit_y);
+        binaryCtx.fillStyle = '#ffff00';
+        binaryCtx.fillRect(Math.floor(hx), Math.floor(hy), 1, 1);
+      }
     }
 
     const cornerPalette = {
@@ -5137,6 +5331,7 @@
 
     function resetReplayFrameUrlCache() {
       lastReplayGrayUrl = '';
+      lastReplayBinaryUrl = '';
       lastReplayRgbUrl = '';
       lastReplayRoi64Url = '';
     }
@@ -5164,6 +5359,34 @@
         if (rgbFrameReady) renderGrayFrame();
       } finally {
         if (seq === grayFetchSeq) grayFetchInFlight = false;
+      }
+    }
+
+    async function fetchBinaryFrameDirect(urlOverride) {
+      const seq = ++binaryFetchSeq;
+      binaryFetchInFlight = true;
+      const binaryUrl = urlOverride || frameSource.urlForMode('binary');
+      try {
+        if (!binaryUrl) throw new Error('binary frame unavailable');
+        const response = await fetch(binaryUrl, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`binary frame ${response.status}`);
+        const blob = await response.blob();
+        const bitmap = await createImageBitmap(blob);
+        if (seq !== binaryFetchSeq) {
+          bitmap.close();
+          return;
+        }
+        binaryFrameReady = true;
+        binaryFetchRetryAtMs = 0;
+        renderBinaryFrameFromSource(bitmap, bitmap.width || 160, bitmap.height || 120);
+        if (frameSource.isReplay()) lastReplayBinaryUrl = binaryUrl;
+        bitmap.close();
+      } catch (_) {
+        binaryFrameReady = false;
+        binaryFetchRetryAtMs = Date.now() + 1000;
+        renderBinaryFromGray();
+      } finally {
+        if (seq === binaryFetchSeq) binaryFetchInFlight = false;
       }
     }
 
@@ -5379,6 +5602,15 @@
       const grayUrl = frameSource.urlForMode('gray');
       if (grayUrl && !grayFetchInFlight && (!isReplaySource || grayUrl !== lastReplayGrayUrl)) {
         fetchGrayFrameDirect(grayUrl);
+      }
+      const binaryUrl = frameSource.urlForMode('binary');
+      const shouldTryBinary =
+        isBool01(latestStatus && latestStatus.udp_web_send_binary) ||
+        isReplaySource ||
+        binaryFrameReady ||
+        Date.now() >= binaryFetchRetryAtMs;
+      if (binaryUrl && shouldTryBinary && !binaryFetchInFlight && (!isReplaySource || binaryUrl !== lastReplayBinaryUrl)) {
+        fetchBinaryFrameDirect(binaryUrl);
       }
       if (isBool01(latestStatus && latestStatus.udp_web_send_roi64)) {
         const roiUrl = frameSource.urlForMode('roi64');

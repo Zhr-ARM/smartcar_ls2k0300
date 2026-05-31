@@ -309,6 +309,10 @@ void vision_image_processor_get_ipm_shifted_centerline_from_right(uint16 **x, ui
 // 将左右偏移中线从 IPM 坐标回投到原图后的结果。
 void vision_image_processor_get_src_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_src_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
+
+// 作用：IPM 坐标 ↔ src 坐标单点转换（封装 change_un_mat 正逆矩阵）。
+bool vision_image_processor_src_to_ipm_point(int src_x, int src_y, int *ipm_x, int *ipm_y);
+bool vision_image_processor_ipm_to_src_point(int ipm_x, int ipm_y, int *src_x, int *src_y);
 // 逐行重采样后的回投中线（每行唯一 x）。
 void vision_image_processor_get_src_shifted_center_resampled_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_src_shifted_center_resampled_from_right(uint16 **x, uint16 **y, uint16 *dot_num);

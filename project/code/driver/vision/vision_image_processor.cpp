@@ -72,8 +72,6 @@ static inline int scale_by_area(int ref_area_px)
 static constexpr int kIpmOutputWidth = VISION_IPM_WIDTH;
 static constexpr int kIpmOutputHeight = VISION_IPM_HEIGHT;
 static constexpr int kMazeStartMinBoundaryGapPx = 5;
-static constexpr int kBinaryMorphWhiteHigh = 255 * 5;
-static constexpr int kBinaryMorphWhiteLow = 255 * 2;
 static constexpr int kInitialFrameWallKeepMaxYSpan = 15;
 static constexpr int kCrossLowerFitPointCount = 10;
 static constexpr int kCrossLowerFitMinPointCount = 2;
@@ -453,7 +451,6 @@ static int extract_one_point_per_row_from_contour(const maze_point_t *raw_pts,
                                                   maze_point_t *regular_pts,
                                                   int max_regular_pts);
 static int previous_src_centerline_first_x();
-static void filter_binary_image_inplace(uint8 *binary_img);
 static void draw_binary_black_frame(uint8 *binary_img);
 static void resample_boundary_points_equal_spacing_inplace(maze_point_t *pts, int *num, int width, int height, float step_px);
 static void clear_eight_neighbor_trace_cache();
@@ -846,40 +843,6 @@ static void build_binary_image_adaptive(const uint8 *gray_img, int width, int he
 
             const int idx = y * width + x;
             binary_out[idx] = (gray_img[idx] > static_cast<uint8>(threshold)) ? static_cast<uint8>(255) : static_cast<uint8>(0);
-        }
-    }
-}
-
-static void filter_binary_image_inplace(uint8 *binary_img)
-{
-    if (binary_img == nullptr)
-    {
-        return;
-    }
-
-    for (int y = 1; y < kProcHeight - 1; ++y)
-    {
-        for (int x = 1; x < kProcWidth - 1; ++x)
-        {
-            const int idx = y * kProcWidth + x;
-            const int neighbor_sum =
-                binary_img[(y - 1) * kProcWidth + (x - 1)] +
-                binary_img[(y - 1) * kProcWidth + x] +
-                binary_img[(y - 1) * kProcWidth + (x + 1)] +
-                binary_img[y * kProcWidth + (x - 1)] +
-                binary_img[y * kProcWidth + (x + 1)] +
-                binary_img[(y + 1) * kProcWidth + (x - 1)] +
-                binary_img[(y + 1) * kProcWidth + x] +
-                binary_img[(y + 1) * kProcWidth + (x + 1)];
-
-            if (neighbor_sum >= kBinaryMorphWhiteHigh && binary_img[idx] == 0)
-            {
-                binary_img[idx] = 255;
-            }
-            else if (neighbor_sum <= kBinaryMorphWhiteLow && binary_img[idx] == 255)
-            {
-                binary_img[idx] = 0;
-            }
         }
     }
 }
@@ -2512,6 +2475,16 @@ static bool ipm_point_to_src_point(int ipm_x, int ipm_y, int *src_x, int *src_y)
     *src_x = x;
     *src_y = y;
     return true;
+}
+
+bool vision_image_processor_src_to_ipm_point(int src_x, int src_y, int *ipm_x, int *ipm_y)
+{
+    return src_point_to_ipm_point(src_x, src_y, ipm_x, ipm_y);
+}
+
+bool vision_image_processor_ipm_to_src_point(int ipm_x, int ipm_y, int *src_x, int *src_y)
+{
+    return ipm_point_to_src_point(ipm_x, ipm_y, src_x, src_y);
 }
 
 static inline uint16 clamp_u16_to_range(int v, int max_inclusive)
@@ -4872,7 +4845,6 @@ bool vision_image_processor_process_step()
                                     g_vision_processor_config.adaptive_window_size,
                                     g_vision_processor_config.adaptive_constant,
                                     g_image_binary_u8);
-        filter_binary_image_inplace(g_image_binary_u8);
         draw_binary_black_frame(g_image_binary_u8);
         g_last_otsu_threshold = 127;
 
@@ -4884,7 +4856,6 @@ bool vision_image_processor_process_step()
         cv::Mat binary(kProcHeight, kProcWidth, CV_8UC1, g_image_binary_u8);
         const double otsu_value = cv::threshold(gray_ipm, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
         otsu_threshold = static_cast<uint8>(std::clamp(static_cast<int>(std::lround(otsu_value)), 0, 255));
-        filter_binary_image_inplace(g_image_binary_u8);
         draw_binary_black_frame(g_image_binary_u8);
         g_last_otsu_threshold = otsu_threshold;
 
@@ -5851,7 +5822,6 @@ bool vision_image_processor_process_step()
     {
         const uint8 avg_threshold = classifier.average_threshold();
         build_binary_image_from_gray_threshold(g_image_gray, avg_threshold);
-        filter_binary_image_inplace(g_image_binary_u8);
         draw_binary_black_frame(g_image_binary_u8);
         g_last_otsu_threshold = avg_threshold;
     }
@@ -6755,12 +6725,12 @@ void vision_image_processor_set_red_rect(bool found, int x, int y, int w, int h,
 {
     std::lock_guard<std::mutex> lk(g_detect_result_mutex);
     g_red_rect_found = found;
-    g_red_rect_x = std::clamp(x, 0, kProcWidth - 1);
-    g_red_rect_y = std::clamp(y, 0, kProcHeight - 1);
-    g_red_rect_w = std::clamp(w, 0, kProcWidth);
-    g_red_rect_h = std::clamp(h, 0, kProcHeight);
-    g_red_rect_cx = std::clamp(cx, 0, kProcWidth - 1);
-    g_red_rect_cy = std::clamp(cy, 0, kProcHeight - 1);
+    g_red_rect_x = std::clamp(x, 0, UVC_WIDTH - 1);
+    g_red_rect_y = std::clamp(y, 0, UVC_HEIGHT - 1);
+    g_red_rect_w = std::clamp(w, 0, UVC_WIDTH);
+    g_red_rect_h = std::clamp(h, 0, UVC_HEIGHT);
+    g_red_rect_cx = std::clamp(cx, 0, UVC_WIDTH - 1);
+    g_red_rect_cy = std::clamp(cy, 0, UVC_HEIGHT - 1);
     g_red_rect_area = std::max(0, area);
 }
 

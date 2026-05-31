@@ -6,8 +6,6 @@
 #include "driver/vision/vision_transport.h"
 
 #include <algorithm>
-#include <cmath>
-#include <opencv2/opencv.hpp>
 
 namespace
 {
@@ -206,20 +204,6 @@ static void update_dynamic_center_target_offset_from_infer_result(const vision_i
     update_idle_target_board_candidate(result);
 }
 
-static cv::Rect map_full_rect_to_proc_rect(int x, int y, int w, int h)
-{
-    if (w <= 0 || h <= 0 || kFullWidth <= 0 || kFullHeight <= 0)
-    {
-        return cv::Rect();
-    }
-    const int x0 = static_cast<int>(std::floor(static_cast<double>(x) * kProcWidth / kFullWidth));
-    const int y0 = static_cast<int>(std::floor(static_cast<double>(y) * kProcHeight / kFullHeight));
-    const int x1 = static_cast<int>(std::ceil(static_cast<double>(x + w) * kProcWidth / kFullWidth));
-    const int y1 = static_cast<int>(std::ceil(static_cast<double>(y + h) * kProcHeight / kFullHeight));
-    return cv::Rect(x0, y0, std::max(0, x1 - x0), std::max(0, y1 - y0)) &
-           cv::Rect(0, 0, kProcWidth, kProcHeight);
-}
-
 // 作用：清空 image_processor 内缓存的推理结果。
 // 调用关系：推理关闭、无结果、cleanup 时调用。
 static void clear_infer_result_in_image_processor()
@@ -268,41 +252,6 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
                                         result->ncnn_roi_y,
                                         result->ncnn_roi_w,
                                         result->ncnn_roi_h);
-
-    const uint8 *bgr_proc_data = vision_image_processor_bgr_image();
-    const uint8 *gray_data = vision_image_processor_gray_image();
-    const cv::Rect red_proc_rect = map_full_rect_to_proc_rect(result->red_x,
-                                                              result->red_y,
-                                                              result->red_w,
-                                                              result->red_h);
-    const cv::Rect roi_proc_rect = map_full_rect_to_proc_rect(result->ncnn_roi_x,
-                                                              result->ncnn_roi_y,
-                                                              result->ncnn_roi_w,
-                                                              result->ncnn_roi_h);
-    if (bgr_proc_data != nullptr)
-    {
-        cv::Mat proc_frame(kProcHeight, kProcWidth, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
-        if (red_proc_rect.width > 0 && red_proc_rect.height > 0)
-        {
-            cv::rectangle(proc_frame, red_proc_rect, cv::Scalar(0, 0, 255), 1, cv::LINE_8);
-        }
-        if (roi_proc_rect.width > 0 && roi_proc_rect.height > 0)
-        {
-            cv::rectangle(proc_frame, roi_proc_rect, cv::Scalar(0, 255, 0), 1, cv::LINE_8);
-        }
-    }
-    if (gray_data != nullptr)
-    {
-        cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, const_cast<uint8 *>(gray_data));
-        if (red_proc_rect.width > 0 && red_proc_rect.height > 0)
-        {
-            cv::rectangle(gray, red_proc_rect, cv::Scalar(200), 1, cv::LINE_8);
-        }
-        if (roi_proc_rect.width > 0 && roi_proc_rect.height > 0)
-        {
-            cv::rectangle(gray, roi_proc_rect, cv::Scalar(255), 1, cv::LINE_8);
-        }
-    }
 }
 
 } // namespace
