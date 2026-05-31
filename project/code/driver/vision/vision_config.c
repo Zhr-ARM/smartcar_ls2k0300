@@ -2,7 +2,7 @@
 
 vision_runtime_config_t g_vision_runtime_config = {
     // ==================== 参数区域 3: 网页发送 ====================
-    // 说明：发送相关参数集中在最前，包含逐飞助手、UDP 视频、TCP 状态上报。
+    // 说明：发送相关参数集中在最前，包含 UDP 视频、TCP 状态上报。
     //
     // ==================== 网页图传怎么选 ====================
     // 当前代码已实现：灰度 / 二值 / 彩图 均可选 JPEG / PNG / BMP。
@@ -44,12 +44,6 @@ vision_runtime_config_t g_vision_runtime_config = {
     // 1. 不建议长期同时发送灰度图和彩图，重复占带宽。
     // 2. 不建议长期发送二值图，网页侧可由灰度图 + otsu_threshold 现算。
     // 3. 若要兼顾“低负载 + 高保真”，优先把灰度图格式切到 PNG。
-    // ==================== 本地显示与逐飞助手链路 ====================
-    // 图传输出模式：
-    // 0=binary 二值图，1=gray 灰度图(带线)。
-    .send_mode = 1,
-    // 图传发送上限帧率，0 表示不限速。
-    .send_max_fps = 60,
     // 推理总开关：false 时关闭红色识别与 ncnn 推理。
     .infer_enabled = false,
     // ncnn 子开关：false 时只保留红框检测，不做 ncnn 分类。
@@ -78,7 +72,6 @@ vision_runtime_config_t g_vision_runtime_config = {
     .red_roi_ratio_h = 1.2f,
     .red_roi_offset_ratio = 0.0f,
     // 逐飞客户端发送开关。
-    .client_sender_enabled = false,
     // 车载屏显示开关。
     .screen_display_enabled = false,
 
@@ -249,12 +242,6 @@ vision_runtime_config_t g_vision_runtime_config = {
     .udp_web_video_port = 10000,
     // 电脑端 TCP 状态端口。
     .udp_web_meta_port = 10001,
-    // 逐飞助手独立 UDP 通道开关。
-    .assistant_udp_enabled = false,
-    // 逐飞助手接收端 IP。
-    .assistant_server_ip = "172.21.79.129",
-    // 逐飞助手接收端端口。
-    .assistant_server_port = 8899,
 
     // ==================== 参数区域 1: 视觉处理 ====================
     // 说明：视觉处理链参数（迷宫法、去畸变、IPM 边界/中线后处理）集中在这里。
@@ -468,5 +455,11 @@ vision_processor_config_t g_vision_processor_config = {
     // 迷宫法默认允许搜索的最小 x，屏蔽左侧黑边。
     .default_maze_trace_x_min = 1,
     // 迷宫法默认允许搜索的最大 x，屏蔽右侧黑边。
-    .default_maze_trace_x_max = 159
+    .default_maze_trace_x_max = 159,
+    // 原图裁剪上边界，分母 120，默认 30 / 120 = 0.25。
+    .crop_top = 30,
+    // 原图裁剪下边界，分母 120，默认 90 / 120 = 0.75。
+    .crop_bottom = 90,
+    // 原图裁剪分母，默认 120。
+    .crop_denominator = 120
 };

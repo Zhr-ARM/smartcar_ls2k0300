@@ -396,36 +396,6 @@ const uint8 *vision_pipeline_bgr_image()
     return vision_image_processor_bgr_image();
 }
 
-void vision_pipeline_set_send_mode(vision_send_mode_enum mode)
-{
-    vision_transport_set_send_mode(mode);
-}
-
-vision_send_mode_enum vision_pipeline_get_send_mode()
-{
-    return vision_transport_get_send_mode();
-}
-
-void vision_pipeline_set_send_max_fps(uint32 max_fps)
-{
-    vision_transport_set_send_max_fps(max_fps);
-}
-
-uint32 vision_pipeline_get_send_max_fps()
-{
-    return vision_transport_get_send_max_fps();
-}
-
-void vision_pipeline_set_send_enabled(bool enabled)
-{
-    vision_transport_set_send_enabled(enabled);
-}
-
-bool vision_pipeline_is_send_enabled()
-{
-    return vision_transport_is_send_enabled();
-}
-
 void vision_pipeline_set_infer_enabled(bool enabled)
 {
     vision_infer_async_set_enabled(enabled);

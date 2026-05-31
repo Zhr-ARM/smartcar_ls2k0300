@@ -4645,12 +4645,12 @@
       grayCtx.moveTo(centerX + 0.5, 0);
       grayCtx.lineTo(centerX + 0.5, h);
       grayCtx.stroke();
-      const guideY = Math.max(0, Math.min(h - 1, 100));
+      const cropLineY = Math.round(h * 0.8);
       grayCtx.strokeStyle = '#ffffff';
       grayCtx.lineWidth = 1;
       grayCtx.beginPath();
-      grayCtx.moveTo(0, guideY + 0.5);
-      grayCtx.lineTo(w, guideY + 0.5);
+      grayCtx.moveTo(0, cropLineY + 0.5);
+      grayCtx.lineTo(w, cropLineY + 0.5);
       grayCtx.stroke();
       const renderStatus = getRenderStatus();
       const left = renderStatus.left_boundary || [];

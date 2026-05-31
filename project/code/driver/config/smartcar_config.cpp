@@ -27,7 +27,6 @@ namespace
 struct StringStorage
 {
     std::string udp_web_server_ip;
-    std::string assistant_server_ip;
     std::array<std::string, VISION_NCNN_CONFIG_MAX_LABELS> ncnn_labels;
 };
 
@@ -854,7 +853,6 @@ void restore_config_snapshot(const ConfigSnapshot &snapshot)
     g_vision_runtime_config = snapshot.vision_runtime;
     g_vision_processor_config = snapshot.vision_processor;
     g_vision_runtime_config.udp_web_server_ip = g_string_storage.udp_web_server_ip.c_str();
-    g_vision_runtime_config.assistant_server_ip = g_string_storage.assistant_server_ip.c_str();
     for (size_t i = 0; i < VISION_NCNN_CONFIG_MAX_LABELS; ++i)
     {
         g_vision_runtime_config.ncnn_labels[i] =
@@ -889,13 +887,6 @@ void collect_restart_required_keys(const ConfigSnapshot &old_config,
     push_if(std::string(old_config.vision_runtime.udp_web_server_ip ? old_config.vision_runtime.udp_web_server_ip : "") !=
                 std::string(g_vision_runtime_config.udp_web_server_ip ? g_vision_runtime_config.udp_web_server_ip : ""),
             "vision.runtime.web.server_ip");
-    push_if(old_config.vision_runtime.assistant_udp_enabled != g_vision_runtime_config.assistant_udp_enabled,
-            "vision.runtime.assistant.enabled");
-    push_if(old_config.vision_runtime.assistant_server_port != g_vision_runtime_config.assistant_server_port,
-            "vision.runtime.assistant.server_port");
-    push_if(std::string(old_config.vision_runtime.assistant_server_ip ? old_config.vision_runtime.assistant_server_ip : "") !=
-                std::string(g_vision_runtime_config.assistant_server_ip ? g_vision_runtime_config.assistant_server_ip : ""),
-            "vision.runtime.assistant.server_ip");
     push_if(old_config.vision_runtime.ncnn_input_width != g_vision_runtime_config.ncnn_input_width,
             "vision.runtime.ncnn.input_width");
     push_if(old_config.vision_runtime.ncnn_input_height != g_vision_runtime_config.ncnn_input_height,
@@ -920,11 +911,8 @@ void apply_runtime_changes_after_commit()
     vision_transport_udp_set_max_fps(g_vision_runtime_config.udp_web_max_fps);
     vision_transport_udp_set_tcp_enabled(g_vision_runtime_config.udp_web_tcp_enabled);
 
-    vision_thread_set_send_mode(static_cast<vision_thread_send_mode_enum>(g_vision_runtime_config.send_mode));
-    vision_thread_set_send_max_fps(g_vision_runtime_config.send_max_fps);
     vision_thread_set_infer_enabled(g_vision_runtime_config.infer_enabled);
     vision_thread_set_ncnn_enabled(g_vision_runtime_config.ncnn_enabled);
-    vision_thread_set_client_sender_enabled(g_vision_runtime_config.client_sender_enabled);
 
     vision_image_processor_reload_config_from_globals();
     line_follow_thread_set_normal_speed_reference(pid_tuning::route_line_follow::kNormalProfile.base_speed);
@@ -953,15 +941,11 @@ bool load_from_path(const std::string &path, std::string *error_message)
         return false;
     }
 
-    int send_max_fps = 0;
     int udp_web_max_fps = 0;
     int udp_web_video_port = 0;
     int udp_web_meta_port = 0;
-    int assistant_server_port = 0;
     size_t ncnn_label_count = 0;
-    if (!require_int(values, &consumed, "vision.runtime.send_mode", &g_vision_runtime_config.send_mode, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.send_max_fps", &send_max_fps, error_message) ||
-        !require_bool(values, &consumed, "vision.runtime.infer_enabled", &g_vision_runtime_config.infer_enabled, error_message) ||
+    if (!require_bool(values, &consumed, "vision.runtime.infer_enabled", &g_vision_runtime_config.infer_enabled, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.ncnn_enabled", &g_vision_runtime_config.ncnn_enabled, error_message) ||
         !require_int(values, &consumed, "vision.runtime.ncnn.input_width", &g_vision_runtime_config.ncnn_input_width, error_message) ||
         !require_int(values, &consumed, "vision.runtime.ncnn.input_height", &g_vision_runtime_config.ncnn_input_height, error_message) ||
@@ -976,12 +960,10 @@ bool load_from_path(const std::string &path, std::string *error_message)
         !require_float(values, &consumed, "vision.runtime.red_roi.ratio_w", &g_vision_runtime_config.red_roi_ratio_w, error_message) ||
         !require_float(values, &consumed, "vision.runtime.red_roi.ratio_h", &g_vision_runtime_config.red_roi_ratio_h, error_message) ||
         !require_float(values, &consumed, "vision.runtime.red_roi.offset_ratio", &g_vision_runtime_config.red_roi_offset_ratio, error_message) ||
-        !require_bool(values, &consumed, "vision.runtime.client_sender_enabled", &g_vision_runtime_config.client_sender_enabled, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.screen_display_enabled", &g_vision_runtime_config.screen_display_enabled, error_message))
     {
         return false;
     }
-    g_vision_runtime_config.send_max_fps = static_cast<uint32>(std::max(send_max_fps, 0));
     if (ncnn_label_count != g_vision_runtime_config.ncnn_label_count)
     {
         *error_message = "vision.runtime.ncnn.label_count does not match labels array length";
@@ -1075,16 +1057,12 @@ bool load_from_path(const std::string &path, std::string *error_message)
 
     if (!require_string(values, &consumed, "vision.runtime.web.server_ip", &g_string_storage.udp_web_server_ip, &g_vision_runtime_config.udp_web_server_ip, error_message) ||
         !require_int(values, &consumed, "vision.runtime.web.video_port", &udp_web_video_port, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.web.meta_port", &udp_web_meta_port, error_message) ||
-        !require_bool(values, &consumed, "vision.runtime.assistant.enabled", &g_vision_runtime_config.assistant_udp_enabled, error_message) ||
-        !require_string(values, &consumed, "vision.runtime.assistant.server_ip", &g_string_storage.assistant_server_ip, &g_vision_runtime_config.assistant_server_ip, error_message) ||
-        !require_int(values, &consumed, "vision.runtime.assistant.server_port", &assistant_server_port, error_message))
+        !require_int(values, &consumed, "vision.runtime.web.meta_port", &udp_web_meta_port, error_message))
     {
         return false;
     }
     g_vision_runtime_config.udp_web_video_port = static_cast<uint16>(std::max(udp_web_video_port, 0));
     g_vision_runtime_config.udp_web_meta_port = static_cast<uint16>(std::max(udp_web_meta_port, 0));
-    g_vision_runtime_config.assistant_server_port = static_cast<uint16>(std::max(assistant_server_port, 0));
 
 #define REQUIRE_RUNTIME_INT(name) \
     if (!require_int(values, &consumed, "vision.runtime." #name, &g_vision_runtime_config.name, error_message)) return false
@@ -1204,7 +1182,10 @@ bool load_from_path(const std::string &path, std::string *error_message)
         !require_int(values, &consumed, "vision.processor.undistort_move_y", &g_vision_processor_config.undistort_move_y, error_message) ||
         !require_float(values, &consumed, "vision.processor.default_line_sample_ratio", &g_vision_processor_config.default_line_sample_ratio, error_message) ||
         !require_int(values, &consumed, "vision.processor.default_maze_trace_x_min", &g_vision_processor_config.default_maze_trace_x_min, error_message) ||
-        !require_int(values, &consumed, "vision.processor.default_maze_trace_x_max", &g_vision_processor_config.default_maze_trace_x_max, error_message))
+        !require_int(values, &consumed, "vision.processor.default_maze_trace_x_max", &g_vision_processor_config.default_maze_trace_x_max, error_message) ||
+        !require_int(values, &consumed, "vision.processor.crop.top", &g_vision_processor_config.crop_top, error_message) ||
+        !require_int(values, &consumed, "vision.processor.crop.bottom", &g_vision_processor_config.crop_bottom, error_message) ||
+        !require_int(values, &consumed, "vision.processor.crop.denominator", &g_vision_processor_config.crop_denominator, error_message))
     {
         return false;
     }
@@ -1317,6 +1298,14 @@ bool load_from_path(const std::string &path, std::string *error_message)
         pid_tuning::brushless::kRightDutyPercent < 0.0f || pid_tuning::brushless::kRightDutyPercent > 100.0f)
     {
         *error_message = "pid.brushless duty_percent must be in [0, 100]";
+        return false;
+    }
+    if (g_vision_processor_config.crop_denominator <= 0 ||
+        g_vision_processor_config.crop_top < 0 ||
+        g_vision_processor_config.crop_bottom <= g_vision_processor_config.crop_top ||
+        g_vision_processor_config.crop_bottom > g_vision_processor_config.crop_denominator)
+    {
+        *error_message = "vision.processor.crop values are invalid: must satisfy 0 <= top < bottom <= denominator";
         return false;
     }
 

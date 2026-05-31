@@ -9,21 +9,12 @@
 schema_version = 1
 
 [vision.runtime]
-# 图像发送模式。
-# 0=binary 二值图，1=gray 灰度图。
-send_mode = 1
-# 图像发送链路最大帧率。
-# 0 表示不限速。
-send_max_fps = 60
 # 推理总开关。
 # false 时关闭红框检测和 ncnn 分类主链。
 infer_enabled = false
 # ncnn 分类子开关。
 # false 时即使 infer_enabled=true，也只保留红框检测，不做 ncnn 分类。
 ncnn_enabled = false
-# 逐飞客户端发送开关。
-# true 时启用客户端发送链路。
-client_sender_enabled = false
 # 车载屏显示开关。
 # true 时启动屏幕显示线程。
 screen_display_enabled = false
@@ -96,9 +87,9 @@ ipm_boundary_straight_check_count = 20
 # IPM 直边检测要求的最小 cos 阈值。
 ipm_boundary_straight_min_cos = 0.95
 # IPM 赛道宽度像素。
-ipm_track_width_px = 28.0
+ipm_track_width_px = 30.0
 # 默认目标中线距离左边界的偏移像素。
-ipm_center_target_offset_from_left_px = 14.0
+ipm_center_target_offset_from_left_px = 15.0
 # 进入目标板状态前，需要连续多少帧同类高置信 Top1。
 infer_target_confirm_count = 5
 # 目标板确认的 Top1 置信度阈值。
@@ -216,10 +207,10 @@ offset_ratio = 0.0
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
-enabled = false
+enabled = true
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
-max_fps = 45
+max_fps = 30
 # 是否发送灰度图。
 send_gray_jpeg = true
 # 灰度图发送格式。
@@ -239,7 +230,7 @@ rgb_image_format = 1
 # 0=FULL，1=RAW_MINIMAL。
 data_profile = 0
 # 网页端 TCP 状态发送总开关。
-tcp_enabled = false
+tcp_enabled = true
 # PC 接收端 IP 地址。
 server_ip = "192.168.3.9"
 # PC 接收端 UDP 视频端口。
@@ -355,14 +346,6 @@ gray_size = true
 # 是否发送 IPM 图尺寸。
 ipm_size = true
 
-[vision.runtime.assistant]
-# 逐飞助手 UDP 通道开关。
-enabled = false
-# 逐飞助手接收端 IP。
-server_ip = "192.168.3.9"
-# 逐飞助手接收端端口。
-server_port = 8899
-
 [vision.processor]
 # 单侧迷宫法最大输出点数。
 maze_trace_max_points = 180
@@ -384,7 +367,7 @@ ipm_output_width = 160
 ipm_output_height = 100
 # 逆透视矩阵。
 # 按 3x3 展平写入，顺序为行优先。
-change_un_mat = [0.507692, -0.546746, 30.852071, 0.0, 0.096657, 1.508432, 0.0, -0.006834, 0.893343]
+change_un_mat = [0.454728, -0.511916, 27.999949, 0.022943, 0.040097, 3.996650, 0.000459, -0.006650, 0.787858]
 # 相机内参矩阵。
 # 按 3x3 展平写入，顺序为行优先。
 camera_matrix = [88.352003, 0.0, 76.039402, 0.0, 88.094982, 30.149306, 0.0, 0.0, 1.0]
@@ -401,6 +384,16 @@ default_line_sample_ratio = 0.55
 default_maze_trace_x_min = 1
 # 迷宫法默认允许搜索的最大 x。
 default_maze_trace_x_max = 159
+
+[vision.processor.crop]
+# 原图裁剪上边界，与 denominator 配合换算为比例。
+# crop_y = UVC_HEIGHT * top / denominator
+top = 25
+# 原图裁剪下边界，与 denominator 配合换算为比例。
+# crop_h = UVC_HEIGHT * (bottom - top) / denominator
+bottom = 85
+# 原图裁剪分母，默认 120。
+denominator = 120
 
 [pid.imu]
 # 启动阶段 IMU 静止标定时长，单位毫秒。

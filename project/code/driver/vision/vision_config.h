@@ -28,12 +28,7 @@ typedef enum
 typedef struct
 {
     // ==================== 参数区域 3: 网页发送 ====================
-    // 包括逐飞助手发送、UDP 视频发送、TCP 状态发送及其字段开关。
-    // 图传输出模式：
-    // VISION_THREAD_SEND_BINARY / VISION_THREAD_SEND_GRAY。
-    int send_mode;
-    // 图传发送上限帧率，0 表示不限速。
-    uint32 send_max_fps;
+    // 包括 UDP 视频发送、TCP 状态发送及其字段开关。
     // 推理总开关：false 时关闭红色识别与 ncnn 推理链路。
     bool infer_enabled;
     // ncnn 子开关：false 时保留红框检测，但不做 ncnn 分类。
@@ -56,8 +51,6 @@ typedef struct
     float red_roi_ratio_w;
     float red_roi_ratio_h;
     float red_roi_offset_ratio;
-    // 客户端发送开关：控制逐飞助手发送链路是否启用。
-    bool client_sender_enabled;
     // 车载屏显示开关：true 时启动 screen_display_thread。
     bool screen_display_enabled;
     // ==================== 网页图传选型说明 ====================
@@ -174,12 +167,6 @@ typedef struct
     uint16 udp_web_video_port;
     // 电脑端 TCP 状态端口（需与 PC 接收端 --tcp-port 一致）。
     uint16 udp_web_meta_port;
-    // 逐飞客户端 UDP 通道开关（与网页端 UDP/TCP 独立）。
-    bool assistant_udp_enabled;
-    // 逐飞客户端接收端 IP。
-    const char *assistant_server_ip;
-    // 逐飞客户端接收端端口。
-    uint16 assistant_server_port;
 
     // ==================== 参数区域 1: 视觉处理 ====================
     // 包括迷宫法起点、去畸变、IPM 边界/中线后处理。
@@ -405,6 +392,12 @@ typedef struct
     int default_maze_trace_x_min;
     // 原图迷宫法巡线默认最大 x。
     int default_maze_trace_x_max;
+    // 原图裁剪上边界（与 crop_denominator 配合换算为比例）。
+    int crop_top;
+    // 原图裁剪下边界（与 crop_denominator 配合换算为比例）。
+    int crop_bottom;
+    // 原图裁剪分母，默认 120。
+    int crop_denominator;
 } vision_processor_config_t;
 
 // 视觉运行时配置：

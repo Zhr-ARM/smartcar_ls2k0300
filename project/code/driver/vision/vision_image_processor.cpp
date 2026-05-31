@@ -37,10 +37,9 @@ static constexpr int kRefProcHeight = 60;
 static constexpr int kRefProcPixels = kRefProcWidth * kRefProcHeight;
 static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
 static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
-static constexpr int kCropOffsetY = 30;
 static constexpr int kCropW = UVC_WIDTH;
-static constexpr int kCropH = UVC_HEIGHT / 2;
-static constexpr int kCropY = UVC_HEIGHT / 4;
+static int kCropH = UVC_HEIGHT / 2;
+static int kCropY = UVC_HEIGHT / 4;
 
 static inline int scale_by_width(int ref_px)
 {
@@ -216,7 +215,7 @@ static int g_src_shift_right_center_resampled_count = 0;
 // - g_image_bgr_crop: full 分辨率裁剪图（320x120 或 160x60），保留 BGR 色彩；
 // - g_image_bgr/g_image_gray/g_image_binary_u8: 处理分辨率图（固定 160x60）。
 static uint8 g_image_bgr_full[UVC_HEIGHT * UVC_WIDTH * 3];
-static uint8 g_image_bgr_crop[kCropH * kCropW * 3];
+static uint8 g_image_bgr_crop[UVC_WIDTH * UVC_HEIGHT * 3];
 static uint8 g_image_bgr[kProcHeight * kProcWidth * 3];
 static uint8 g_image_gray[kProcHeight * kProcWidth];
 static uint8 g_image_binary_u8[kProcHeight * kProcWidth];
@@ -2399,7 +2398,7 @@ static bool init_undistort_remap_table()
         for (int x = 0; x < kProcWidth; ++x)
         {
             const double xu = static_cast<double>(x - move_x);
-            const double yu = static_cast<double>(y + kCropOffsetY - move_y);
+            const double yu = static_cast<double>(y + kCropY - move_y);
 
             const double x_corrected = (xu - ux) / fx;
             const double y_corrected = (yu - uy) / fy;
@@ -3032,7 +3031,7 @@ static void resample_src_centerline_rowwise(const maze_point_t *pts, int count,
 
     const int n = std::min(count, VISION_BOUNDARY_NUM);
 
-    // 阶段一：逐点扫描，距离上一保留点 >= 2px 才保留。
+    // 阶段一：逐点扫描，距离上一保留点 >= 4px 才保留。
     struct kept_t
     {
         int x, y;
@@ -3046,7 +3045,7 @@ static void resample_src_centerline_rowwise(const maze_point_t *pts, int count,
         const int dx = pts[i].x - kept[kept_cnt - 1].x;
         const int dy = pts[i].y - kept[kept_cnt - 1].y;
         const float dist = std::sqrt(static_cast<float>(dx * dx + dy * dy));
-        if (dist >= 2.0f && kept_cnt < VISION_BOUNDARY_NUM)
+        if (dist >= 4.0f && kept_cnt < VISION_BOUNDARY_NUM)
         {
             kept[kept_cnt].x = pts[i].x;
             kept[kept_cnt].y = pts[i].y;
@@ -3059,7 +3058,7 @@ static void resample_src_centerline_rowwise(const maze_point_t *pts, int count,
         return;
     }
 
-    // 阶段二：相邻保留点间距 >=2 时，线性插值补点，每段间距 ∈[1,2)。
+    // 阶段二：逐行线性插值，保证每行最多一个点。
     int out_cnt = 0;
     out_xs[out_cnt] = static_cast<uint16>(std::clamp(kept[0].x, 0, kProcWidth - 1));
     out_ys[out_cnt] = static_cast<uint16>(kept[0].y);
@@ -3071,31 +3070,28 @@ static void resample_src_centerline_rowwise(const maze_point_t *pts, int count,
         const int y0 = kept[i - 1].y;
         const int x1 = kept[i].x;
         const int y1 = kept[i].y;
-        const int dx = x1 - x0;
         const int dy = y1 - y0;
-        const float d = std::sqrt(static_cast<float>(dx * dx + dy * dy));
+        const int dx = x1 - x0;
 
-        if (d < 2.0f)
+        if (dy == 0)
         {
-            // 间距已在 [0,2) 内，直接输出下一保留点。
-            out_xs[out_cnt] = static_cast<uint16>(std::clamp(x1, 0, kProcWidth - 1));
-            out_ys[out_cnt] = static_cast<uint16>(y1);
-            ++out_cnt;
+            // 同一行，用新点覆盖旧点（保留最新的 x）。
+            out_xs[out_cnt - 1] = static_cast<uint16>(std::clamp(x1, 0, kProcWidth - 1));
             continue;
         }
 
-        // 插入 floor(d)-1 个中间点，每小段长度 d/floor(d) ∈[1,2)。
-        const int n_seg = static_cast<int>(std::floor(d));
-        for (int j = 1; j < n_seg && out_cnt < VISION_BOUNDARY_NUM; ++j)
+        // 逐行插值，每个 y 行一个点。
+        const int step = (dy > 0) ? 1 : -1;
+        for (int y = y0 + step; y != y1 && out_cnt < VISION_BOUNDARY_NUM; y += step)
         {
-            const float t = static_cast<float>(j) / static_cast<float>(n_seg);
+            const float t = static_cast<float>(y - y0) / static_cast<float>(dy);
             const int ix = static_cast<int>(std::lround(static_cast<float>(x0) + t * static_cast<float>(dx)));
-            const int iy = static_cast<int>(std::lround(static_cast<float>(y0) + t * static_cast<float>(dy)));
             out_xs[out_cnt] = static_cast<uint16>(std::clamp(ix, 0, kProcWidth - 1));
-            out_ys[out_cnt] = static_cast<uint16>(iy);
+            out_ys[out_cnt] = static_cast<uint16>(y);
             ++out_cnt;
         }
-        // 输出当前保留点本身。
+
+        // 输出终点 y1。
         if (out_cnt < VISION_BOUNDARY_NUM)
         {
             out_xs[out_cnt] = static_cast<uint16>(std::clamp(x1, 0, kProcWidth - 1));
@@ -5945,8 +5941,23 @@ uint32 vision_image_processor_processed_frame_seq()
     return g_processed_frame_seq.load();
 }
 
+static void vision_image_processor_reload_crop_from_config()
+{
+    const int d = g_vision_processor_config.crop_denominator;
+    const int top = g_vision_processor_config.crop_top;
+    const int bottom = g_vision_processor_config.crop_bottom;
+
+    kCropY = (UVC_HEIGHT * top) / d;
+    kCropH = (UVC_HEIGHT * (bottom - top)) / d;
+    if (kCropH <= 0)
+    {
+        kCropH = 1;
+    }
+}
+
 void vision_image_processor_reload_config_from_globals()
 {
+    vision_image_processor_reload_crop_from_config();
     g_maze_start_row.store(g_vision_runtime_config.maze_start_row);
     g_maze_trace_method.store(g_vision_runtime_config.maze_trace_method);
     g_maze_trace_y_fallback_stop_delta.store(g_vision_runtime_config.maze_trace_y_fallback_stop_delta);

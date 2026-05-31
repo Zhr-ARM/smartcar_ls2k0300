@@ -29,21 +29,6 @@
 
 namespace
 {
-// ---------- client sender ----------
-static constexpr uint32 kClientDefaultMaxFps = 30;
-static constexpr uint32 kClientMaxFpsUpper = 240;
-// 客户端发送模式与开关。
-static std::atomic<int> g_send_mode(VISION_SEND_BINARY);
-static std::atomic<bool> g_send_enabled(true);
-// 最近一次已配置模式（避免重复配置底层发送结构）。
-static std::atomic<int> g_last_send_mode(-1);
-// 最近一次客户端发送耗时（us）。
-static std::atomic<uint32> g_last_send_time_us(0);
-// 最近一次客户端发送时间戳（用于限频）。
-static std::atomic<uint64> g_last_send_tick_us(0);
-// 客户端发送最大 FPS（0 表示不限）。
-static std::atomic<uint32> g_send_max_fps(kClientDefaultMaxFps);
-
 // ---------- udp/tcp sender ----------
 constexpr uint32 kUdpDefaultMaxFps = 30;
 constexpr uint32 kUdpMaxFpsUpper = 120;
@@ -72,6 +57,7 @@ struct udp_chunk_header_t
 };
 #pragma pack(pop)
 
+std::atomic<uint32> g_last_send_time_us(0);         // 最近一次发送耗时（us）。
 std::atomic<bool> g_udp_enabled(false);            // UDP 图像发送开关。
 std::atomic<bool> g_tcp_enabled(true);             // TCP 状态发送开关。
 std::atomic<uint32> g_udp_max_fps(kUdpDefaultMaxFps); // UDP 图像限频。
@@ -276,86 +262,6 @@ static const char *opencv_ext_for_web_image_format(vision_web_image_format_enum 
             return ".bmp";
         default:
             return ".jpg";
-    }
-}
-
-static vision_send_mode_enum vision_sender_sanitize_mode(vision_send_mode_enum mode)
-{
-    if (mode == VISION_SEND_BINARY)
-    {
-        return VISION_SEND_BINARY;
-    }
-    return VISION_SEND_GRAY;
-}
-
-static bool mode_enable_boundary_packet(vision_send_mode_enum mode)
-{
-    return mode == VISION_SEND_GRAY;
-}
-
-// 作用：首次配置助手图像发送与边线发送格式。
-static void config_camera_send_packet(vision_send_mode_enum mode)
-{
-    uint16 *x1 = nullptr;
-    uint16 *x2 = nullptr;
-    uint16 *x3 = nullptr;
-    uint16 *y1 = nullptr;
-    uint16 *y2 = nullptr;
-    uint16 *y3 = nullptr;
-    uint16 dot_num = 0;
-    vision_image_processor_get_boundaries(&x1, &x2, &x3, &y1, &y2, &y3, &dot_num);
-
-    switch (mode)
-    {
-        case VISION_SEND_BINARY:
-            seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_GRAY,
-                                                         const_cast<uint8 *>(vision_image_processor_binary_downsampled_u8_image()),
-                                                         VISION_DOWNSAMPLED_WIDTH,
-                                                         VISION_DOWNSAMPLED_HEIGHT);
-            break;
-        default:
-            seekfree_assistant_camera_information_config(SEEKFREE_ASSISTANT_GRAY,
-                                                         const_cast<uint8 *>(vision_image_processor_gray_downsampled_image()),
-                                                         VISION_DOWNSAMPLED_WIDTH,
-                                                         VISION_DOWNSAMPLED_HEIGHT);
-            break;
-    }
-
-    if (mode_enable_boundary_packet(mode) && dot_num > 0 && x1 && x2 && x3 && y1 && y2 && y3)
-    {
-        seekfree_assistant_camera_boundary_config(XY_BOUNDARY, dot_num, x1, x2, x3, y1, y2, y3);
-    }
-    else
-    {
-        seekfree_assistant_camera_boundary_config(NO_BOUNDARY, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
-    }
-    g_last_send_mode.store(static_cast<int>(mode));
-}
-
-// 作用：刷新边线包（灰度模式下每帧刷新）。
-static void refresh_camera_boundary_packet(vision_send_mode_enum mode)
-{
-    if (!mode_enable_boundary_packet(mode))
-    {
-        seekfree_assistant_camera_boundary_config(NO_BOUNDARY, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
-        return;
-    }
-
-    uint16 *x1 = nullptr;
-    uint16 *x2 = nullptr;
-    uint16 *x3 = nullptr;
-    uint16 *y1 = nullptr;
-    uint16 *y2 = nullptr;
-    uint16 *y3 = nullptr;
-    uint16 dot_num = 0;
-    vision_image_processor_get_boundaries(&x1, &x2, &x3, &y1, &y2, &y3, &dot_num);
-    if (dot_num > 0 && x1 && x2 && x3 && y1 && y2 && y3)
-    {
-        seekfree_assistant_camera_boundary_config(XY_BOUNDARY, dot_num, x1, x2, x3, y1, y2, y3);
-    }
-    else
-    {
-        seekfree_assistant_camera_boundary_config(NO_BOUNDARY, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
     }
 }
 
@@ -1638,48 +1544,12 @@ static void send_tcp_status()
 
 void vision_transport_init()
 {
-    // 首帧前不做底层图像包配置，避免空指针或黑屏。
-    g_last_send_mode.store(-1);
 }
 
 void vision_transport_send_step()
 {
-    // 发送统一入口：先客户端发送，再 UDP/TCP 发送。
     auto t0 = std::chrono::steady_clock::now();
-    bool allow_send = true;
-    const uint32 max_fps = g_send_max_fps.load();
-    if (max_fps > 0)
-    {
-        const uint64 now_us = static_cast<uint64>(
-            std::chrono::duration_cast<std::chrono::microseconds>(t0.time_since_epoch()).count());
-        const uint64 min_interval_us = 1000000ULL / static_cast<uint64>(max_fps);
-        const uint64 last_us = g_last_send_tick_us.load();
-        if (last_us != 0 && (now_us - last_us) < min_interval_us)
-        {
-            allow_send = false;
-        }
-    }
-
-    if (!allow_send || !g_send_enabled.load())
-    {
-        g_last_send_time_us.store(0);
-    }
-    else
-    {
-        vision_send_mode_enum mode = vision_sender_sanitize_mode(
-            static_cast<vision_send_mode_enum>(g_send_mode.load()));
-        if (g_last_send_mode.load() != static_cast<int>(mode))
-        {
-            config_camera_send_packet(mode);
-        }
-        refresh_camera_boundary_packet(mode);
-        seekfree_assistant_camera_send();
-        auto t1 = std::chrono::steady_clock::now();
-        g_last_send_tick_us.store(static_cast<uint64>(
-            std::chrono::duration_cast<std::chrono::microseconds>(t1.time_since_epoch()).count()));
-        g_last_send_time_us.store(static_cast<uint32>(
-            std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count()));
-    }
+    uint32 send_time_us = 0;
 
     if (try_acquire_udp_send_slot())
     {
@@ -1736,48 +1606,16 @@ void vision_transport_send_step()
             }
         }
         send_tcp_status();
+        auto t1 = std::chrono::steady_clock::now();
+        send_time_us = static_cast<uint32>(
+            std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
     }
+    g_last_send_time_us.store(send_time_us);
 }
 
 uint32 vision_transport_get_last_send_time_us()
 {
     return g_last_send_time_us.load();
-}
-
-void vision_transport_set_send_mode(vision_send_mode_enum mode)
-{
-    g_send_mode.store(static_cast<int>(vision_sender_sanitize_mode(mode)));
-}
-
-vision_send_mode_enum vision_transport_get_send_mode()
-{
-    return static_cast<vision_send_mode_enum>(g_send_mode.load());
-}
-
-void vision_transport_set_send_max_fps(uint32 max_fps)
-{
-    uint32 v = max_fps;
-    if (v > kClientMaxFpsUpper)
-    {
-        v = kClientMaxFpsUpper;
-    }
-    g_send_max_fps.store(v);
-    g_last_send_tick_us.store(0);
-}
-
-uint32 vision_transport_get_send_max_fps()
-{
-    return g_send_max_fps.load();
-}
-
-void vision_transport_set_send_enabled(bool enabled)
-{
-    g_send_enabled.store(enabled);
-}
-
-bool vision_transport_is_send_enabled()
-{
-    return g_send_enabled.load();
 }
 
 bool vision_transport_udp_init(const char *server_ip, uint16 video_port, uint16 meta_port)

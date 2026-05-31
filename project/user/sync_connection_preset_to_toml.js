@@ -33,12 +33,8 @@ if (!preset) {
 }
 
 const pcReceiverIp = String(preset.pc_receiver_ip || '').trim();
-const assistantReceiverIp = String(preset.assistant_receiver_ip || pcReceiverIp).trim();
 if (!pcReceiverIp) {
   fail(`预设 ${presetId} 缺少 pc_receiver_ip`);
-}
-if (!assistantReceiverIp) {
-  fail(`预设 ${presetId} 缺少 assistant_receiver_ip`);
 }
 
 const tomlText = fs.readFileSync(tomlFile, 'utf8');
@@ -48,7 +44,6 @@ if (!tomlText.trim()) {
 const lines = tomlText.split('\n');
 let section = '';
 let replacedWeb = false;
-let replacedAssistant = false;
 
 for (let i = 0; i < lines.length; i += 1) {
   const rawLine = lines[i];
@@ -63,19 +58,11 @@ for (let i = 0; i < lines.length; i += 1) {
   if (section === 'vision.runtime.web') {
     lines[i] = rawLine.replace(/server_ip\s*=\s*"[^"]*"/, `server_ip = "${pcReceiverIp}"`);
     replacedWeb = true;
-    continue;
-  }
-  if (section === 'vision.runtime.assistant') {
-    lines[i] = rawLine.replace(/server_ip\s*=\s*"[^"]*"/, `server_ip = "${assistantReceiverIp}"`);
-    replacedAssistant = true;
   }
 }
 
 if (!replacedWeb) {
   fail('未找到 [vision.runtime.web] 下的 server_ip');
-}
-if (!replacedAssistant) {
-  fail('未找到 [vision.runtime.assistant] 下的 server_ip');
 }
 
 const nextText = lines.join('\n');
