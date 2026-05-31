@@ -1206,6 +1206,37 @@
       color: var(--console-text);
       font-weight: 700;
     }
+    .roi64-card {
+      margin-top: 10px;
+      padding: 12px;
+      background: linear-gradient(180deg, #141a21 0%, #0e1319 100%);
+      border: 1px solid var(--console-line);
+      border-radius: 6px;
+      text-align: center;
+    }
+    .roi64-title {
+      color: var(--console-muted);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .roi64-card canvas {
+      display: block;
+      margin: 0 auto;
+      width: 64px;
+      height: 64px;
+      image-rendering: pixelated;
+      border-radius: 4px;
+      border: 1px solid var(--console-line-soft);
+      background: #000;
+    }
+    .roi64-hint {
+      margin-top: 8px;
+      color: var(--console-dim);
+      font-size: 10px;
+      line-height: 1.35;
+    }
     .state-detail-panel {
       margin-top: 10px;
     }
@@ -1588,6 +1619,11 @@
               <span>无红 <strong id="targetBoardNoRedValue">--</strong></span>
             </div>
           </div>
+        </div>
+        <div class="roi64-card">
+          <div class="roi64-title">ROI 64×64</div>
+          <canvas id="roi64Canvas" width="64" height="64"></canvas>
+          <div class="roi64-hint" id="roi64Hint">还没有可显示的 ROI64 图像。</div>
         </div>
         <details class="detail-panel state-detail-panel">
           <summary>状态机判定细节</summary>

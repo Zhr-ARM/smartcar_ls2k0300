@@ -11,7 +11,7 @@ schema_version = 1
 [vision.runtime]
 # 推理总开关。
 # false 时关闭红框检测和 ncnn 分类主链。
-infer_enabled = false
+infer_enabled = true
 # ncnn 分类子开关。
 # false 时即使 infer_enabled=true，也只保留红框检测，不做 ncnn 分类。
 ncnn_enabled = false
