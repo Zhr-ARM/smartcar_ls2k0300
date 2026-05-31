@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+extern bool g_cpu_monitor_enabled;
+
 bool smartcar_config_load_from_default_locations(std::string *loaded_path, std::string *error_message);
 bool smartcar_config_apply_toml_text(const std::string &toml_text,
                                      std::vector<std::string> *restart_required_keys,

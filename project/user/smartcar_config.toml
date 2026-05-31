@@ -216,7 +216,7 @@ offset_ratio = 0.0
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
-enabled = true
+enabled = false
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
 max_fps = 45
@@ -239,9 +239,9 @@ rgb_image_format = 1
 # 0=FULL，1=RAW_MINIMAL。
 data_profile = 0
 # 网页端 TCP 状态发送总开关。
-tcp_enabled = true
+tcp_enabled = false
 # PC 接收端 IP 地址。
-server_ip = "192.168.3.11"
+server_ip = "192.168.3.9"
 # PC 接收端 UDP 视频端口。
 video_port = 10000
 # PC 接收端 TCP 状态端口。
@@ -359,7 +359,7 @@ ipm_size = true
 # 逐飞助手 UDP 通道开关。
 enabled = false
 # 逐飞助手接收端 IP。
-server_ip = "192.168.3.11"
+server_ip = "192.168.3.9"
 # 逐飞助手接收端端口。
 server_port = 8899
 
@@ -643,3 +643,8 @@ speed_scheme_target_yaw_rate_full_dps = 120.0
 speed_scheme_target_yaw_rate_min_scale = 0.2
 # 目标角速度低通滤波 alpha。
 speed_scheme_target_yaw_rate_filter_alpha = 0.7
+
+[cpu_monitor]
+# 终端 CPU 使用率打印开关。
+# true 时每 2 秒在终端打印一次 CPU 使用率。
+enabled = true

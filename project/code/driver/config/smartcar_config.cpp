@@ -1320,6 +1320,11 @@ bool load_from_path(const std::string &path, std::string *error_message)
         return false;
     }
 
+    if (!require_bool(values, &consumed, "cpu_monitor.enabled", &g_cpu_monitor_enabled, error_message))
+    {
+        return false;
+    }
+
     if (consumed.size() != values.size())
     {
         std::ostringstream oss;
@@ -1345,6 +1350,8 @@ bool load_from_path(const std::string &path, std::string *error_message)
 }
 
 } // namespace
+
+bool g_cpu_monitor_enabled = false;
 
 bool smartcar_config_load_from_default_locations(std::string *loaded_path, std::string *error_message)
 {

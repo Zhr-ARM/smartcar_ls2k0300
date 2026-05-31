@@ -8,6 +8,7 @@
 #include "line_follow_thread.h"
 #include "vision_thread.h"
 #include "screen_display_thread.h"
+#include "cpu_monitor_thread.h"
 #include "driver/pid/pid_tuning.h"
 #include "driver/config/smartcar_config.h"
 #include "driver/vision/vision_assistant_udp.h"
@@ -39,6 +40,7 @@ void cleanup_worker_threads_once()
     }
 
     screen_display_thread_cleanup();
+    cpu_monitor_thread_cleanup();
     line_follow_thread_cleanup();
     vision_thread_cleanup();
     config_http_thread_cleanup();
@@ -301,7 +303,13 @@ int main(int, char**)
         return -1;
     }
 
-    // 下发视觉配置参数（按“网页发送 / 视觉处理 / 偏差计算”分组）。
+    if (!cpu_monitor_thread_init())
+    {
+        cleanup();
+        return -1;
+    }
+
+    // 下发视觉配置参数（按”网页发送 / 视觉处理 / 偏差计算”分组）。
     // [网页发送]
     vision_thread_set_send_mode(static_cast<vision_thread_send_mode_enum>(g_vision_runtime_config.send_mode)); // 图像模式
     vision_thread_set_send_max_fps(g_vision_runtime_config.send_max_fps); // 客户端发送限频
@@ -386,6 +394,7 @@ int main(int, char**)
     motor_thread_print_info();
     imu_thread_print_info();
     line_follow_thread_print_info();
+    cpu_monitor_thread_print_info();
 
     // ============================================================
     // 速度环调试模式
