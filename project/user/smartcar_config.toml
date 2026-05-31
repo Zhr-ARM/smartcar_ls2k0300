@@ -406,8 +406,8 @@ default_maze_trace_x_max = 159
 # 启动阶段 IMU 静止标定时长，单位毫秒。
 startup_calibrate_duration_ms = 2000
 # gyro_z 方向符号。
-# 越抗漂越甩时通常要改成 -1。
-gyro_yaw_rate_sign = 1.0
+# 越抗漂越甩时通常要改成 -1。（此处修改陀螺仪方向）
+gyro_yaw_rate_sign = -1.0
 # gyro_z 低通滤波 alpha。
 gyro_yaw_rate_filter_alpha = 0.45
 
@@ -532,7 +532,7 @@ yaw_rate_ref_from_track_point_gain_dps = 9.0
 # NORMAL 档目标横摆角速度限幅。
 yaw_rate_ref_limit_dps = 360.0
 # NORMAL 档角速度环 Kp。
-yaw_rate_kp = 0.8
+yaw_rate_kp = 0.05
 # NORMAL 档角速度环动态 Kp 一次项系数。
 yaw_rate_dynamic_kp_quad_a = 0.0
 # NORMAL 档角速度环动态 Kp 下限。
