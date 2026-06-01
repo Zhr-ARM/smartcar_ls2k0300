@@ -336,6 +336,8 @@ static std::atomic<bool> g_ipm_centerline_postprocess_enabled(g_vision_runtime_c
 static std::atomic<bool> g_ipm_centerline_triangle_filter_enabled(g_vision_runtime_config.ipm_centerline_triangle_filter_enabled);
 static std::atomic<bool> g_ipm_centerline_resample_enabled(g_vision_runtime_config.ipm_centerline_resample_enabled);
 static std::atomic<float> g_ipm_centerline_resample_step_px(g_vision_runtime_config.ipm_centerline_resample_step_px);
+static std::atomic<bool> g_src_backproj_resample_enabled(g_vision_runtime_config.src_backproj_resample_enabled);
+static std::atomic<float> g_src_backproj_resample_step_px(g_vision_runtime_config.src_backproj_resample_step_px);
 static std::atomic<bool> g_ipm_centerline_curvature_enabled(g_vision_runtime_config.ipm_centerline_curvature_enabled);
 static std::atomic<bool> g_keep_last_centerline_on_double_loss(g_vision_runtime_config.keep_last_centerline_on_double_loss);
 // 平移中线偏好源（左/右/无偏好自动），用于每帧选边。
@@ -2995,91 +2997,6 @@ static void resample_boundary_points_equal_spacing_inplace(maze_point_t *pts, in
     *num = out;
 }
 
-// 对回投到原图的 IPM 中线做距离过滤 + 线性补点。
-// 阶段一：过滤间距 <2px 的过密点，保留间距 >=2 的稀疏点集。
-// 阶段二：对间距 >=2 的相邻线段线性插值补点，使最终每段间距 ∈[1,2)。
-static void resample_src_centerline_rowwise(const maze_point_t *pts, int count,
-                                             uint16 *out_xs, uint16 *out_ys, int *out_count)
-{
-    *out_count = 0;
-    if (pts == nullptr || count < 2 || out_xs == nullptr || out_ys == nullptr)
-    {
-        return;
-    }
-
-    const int n = std::min(count, VISION_BOUNDARY_NUM);
-
-    // 阶段一：逐点扫描，距离上一保留点 >= 4px 才保留。
-    struct kept_t
-    {
-        int x, y;
-    };
-    std::array<kept_t, VISION_BOUNDARY_NUM> kept{};
-    kept[0].x = pts[0].x;
-    kept[0].y = pts[0].y;
-    int kept_cnt = 1;
-    for (int i = 1; i < n; ++i)
-    {
-        const int dx = pts[i].x - kept[kept_cnt - 1].x;
-        const int dy = pts[i].y - kept[kept_cnt - 1].y;
-        const float dist = std::sqrt(static_cast<float>(dx * dx + dy * dy));
-        if (dist >= 4.0f && kept_cnt < VISION_BOUNDARY_NUM)
-        {
-            kept[kept_cnt].x = pts[i].x;
-            kept[kept_cnt].y = pts[i].y;
-            ++kept_cnt;
-        }
-    }
-
-    if (kept_cnt < 2)
-    {
-        return;
-    }
-
-    // 阶段二：逐行线性插值，保证每行最多一个点。
-    int out_cnt = 0;
-    out_xs[out_cnt] = static_cast<uint16>(std::clamp(kept[0].x, 0, kProcWidth - 1));
-    out_ys[out_cnt] = static_cast<uint16>(kept[0].y);
-    ++out_cnt;
-
-    for (int i = 1; i < kept_cnt && out_cnt < VISION_BOUNDARY_NUM; ++i)
-    {
-        const int x0 = kept[i - 1].x;
-        const int y0 = kept[i - 1].y;
-        const int x1 = kept[i].x;
-        const int y1 = kept[i].y;
-        const int dy = y1 - y0;
-        const int dx = x1 - x0;
-
-        if (dy == 0)
-        {
-            // 同一行，用新点覆盖旧点（保留最新的 x）。
-            out_xs[out_cnt - 1] = static_cast<uint16>(std::clamp(x1, 0, kProcWidth - 1));
-            continue;
-        }
-
-        // 逐行插值，每个 y 行一个点。
-        const int step = (dy > 0) ? 1 : -1;
-        for (int y = y0 + step; y != y1 && out_cnt < VISION_BOUNDARY_NUM; y += step)
-        {
-            const float t = static_cast<float>(y - y0) / static_cast<float>(dy);
-            const int ix = static_cast<int>(std::lround(static_cast<float>(x0) + t * static_cast<float>(dx)));
-            out_xs[out_cnt] = static_cast<uint16>(std::clamp(ix, 0, kProcWidth - 1));
-            out_ys[out_cnt] = static_cast<uint16>(y);
-            ++out_cnt;
-        }
-
-        // 输出终点 y1。
-        if (out_cnt < VISION_BOUNDARY_NUM)
-        {
-            out_xs[out_cnt] = static_cast<uint16>(std::clamp(x1, 0, kProcWidth - 1));
-            out_ys[out_cnt] = static_cast<uint16>(y1);
-            ++out_cnt;
-        }
-    }
-    *out_count = out_cnt;
-}
-
 static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *left_pts,
                                                            int left_num,
                                                            const maze_point_t *right_pts,
@@ -3265,11 +3182,44 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                            kIpmOutputWidth,
                                            kIpmOutputHeight);
 
+    // IPM 边界回投到原图，并在所有后续使用前做二次等距采样。
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> src_left_selected{};
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> src_right_selected{};
+    int src_left_selected_num = transform_boundary_points_from_ipm_to_src(left_proc.data(),
+                                                                           left_proc_num,
+                                                                           src_left_selected.data(),
+                                                                           static_cast<int>(src_left_selected.size()));
+    int src_right_selected_num = transform_boundary_points_from_ipm_to_src(right_proc.data(),
+                                                                            right_proc_num,
+                                                                            src_right_selected.data(),
+                                                                            static_cast<int>(src_right_selected.size()));
+    if (g_src_backproj_resample_enabled.load())
+    {
+        resample_boundary_points_equal_spacing_inplace(src_left_selected.data(),
+                                                       &src_left_selected_num,
+                                                       kProcWidth,
+                                                       kProcHeight,
+                                                       g_src_backproj_resample_step_px.load());
+        resample_boundary_points_equal_spacing_inplace(src_right_selected.data(),
+                                                       &src_right_selected_num,
+                                                       kProcWidth,
+                                                       kProcHeight,
+                                                       g_src_backproj_resample_step_px.load());
+    }
+
     std::array<maze_point_t, VISION_BOUNDARY_NUM> src_center_selected{};
-    const int src_center_selected_num = transform_boundary_points_from_ipm_to_src(center_selected.data(),
-                                                                                  center_selected_num,
-                                                                                  src_center_selected.data(),
-                                                                                  static_cast<int>(src_center_selected.size()));
+    int src_center_selected_num = transform_boundary_points_from_ipm_to_src(center_selected.data(),
+                                                                             center_selected_num,
+                                                                             src_center_selected.data(),
+                                                                             static_cast<int>(src_center_selected.size()));
+    if (g_src_backproj_resample_enabled.load())
+    {
+        resample_boundary_points_equal_spacing_inplace(src_center_selected.data(),
+                                                       &src_center_selected_num,
+                                                       kProcWidth,
+                                                       kProcHeight,
+                                                       g_src_backproj_resample_step_px.load());
+    }
 
     if (selected_is_right)
     {
@@ -3287,11 +3237,13 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                             &g_src_shift_right_center_count,
                                             kProcWidth,
                                             kProcHeight);
-        resample_src_centerline_rowwise(src_center_selected.data(),
-                                        src_center_selected_num,
-                                        g_src_shift_right_center_resampled_x,
-                                        g_src_shift_right_center_resampled_y,
-                                        &g_src_shift_right_center_resampled_count);
+        fill_single_line_arrays_from_points(src_center_selected.data(),
+                                            src_center_selected_num,
+                                            g_src_shift_right_center_resampled_x,
+                                            g_src_shift_right_center_resampled_y,
+                                            &g_src_shift_right_center_resampled_count,
+                                            kProcWidth,
+                                            kProcHeight);
     }
     else
     {
@@ -3309,11 +3261,13 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                             &g_src_shift_left_center_count,
                                             kProcWidth,
                                             kProcHeight);
-        resample_src_centerline_rowwise(src_center_selected.data(),
-                                        src_center_selected_num,
-                                        g_src_shift_left_center_resampled_x,
-                                        g_src_shift_left_center_resampled_y,
-                                        &g_src_shift_left_center_resampled_count);
+        fill_single_line_arrays_from_points(src_center_selected.data(),
+                                            src_center_selected_num,
+                                            g_src_shift_left_center_resampled_x,
+                                            g_src_shift_left_center_resampled_y,
+                                            &g_src_shift_left_center_resampled_count,
+                                            kProcWidth,
+                                            kProcHeight);
     }
     vision_line_error_layer_set_source(selected_is_right ? static_cast<int>(VISION_IPM_LINE_ERROR_FROM_RIGHT_SHIFT)
                                                          : static_cast<int>(VISION_IPM_LINE_ERROR_FROM_LEFT_SHIFT));
@@ -3355,6 +3309,11 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                kIpmOutputHeight);
     g_ipm_boundary_left_count = std::clamp(left_proc_num, 0, VISION_BOUNDARY_NUM);
     g_ipm_boundary_right_count = std::clamp(right_proc_num, 0, VISION_BOUNDARY_NUM);
+
+    fill_boundary_arrays_from_maze(src_left_selected.data(),
+                                   src_left_selected_num,
+                                   src_right_selected.data(),
+                                   src_right_selected_num);
     return 0;
 }
 
@@ -5968,6 +5927,8 @@ void vision_image_processor_reload_config_from_globals()
     g_ipm_centerline_triangle_filter_enabled.store(g_vision_runtime_config.ipm_centerline_triangle_filter_enabled);
     g_ipm_centerline_resample_enabled.store(g_vision_runtime_config.ipm_centerline_resample_enabled);
     g_ipm_centerline_resample_step_px.store(g_vision_runtime_config.ipm_centerline_resample_step_px);
+    g_src_backproj_resample_enabled.store(g_vision_runtime_config.src_backproj_resample_enabled);
+    g_src_backproj_resample_step_px.store(g_vision_runtime_config.src_backproj_resample_step_px);
     g_ipm_centerline_curvature_enabled.store(g_vision_runtime_config.ipm_centerline_curvature_enabled);
     g_keep_last_centerline_on_double_loss.store(g_vision_runtime_config.keep_last_centerline_on_double_loss);
     g_ipm_line_error_preferred_source.store(g_vision_runtime_config.ipm_line_error_source);

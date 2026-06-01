@@ -319,6 +319,10 @@ vision_runtime_config_t g_vision_runtime_config = {
     .ipm_centerline_resample_enabled = true,
     // 中线等距采样步长，单位 px。
     .ipm_centerline_resample_step_px = 3.0f,
+    // IPM 回投到原图后的左右边界/中线二次等距采样开关。
+    .src_backproj_resample_enabled = true,
+    // IPM 回投到原图后的左右边界/中线二次等距采样步长。
+    .src_backproj_resample_step_px = 2.0f,
     // 中线曲率计算总开关。
     .ipm_centerline_curvature_enabled = true,
     // 所选偏移中线曲率计算步长（索引步长）。

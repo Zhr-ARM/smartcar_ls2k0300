@@ -1092,6 +1092,8 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_BOOL(ipm_centerline_triangle_filter_enabled);
     REQUIRE_RUNTIME_BOOL(ipm_centerline_resample_enabled);
     REQUIRE_RUNTIME_FLOAT(ipm_centerline_resample_step_px);
+    REQUIRE_RUNTIME_BOOL(src_backproj_resample_enabled);
+    REQUIRE_RUNTIME_FLOAT(src_backproj_resample_step_px);
     REQUIRE_RUNTIME_BOOL(ipm_centerline_curvature_enabled);
     REQUIRE_RUNTIME_INT(ipm_centerline_curvature_step);
     REQUIRE_RUNTIME_BOOL(zebra_cross_detection_enabled);
@@ -1253,7 +1255,8 @@ bool load_from_path(const std::string &path, std::string *error_message)
         g_vision_runtime_config.infer_target_confidence_threshold > 1.0f ||
         g_vision_runtime_config.infer_avoid_offset_delta_px < 0.0f ||
         g_vision_runtime_config.infer_target_exit_no_red_count < 1 ||
-        g_vision_runtime_config.red_roi_square_side_px <= 0.0f)
+        g_vision_runtime_config.red_roi_square_side_px <= 0.0f ||
+        g_vision_runtime_config.src_backproj_resample_step_px <= 0.0f)
     {
         *error_message = "vision.runtime target board infer parameters are invalid";
         return false;

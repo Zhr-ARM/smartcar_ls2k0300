@@ -253,6 +253,10 @@ typedef struct
     bool ipm_centerline_resample_enabled;
     // 逆透视处理中线等距采样步长（px）。
     float ipm_centerline_resample_step_px;
+    // IPM 回投到原图后的左右边界/中线二次等距采样开关。
+    bool src_backproj_resample_enabled;
+    // IPM 回投到原图后的左右边界/中线二次等距采样步长（px）。
+    float src_backproj_resample_step_px;
     // 所选偏移中线曲率计算总开关。
     bool ipm_centerline_curvature_enabled;
     // 所选偏移中线曲率计算步长（索引步长，默认3）。
