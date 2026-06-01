@@ -5487,14 +5487,15 @@
       if (!status) return;
       transportRateValueEl.textContent = fmtHumanRateMbps(status.rx_udp_mbps);
       transportRateSubEl.textContent = fmtHumanRateKiB(status.rx_udp_kib_per_sec);
-      transportFpsValueEl.textContent = receiverCore.hasValue(status.rx_udp_frames_per_sec) ? `${status.rx_udp_frames_per_sec} fps` : '-- fps';
+      transportFpsValueEl.textContent = receiverCore.hasValue(status.rx_overall_avg_fps) ? `${status.rx_overall_avg_fps} fps` : '-- fps';
       const captureThreadFps = receiverCore.hasValue(status.capture_thread_fps) ? status.capture_thread_fps : '--';
       const visionProcessFps = receiverCore.hasValue(status.vision_process_fps) ? status.vision_process_fps : '--';
       const udpTxFps = receiverCore.hasValue(status.udp_tx_fps) ? status.udp_tx_fps : '--';
       transportFpsSubEl.textContent =
         `rx gray ${receiverCore.hasValue(status.rx_udp_gray_fps) ? status.rx_udp_gray_fps : '--'} / `
         + `rgb ${receiverCore.hasValue(status.rx_udp_rgb_fps) ? status.rx_udp_rgb_fps : '--'} / `
-        + `binary ${receiverCore.hasValue(status.rx_udp_binary_fps) ? status.rx_udp_binary_fps : '--'} | `
+        + `binary ${receiverCore.hasValue(status.rx_udp_binary_fps) ? status.rx_udp_binary_fps : '--'} / `
+        + `tcp ${receiverCore.hasValue(status.rx_tcp_status_per_sec) ? status.rx_tcp_status_per_sec : '--'} | `
         + `board cap ${captureThreadFps} / proc ${visionProcessFps} / tx ${udpTxFps}`;
       transportModeValueEl.textContent = buildTransportModeSummary(status);
       transportModeSubEl.textContent = receiverCore.hasValue(status.udp_web_max_fps)

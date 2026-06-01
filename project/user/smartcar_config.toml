@@ -191,14 +191,14 @@ labels = ["ambulance", "armored_car", "bomb", "gun", "medicine", "telescope"]
 [vision.runtime.red_roi]
 # 红色提示矩形下底边中点到目标物下底边中点的距离斜率（IPM 空间）。
 # gap_ipm = k * dist_ipm + b。
-red_to_target_bottom_k = 0.0
+red_to_target_bottom_k = -0.05
 # 红色提示矩形下底边中点到目标物下底边中点的距离截距（IPM 像素）。
-red_to_target_bottom_b = 1.0
+red_to_target_bottom_b = 1.5
 # 目标物高度一次函数斜率（IPM 空间）。
 # height_ipm = k * dist_ipm + b。
-target_height_k = -0.1
+target_height_k = 0
 # 目标物高度一次函数截距（IPM 像素）。
-target_height_b = 8.0
+target_height_b = 9.0
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
@@ -362,7 +362,7 @@ ipm_output_width = 160
 ipm_output_height = 100
 # 逆透视矩阵。
 # 按 3x3 展平写入，顺序为行优先。
-change_un_mat = [0.454728, -0.511916, 27.999949, 0.022943, 0.040097, 3.996650, 0.000459, -0.006650, 0.787858]
+change_un_mat = [0.057576, -0.068402, 4.310390, 0.0, 0.001423, 1.400773, 0.0, -0.000899, 0.115301]
 # 相机内参矩阵。
 # 按 3x3 展平写入，顺序为行优先。
 camera_matrix = [88.352003, 0.0, 76.039402, 0.0, 88.094982, 30.149306, 0.0, 0.0, 1.0]
@@ -383,10 +383,10 @@ default_maze_trace_x_max = 159
 [vision.processor.crop]
 # 原图裁剪上边界，与 denominator 配合换算为比例。
 # crop_y = UVC_HEIGHT * top / denominator
-top = 25
+top = 15
 # 原图裁剪下边界，与 denominator 配合换算为比例。
 # crop_h = UVC_HEIGHT * (bottom - top) / denominator
-bottom = 85
+bottom = 75
 # 原图裁剪分母，默认 120。
 denominator = 120
 

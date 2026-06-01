@@ -242,6 +242,11 @@ static int g_ncnn_roi_x = 0;
 static int g_ncnn_roi_y = 0;
 static int g_ncnn_roi_w = 0;
 static int g_ncnn_roi_h = 0;
+
+// warp ROI 64×64 BGR 图像缓存（由 infer 模块写入，发送层读取）。
+static constexpr int kWarpRoiSize = 64;
+static bool g_warp_roi_valid = false;
+static uint8 g_warp_roi_bgr[kWarpRoiSize * kWarpRoiSize * 3];
 static std::mutex g_detect_result_mutex;
 
 // 最近一帧处理耗时（us）：用于性能统计与 TCP 状态上报。
@@ -6758,4 +6763,21 @@ void vision_image_processor_get_ncnn_roi(bool *valid, int *x, int *y, int *w, in
     if (y) *y = g_ncnn_roi_y;
     if (w) *w = g_ncnn_roi_w;
     if (h) *h = g_ncnn_roi_h;
+}
+
+void vision_image_processor_set_warp_roi(bool valid, const uint8 *bgr_data)
+{
+    std::lock_guard<std::mutex> lk(g_detect_result_mutex);
+    g_warp_roi_valid = valid;
+    if (valid && bgr_data != nullptr)
+    {
+        std::memcpy(g_warp_roi_bgr, bgr_data, sizeof(g_warp_roi_bgr));
+    }
+}
+
+const uint8 *vision_image_processor_get_warp_roi(bool *valid)
+{
+    std::lock_guard<std::mutex> lk(g_detect_result_mutex);
+    if (valid) *valid = g_warp_roi_valid;
+    return g_warp_roi_valid ? g_warp_roi_bgr : nullptr;
 }

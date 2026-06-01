@@ -777,6 +777,16 @@ static void run_infer_worker()
         result.red_detect_us = static_cast<uint32>(
             std::chrono::duration_cast<std::chrono::microseconds>(detect_end - detect_start).count());
 
+        // 将 warp 后的 64×64 BGR 图像写入 image_processor，供网页 ROI 显示。
+        if (found && !warped_roi.empty())
+        {
+            vision_image_processor_set_warp_roi(true, warped_roi.data);
+        }
+        else
+        {
+            vision_image_processor_set_warp_roi(false, nullptr);
+        }
+
         if (found && g_ncnn_enabled.load() && !warped_roi.empty())
         {
             result.ncnn_infer_valid = ncnn_step(reinterpret_cast<const uint8 *>(warped_roi.data),

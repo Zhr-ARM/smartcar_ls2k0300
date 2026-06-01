@@ -79,6 +79,7 @@ let latestStatus = { message: 'waiting' };
 const inflightFrames = new Map();
 const udpByteEvents = [];
 const udpFrameEvents = [];
+const tcpStatusEvents = [];
 let boardConnectionStore = loadBoardConnectionStore();
 let backendRecording = null;
 let projectControlState = {
@@ -1055,6 +1056,7 @@ function cleanupInflight() {
   }
   while (udpByteEvents.length > 0 && now - udpByteEvents[0].ts > 5000) udpByteEvents.shift();
   while (udpFrameEvents.length > 0 && now - udpFrameEvents[0].ts > 5000) udpFrameEvents.shift();
+  while (tcpStatusEvents.length > 0 && now - tcpStatusEvents[0].ts > 5000) tcpStatusEvents.shift();
 }
 
 function isFrameNewer(prevFrameId, nextFrameId) {
@@ -1154,9 +1156,12 @@ function buildTransportTelemetry(status) {
   const oneSecAgo = now - 1000;
   const recentBytes = udpByteEvents.filter((item) => item.ts >= oneSecAgo);
   const recentFrames = udpFrameEvents.filter((item) => item.ts >= oneSecAgo);
+  const recentTcpStatuses = tcpStatusEvents.filter((item) => item.ts >= oneSecAgo);
 
   const rxBytesPerSec = recentBytes.reduce((sum, item) => sum + item.bytes, 0);
   const rxFramesPerSec = recentFrames.length;
+  const rxTcpStatusPerSec = recentTcpStatuses.length;
+  const rxTotalFramesPerSec = rxFramesPerSec + rxTcpStatusPerSec;
   const rxFramesByMode = { gray: 0, binary: 0, rgb: 0, roi64: 0 };
   const frameBytesByMode = { gray: 0, binary: 0, rgb: 0, roi64: 0 };
   for (const item of recentFrames) {
@@ -1166,6 +1171,16 @@ function buildTransportTelemetry(status) {
       frameBytesByMode[key] += item.wireBytes;
     }
   }
+
+  const fpsSamples = [];
+  if (rxFramesByMode.gray > 0) fpsSamples.push(rxFramesByMode.gray);
+  if (rxFramesByMode.binary > 0) fpsSamples.push(rxFramesByMode.binary);
+  if (rxFramesByMode.rgb > 0) fpsSamples.push(rxFramesByMode.rgb);
+  if (rxFramesByMode.roi64 > 0) fpsSamples.push(rxFramesByMode.roi64);
+  if (rxTcpStatusPerSec > 0) fpsSamples.push(rxTcpStatusPerSec);
+  const rxOverallAvgFps = fpsSamples.length > 0
+    ? round3(fpsSamples.reduce((sum, v) => sum + v, 0) / fpsSamples.length)
+    : 0;
 
   const avgWireBytesByMode = { gray: null, binary: null, rgb: null, roi64: null };
   for (const key of Object.keys(avgWireBytesByMode)) {
@@ -1202,6 +1217,9 @@ function buildTransportTelemetry(status) {
       : null;
 
   return {
+    rx_overall_avg_fps: rxOverallAvgFps,
+    rx_total_frames_per_sec: rxTotalFramesPerSec,
+    rx_tcp_status_per_sec: rxTcpStatusPerSec,
     rx_udp_bytes_per_sec: rxBytesPerSec,
     rx_udp_kib_per_sec: round3(rxBytesPerSec / 1024),
     rx_udp_mbps: round3((rxBytesPerSec * 8) / 1000000),
@@ -1247,6 +1265,7 @@ function startTcpReceiver() {
         if (line) {
           try {
             latestStatus = JSON.parse(line);
+            tcpStatusEvents.push({ ts: Date.now() });
             recordTcpStatusLine(line, latestStatus, socket.remoteAddress);
             broadcastWs('status', latestStatus);
           } catch (_) {

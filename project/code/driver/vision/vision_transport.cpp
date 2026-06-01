@@ -61,7 +61,7 @@ std::atomic<uint32> g_last_send_time_us(0);         // 最近一次发送耗时�
 std::atomic<bool> g_udp_enabled(false);            // UDP 图像发送开关。
 std::atomic<bool> g_tcp_enabled(true);             // TCP 状态发送开关。
 std::atomic<uint32> g_udp_max_fps(kUdpDefaultMaxFps); // UDP 图像限频。
-std::atomic<uint64> g_udp_last_send_tick_us(0);    // UDP 限频时间戳。
+std::atomic<uint64> g_udp_next_send_tick_us(0);    // UDP 下次可发送时间戳（节拍调度）。
 std::atomic<uint32> g_udp_frame_id(0);             // UDP 分片帧号。
 std::atomic<uint32> g_udp_tx_fps(0);               // UDP 发送帧率（mode 0/1/2 合计，不含 ROI64）。
 
@@ -271,7 +271,7 @@ static uint64 now_us()
         std::chrono::steady_clock::now().time_since_epoch()).count());
 }
 
-// 作用：UDP 限频抢占。
+// 作用：UDP 节拍限频抢占（时间戳模式）。
 static bool try_acquire_udp_send_slot()
 {
     const uint32 max_fps = g_udp_max_fps.load();
@@ -282,12 +282,23 @@ static bool try_acquire_udp_send_slot()
 
     const uint64 now = now_us();
     const uint64 min_interval_us = 1000000ULL / static_cast<uint64>(max_fps);
-    const uint64 last = g_udp_last_send_tick_us.load();
-    if (last != 0 && (now - last) < min_interval_us)
+    uint64 next_due = g_udp_next_send_tick_us.load();
+    if (next_due == 0)
+    {
+        // 首次启动：立即允许发送，并把下次时刻推进一个节拍。
+        g_udp_next_send_tick_us.store(now + min_interval_us);
+        return true;
+    }
+    if (now < next_due)
     {
         return false;
     }
-    g_udp_last_send_tick_us.store(now);
+
+    // 到点后按“时间戳节拍”推进，避免“发完后再等一个间隔”导致节奏漂移。
+    // 若主循环偶发卡顿，按丢拍处理，把 next_due 追到当前时刻之后。
+    const uint64 overdue = now - next_due;
+    const uint64 missed_slots = overdue / min_interval_us;
+    g_udp_next_send_tick_us.store(next_due + (missed_slots + 1ULL) * min_interval_us);
     return true;
 }
 
@@ -393,18 +404,13 @@ static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *he
         return false;
     }
 
-    bool roi_valid = false;
-    int roi_x = 0;
-    int roi_y = 0;
-    int roi_w = 0;
-    int roi_h = 0;
-    vision_image_processor_get_ncnn_roi(&roi_valid, &roi_x, &roi_y, &roi_w, &roi_h);
-    if (!roi_valid || roi_w <= 0 || roi_h <= 0)
+    bool warp_valid = false;
+    const uint8 *warp_bgr = vision_image_processor_get_warp_roi(&warp_valid);
+    if (!warp_valid || warp_bgr == nullptr)
     {
         return false;
     }
 
-    const cv::Rect roi_rect(roi_x, roi_y, roi_w, roi_h);
     const vision_web_image_format_enum format =
         sanitize_web_image_format(g_vision_runtime_config.udp_web_rgb_image_format);
     std::vector<int> enc_params;
@@ -413,59 +419,10 @@ static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *he
         enc_params = {cv::IMWRITE_JPEG_QUALITY, kRoiJpegQuality};
     }
 
-    const uint8 *bgr_full = vision_image_processor_bgr_full_image();
-    if (bgr_full != nullptr)
+    cv::Mat warp_mat(kRoi64Size, kRoi64Size, CV_8UC3, const_cast<uint8 *>(warp_bgr));
+    if (!cv::imencode(opencv_ext_for_web_image_format(format), warp_mat, *image_out, enc_params))
     {
-        cv::Mat full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, const_cast<uint8 *>(bgr_full));
-        cv::Rect safe = roi_rect & cv::Rect(0, 0, full.cols, full.rows);
-        if (safe.width <= 0 || safe.height <= 0)
-        {
-            return false;
-        }
-        cv::Mat roi = full(safe);
-        cv::Mat roi64;
-        cv::resize(roi, roi64, cv::Size(kRoi64Size, kRoi64Size), 0.0, 0.0, cv::INTER_LINEAR);
-        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi64, *image_out, enc_params))
-        {
-            return false;
-        }
-    }
-    else if (const uint8 *bgr = vision_image_processor_bgr_downsampled_image())
-    {
-        cv::Mat full(VISION_DOWNSAMPLED_HEIGHT, VISION_DOWNSAMPLED_WIDTH, CV_8UC3, const_cast<uint8 *>(bgr));
-        cv::Rect safe = roi_rect & cv::Rect(0, 0, full.cols, full.rows);
-        if (safe.width <= 0 || safe.height <= 0)
-        {
-            return false;
-        }
-        cv::Mat roi = full(safe);
-        cv::Mat roi64;
-        cv::resize(roi, roi64, cv::Size(kRoi64Size, kRoi64Size), 0.0, 0.0, cv::INTER_LINEAR);
-        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi64, *image_out, enc_params))
-        {
-            return false;
-        }
-    }
-    else
-    {
-        const uint8 *gray = vision_image_processor_gray_downsampled_image();
-        if (gray == nullptr)
-        {
-            return false;
-        }
-        cv::Mat full(VISION_DOWNSAMPLED_HEIGHT, VISION_DOWNSAMPLED_WIDTH, CV_8UC1, const_cast<uint8 *>(gray));
-        cv::Rect safe = roi_rect & cv::Rect(0, 0, full.cols, full.rows);
-        if (safe.width <= 0 || safe.height <= 0)
-        {
-            return false;
-        }
-        cv::Mat roi = full(safe);
-        cv::Mat roi64;
-        cv::resize(roi, roi64, cv::Size(kRoi64Size, kRoi64Size), 0.0, 0.0, cv::INTER_LINEAR);
-        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi64, *image_out, enc_params))
-        {
-            return false;
-        }
+        return false;
     }
 
     *width = kRoi64Size;
@@ -1694,7 +1651,7 @@ bool vision_transport_udp_init(const char *server_ip, uint16 video_port, uint16 
         }
     }
 
-    g_udp_last_send_tick_us.store(0);
+    g_udp_next_send_tick_us.store(0);
     return g_udp_ready;
 }
 
@@ -1720,7 +1677,7 @@ void vision_transport_udp_set_max_fps(uint32 max_fps)
         v = kUdpMaxFpsUpper;
     }
     g_udp_max_fps.store(v);
-    g_udp_last_send_tick_us.store(0);
+    g_udp_next_send_tick_us.store(0);
 }
 
 uint32 vision_transport_udp_get_max_fps()

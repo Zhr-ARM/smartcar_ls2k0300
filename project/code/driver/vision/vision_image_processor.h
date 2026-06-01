@@ -329,4 +329,9 @@ void vision_image_processor_set_last_red_detect_us(uint32 red_detect_us);
 void vision_image_processor_set_ncnn_roi(bool valid, int x, int y, int w, int h);
 void vision_image_processor_get_ncnn_roi(bool *valid, int *x, int *y, int *w, int *h);
 
+// warp 透视变换后的 64×64 BGR ROI 图像（用于网页显示）。
+// set 由 infer 模块写入，get 由 transport 发送层读取。
+void vision_image_processor_set_warp_roi(bool valid, const uint8 *bgr_data);
+const uint8 *vision_image_processor_get_warp_roi(bool *valid);
+
 #endif
