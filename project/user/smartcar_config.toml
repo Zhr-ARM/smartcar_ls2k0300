@@ -184,9 +184,9 @@ ipm_line_error_fixed_index = 8
 # line_error 离散加权模式使用的点数量（仅 method=1 生效）。
 ipm_line_error_weighted_point_count = 3
 # line_error 离散加权模式的索引点（0-based，仅 method=1 生效）。
-ipm_line_error_point_indices = [9, 13, 18]
+ipm_line_error_point_indices = [2, 6, 10]
 # line_error 离散加权模式的各索引点权重（仅 method=1 生效）。
-ipm_line_error_weights = [0.5, 0.28, 0.22]
+ipm_line_error_weights = [0.6, 0.3, 0.1]
 # line_error 随速度索引公式系数 k（idx = k * speed + b，仅 method=2 生效）。
 ipm_line_error_speed_k = 0.03
 # line_error 随速度索引公式常数项 b（idx = k * speed + b，仅 method=2 生效）。
