@@ -109,16 +109,7 @@ struct Profile
     float position_kd;
     float position_max_integral;
     float position_max_output;
-    float steering_max_output;
-
-    float yaw_rate_ref_from_error_gain_dps;
-    float yaw_rate_ref_from_track_point_gain_dps;
-    float yaw_rate_ref_limit_dps;
     float yaw_rate_kp;
-    float yaw_rate_dynamic_kp_quad_a;
-    float yaw_rate_dynamic_kp_min;
-    float yaw_rate_dynamic_kp_max;
-    float yaw_rate_kp_enable_error_threshold_px;
     float yaw_rate_ki;
     float yaw_rate_kd;
     float yaw_rate_max_integral;

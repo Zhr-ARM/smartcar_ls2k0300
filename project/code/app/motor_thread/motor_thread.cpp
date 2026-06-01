@@ -16,7 +16,6 @@
 namespace
 {
 constexpr int32 MOTOR_PERIOD_MS = 5;
-constexpr float TARGET_COUNT_MIN = -8.0f;
 constexpr float TARGET_COUNT_MAX = 1500.0f;
 
 std::thread g_motor_thread;
@@ -55,15 +54,16 @@ std::atomic<bool> g_reload_from_globals_requested(false);
 
 float clamp_target_count(float value)
 {
-    return std::clamp(value, TARGET_COUNT_MIN, TARGET_COUNT_MAX);
+    return std::clamp(value, -TARGET_COUNT_MAX, TARGET_COUNT_MAX);
 }
 
 void apply_speed_command_locked(float base_speed, float diff_speed)
 {
+    const float abs_base = (base_speed >= 0.0f) ? base_speed : -base_speed;
+    const float clamped_diff = (abs_base > 0.0f)
+        ? std::clamp(diff_speed, -abs_base, abs_base)
+        : diff_speed;
     const float clamped_base = clamp_target_count(base_speed);
-    const float diff_min = std::max(clamped_base - TARGET_COUNT_MAX, TARGET_COUNT_MIN - clamped_base);
-    const float diff_max = std::min(clamped_base - TARGET_COUNT_MIN, TARGET_COUNT_MAX - clamped_base);
-    const float clamped_diff = std::clamp(diff_speed, diff_min, diff_max);
 
     g_target_base_speed = clamped_base;
     g_target_diff_speed = clamped_diff;

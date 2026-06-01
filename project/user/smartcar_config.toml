@@ -423,15 +423,15 @@ gyro_yaw_rate_filter_alpha = 0.45
 
 [pid.motor_speed]
 # 左轮速度环 Kp。
-left_kp = 0.023
+left_kp = 0.03
 # 左轮速度环 Ki。
-left_ki = 0.002
+left_ki = 0.006
 # 左轮速度环 Kd。
 left_kd = 0.0
 # 右轮速度环 Kp。
-right_kp = 0.018
+right_kp = 0.145
 # 右轮速度环 Ki。
-right_ki = 0.002
+right_ki = 0.006
 # 右轮速度环 Kd。
 right_kd = 0.0
 # 速度环积分限幅。
@@ -500,15 +500,15 @@ error_low_gain_limit_px = 1.0
 # 小误差区间降增益倍率。
 error_low_gain = 0.4
 # 角速度环调试模式开关（true 时固定角速度目标，旁路位置环输出）。
-yaw_rate_debug_enabled = true
+yaw_rate_debug_enabled = false
 # 角速度环调试固定目标，单位 dps（仅 yaw_rate_debug_enabled=true 生效）。
-yaw_rate_debug_target_dps = 0.0
+yaw_rate_debug_target_dps = 90.0
 # 速度环调试模式开关（true 时固定 base/diff 命令，旁路上两级输出）。
 speed_loop_debug_enabled = false
 # 速度环调试固定基础速度（仅 speed_loop_debug_enabled=true 生效）。
-speed_loop_debug_base_speed = 480.0
+speed_loop_debug_base_speed = 0.0
 # 速度环调试固定差速，正值表示右轮更快（仅 speed_loop_debug_enabled=true 生效）。
-speed_loop_debug_diff_speed = 0.0
+speed_loop_debug_diff_speed = 150.0
 
 [pid.route_line_follow.global]
 # 全局基础速度倍率。
@@ -542,33 +542,17 @@ position_kd = 0.02
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
 position_max_output = 3500.0
-# NORMAL 档总转向输出限幅。
-steering_max_output = 90.0
 
-# NORMAL 档由横向误差生成目标横摆角速度的增益。
-yaw_rate_ref_from_error_gain_dps = 1.0
-# NORMAL 档由跟踪点夹角生成目标横摆角速度的增益。
-yaw_rate_ref_from_track_point_gain_dps = 9.0
-# NORMAL 档目标横摆角速度限幅。
-yaw_rate_ref_limit_dps = 360.0
 # NORMAL 档角速度环 Kp。
-yaw_rate_kp = 0.05
-# NORMAL 档角速度环动态 Kp 一次项系数。
-yaw_rate_dynamic_kp_quad_a = 0.0
-# NORMAL 档角速度环动态 Kp 下限。
-yaw_rate_dynamic_kp_min = 0.0
-# NORMAL 档角速度环动态 Kp 上限。
-yaw_rate_dynamic_kp_max = 10.0
-# NORMAL 档角速度环启用阈值。
-yaw_rate_kp_enable_error_threshold_px = 0.0
+yaw_rate_kp = 2.5
 # NORMAL 档角速度环 Ki。
 yaw_rate_ki = 0.0
 # NORMAL 档角速度环 Kd。
-yaw_rate_kd = 0.0
+yaw_rate_kd = 0.085
 # NORMAL 档角速度环积分限幅。
 yaw_rate_max_integral = 0.0
 # NORMAL 档角速度环输出限幅。
-yaw_rate_max_output =200.0
+yaw_rate_max_output =300.0
 # NORMAL 档 line_error 前缀比例（0,1]。
 line_error_prefix_ratio = 0.4
 

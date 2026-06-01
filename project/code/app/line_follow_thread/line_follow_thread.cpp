@@ -31,6 +31,8 @@ constexpr float VISION_NOMINAL_DT_SECONDS = 1.0f / 60.0f;
 constexpr float IMU_MAX_DT_SECONDS = 0.050f;
 constexpr float VISION_MAX_DT_SECONDS = 0.200f;
 constexpr float PID_MAX_DT_SECONDS = 0.200f;
+constexpr float POSITION_PID_DT_SECONDS = 0.010f;
+constexpr float YAW_RATE_PID_DT_SECONDS = 0.005f;
 constexpr float RAD_TO_DEG = 180.0f / 3.1415926f;
 
 using RouteProfile = pid_tuning::route_line_follow::Profile;
@@ -99,12 +101,8 @@ uint32 g_last_imu_sample_seq = 0;
 uint32 g_last_vision_frame_seq = 0;
 bool g_has_last_imu_update_time = false;
 bool g_has_last_vision_update_time = false;
-bool g_has_last_position_pid_time = false;
-bool g_has_last_yaw_rate_pid_time = false;
 std::chrono::steady_clock::time_point g_last_imu_update_time;
 std::chrono::steady_clock::time_point g_last_vision_update_time;
-std::chrono::steady_clock::time_point g_last_position_pid_time;
-std::chrono::steady_clock::time_point g_last_yaw_rate_pid_time;
 bool g_has_last_logged_route_state = false;
 int g_last_logged_route_main_state = VISION_ROUTE_MAIN_NORMAL;
 int g_last_logged_route_sub_state = VISION_ROUTE_SUB_NONE;
@@ -169,19 +167,6 @@ float apply_iir_filter(float previous_value, float current_value, float alpha)
  * - 增益随 |e| 线性上升，调参更直观；
  * - clamp 是最后一道保护，确保结果始终落在调参可接受区间。
  */
-float compute_linear_abs_gain(float base_gain,
-                              float linear_a,
-                              float min_gain,
-                              float max_gain,
-                              float error_value)
-{
-    // 误差绝对值项：只关心误差大小，不区分正负方向。
-    const float abs_error = std::fabs(error_value);
-
-    // 一次增益律 + 限幅保护。
-    return std::clamp(base_gain + linear_a * abs_error, min_gain, max_gain);
-}
-
 /**
  * @brief 三段连续分段动态增益：不同误差段用不同斜率，但段间保持连续。
  *
@@ -251,8 +236,6 @@ void reset_line_follow_runtime_state()
     g_last_vision_frame_seq = 0;
     g_has_last_imu_update_time = false;
     g_has_last_vision_update_time = false;
-    g_has_last_position_pid_time = false;
-    g_has_last_yaw_rate_pid_time = false;
     g_has_last_logged_route_state = false;
     g_last_logged_route_main_state = VISION_ROUTE_MAIN_NORMAL;
     g_last_logged_route_sub_state = VISION_ROUTE_SUB_NONE;
@@ -728,67 +711,48 @@ void line_follow_loop()
             position_pid2.reset();
             g_position_output_state = 0.0f;
             g_yaw_rate_output_state = 0.0f;
-            g_has_last_position_pid_time = false;
-            g_has_last_yaw_rate_pid_time = false;
             g_last_cascade_mode = cascade_mode;
         }
 
-        const float position_pid_output_limit = std::max(route_profile.yaw_rate_ref_limit_dps, 0.0f);
+        const float position_pid_output_limit = std::max(route_profile.position_max_output, 0.0f);
         configure_line_follow_controllers_for_profile(route_profile,
                                                       dynamic_kp,
                                                       route_profile.position_kd,
                                                       route_profile.yaw_rate_kp);
 
+        bool pos_dummy_has_time = false;
+        std::chrono::steady_clock::time_point pos_dummy_time;
         g_position_output_state = update_pid_output_state_if_needed(vision_updated,
                                                                     error_state.control_error_px,
-                                                                    vision_frame_dt_seconds,
-                                                                    g_last_position_pid_time,
-                                                                    g_has_last_position_pid_time,
+                                                                    POSITION_PID_DT_SECONDS,
+                                                                    pos_dummy_time,
+                                                                    pos_dummy_has_time,
                                                                     position_pid_output_limit,
                                                                     position_pid1,
                                                                     g_position_output_state);
         const float realtime_speed =
             0.5f * (std::fabs(motor_thread_left_filtered_count()) +
                     std::fabs(motor_thread_right_filtered_count()));
-        const float yaw_rate_ref_from_pos_dps =
-            std::clamp(g_position_output_state * route_profile.yaw_rate_ref_from_error_gain_dps,
-                       -route_profile.yaw_rate_ref_limit_dps,
-                       route_profile.yaw_rate_ref_limit_dps);
+        const float yaw_rate_ref_from_pos_dps = g_position_output_state;
         const float yaw_rate_ref_final_dps = yaw_rate_debug_enabled
-                                                 ? std::clamp(pid_tuning::line_follow::kYawRateDebugTargetDps,
-                                                              -route_profile.yaw_rate_ref_limit_dps,
-                                                              route_profile.yaw_rate_ref_limit_dps)
+                                                 ? pid_tuning::line_follow::kYawRateDebugTargetDps
                                                  : yaw_rate_ref_from_pos_dps;
         const float yaw_rate_error_dps = yaw_rate_ref_final_dps - g_filtered_yaw_rate_dps;
-        const float dynamic_yaw_rate_kp = compute_linear_abs_gain(route_profile.yaw_rate_kp,
-                                                                  route_profile.yaw_rate_dynamic_kp_quad_a,
-                                                                  route_profile.yaw_rate_dynamic_kp_min,
-                                                                  route_profile.yaw_rate_dynamic_kp_max,
-                                                                  yaw_rate_error_dps);
-        const bool enable_yaw_rate_kp =
-            (route_profile.yaw_rate_kp_enable_error_threshold_px <= 0.0f) ||
-            (error_state.abs_filtered_error_px >= route_profile.yaw_rate_kp_enable_error_threshold_px);
-        const float applied_yaw_rate_kp = enable_yaw_rate_kp ? dynamic_yaw_rate_kp : 0.0f;
-        position_pid2.set_params(applied_yaw_rate_kp, route_profile.yaw_rate_ki, route_profile.yaw_rate_kd);
+        position_pid2.set_params(route_profile.yaw_rate_kp, route_profile.yaw_rate_ki, route_profile.yaw_rate_kd);
         position_pid2.set_integral_limit(route_profile.yaw_rate_max_integral);
         position_pid2.set_output_limit(route_profile.yaw_rate_max_output);
 
-        const float yaw_rate_pid_dt_fallback =
-            vision_updated ? vision_frame_dt_seconds : imu_sample_dt_seconds;
+        bool yaw_dummy_has_time = false;
+        std::chrono::steady_clock::time_point yaw_dummy_time;
         g_yaw_rate_output_state = update_pid_output_state_if_needed(vision_updated || imu_updated,
                                                                     yaw_rate_error_dps,
-                                                                    yaw_rate_pid_dt_fallback,
-                                                                    g_last_yaw_rate_pid_time,
-                                                                    g_has_last_yaw_rate_pid_time,
+                                                                    YAW_RATE_PID_DT_SECONDS,
+                                                                    yaw_dummy_time,
+                                                                    yaw_dummy_has_time,
                                                                     route_profile.yaw_rate_max_output,
                                                                     position_pid2,
                                                                     g_yaw_rate_output_state);
         const float delta_v_cmd = g_yaw_rate_output_state;
-
-        const int selected_centerline_count = vision_image_processor_ipm_selected_centerline_count();
-        const float raw_steering_output = std::clamp(delta_v_cmd,
-                                                     -route_profile.steering_max_output,
-                                                     route_profile.steering_max_output);
 
         bool force_full_speed = false;
         const float mean_abs_path_error = vision_image_processor_ipm_mean_abs_offset_error(); // 视觉给出的整条分析路径平均绝对偏差像素
@@ -827,7 +791,7 @@ void line_follow_loop()
                                              : applied_base_speed;
         const float speed_command_diff = speed_loop_debug_enabled
                                              ? pid_tuning::line_follow::kSpeedLoopDebugDiffSpeed
-                                             : raw_steering_output;
+                                             : delta_v_cmd;
 
         // 速度环入口统一接收 base + diff。diff 为正时右轮更快、左轮更慢；
         // 最终左右轮目标和 diff 限幅都由 motor_thread 统一派生，避免上级和速度环各自分配。
@@ -878,8 +842,8 @@ void line_follow_loop()
             g_pid_debug_status.target_yaw_rate_speed_scale =
                 target_yaw_rate_runtime.speed_scale;
             g_pid_debug_status.dynamic_position_kp = dynamic_kp;
-            g_pid_debug_status.dynamic_yaw_rate_kp = dynamic_yaw_rate_kp;
-            g_pid_debug_status.applied_yaw_rate_kp = applied_yaw_rate_kp;
+            g_pid_debug_status.dynamic_yaw_rate_kp = route_profile.yaw_rate_kp;
+            g_pid_debug_status.applied_yaw_rate_kp = route_profile.yaw_rate_kp;
             g_pid_debug_status.position_pid_kp = position_pid1.kp();
             g_pid_debug_status.position_pid_ki = position_pid1.ki();
             g_pid_debug_status.position_pid_kd = position_pid1.kd();
@@ -898,11 +862,10 @@ void line_follow_loop()
             g_pid_debug_status.yaw_pid_output = position_pid2.get_output();
             g_pid_debug_status.yaw_pid_max_integral = position_pid2.max_integral();
             g_pid_debug_status.yaw_pid_max_output = position_pid2.max_output();
-            g_pid_debug_status.route_yaw_rate_ref_gain = route_profile.yaw_rate_ref_from_error_gain_dps;
-            g_pid_debug_status.route_yaw_rate_ref_limit = route_profile.yaw_rate_ref_limit_dps;
-            g_pid_debug_status.route_steering_max_output = route_profile.steering_max_output;
-            g_pid_debug_status.route_yaw_rate_kp_enable_error_threshold_px =
-                route_profile.yaw_rate_kp_enable_error_threshold_px;
+            g_pid_debug_status.route_yaw_rate_ref_gain = 1.0f;
+            g_pid_debug_status.route_yaw_rate_ref_limit = route_profile.position_max_output;
+            g_pid_debug_status.route_steering_max_output = 0.0f;
+            g_pid_debug_status.route_yaw_rate_kp_enable_error_threshold_px = 0.0f;
             g_pid_debug_status.mean_abs_path_error = mean_abs_path_error;
             g_pid_debug_status.speed_scheme_blended_abs_error_sum =
                 target_yaw_rate_runtime.filtered_abs_target_yaw_rate_dps;
@@ -910,7 +873,7 @@ void line_follow_loop()
             g_pid_debug_status.speed_scheme_error_scale_raw = speed_scheme_error_scale_raw;
             g_pid_debug_status.speed_scheme_final_speed_scale = speed_scheme_final_speed_scale;
             g_pid_debug_status.speed_scheme_split_ratio = speed_scheme.split_ratio;
-            g_pid_debug_status.speed_scheme_point_count = selected_centerline_count;
+            g_pid_debug_status.speed_scheme_point_count = vision_image_processor_ipm_selected_centerline_count();
             g_pid_debug_status.speed_scheme_ready = speed_scheme_ready;
             g_pid_debug_status.speed_scheme_triggered = speed_scheme_triggered;
             g_pid_debug_status.speed_scheme_winner_branch = speed_scheme_winner_branch;
@@ -919,7 +882,7 @@ void line_follow_loop()
             g_pid_debug_status.force_full_speed = force_full_speed;
             g_pid_debug_status.speed_command_base = applied_speed_command_base;
             g_pid_debug_status.speed_command_diff = applied_steering_output;
-            g_pid_debug_status.raw_steering_output = raw_steering_output;
+            g_pid_debug_status.raw_steering_output = delta_v_cmd;
             g_pid_debug_status.clamped_steering_output = steering_output;
             g_pid_debug_status.applied_steering_output = applied_steering_output;
             g_pid_debug_status.left_target_count = left_target;

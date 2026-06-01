@@ -704,15 +704,7 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".position_kd", &profile->position_kd, error_message) &&
            require_float(values, consumed, prefix + ".position_max_integral", &profile->position_max_integral, error_message) &&
            require_float(values, consumed, prefix + ".position_max_output", &profile->position_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".steering_max_output", &profile->steering_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_from_error_gain_dps", &profile->yaw_rate_ref_from_error_gain_dps, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_from_track_point_gain_dps", &profile->yaw_rate_ref_from_track_point_gain_dps, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_ref_limit_dps", &profile->yaw_rate_ref_limit_dps, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_kp", &profile->yaw_rate_kp, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_quad_a", &profile->yaw_rate_dynamic_kp_quad_a, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_min", &profile->yaw_rate_dynamic_kp_min, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_dynamic_kp_max", &profile->yaw_rate_dynamic_kp_max, error_message) &&
-           require_float(values, consumed, prefix + ".yaw_rate_kp_enable_error_threshold_px", &profile->yaw_rate_kp_enable_error_threshold_px, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_ki", &profile->yaw_rate_ki, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_kd", &profile->yaw_rate_kd, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_max_integral", &profile->yaw_rate_max_integral, error_message) &&

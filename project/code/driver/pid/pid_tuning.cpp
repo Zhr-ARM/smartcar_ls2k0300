@@ -133,9 +133,7 @@ float kGlobalBaseSpeedScale = 1.00f;
 bool is_dynamic_kp_range_valid(const Profile &profile)
 {
     return (profile.position_dynamic_kp_min <= profile.position_dynamic_kp_base) &&
-           (profile.position_dynamic_kp_base <= profile.position_dynamic_kp_max) &&
-           (profile.yaw_rate_dynamic_kp_min <= profile.yaw_rate_kp) &&
-           (profile.yaw_rate_kp <= profile.yaw_rate_dynamic_kp_max);
+           (profile.position_dynamic_kp_base <= profile.position_dynamic_kp_max);
 }
 
 bool is_position_kp_piecewise_range_valid(const Profile &profile)
@@ -189,8 +187,7 @@ bool is_speed_scheme_range_valid(const Profile &profile)
 Profile kNormalProfile = {
     350.0f,
     3.0f, 2.1f, 0.0f, 50.0f, 3.0f, 4.6f, 10.0f, 5.6f, 0.0f, 0.15f, 0.0f, 210.0f,
-    210.0f,
-    0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 200.0f,
+    1.0f, 0.0f, 0.0f, 0.0f, 200.0f,
     0.6f,
     0.82f, 0.01f, 270.0f,
     true, 60.0f, 180.0f, 0.60f, 0.5f
