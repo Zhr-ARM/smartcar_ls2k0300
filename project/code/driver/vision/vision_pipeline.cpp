@@ -232,14 +232,15 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
         return;
     }
 
-    vision_image_processor_set_red_rect(true,
-                                        result->red_x,
-                                        result->red_y,
-                                        result->red_w,
-                                        result->red_h,
-                                        result->red_cx,
-                                        result->red_cy,
-                                        result->red_area);
+    const bool has_red_rect = (result->red_w > 0 && result->red_h > 0);
+    vision_image_processor_set_red_rect(has_red_rect,
+                                        has_red_rect ? result->red_x : 0,
+                                        has_red_rect ? result->red_y : 0,
+                                        has_red_rect ? result->red_w : 0,
+                                        has_red_rect ? result->red_h : 0,
+                                        has_red_rect ? result->red_cx : 0,
+                                        has_red_rect ? result->red_cy : 0,
+                                        has_red_rect ? result->red_area : 0);
 
     if (!result->ncnn_roi_valid)
     {

@@ -486,10 +486,6 @@ static bool detect_and_extract_target_board(const infer_job_t &job,
     current_crop_geometry(&crop_y_offset, &crop_w, &crop_h);
 
     cv::Point2f src_quad[4];
-    int crop_min_x = crop_w;
-    int crop_min_y = crop_h;
-    int crop_max_x = 0;
-    int crop_max_y = 0;
     for (int i = 0; i < 4; ++i)
     {
         int src_x = 0;
@@ -508,33 +504,8 @@ static bool detect_and_extract_target_board(const infer_job_t &job,
         proc_to_crop(src_x, src_y, &cx, &cy);
         src_quad[i] = cv::Point2f(static_cast<float>(cx), static_cast<float>(cy));
 
-        if (cx < crop_min_x) crop_min_x = cx;
-        if (cy < crop_min_y) crop_min_y = cy;
-        if (cx > crop_max_x) crop_max_x = cx;
-        if (cy > crop_max_y) crop_max_y = cy;
     }
-
-    // ---- 填充红框信息（axis-aligned bounding rect，输出 full 坐标系）----
-    cv::Rect aabb_crop;
-    {
-        aabb_crop = cv::Rect(crop_min_x, crop_min_y,
-                             std::max(1, crop_max_x - crop_min_x),
-                             std::max(1, crop_max_y - crop_min_y));
-        aabb_crop &= cv::Rect(0, 0, crop_w, crop_h);
-        const cv::Rect aabb_full(aabb_crop.x,
-                                 aabb_crop.y + crop_y_offset,
-                                 aabb_crop.width,
-                                 aabb_crop.height);
-        result->found = true;
-        result->red_x = aabb_full.x;
-        result->red_y = aabb_full.y;
-        result->red_w = aabb_full.width;
-        result->red_h = aabb_full.height;
-        result->red_cx = aabb_full.x + aabb_full.width / 2;
-        result->red_cy = aabb_full.y + aabb_full.height / 2;
-        result->red_area = aabb_full.width * aabb_full.height;
-        result->ncnn_roi_full = aabb_full;
-    }
+    result->found = true;
 
     // ---- 填充调试信息 ----
     {

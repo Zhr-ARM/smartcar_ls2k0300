@@ -532,6 +532,8 @@ static void send_tcp_status()
     int roi_w = 0;
     int roi_h = 0;
     vision_image_processor_get_ncnn_roi(&roi_valid, &roi_x, &roi_y, &roi_w, &roi_h);
+    bool roi64_valid = false;
+    (void)vision_image_processor_get_warp_roi(&roi64_valid);
     vision_infer_async_result_t infer_result{};
     const bool has_infer_result = vision_infer_async_fetch_latest(&infer_result);
     const bool infer_enabled = vision_infer_async_enabled();
@@ -1146,7 +1148,7 @@ static void send_tcp_status()
         append_int_array(true, "board_src_tr", {infer_result.board_src_tr_x, infer_result.board_src_tr_y});
         append_int_array(true, "board_src_tl", {infer_result.board_src_tl_x, infer_result.board_src_tl_y});
         append_pid_debug(true);
-        append_bool(true, "udp_web_send_roi64", roi_valid);
+        append_bool(true, "udp_web_send_roi64", roi64_valid);
         append_int_array(true, "roi64_size", {kRoi64Size, kRoi64Size});
         append_int_array(true, "gray_size",
                          {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
@@ -1243,7 +1245,7 @@ static void send_tcp_status()
     append_int_array(true, "board_src_tr", {infer_result.board_src_tr_x, infer_result.board_src_tr_y});
     append_int_array(true, "board_src_tl", {infer_result.board_src_tl_x, infer_result.board_src_tl_y});
     append_pid_debug(true);
-    append_bool(true, "udp_web_send_roi64", roi_valid);
+    append_bool(true, "udp_web_send_roi64", roi64_valid);
     append_int_array(true, "roi64_size", {kRoi64Size, kRoi64Size});
     append_bool(g_vision_runtime_config.udp_web_tcp_send_ipm_track_valid, "ipm_track_valid", ipm_track_valid);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_method, "ipm_track_method",
