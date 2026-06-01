@@ -433,50 +433,52 @@ static bool detect_and_extract_target_board(const infer_job_t &job,
     }
 
     // ---- 步骤 4：在 IPM 空间推算目标物上底边中点 ----
-    const double target_height_ipm =
-        static_cast<double>(g_vision_runtime_config.red_roi_target_height_k) * dist_ipm +
-        static_cast<double>(g_vision_runtime_config.red_roi_target_height_b);
-    if (target_height_ipm <= 0.0)
+    const double square_side_ipm = static_cast<double>(g_vision_runtime_config.red_roi_square_side_px);
+    if (square_side_ipm <= 0.0)
     {
-        result->board_fail_reason = "target_height_invalid";
+        result->board_fail_reason = "square_side_invalid";
         return false;
     }
 
-    int top_ipm_x = target_bottom_ipm_x;
-    int top_ipm_y = target_bottom_ipm_y;
-    int top_next_index = target_bottom_next_index;
+    int arc_ipm_x = target_bottom_ipm_x;
+    int arc_ipm_y = target_bottom_ipm_y;
+    int top_walk_next_index = target_bottom_next_index;
     if (!walk_ipm_centerline_distance(job,
                                       target_bottom_next_index,
                                       target_bottom_ipm_x,
                                       target_bottom_ipm_y,
-                                      target_height_ipm,
-                                      &top_ipm_x,
-                                      &top_ipm_y,
-                                      &top_next_index))
+                                      square_side_ipm,
+                                      &arc_ipm_x,
+                                      &arc_ipm_y,
+                                      &top_walk_next_index))
     {
         result->board_fail_reason = "target_top_centerline_too_short";
         return false;
     }
-    (void)top_next_index;
 
     // ---- 步骤 5：在 IPM 空间计算目标物正方形四个角点 ----
-    const double dx_ipm = static_cast<double>(top_ipm_x - target_bottom_ipm_x);
-    const double dy_ipm = static_cast<double>(top_ipm_y - target_bottom_ipm_y);
-    const double H_ipm = std::sqrt(dx_ipm * dx_ipm + dy_ipm * dy_ipm);
-    if (H_ipm < 1.0)
+    const double dx_ipm = static_cast<double>(arc_ipm_x - target_bottom_ipm_x);
+    const double dy_ipm = static_cast<double>(arc_ipm_y - target_bottom_ipm_y);
+    const double axis_len = std::sqrt(dx_ipm * dx_ipm + dy_ipm * dy_ipm);
+    if (axis_len < 1.0)
     {
         result->board_fail_reason = "height_too_small";
         return false;
     }
-    const double W_ipm = H_ipm;
-    const double px = -dy_ipm / H_ipm * (W_ipm * 0.5);
-    const double py = dx_ipm / H_ipm * (W_ipm * 0.5);
+
+    const double ux = dx_ipm / axis_len;
+    const double uy = dy_ipm / axis_len;
+    const double nx = -uy;
+    const double ny = ux;
+    const double half_side = square_side_ipm * 0.5;
+    const double top_ipm_x = static_cast<double>(target_bottom_ipm_x) + ux * square_side_ipm;
+    const double top_ipm_y = static_cast<double>(target_bottom_ipm_y) + uy * square_side_ipm;
 
     struct { double x; double y; } ipm_corners[4] = {
-        {static_cast<double>(target_bottom_ipm_x) - px, static_cast<double>(target_bottom_ipm_y) - py}, // bl
-        {static_cast<double>(target_bottom_ipm_x) + px, static_cast<double>(target_bottom_ipm_y) + py}, // br
-        {static_cast<double>(top_ipm_x)    + px, static_cast<double>(top_ipm_y)    + py}, // tr
-        {static_cast<double>(top_ipm_x)    - px, static_cast<double>(top_ipm_y)    - py}, // tl
+        {static_cast<double>(target_bottom_ipm_x) - nx * half_side, static_cast<double>(target_bottom_ipm_y) - ny * half_side}, // bl
+        {static_cast<double>(target_bottom_ipm_x) + nx * half_side, static_cast<double>(target_bottom_ipm_y) + ny * half_side}, // br
+        {top_ipm_x + nx * half_side, top_ipm_y + ny * half_side}, // tr
+        {top_ipm_x - nx * half_side, top_ipm_y - ny * half_side}, // tl
     };
 
     // ---- 步骤 6：四角点回投 crop 图（320×crop_h 或 160×crop_h）----
@@ -531,7 +533,10 @@ static bool detect_and_extract_target_board(const infer_job_t &job,
         // 上底边中点（crop 坐标）。
         int top_src_x = 0;
         int top_src_y = 0;
-        if (vision_image_processor_ipm_to_src_point(top_ipm_x, top_ipm_y, &top_src_x, &top_src_y))
+        if (vision_image_processor_ipm_to_src_point(static_cast<int>(std::lround(top_ipm_x)),
+                                                    static_cast<int>(std::lround(top_ipm_y)),
+                                                    &top_src_x,
+                                                    &top_src_y))
         {
             int top_cx = 0;
             int top_cy = 0;
@@ -558,8 +563,8 @@ static bool detect_and_extract_target_board(const infer_job_t &job,
         result->board_ipm_red_bottom_y = bottom_ipm_y;
         result->board_ipm_bottom_x = target_bottom_ipm_x;
         result->board_ipm_bottom_y = target_bottom_ipm_y;
-        result->board_ipm_top_x = top_ipm_x;
-        result->board_ipm_top_y = top_ipm_y;
+        result->board_ipm_top_x = static_cast<int>(std::lround(top_ipm_x));
+        result->board_ipm_top_y = static_cast<int>(std::lround(top_ipm_y));
 
         // IPM 坐标系：四角点（顺序 bl / br / tr / tl）。
         result->board_ipm_bl_x = static_cast<int>(std::lround(ipm_corners[0].x));

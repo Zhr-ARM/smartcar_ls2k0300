@@ -194,11 +194,9 @@ labels = ["ambulance", "armored_car", "bomb", "gun", "medicine", "telescope"]
 red_to_target_bottom_k = -0.05
 # 红色提示矩形下底边中点到目标物下底边中点的距离截距（IPM 像素）。
 red_to_target_bottom_b = 1.5
-# 目标物高度一次函数斜率（IPM 空间）。
-# height_ipm = k * dist_ipm + b。
-target_height_k = 0
-# 目标物高度一次函数截距（IPM 像素）。
-target_height_b = 9.0
+# IPM 中截取目标板正方形边长（像素）。
+# 45cm 赛道宽对应 30px 时，12cm 目标板约为 8px。
+square_side_px = 8.0
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。

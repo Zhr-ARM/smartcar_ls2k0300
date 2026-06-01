@@ -953,8 +953,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
         !require_string_array(values, &consumed, "vision.runtime.ncnn.labels", &g_string_storage.ncnn_labels, g_vision_runtime_config.ncnn_labels, &g_vision_runtime_config.ncnn_label_count, error_message) ||
         !require_float(values, &consumed, "vision.runtime.red_roi.red_to_target_bottom_k", &g_vision_runtime_config.red_roi_red_to_target_bottom_k, error_message) ||
         !require_float(values, &consumed, "vision.runtime.red_roi.red_to_target_bottom_b", &g_vision_runtime_config.red_roi_red_to_target_bottom_b, error_message) ||
-        !require_float(values, &consumed, "vision.runtime.red_roi.target_height_k", &g_vision_runtime_config.red_roi_target_height_k, error_message) ||
-        !require_float(values, &consumed, "vision.runtime.red_roi.target_height_b", &g_vision_runtime_config.red_roi_target_height_b, error_message) ||
+        !require_float(values, &consumed, "vision.runtime.red_roi.square_side_px", &g_vision_runtime_config.red_roi_square_side_px, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.screen_display_enabled", &g_vision_runtime_config.screen_display_enabled, error_message))
     {
         return false;
@@ -1253,7 +1252,8 @@ bool load_from_path(const std::string &path, std::string *error_message)
         g_vision_runtime_config.infer_target_confidence_threshold < 0.0f ||
         g_vision_runtime_config.infer_target_confidence_threshold > 1.0f ||
         g_vision_runtime_config.infer_avoid_offset_delta_px < 0.0f ||
-        g_vision_runtime_config.infer_target_exit_no_red_count < 1)
+        g_vision_runtime_config.infer_target_exit_no_red_count < 1 ||
+        g_vision_runtime_config.red_roi_square_side_px <= 0.0f)
     {
         *error_message = "vision.runtime target board infer parameters are invalid";
         return false;

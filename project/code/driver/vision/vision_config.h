@@ -42,13 +42,12 @@ typedef struct
     // ncnn 默认模型标签表，索引顺序必须与模型输出类别顺序一致。
     const char *ncnn_labels[VISION_NCNN_CONFIG_MAX_LABELS];
     // 目标板检测参数：沿中线搜索 + IPM 空间推算（替代原 HSV 检测）。
-    // 第一段：红色提示矩形下底边中点 -> 目标物下底边中点。
-    // 第二段：目标物下底边中点 -> 目标物上底边中点。
-    // 两段距离均为 IPM 空间距离: gap_ipm = k * dist_ipm + b。
+    // 红色提示矩形下底边中点 -> 目标物下底边中点。
+    // 距离为 IPM 空间距离: gap_ipm = k * dist_ipm + b。
     float red_roi_red_to_target_bottom_k;
     float red_roi_red_to_target_bottom_b;
-    float red_roi_target_height_k;
-    float red_roi_target_height_b;
+    // 目标板 ROI 在 IPM 空间中的正方形边长（像素）。
+    float red_roi_square_side_px;
     // 车载屏显示开关：true 时启动 screen_display_thread。
     bool screen_display_enabled;
     // ==================== 网页图传选型说明 ====================

@@ -61,11 +61,10 @@ vision_runtime_config_t g_vision_runtime_config = {
         "medicine",
         "telescope",
     },
-    // 目标板检测默认参数（沿中线搜索 + IPM 空间两段推算）。
+    // 目标板检测默认参数（沿中线搜索 + IPM 空间推算）。
     .red_roi_red_to_target_bottom_k = 0.0f,
     .red_roi_red_to_target_bottom_b = 0.0f,
-    .red_roi_target_height_k = -0.3f,
-    .red_roi_target_height_b = 25.0f,
+    .red_roi_square_side_px = 8.0f,
     // 逐飞客户端发送开关。
     // 车载屏显示开关。
     .screen_display_enabled = false,
