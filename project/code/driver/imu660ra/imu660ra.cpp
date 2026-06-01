@@ -141,6 +141,11 @@ float Imu660raDriver::filtered_gyro_z_deg_s() const
     return filtered_gyro_rad_s_.z * IMU660RA_RAD_TO_DEG;
 }
 
+int16 Imu660raDriver::raw_gyro_z() const
+{
+    return data_.gyro_z;
+}
+
 const char *Imu660raDriver::last_error() const
 {
     return last_error_;

@@ -1,5 +1,6 @@
 #include "driver/vision/vision_transport.h"
 
+#include "imu_thread.h"
 #include "motor_thread.h"
 #include "line_follow_thread.h"
 #include "driver/vision/vision_config.h"
@@ -956,6 +957,7 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_current_track_point_angle_deg", line_follow_pid_debug.current_track_point_angle_deg);
         append_float(enabled, "pid_common_filtered_track_point_angle_deg", line_follow_pid_debug.filtered_track_point_angle_deg);
         append_float(enabled, "pid_common_measured_yaw_rate_dps", line_follow_pid_debug.measured_yaw_rate_dps);
+        append_int(enabled, "raw_gyro_z", (int)imu_thread_raw_gyro_z());
         append_float(enabled, "pid_common_yaw_rate_ref_from_pos_dps", line_follow_pid_debug.yaw_rate_ref_from_pos_dps);
         append_float(enabled, "pid_common_yaw_rate_ref_final_dps", line_follow_pid_debug.yaw_rate_ref_final_dps);
         append_float(enabled, "pid_common_yaw_rate_ref_dps", line_follow_pid_debug.yaw_rate_ref_dps);

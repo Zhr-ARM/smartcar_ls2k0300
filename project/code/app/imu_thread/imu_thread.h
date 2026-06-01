@@ -25,6 +25,12 @@ bool imu_thread_calibrate_and_start(int32 calibrate_duration_ms);
 float imu_thread_gyro_z_dps();
 
 /**
+ * @brief 获取陀螺仪 Z 轴原始寄存器值
+ * @return 原始 ADC 计数值，未滤波未换算
+ */
+int16 imu_thread_raw_gyro_z();
+
+/**
  * @brief 获取当前 gyro_z 对应的新样本序号
  * @return 每成功发布一份新 gyro_z 样本就递增一次的序号
  */

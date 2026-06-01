@@ -23,6 +23,7 @@ std::atomic<int32> g_thread_policy(0);
 std::atomic<int32> g_thread_priority(0);
 std::atomic<float> g_gyro_z_dps(0.0f);
 std::atomic<float> g_gyro_z_bias_dps(0.0f);
+std::atomic<int16> g_raw_gyro_z(0);
 std::atomic<uint32> g_gyro_z_sample_seq(0);
 
 /**
@@ -158,7 +159,8 @@ void publish_gyro_state()
     const float corrected_gyro_z_dps =
         imu660ra_driver.filtered_gyro_z_deg_s() - g_gyro_z_bias_dps.load();
     g_gyro_z_dps.store(corrected_gyro_z_dps);
-    // 序号仅在“拿到并发布了新 IMU 样本”时递增，供上层判断是否需要推进滤波器状态。
+    g_raw_gyro_z.store(imu660ra_driver.raw_gyro_z());
+    // 序号仅在”拿到并发布了新 IMU 样本”时递增，供上层判断是否需要推进滤波器状态。
     g_gyro_z_sample_seq.fetch_add(1U);
 }
 
@@ -371,6 +373,11 @@ bool imu_thread_calibrate_and_start(int32 calibrate_duration_ms)
 float imu_thread_gyro_z_dps()
 {
     return g_gyro_z_dps.load();
+}
+
+int16 imu_thread_raw_gyro_z()
+{
+    return g_raw_gyro_z.load();
 }
 
 uint32 imu_thread_gyro_z_sample_seq()

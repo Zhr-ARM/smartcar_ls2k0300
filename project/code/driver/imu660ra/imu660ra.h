@@ -85,6 +85,12 @@ public:
     float filtered_gyro_z_deg_s() const;
 
     /**
+     * @brief 获取 Z 轴陀螺仪原始寄存器值（未滤波、未换算）
+     * @return Z 轴原始 ADC 计数值
+     */
+    int16 raw_gyro_z() const;
+
+    /**
      * @brief 获取最近一次初始化或运行错误信息
      * @return 错误信息字符串
      */
