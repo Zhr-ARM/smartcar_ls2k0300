@@ -1594,8 +1594,26 @@
       grid-template-columns: 1fr;
     }
     .detail-panel-body canvas {
-      max-height: 300px;
+      max-height: 460px;
       object-fit: contain;
+    }
+    .pid-chart-panel .chart-card {
+      padding: 8px 10px;
+    }
+    .chart-legend {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 4px;
+      font-size: 11px;
+      color: var(--console-dim);
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 2px;
     }
     pre {
       font-size: 11px;
@@ -1972,6 +1990,49 @@
                   <div><span style="color:#fbbf24">■</span> = 越界(128)</div>
                 </div>
               </div>
+            </div>
+          </div>
+        </details>
+        <details class="detail-panel pid-chart-panel" id="posChartPanel" open>
+          <summary>位置环 — 目标值 vs 实际偏差 (px)</summary>
+          <div class="detail-panel-body single">
+            <div class="card chart-card">
+              <div class="chart-legend">
+                <span class="legend-dot" style="background:#fbbf24;"></span> 目标值(0)
+                <span class="legend-dot" style="background:#38bdf8;"></span> 实际偏差(px)
+              </div>
+              <canvas id="posChartCanvas" width="900" height="220"></canvas>
+            </div>
+          </div>
+        </details>
+        <details class="detail-panel pid-chart-panel" id="yawChartPanel" open>
+          <summary>角速度环 — 目标值 vs 实际值 (dps)</summary>
+          <div class="detail-panel-body single">
+            <div class="card chart-card">
+              <div class="chart-legend">
+                <span class="legend-dot" style="background:#fbbf24;"></span> 目标角速度(dps)
+                <span class="legend-dot" style="background:#38bdf8;"></span> 实测角速度(dps)
+              </div>
+              <canvas id="yawChartCanvas" width="900" height="220"></canvas>
+            </div>
+          </div>
+        </details>
+        <details class="detail-panel pid-chart-panel" id="spdChartPanel" open>
+          <summary>速度环 — 左右轮 目标值 vs 实际反馈 (counts/5ms)</summary>
+          <div class="detail-panel-body">
+            <div class="card chart-card">
+              <div class="chart-legend">
+                <span class="legend-dot" style="background:#fbbf24;"></span> 左轮目标
+                <span class="legend-dot" style="background:#38bdf8;"></span> 左轮反馈
+              </div>
+              <canvas id="spdLeftChartCanvas" width="680" height="420"></canvas>
+            </div>
+            <div class="card chart-card">
+              <div class="chart-legend">
+                <span class="legend-dot" style="background:#fbbf24;"></span> 右轮目标
+                <span class="legend-dot" style="background:#38bdf8;"></span> 右轮反馈
+              </div>
+              <canvas id="spdRightChartCanvas" width="680" height="420"></canvas>
             </div>
           </div>
         </details>
@@ -2445,6 +2506,225 @@
     const pageParams = new URLSearchParams(window.location.search || '');
     const requestedReplayFolder = String(pageParams.get('replay') || '').trim();
     let latestStatus = {};
+    const PID_CHART_RING_CAPACITY = 300;
+    const pidHistory = {
+      pos_target:   new Float32Array(PID_CHART_RING_CAPACITY),
+      pos_actual:   new Float32Array(PID_CHART_RING_CAPACITY),
+      yaw_target:   new Float32Array(PID_CHART_RING_CAPACITY),
+      yaw_actual:   new Float32Array(PID_CHART_RING_CAPACITY),
+      spd_left_target:  new Float32Array(PID_CHART_RING_CAPACITY),
+      spd_left_actual:  new Float32Array(PID_CHART_RING_CAPACITY),
+      spd_right_target: new Float32Array(PID_CHART_RING_CAPACITY),
+      spd_right_actual: new Float32Array(PID_CHART_RING_CAPACITY),
+      timestamps: new Float64Array(PID_CHART_RING_CAPACITY),
+      head: 0,
+      count: 0,
+    };
+
+    function pushPidHistory(status) {
+      var i = pidHistory.head;
+      var fn = function(chain) {
+        for (var k = 0; k < chain.length; k++) {
+          var v = chain[k];
+          if (v !== undefined && v !== null && Number.isFinite(v)) return v;
+        }
+        return 0;
+      };
+
+      pidHistory.pos_target[i]   = fn([status.pid_common_position_pid_target]) || 0;
+      pidHistory.pos_actual[i]   = fn([status.pid_common_control_error_px]) || 0;
+      pidHistory.yaw_target[i]   = fn([status.pid_common_yaw_rate_ref_dps]) || 0;
+      pidHistory.yaw_actual[i]   = fn([status.pid_common_measured_yaw_rate_dps]) || 0;
+      pidHistory.spd_left_target[i]  = fn([status.pid_left_target_count, status.left_target_count]) || 0;
+      pidHistory.spd_left_actual[i]  = fn([status.pid_left_feedback, status.left_filtered_count, status.pid_left_current_count, status.left_current_count]) || 0;
+      pidHistory.spd_right_target[i] = fn([status.pid_right_target_count, status.right_target_count]) || 0;
+      pidHistory.spd_right_actual[i] = fn([status.pid_right_feedback, status.right_filtered_count, status.pid_right_current_count, status.right_current_count]) || 0;
+      pidHistory.timestamps[i] = Date.now();
+
+      pidHistory.head = (i + 1) % PID_CHART_RING_CAPACITY;
+      if (pidHistory.count < PID_CHART_RING_CAPACITY) pidHistory.count++;
+    }
+
+    var pidChartAutoRangeCounter = 0;
+    var pidChartRanges = {
+      pos:  { min: -40, max: 40,  step: 5 },
+      yaw:  { min: -200, max: 200, step: 0 },
+      spdL: { min: -600, max: 600, step: 10 },
+      spdR: { min: -600, max: 600, step: 10 },
+    };
+
+    function updateAutoRange(series1, series2, range) {
+      var total = pidHistory.count;
+      if (total < 2) return;
+      var cap = PID_CHART_RING_CAPACITY;
+      var head = pidHistory.head;
+      var vmin = Infinity, vmax = -Infinity;
+      for (var j = 0; j < total; j++) {
+        var idx = (head - total + j + cap) % cap;
+        var a = series1[idx], b = series2[idx];
+        if (Number.isFinite(a)) { if (a < vmin) vmin = a; if (a > vmax) vmax = a; }
+        if (Number.isFinite(b)) { if (b < vmin) vmin = b; if (b > vmax) vmax = b; }
+      }
+      if (!isFinite(vmin) || !isFinite(vmax)) return;
+      var pad = Math.max((vmax - vmin) * 0.15, 1);
+      range.min = vmin - pad;
+      range.max = vmax + pad;
+    }
+
+    function drawPidChart(canvas, seriesList, minY, maxY, title, step) {
+      var ctx = canvas.getContext('2d');
+      var w = canvas.width;
+      var h = canvas.height;
+      var M = { left: 50, right: 14, top: 14, bottom: 28 };
+      var pw = Math.max(1, w - M.left - M.right);
+      var ph = Math.max(1, h - M.top - M.bottom);
+
+      // background
+      ctx.fillStyle = '#0d1116';
+      ctx.fillRect(0, 0, w, h);
+
+      var yRange = maxY - minY || 1;
+      var yAt = function(v) { return M.top + ((maxY - v) / yRange) * ph; };
+
+      // grid: use step if given, otherwise 5 divisions
+      var gridStep = (step > 0) ? step : (yRange / 5);
+      var gridCount = Math.round(yRange / gridStep);
+
+      ctx.strokeStyle = 'rgba(51,65,85,0.4)';
+      ctx.lineWidth = 0.5;
+      var i, gx, gy;
+      var vGridCount = 5;
+      for (i = 0; i <= vGridCount; i++) {
+        gx = M.left + (i / vGridCount) * pw;
+        ctx.beginPath(); ctx.moveTo(gx, M.top); ctx.lineTo(gx, M.top + ph); ctx.stroke();
+      }
+      for (i = 0; i <= gridCount; i++) {
+        gy = yAt(maxY - i * gridStep);
+        ctx.beginPath(); ctx.moveTo(M.left, gy); ctx.lineTo(M.left + pw, gy); ctx.stroke();
+      }
+
+      // Y-axis labels at step interval, coarsened if too many
+      ctx.fillStyle = '#64748b';
+      ctx.font = '10px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'right';
+      var labelStep = gridStep;
+      var labelEvery = 1;
+      if (gridCount > 18) { labelEvery = Math.ceil(gridCount / 12); labelStep = gridStep * labelEvery; }
+      for (i = 0; i <= gridCount; i++) {
+        if (i % labelEvery !== 0 && i !== gridCount) continue;
+        var v = maxY - i * gridStep;
+        gy = yAt(v);
+        ctx.fillText(v.toFixed(step > 0 && step < 1 ? 1 : 0), M.left - 6, gy + 4);
+      }
+
+      // zero line
+      if (minY < 0 && maxY > 0) {
+        var yz = yAt(0);
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(M.left, yz); ctx.lineTo(M.left + pw, yz); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // title
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '11px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(title || '', M.left, M.top - 2);
+
+      var totalCount = pidHistory.count;
+      if (totalCount < 2) {
+        ctx.fillStyle = '#64748b';
+        ctx.textAlign = 'center';
+        ctx.fillText('Waiting for data...', w / 2, h / 2);
+        return;
+      }
+
+      var head = pidHistory.head;
+      var cap = PID_CHART_RING_CAPACITY;
+      var xAt = function(idx) { return M.left + (idx / (PID_CHART_RING_CAPACITY - 1)) * pw; };
+
+      // draw each series
+      var s, j, idx, val, sx, sy, started;
+      for (s = 0; s < seriesList.length; s++) {
+        var series = seriesList[s];
+        var vals = series.values;
+        ctx.strokeStyle = series.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        started = false;
+        for (j = 0; j < totalCount; j++) {
+          idx = (head - totalCount + j + cap) % cap;
+          val = vals[idx];
+          if (!Number.isFinite(val)) val = 0;
+          if (val < minY) val = minY;
+          if (val > maxY) val = maxY;
+          sx = xAt(j);
+          sy = yAt(val);
+          if (!started) { ctx.moveTo(sx, sy); started = true; }
+          else ctx.lineTo(sx, sy);
+        }
+        ctx.stroke();
+      }
+
+      // legend at bottom
+      ctx.textAlign = 'left';
+      var legendX = M.left;
+      for (s = 0; s < seriesList.length; s++) {
+        var ser = seriesList[s];
+        ctx.fillStyle = ser.color;
+        ctx.fillRect(legendX, M.top + ph + 10, 10, 10);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+        ctx.fillText(ser.name, legendX + 14, M.top + ph + 20);
+        legendX += ctx.measureText(ser.name).width + 36;
+      }
+    }
+
+    function renderPidCharts() {
+      // auto-range every 50 samples
+      pidChartAutoRangeCounter++;
+      if (pidChartAutoRangeCounter % 50 === 1) {
+        updateAutoRange(pidHistory.yaw_target, pidHistory.yaw_actual, pidChartRanges.yaw);
+      }
+
+      var h = pidHistory;
+
+      // Position loop chart
+      var posCanvas = document.getElementById('posChartPanel');
+      if (posCanvas && posCanvas.open) {
+        drawPidChart(document.getElementById('posChartCanvas'), [
+          { name: 'Target', values: h.pos_target, color: '#fbbf24' },
+          { name: 'Actual', values: h.pos_actual, color: '#38bdf8' },
+        ], pidChartRanges.pos.min, pidChartRanges.pos.max, 'Position Loop (px)', pidChartRanges.pos.step);
+      }
+
+      // Yaw rate loop chart
+      var yawCanvas = document.getElementById('yawChartPanel');
+      if (yawCanvas && yawCanvas.open) {
+        drawPidChart(document.getElementById('yawChartCanvas'), [
+          { name: 'Target', values: h.yaw_target, color: '#fbbf24' },
+          { name: 'Actual', values: h.yaw_actual, color: '#38bdf8' },
+        ], pidChartRanges.yaw.min, pidChartRanges.yaw.max, 'Yaw Rate Loop (dps)', pidChartRanges.yaw.step);
+      }
+
+      // Speed loop - left wheel
+      var spdPanel = document.getElementById('spdChartPanel');
+      if (spdPanel && spdPanel.open) {
+        drawPidChart(document.getElementById('spdLeftChartCanvas'), [
+          { name: 'L Target', values: h.spd_left_target, color: '#fbbf24' },
+          { name: 'L Feedback', values: h.spd_left_actual, color: '#38bdf8' },
+        ], pidChartRanges.spdL.min, pidChartRanges.spdL.max, 'Left Wheel Speed (counts/5ms)', pidChartRanges.spdL.step);
+
+        // Speed loop - right wheel
+        drawPidChart(document.getElementById('spdRightChartCanvas'), [
+          { name: 'R Target', values: h.spd_right_target, color: '#fbbf24' },
+          { name: 'R Feedback', values: h.spd_right_actual, color: '#38bdf8' },
+        ], pidChartRanges.spdR.min, pidChartRanges.spdR.max, 'Right Wheel Speed (counts/5ms)', pidChartRanges.spdR.step);
+      }
+    }
+
     let latestLocalPayload = null;
     let latestWasmSyncStatus = null;
     let showGrayBoundaries = true;
@@ -5667,6 +5947,8 @@
       try {
         const j = await receiverCore.fetchJsonNoStore('/api/status');
         latestStatus = j;
+        pushPidHistory(j);
+        renderPidCharts();
         const isFull = receiverCore.isFullDebugProfile(j.web_data_profile);
         setDebugPageActive(isFull || shouldUseLocalCompute());
         const renderStatus = getRenderStatus();

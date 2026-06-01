@@ -423,15 +423,15 @@ gyro_yaw_rate_filter_alpha = 0.45
 
 [pid.motor_speed]
 # 左轮速度环 Kp。
-left_kp = 0.055
+left_kp = 0.023
 # 左轮速度环 Ki。
-left_ki = 0.00078
+left_ki = 0.002
 # 左轮速度环 Kd。
 left_kd = 0.0
 # 右轮速度环 Kp。
-right_kp = 0.055
+right_kp = 0.018
 # 右轮速度环 Ki。
-right_ki = 0.00078
+right_ki = 0.002
 # 右轮速度环 Kd。
 right_kd = 0.0
 # 速度环积分限幅。
@@ -500,13 +500,13 @@ error_low_gain_limit_px = 1.0
 # 小误差区间降增益倍率。
 error_low_gain = 0.4
 # 角速度环调试模式开关（true 时固定角速度目标，旁路位置环输出）。
-yaw_rate_debug_enabled = false
+yaw_rate_debug_enabled = true
 # 角速度环调试固定目标，单位 dps（仅 yaw_rate_debug_enabled=true 生效）。
 yaw_rate_debug_target_dps = 0.0
 # 速度环调试模式开关（true 时固定 base/diff 命令，旁路上两级输出）。
-speed_loop_debug_enabled = true
+speed_loop_debug_enabled = false
 # 速度环调试固定基础速度（仅 speed_loop_debug_enabled=true 生效）。
-speed_loop_debug_base_speed = 240.0
+speed_loop_debug_base_speed = 480.0
 # 速度环调试固定差速，正值表示右轮更快（仅 speed_loop_debug_enabled=true 生效）。
 speed_loop_debug_diff_speed = 0.0
 
