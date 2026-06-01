@@ -146,7 +146,6 @@ bool is_line_error_prefix_exp_valid(const Profile &profile);
 bool is_speed_scheme_range_valid(const Profile &profile);
 
 extern Profile kNormalProfile;
-extern Profile kCircleProfile;
 } // namespace route_line_follow
 } // namespace pid_tuning
 

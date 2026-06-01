@@ -96,7 +96,6 @@ struct PidSnapshot
 
     float route_global_base_speed_scale = 0.0f;
     pid_tuning::route_line_follow::Profile normal_profile{};
-    pid_tuning::route_line_follow::Profile circle_profile{};
 };
 
 struct ConfigSnapshot
@@ -790,7 +789,6 @@ PidSnapshot capture_pid_snapshot()
 
     snapshot.route_global_base_speed_scale = pid_tuning::route_line_follow::kGlobalBaseSpeedScale;
     snapshot.normal_profile = pid_tuning::route_line_follow::kNormalProfile;
-    snapshot.circle_profile = pid_tuning::route_line_follow::kCircleProfile;
     return snapshot;
 }
 
@@ -854,7 +852,6 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
 
     pid_tuning::route_line_follow::kGlobalBaseSpeedScale = snapshot.route_global_base_speed_scale;
     pid_tuning::route_line_follow::kNormalProfile = snapshot.normal_profile;
-    pid_tuning::route_line_follow::kCircleProfile = snapshot.circle_profile;
 }
 
 ConfigSnapshot capture_config_snapshot()
@@ -1297,8 +1294,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
 #undef REQUIRE_PID_FLOAT
 #undef REQUIRE_PID_INT
 
-    if (!load_route_profile(values, &consumed, "pid.route_line_follow.normal", &pid_tuning::route_line_follow::kNormalProfile, error_message) ||
-        !load_route_profile(values, &consumed, "pid.route_line_follow.circle", &pid_tuning::route_line_follow::kCircleProfile, error_message))
+    if (!load_route_profile(values, &consumed, "pid.route_line_follow.normal", &pid_tuning::route_line_follow::kNormalProfile, error_message))
     {
         return false;
     }
@@ -1326,8 +1322,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
                pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile) &&
                pid_tuning::route_line_follow::is_speed_scheme_range_valid(profile);
     };
-    if (!route_valid(pid_tuning::route_line_follow::kNormalProfile) ||
-        !route_valid(pid_tuning::route_line_follow::kCircleProfile))
+    if (!route_valid(pid_tuning::route_line_follow::kNormalProfile))
     {
         *error_message = "pid.route_line_follow contains invalid profile";
         return false;

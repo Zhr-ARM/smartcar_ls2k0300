@@ -312,18 +312,11 @@ const char *route_sub_state_name(int route_sub_state)
 
 RouteProfileSelection select_route_profile_selection(int route_main_state, int route_sub_state)
 {
-    using pid_tuning::route_line_follow::kCircleProfile;
+    (void)route_main_state;
+    (void)route_sub_state;
+
     using pid_tuning::route_line_follow::kNormalProfile;
-
-    switch (route_main_state)
-    {
-        case VISION_ROUTE_MAIN_CIRCLE:
-            (void)route_sub_state;
-            return {kCircleProfile, "CIRCLE"};
-
-        default:
-            return {kNormalProfile, "NORMAL"};
-    }
+    return {kNormalProfile, "NORMAL"};
 }
 
 void log_route_state_transition_if_changed(int route_main_state, int route_sub_state)

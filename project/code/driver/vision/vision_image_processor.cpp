@@ -396,22 +396,12 @@ static const pid_tuning::route_line_follow::Profile *select_route_line_follow_pr
     const vision_route_state_snapshot_t &route_snapshot,
     int *profile_id)
 {
+    (void)route_snapshot;
     if (profile_id)
     {
         *profile_id = kLineErrorProfileNormal;
     }
-
-    switch (route_snapshot.main_state)
-    {
-        case VISION_ROUTE_MAIN_CIRCLE:
-            if (profile_id) *profile_id = kLineErrorProfileCircle;
-            return &pid_tuning::route_line_follow::kCircleProfile;
-
-        case VISION_ROUTE_MAIN_NORMAL:
-        default:
-            if (profile_id) *profile_id = kLineErrorProfileNormal;
-            return &pid_tuning::route_line_follow::kNormalProfile;
-    }
+    return &pid_tuning::route_line_follow::kNormalProfile;
 }
 
 static void apply_line_error_profile_if_needed(const vision_route_state_snapshot_t &route_snapshot)

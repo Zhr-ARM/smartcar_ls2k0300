@@ -195,15 +195,5 @@ Profile kNormalProfile = {
     0.82f, 0.01f, 270.0f,
     true, 60.0f, 180.0f, 0.60f, 0.5f
 };
-
-Profile kCircleProfile = {
-    320.0f,
-    1.7f, 1.8f, 0.0f, 110.0f, 3.0f, 3.6f, 9.0f, 4.4f, 0.0f, 0.0f, 0.0f, 400.0f,
-    660.0f,
-    0.0f, 7.0f, 360.0f, 1.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 0.02f, 0.0f, 300.0f,
-    0.6f,
-    0.82f, 0.01f, 270.0f,
-    true, 40.0f, 150.0f, 0.20f, 0.35f
-};
 } // namespace route_line_follow
 } // namespace pid_tuning
