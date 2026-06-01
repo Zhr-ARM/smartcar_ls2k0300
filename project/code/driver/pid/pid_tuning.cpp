@@ -58,6 +58,13 @@ float kTargetCountMax = 1550.0f;
 float kErrorDeadzonePx = 0.6f;
 float kErrorLowGainLimitPx = 3.0f;
 float kErrorLowGain = 0.70f;
+bool kYawRateDebugEnabled = false;
+float kYawRateDebugTargetDps = 0.0f;
+bool kSpeedLoopDebugEnabled = false;
+float kSpeedLoopDebugLeftTarget = 0.0f;
+float kSpeedLoopDebugRightTarget = 0.0f;
+float kSpeedLoopDebugBaseSpeed = 0.0f;
+float kSpeedLoopDebugDiffSpeed = 0.0f;
 } // namespace line_follow
 
 namespace line_error_preview

@@ -5,6 +5,7 @@
 
 struct LineFollowPidDebugStatus
 {
+    int cascade_mode;
     bool vision_updated;
     bool imu_updated;
     int route_main_state;
@@ -23,8 +24,11 @@ struct LineFollowPidDebugStatus
     float current_track_point_angle_deg;
     float filtered_track_point_angle_deg;
     float measured_yaw_rate_dps;
+    float yaw_rate_ref_from_pos_dps;
+    float yaw_rate_ref_final_dps;
     float yaw_rate_ref_dps;
     float yaw_rate_error_dps;
+    float delta_v_cmd;
     float target_yaw_rate_abs_filtered_dps;
     float target_yaw_rate_speed_scale;
     float dynamic_position_kp;
@@ -65,11 +69,15 @@ struct LineFollowPidDebugStatus
     float speed_scheme_max_drop_ratio_per_cycle;
     float speed_scheme_max_rise_ratio_per_cycle;
     bool force_full_speed;
+    float speed_command_base;
+    float speed_command_diff;
     float raw_steering_output;
     float clamped_steering_output;
     float applied_steering_output;
     float left_target_count;
     float right_target_count;
+    float speed_debug_left_target_applied;
+    float speed_debug_right_target_applied;
     float vision_dt_ms;
     float imu_dt_ms;
 };

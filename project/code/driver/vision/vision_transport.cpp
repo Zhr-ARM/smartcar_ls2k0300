@@ -936,6 +936,7 @@ static void send_tcp_status()
     line_follow_thread_get_pid_debug_status(line_follow_pid_debug);
 
     auto append_pid_debug = [&](bool enabled) {
+        append_int(enabled, "pid_common_cascade_mode", line_follow_pid_debug.cascade_mode);
         append_bool(enabled, "pid_common_vision_updated", line_follow_pid_debug.vision_updated);
         append_bool(enabled, "pid_common_imu_updated", line_follow_pid_debug.imu_updated);
         append_int(enabled, "pid_common_route_main_state", line_follow_pid_debug.route_main_state);
@@ -955,8 +956,11 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_current_track_point_angle_deg", line_follow_pid_debug.current_track_point_angle_deg);
         append_float(enabled, "pid_common_filtered_track_point_angle_deg", line_follow_pid_debug.filtered_track_point_angle_deg);
         append_float(enabled, "pid_common_measured_yaw_rate_dps", line_follow_pid_debug.measured_yaw_rate_dps);
+        append_float(enabled, "pid_common_yaw_rate_ref_from_pos_dps", line_follow_pid_debug.yaw_rate_ref_from_pos_dps);
+        append_float(enabled, "pid_common_yaw_rate_ref_final_dps", line_follow_pid_debug.yaw_rate_ref_final_dps);
         append_float(enabled, "pid_common_yaw_rate_ref_dps", line_follow_pid_debug.yaw_rate_ref_dps);
         append_float(enabled, "pid_common_yaw_rate_error_dps", line_follow_pid_debug.yaw_rate_error_dps);
+        append_float(enabled, "pid_common_delta_v_cmd", line_follow_pid_debug.delta_v_cmd);
         append_float(enabled, "pid_common_target_yaw_rate_abs_filtered_dps",
                      line_follow_pid_debug.target_yaw_rate_abs_filtered_dps);
         append_float(enabled, "pid_common_target_yaw_rate_speed_scale",
@@ -1010,11 +1014,17 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_speed_scheme_max_rise_ratio_per_cycle",
                      line_follow_pid_debug.speed_scheme_max_rise_ratio_per_cycle);
         append_bool(enabled, "pid_common_force_full_speed", line_follow_pid_debug.force_full_speed);
+        append_float(enabled, "pid_common_speed_command_base", line_follow_pid_debug.speed_command_base);
+        append_float(enabled, "pid_common_speed_command_diff", line_follow_pid_debug.speed_command_diff);
         append_float(enabled, "pid_common_raw_steering_output", line_follow_pid_debug.raw_steering_output);
         append_float(enabled, "pid_common_clamped_steering_output", line_follow_pid_debug.clamped_steering_output);
         append_float(enabled, "pid_common_applied_steering_output", line_follow_pid_debug.applied_steering_output);
         append_float(enabled, "pid_common_left_target_count_from_line_follow", line_follow_pid_debug.left_target_count);
         append_float(enabled, "pid_common_right_target_count_from_line_follow", line_follow_pid_debug.right_target_count);
+        append_float(enabled, "pid_common_speed_debug_left_target_applied",
+                     line_follow_pid_debug.speed_debug_left_target_applied);
+        append_float(enabled, "pid_common_speed_debug_right_target_applied",
+                     line_follow_pid_debug.speed_debug_right_target_applied);
         append_float(enabled, "pid_common_vision_dt_ms", line_follow_pid_debug.vision_dt_ms);
         append_float(enabled, "pid_common_imu_dt_ms", line_follow_pid_debug.imu_dt_ms);
         append_float(enabled, "pid_common_motor_integral_limit", motor_pid_debug.integral_limit);

@@ -4,6 +4,7 @@
 #include "brushless.h"
 #include "pid.h"
 
+#include <algorithm>
 #include <atomic>
 #include <mutex>
 #include <pthread.h>
@@ -26,6 +27,8 @@ std::atomic<int32> g_thread_priority(0);
 
 // 目标计数保护
 std::mutex g_target_mutex;
+float g_target_base_speed = 0.0f;
+float g_target_diff_speed = 0.0f;
 float g_target_left_count = 0.0f;
 float g_target_right_count = 0.0f;
 
@@ -49,6 +52,24 @@ std::atomic<float> g_right_hardware_duty{0.0f};
 std::atomic<int> g_left_dir_level{1};
 std::atomic<int> g_right_dir_level{1};
 std::atomic<bool> g_reload_from_globals_requested(false);
+
+float clamp_target_count(float value)
+{
+    return std::clamp(value, TARGET_COUNT_MIN, TARGET_COUNT_MAX);
+}
+
+void apply_speed_command_locked(float base_speed, float diff_speed)
+{
+    const float clamped_base = clamp_target_count(base_speed);
+    const float diff_min = std::max(clamped_base - TARGET_COUNT_MAX, TARGET_COUNT_MIN - clamped_base);
+    const float diff_max = std::min(clamped_base - TARGET_COUNT_MIN, TARGET_COUNT_MAX - clamped_base);
+    const float clamped_diff = std::clamp(diff_speed, diff_min, diff_max);
+
+    g_target_base_speed = clamped_base;
+    g_target_diff_speed = clamped_diff;
+    g_target_left_count = clamp_target_count(clamped_base - clamped_diff);
+    g_target_right_count = clamp_target_count(clamped_base + clamped_diff);
+}
 
 /**
  * @brief 将调度策略枚举转换为字符串
@@ -220,11 +241,17 @@ bool motor_thread_init()
     return true;
 }
 
-void motor_thread_set_target_count(float left_count, float right_count)
+void motor_thread_set_speed_command(float base_speed, float diff_speed)
 {
     std::lock_guard<std::mutex> lock(g_target_mutex);
-    g_target_left_count = std::clamp(left_count, TARGET_COUNT_MIN, TARGET_COUNT_MAX);
-    g_target_right_count = std::clamp(right_count, TARGET_COUNT_MIN, TARGET_COUNT_MAX);
+    apply_speed_command_locked(base_speed, diff_speed);
+}
+
+void motor_thread_set_target_count(float left_count, float right_count)
+{
+    const float base_speed = 0.5f * (left_count + right_count);
+    const float diff_speed = 0.5f * (right_count - left_count);
+    motor_thread_set_speed_command(base_speed, diff_speed);
 }
 
 float motor_thread_left_count()
@@ -317,6 +344,18 @@ int motor_thread_right_dir_level()
     return g_right_dir_level.load();
 }
 
+float motor_thread_base_speed_command()
+{
+    std::lock_guard<std::mutex> lock(g_target_mutex);
+    return g_target_base_speed;
+}
+
+float motor_thread_diff_speed_command()
+{
+    std::lock_guard<std::mutex> lock(g_target_mutex);
+    return g_target_diff_speed;
+}
+
 float motor_thread_left_target_count()
 {
     std::lock_guard<std::mutex> lock(g_target_mutex);
@@ -335,6 +374,8 @@ MotorUartStatus motor_thread_uart_status()
 
     {
         std::lock_guard<std::mutex> lock(g_target_mutex);
+        status.base_speed = g_target_base_speed;
+        status.diff_speed = g_target_diff_speed;
         status.left_target_count = g_target_left_count;
         status.right_target_count = g_target_right_count;
     }

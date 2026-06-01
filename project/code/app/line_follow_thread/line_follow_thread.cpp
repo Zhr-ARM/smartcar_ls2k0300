@@ -110,6 +110,7 @@ int g_last_logged_route_main_state = VISION_ROUTE_MAIN_NORMAL;
 int g_last_logged_route_sub_state = VISION_ROUTE_SUB_NONE;
 std::mutex g_pid_debug_mutex;
 LineFollowPidDebugStatus g_pid_debug_status{};
+int g_last_cascade_mode = 0;
 
 struct RouteProfileSelection
 {
@@ -130,6 +131,13 @@ struct TargetYawRateSpeedRuntime
     float speed_scale;
     bool ready;
     bool triggered;
+};
+
+enum CascadeMode
+{
+    CASCADE_MODE_NORMAL = 0,
+    CASCADE_MODE_YAW_DEBUG = 1,
+    CASCADE_MODE_SPEED_DEBUG = 2,
 };
 
 float apply_iir_filter(float previous_value, float current_value, float alpha)
@@ -248,6 +256,7 @@ void reset_line_follow_runtime_state()
     g_has_last_logged_route_state = false;
     g_last_logged_route_main_state = VISION_ROUTE_MAIN_NORMAL;
     g_last_logged_route_sub_state = VISION_ROUTE_SUB_NONE;
+    g_last_cascade_mode = CASCADE_MODE_NORMAL;
     std::lock_guard<std::mutex> lock(g_pid_debug_mutex);
     g_pid_debug_status = {};
 }
@@ -535,16 +544,6 @@ float update_applied_base_speed(float current_base_speed,
                       current_base_speed + max_rise);
 }
 
-float clamp_steering_to_wheel_room(float applied_base_speed, float raw_steering_output)
-{
-    const float max_left_turn_room = applied_base_speed - pid_tuning::line_follow::kTargetCountMin;
-    const float max_right_turn_room = pid_tuning::line_follow::kTargetCountMax - applied_base_speed;
-    const float available_steering_limit = std::max(0.0f, std::min(max_left_turn_room, max_right_turn_room));
-    return std::clamp(raw_steering_output,
-                      -available_steering_limit,
-                      available_steering_limit);
-}
-
 bool update_filtered_yaw_rate_if_new_sample(float *sample_dt_seconds_out)
 {
     const uint32 imu_sample_seq = imu_thread_gyro_z_sample_seq();
@@ -661,8 +660,8 @@ void refresh_thread_info()
  * 1) 视觉模块先给出采样行处的赛道中线偏差 line_error（像素）；
  * 2) 巡线线程只在“拿到新视觉帧 / 新 IMU 样本”时推进各自滤波状态；
  * 3) 再统一方向约定，并通过归一化、死区、小误差降增益把视觉噪声整形成“可控误差”；
- * 4) 位置环 PID 负责“回中线”，角速度环 PID 负责“按视觉期望横摆率转过去”；
- * 5) 两条反馈支路并级叠加成最终差速，再叠加基础速度与角速度变化率降速后下发左右轮目标。
+ * 4) 位置环 PID 输出目标横摆角速度，角速度环 PID 输出差速速度量；
+ * 5) 最终按左右轮目标映射并结合降速策略下发到速度环。
  */
 void line_follow_loop()
 {
@@ -723,18 +722,51 @@ void line_follow_loop()
                                               route_profile.position_dynamic_kp_max,
                                               error_state.control_error_px);
 
-        // 第二条支路：角速度环 PID。
-        // 当前固定采用“跟踪点夹角 -> 目标横摆角速度”的路线：
-        // 1) 跟踪点偏角负责告诉车头“该往哪边、该多快转”；
-        // 2) IMU 负责反馈“车身现在实际转了多少”；
-        // 3) 角速度环去逼近这个由夹角生成的目标横摆角速度。
-        // 这样位置环和角速度环职责更清楚：位置环回中线，角速度环管车头朝向。
-        const float yaw_rate_ref_dps = std::clamp(
-            g_filtered_track_point_angle_deg * route_profile.yaw_rate_ref_from_track_point_gain_dps,
-            -route_profile.yaw_rate_ref_limit_dps,
-            route_profile.yaw_rate_ref_limit_dps);
-        //角速度的差
-        const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 目标角速度与实际角速度之差
+        const bool speed_loop_debug_enabled = pid_tuning::line_follow::kSpeedLoopDebugEnabled;
+        const bool yaw_rate_debug_enabled = !speed_loop_debug_enabled &&
+                                            pid_tuning::line_follow::kYawRateDebugEnabled;
+        const int cascade_mode = speed_loop_debug_enabled ? CASCADE_MODE_SPEED_DEBUG
+                                                          : (yaw_rate_debug_enabled ? CASCADE_MODE_YAW_DEBUG
+                                                                                    : CASCADE_MODE_NORMAL);
+        if (cascade_mode != g_last_cascade_mode)
+        {
+            // 调试模式切换时复位串级状态，避免上级积分残留冲击。
+            position_pid1.reset();
+            position_pid2.reset();
+            g_position_output_state = 0.0f;
+            g_yaw_rate_output_state = 0.0f;
+            g_has_last_position_pid_time = false;
+            g_has_last_yaw_rate_pid_time = false;
+            g_last_cascade_mode = cascade_mode;
+        }
+
+        const float position_pid_output_limit = std::max(route_profile.yaw_rate_ref_limit_dps, 0.0f);
+        configure_line_follow_controllers_for_profile(route_profile,
+                                                      dynamic_kp,
+                                                      route_profile.position_kd,
+                                                      route_profile.yaw_rate_kp);
+
+        g_position_output_state = update_pid_output_state_if_needed(vision_updated,
+                                                                    error_state.control_error_px,
+                                                                    vision_frame_dt_seconds,
+                                                                    g_last_position_pid_time,
+                                                                    g_has_last_position_pid_time,
+                                                                    position_pid_output_limit,
+                                                                    position_pid1,
+                                                                    g_position_output_state);
+        const float realtime_speed =
+            0.5f * (std::fabs(motor_thread_left_filtered_count()) +
+                    std::fabs(motor_thread_right_filtered_count()));
+        const float yaw_rate_ref_from_pos_dps =
+            std::clamp(g_position_output_state * route_profile.yaw_rate_ref_from_error_gain_dps,
+                       -route_profile.yaw_rate_ref_limit_dps,
+                       route_profile.yaw_rate_ref_limit_dps);
+        const float yaw_rate_ref_final_dps = yaw_rate_debug_enabled
+                                                 ? std::clamp(pid_tuning::line_follow::kYawRateDebugTargetDps,
+                                                              -route_profile.yaw_rate_ref_limit_dps,
+                                                              route_profile.yaw_rate_ref_limit_dps)
+                                                 : yaw_rate_ref_from_pos_dps;
+        const float yaw_rate_error_dps = yaw_rate_ref_final_dps - g_filtered_yaw_rate_dps;
         const float dynamic_yaw_rate_kp = compute_linear_abs_gain(route_profile.yaw_rate_kp,
                                                                   route_profile.yaw_rate_dynamic_kp_quad_a,
                                                                   route_profile.yaw_rate_dynamic_kp_min,
@@ -744,27 +776,9 @@ void line_follow_loop()
             (route_profile.yaw_rate_kp_enable_error_threshold_px <= 0.0f) ||
             (error_state.abs_filtered_error_px >= route_profile.yaw_rate_kp_enable_error_threshold_px);
         const float applied_yaw_rate_kp = enable_yaw_rate_kp ? dynamic_yaw_rate_kp : 0.0f;
-        configure_line_follow_controllers_for_profile(route_profile,
-                                                      dynamic_kp,
-                                                      route_profile.position_kd,
-                                                      applied_yaw_rate_kp);
-
-        // ---------------- 并级控制核心 ----------------
-        // 第一条支路：位置环 PID，只负责“把车拉回中线”。
-        // 它盯的是横向误差 e，输出一份差速量。
-        g_position_output_state = update_pid_output_state_if_needed(vision_updated,
-                                                                    error_state.control_error_px,
-                                                                    vision_frame_dt_seconds,
-                                                                    g_last_position_pid_time,
-                                                                    g_has_last_position_pid_time,
-                                                                    route_profile.position_max_output,
-                                                                    position_pid1,
-                                                                    g_position_output_state);
-        const float realtime_speed =
-            0.5f * (std::fabs(motor_thread_left_filtered_count()) +
-                    std::fabs(motor_thread_right_filtered_count()));
-        const float position_pid_output = g_position_output_state;
-        const float position_output = position_pid_output;
+        position_pid2.set_params(applied_yaw_rate_kp, route_profile.yaw_rate_ki, route_profile.yaw_rate_kd);
+        position_pid2.set_integral_limit(route_profile.yaw_rate_max_integral);
+        position_pid2.set_output_limit(route_profile.yaw_rate_max_output);
 
         const float yaw_rate_pid_dt_fallback =
             vision_updated ? vision_frame_dt_seconds : imu_sample_dt_seconds;
@@ -776,14 +790,12 @@ void line_follow_loop()
                                                                     route_profile.yaw_rate_max_output,
                                                                     position_pid2,
                                                                     g_yaw_rate_output_state);
-        const float yaw_rate_output = g_yaw_rate_output_state;
+        const float delta_v_cmd = g_yaw_rate_output_state;
 
         const int selected_centerline_count = vision_image_processor_ipm_selected_centerline_count();
-        const float feedback_output = position_output + yaw_rate_output;
-        const float raw_steering_output =
-            std::clamp(feedback_output,
-                       -route_profile.steering_max_output,
-                       route_profile.steering_max_output);
+        const float raw_steering_output = std::clamp(delta_v_cmd,
+                                                     -route_profile.steering_max_output,
+                                                     route_profile.steering_max_output);
 
         bool force_full_speed = false;
         const float mean_abs_path_error = vision_image_processor_ipm_mean_abs_offset_error(); // 视觉给出的整条分析路径平均绝对偏差像素
@@ -795,7 +807,7 @@ void line_follow_loop()
         const TargetYawRateSpeedRuntime target_yaw_rate_runtime =
             update_target_yaw_rate_speed_runtime(vision_updated,
                                                  vision_frame_dt_seconds,
-                                                 yaw_rate_ref_dps,
+                                                 yaw_rate_ref_final_dps,
                                                  speed_scheme);
         const float speed_scheme_error_scale_raw = target_yaw_rate_runtime.speed_scale;
         const float min_base_speed = std::clamp(speed_scheme.min_base_speed, 0.0f, profile_base_speed);
@@ -817,24 +829,21 @@ void line_follow_loop()
         const float applied_base_speed = std::clamp(g_applied_base_speed_state, // 经过所有降速和缓冲限幅后的最终下发基础速度
                                                     pid_tuning::line_follow::kTargetCountMin,
                                                     pid_tuning::line_follow::kTargetCountMax);
-        const float steering_output = clamp_steering_to_wheel_room(applied_base_speed,
-                                                                   raw_steering_output);
+        const float speed_command_base = speed_loop_debug_enabled
+                                             ? pid_tuning::line_follow::kSpeedLoopDebugBaseSpeed
+                                             : applied_base_speed;
+        const float speed_command_diff = speed_loop_debug_enabled
+                                             ? pid_tuning::line_follow::kSpeedLoopDebugDiffSpeed
+                                             : raw_steering_output;
 
-        // 差速映射：左轮=base-out，右轮=base+out。
-        // steering_output 为正时，右轮更快、左轮更慢，车体会朝左修正；
-        // steering_output 为负时，左轮更快、右轮更慢，车体会朝右修正。
-        //
-        // 这里先根据当前基础速度剩余的轮速余量，再收一次 steering_output，
-        // 避免最后再由左右轮目标限幅“硬裁切”，让转向行为尽量保持可预期。
-        const float left_target = std::clamp(applied_base_speed - steering_output, // 计算得到的电机左轮最终目标速度
-                                             pid_tuning::line_follow::kTargetCountMin,
-                                             pid_tuning::line_follow::kTargetCountMax);
-        const float right_target = std::clamp(applied_base_speed + steering_output, // 计算得到的电机右轮最终目标速度
-                                              pid_tuning::line_follow::kTargetCountMin,
-                                              pid_tuning::line_follow::kTargetCountMax);
-        // 重新用限幅后的左右轮目标反推实际差速，保证对外上报值和真正下发给电机的一致。
-        const float applied_steering_output = (right_target - left_target) * 0.5f; // 反推出来并实际下放给电机的转向差速调整量
-        motor_thread_set_target_count(left_target, right_target);
+        // 速度环入口统一接收 base + diff。diff 为正时右轮更快、左轮更慢；
+        // 最终左右轮目标和 diff 限幅都由 motor_thread 统一派生，避免上级和速度环各自分配。
+        motor_thread_set_speed_command(speed_command_base, speed_command_diff);
+        const float applied_speed_command_base = motor_thread_base_speed_command();
+        const float applied_steering_output = motor_thread_diff_speed_command();
+        const float left_target = motor_thread_left_target_count();
+        const float right_target = motor_thread_right_target_count();
+        const float steering_output = applied_steering_output;
 
         // 对外发布关键调试量，供屏显/上位机读取。
         // 这样你在调试时能同时看到：看到了多大误差、实际打了多少差速、左右轮目标是多少。
@@ -847,6 +856,7 @@ void line_follow_loop()
 
         {
             std::lock_guard<std::mutex> lock(g_pid_debug_mutex);
+            g_pid_debug_status.cascade_mode = cascade_mode;
             g_pid_debug_status.vision_updated = vision_updated;
             g_pid_debug_status.imu_updated = imu_updated;
             g_pid_debug_status.route_main_state = route_main_state;
@@ -865,8 +875,11 @@ void line_follow_loop()
             g_pid_debug_status.current_track_point_angle_deg = current_track_point_angle_deg;
             g_pid_debug_status.filtered_track_point_angle_deg = g_filtered_track_point_angle_deg;
             g_pid_debug_status.measured_yaw_rate_dps = measured_yaw_rate_dps;
-            g_pid_debug_status.yaw_rate_ref_dps = yaw_rate_ref_dps;
+            g_pid_debug_status.yaw_rate_ref_from_pos_dps = yaw_rate_ref_from_pos_dps;
+            g_pid_debug_status.yaw_rate_ref_final_dps = yaw_rate_ref_final_dps;
+            g_pid_debug_status.yaw_rate_ref_dps = yaw_rate_ref_final_dps;
             g_pid_debug_status.yaw_rate_error_dps = yaw_rate_error_dps;
+            g_pid_debug_status.delta_v_cmd = delta_v_cmd;
             g_pid_debug_status.target_yaw_rate_abs_filtered_dps =
                 target_yaw_rate_runtime.filtered_abs_target_yaw_rate_dps;
             g_pid_debug_status.target_yaw_rate_speed_scale =
@@ -892,7 +905,7 @@ void line_follow_loop()
             g_pid_debug_status.yaw_pid_output = position_pid2.get_output();
             g_pid_debug_status.yaw_pid_max_integral = position_pid2.max_integral();
             g_pid_debug_status.yaw_pid_max_output = position_pid2.max_output();
-            g_pid_debug_status.route_yaw_rate_ref_gain = route_profile.yaw_rate_ref_from_track_point_gain_dps;
+            g_pid_debug_status.route_yaw_rate_ref_gain = route_profile.yaw_rate_ref_from_error_gain_dps;
             g_pid_debug_status.route_yaw_rate_ref_limit = route_profile.yaw_rate_ref_limit_dps;
             g_pid_debug_status.route_steering_max_output = route_profile.steering_max_output;
             g_pid_debug_status.route_yaw_rate_kp_enable_error_threshold_px =
@@ -911,11 +924,15 @@ void line_follow_loop()
             g_pid_debug_status.speed_scheme_max_drop_ratio_per_cycle = speed_scheme.max_drop_ratio_per_cycle;
             g_pid_debug_status.speed_scheme_max_rise_ratio_per_cycle = speed_scheme.max_rise_ratio_per_cycle;
             g_pid_debug_status.force_full_speed = force_full_speed;
+            g_pid_debug_status.speed_command_base = applied_speed_command_base;
+            g_pid_debug_status.speed_command_diff = applied_steering_output;
             g_pid_debug_status.raw_steering_output = raw_steering_output;
             g_pid_debug_status.clamped_steering_output = steering_output;
             g_pid_debug_status.applied_steering_output = applied_steering_output;
             g_pid_debug_status.left_target_count = left_target;
             g_pid_debug_status.right_target_count = right_target;
+            g_pid_debug_status.speed_debug_left_target_applied = speed_loop_debug_enabled ? left_target : 0.0f;
+            g_pid_debug_status.speed_debug_right_target_applied = speed_loop_debug_enabled ? right_target : 0.0f;
             g_pid_debug_status.vision_dt_ms = vision_frame_dt_seconds * 1000.0f;
             g_pid_debug_status.imu_dt_ms = imu_sample_dt_seconds * 1000.0f;
         }
@@ -942,9 +959,8 @@ bool line_follow_thread_init()
                        default_profile.position_max_integral,
                        default_profile.position_max_output);
     position_pid1.set_target(0.0f);
-    // 角速度环：同样目标为 0，但真正计算时使用的是 compute_by_error(r_ref - r)。
-    // 这里明确采用位置式 PID，把“目标角速度和实际角速度的差”直接变成一份差速补偿量。
-    // 这样更符合它作为并级支路的角色，也更方便你后面直接看输出大小来调参。
+    // 角速度环：目标仍为 0，但运行时使用 compute_by_error(r_ref - r)。
+    // 串级模式下它直接输出差速速度量（delta_v）。
     position_pid2.init(default_profile.yaw_rate_kp,
                        default_profile.yaw_rate_ki,
                        default_profile.yaw_rate_kd,

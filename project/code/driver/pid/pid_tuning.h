@@ -61,6 +61,13 @@ extern float kTargetCountMax;
 extern float kErrorDeadzonePx;
 extern float kErrorLowGainLimitPx;
 extern float kErrorLowGain;
+extern bool kYawRateDebugEnabled;
+extern float kYawRateDebugTargetDps;
+extern bool kSpeedLoopDebugEnabled;
+extern float kSpeedLoopDebugLeftTarget;
+extern float kSpeedLoopDebugRightTarget;
+extern float kSpeedLoopDebugBaseSpeed;
+extern float kSpeedLoopDebugDiffSpeed;
 } // namespace line_follow
 
 namespace line_error_preview

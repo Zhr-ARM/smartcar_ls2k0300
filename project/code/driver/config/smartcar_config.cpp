@@ -79,6 +79,13 @@ struct PidSnapshot
     float line_follow_error_deadzone_px = 0.0f;
     float line_follow_error_low_gain_limit_px = 0.0f;
     float line_follow_error_low_gain = 0.0f;
+    bool line_follow_yaw_rate_debug_enabled = false;
+    float line_follow_yaw_rate_debug_target_dps = 0.0f;
+    bool line_follow_speed_loop_debug_enabled = false;
+    float line_follow_speed_loop_debug_left_target = 0.0f;
+    float line_follow_speed_loop_debug_right_target = 0.0f;
+    float line_follow_speed_loop_debug_base_speed = 0.0f;
+    float line_follow_speed_loop_debug_diff_speed = 0.0f;
 
     pid_tuning::line_error_preview::WeightedProfile normal_weighted_profile{};
     pid_tuning::line_error_preview::WeightedProfile straight_weighted_profile{};
@@ -766,6 +773,13 @@ PidSnapshot capture_pid_snapshot()
     snapshot.line_follow_error_deadzone_px = pid_tuning::line_follow::kErrorDeadzonePx;
     snapshot.line_follow_error_low_gain_limit_px = pid_tuning::line_follow::kErrorLowGainLimitPx;
     snapshot.line_follow_error_low_gain = pid_tuning::line_follow::kErrorLowGain;
+    snapshot.line_follow_yaw_rate_debug_enabled = pid_tuning::line_follow::kYawRateDebugEnabled;
+    snapshot.line_follow_yaw_rate_debug_target_dps = pid_tuning::line_follow::kYawRateDebugTargetDps;
+    snapshot.line_follow_speed_loop_debug_enabled = pid_tuning::line_follow::kSpeedLoopDebugEnabled;
+    snapshot.line_follow_speed_loop_debug_left_target = pid_tuning::line_follow::kSpeedLoopDebugLeftTarget;
+    snapshot.line_follow_speed_loop_debug_right_target = pid_tuning::line_follow::kSpeedLoopDebugRightTarget;
+    snapshot.line_follow_speed_loop_debug_base_speed = pid_tuning::line_follow::kSpeedLoopDebugBaseSpeed;
+    snapshot.line_follow_speed_loop_debug_diff_speed = pid_tuning::line_follow::kSpeedLoopDebugDiffSpeed;
 
     snapshot.normal_weighted_profile = pid_tuning::line_error_preview::kNormalWeightedProfile;
     snapshot.straight_weighted_profile = pid_tuning::line_error_preview::kStraightWeightedProfile;
@@ -823,6 +837,13 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
     pid_tuning::line_follow::kErrorDeadzonePx = snapshot.line_follow_error_deadzone_px;
     pid_tuning::line_follow::kErrorLowGainLimitPx = snapshot.line_follow_error_low_gain_limit_px;
     pid_tuning::line_follow::kErrorLowGain = snapshot.line_follow_error_low_gain;
+    pid_tuning::line_follow::kYawRateDebugEnabled = snapshot.line_follow_yaw_rate_debug_enabled;
+    pid_tuning::line_follow::kYawRateDebugTargetDps = snapshot.line_follow_yaw_rate_debug_target_dps;
+    pid_tuning::line_follow::kSpeedLoopDebugEnabled = snapshot.line_follow_speed_loop_debug_enabled;
+    pid_tuning::line_follow::kSpeedLoopDebugLeftTarget = snapshot.line_follow_speed_loop_debug_left_target;
+    pid_tuning::line_follow::kSpeedLoopDebugRightTarget = snapshot.line_follow_speed_loop_debug_right_target;
+    pid_tuning::line_follow::kSpeedLoopDebugBaseSpeed = snapshot.line_follow_speed_loop_debug_base_speed;
+    pid_tuning::line_follow::kSpeedLoopDebugDiffSpeed = snapshot.line_follow_speed_loop_debug_diff_speed;
 
     pid_tuning::line_error_preview::kNormalWeightedProfile = snapshot.normal_weighted_profile;
     pid_tuning::line_error_preview::kStraightWeightedProfile = snapshot.straight_weighted_profile;
@@ -1234,6 +1255,43 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_PID_FLOAT("pid.line_follow.error_deadzone_px", pid_tuning::line_follow::kErrorDeadzonePx);
     REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain_limit_px", pid_tuning::line_follow::kErrorLowGainLimitPx);
     REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain", pid_tuning::line_follow::kErrorLowGain);
+    if (!require_bool(values, &consumed, "pid.line_follow.yaw_rate_debug_enabled", &pid_tuning::line_follow::kYawRateDebugEnabled, error_message))
+    {
+        return false;
+    }
+    REQUIRE_PID_FLOAT("pid.line_follow.yaw_rate_debug_target_dps", pid_tuning::line_follow::kYawRateDebugTargetDps);
+    if (!require_bool(values, &consumed, "pid.line_follow.speed_loop_debug_enabled", &pid_tuning::line_follow::kSpeedLoopDebugEnabled, error_message))
+    {
+        return false;
+    }
+    const bool has_speed_debug_base =
+        values.find("pid.line_follow.speed_loop_debug_base_speed") != values.end();
+    const bool has_speed_debug_diff =
+        values.find("pid.line_follow.speed_loop_debug_diff_speed") != values.end();
+    if (has_speed_debug_base || has_speed_debug_diff)
+    {
+        REQUIRE_PID_FLOAT("pid.line_follow.speed_loop_debug_base_speed", pid_tuning::line_follow::kSpeedLoopDebugBaseSpeed);
+        REQUIRE_PID_FLOAT("pid.line_follow.speed_loop_debug_diff_speed", pid_tuning::line_follow::kSpeedLoopDebugDiffSpeed);
+        pid_tuning::line_follow::kSpeedLoopDebugLeftTarget =
+            pid_tuning::line_follow::kSpeedLoopDebugBaseSpeed -
+            pid_tuning::line_follow::kSpeedLoopDebugDiffSpeed;
+        pid_tuning::line_follow::kSpeedLoopDebugRightTarget =
+            pid_tuning::line_follow::kSpeedLoopDebugBaseSpeed +
+            pid_tuning::line_follow::kSpeedLoopDebugDiffSpeed;
+        consume_optional_key_if_present(values, &consumed, "pid.line_follow.speed_loop_debug_left_target");
+        consume_optional_key_if_present(values, &consumed, "pid.line_follow.speed_loop_debug_right_target");
+    }
+    else
+    {
+        REQUIRE_PID_FLOAT("pid.line_follow.speed_loop_debug_left_target", pid_tuning::line_follow::kSpeedLoopDebugLeftTarget);
+        REQUIRE_PID_FLOAT("pid.line_follow.speed_loop_debug_right_target", pid_tuning::line_follow::kSpeedLoopDebugRightTarget);
+        pid_tuning::line_follow::kSpeedLoopDebugBaseSpeed =
+            0.5f * (pid_tuning::line_follow::kSpeedLoopDebugLeftTarget +
+                    pid_tuning::line_follow::kSpeedLoopDebugRightTarget);
+        pid_tuning::line_follow::kSpeedLoopDebugDiffSpeed =
+            0.5f * (pid_tuning::line_follow::kSpeedLoopDebugRightTarget -
+                    pid_tuning::line_follow::kSpeedLoopDebugLeftTarget);
+    }
     REQUIRE_PID_FLOAT("pid.route_line_follow.global.base_speed_scale", pid_tuning::route_line_follow::kGlobalBaseSpeedScale);
 
 #undef REQUIRE_PID_FLOAT

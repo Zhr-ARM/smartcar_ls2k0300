@@ -1457,10 +1457,41 @@
     .pid-status-body {
       padding: 10px;
     }
-    .pid-column-common .pid-list {
+    .pid-three-loop {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 5px;
+    }
+    .pid-loop-header,
+    .pid-loop-row {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
+      gap: 6px;
+      align-items: stretch;
+    }
+    .pid-loop-header {
+      color: var(--console-muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      padding: 0 6px;
+    }
+    .pid-loop-row {
+      background: #10161c;
+      border-radius: 4px;
+      padding: 5px 6px;
+    }
+    .pid-loop-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--console-cyan);
+      align-self: center;
+      white-space: nowrap;
+    }
+    .pid-loop-value {
+      font-size: 11px;
+      line-height: 1.28;
+      word-break: break-all;
+      min-width: 0;
     }
     .pid-deep-panel {
       border: 1px solid var(--console-line-soft);
@@ -1800,7 +1831,32 @@
             <div class="pid-panel">
               <div class="pid-column pid-column-common">
                 <div class="pid-column-title">共同摘要</div>
-                <div class="pid-list" id="pidCommonList"></div>
+                <div class="pid-three-loop" id="pidCommonList">
+                  <div class="pid-loop-header">
+                    <span>环路</span>
+                    <span>目标</span>
+                    <span>实际</span>
+                    <span>输出</span>
+                  </div>
+                  <div class="pid-loop-row">
+                    <div class="pid-loop-title">位置环</div>
+                    <div class="pid-loop-value loop-pos-target">--</div>
+                    <div class="pid-loop-value loop-pos-actual">--</div>
+                    <div class="pid-loop-value loop-pos-output">--</div>
+                  </div>
+                  <div class="pid-loop-row">
+                    <div class="pid-loop-title">角速度环</div>
+                    <div class="pid-loop-value loop-yaw-target">--</div>
+                    <div class="pid-loop-value loop-yaw-actual">--</div>
+                    <div class="pid-loop-value loop-yaw-output">--</div>
+                  </div>
+                  <div class="pid-loop-row">
+                    <div class="pid-loop-title">速度环</div>
+                    <div class="pid-loop-value loop-spd-target">--</div>
+                    <div class="pid-loop-value loop-spd-actual">--</div>
+                    <div class="pid-loop-value loop-spd-output">--</div>
+                  </div>
+                </div>
               </div>
               <details class="pid-deep-panel">
                 <summary>共同完整执行链</summary>
@@ -3008,6 +3064,48 @@
       }).join('');
     }
 
+    function renderCommonSummary(status, container) {
+      if (!container) return;
+      const setVal = (cls, val) => {
+        const el = container.querySelector('.loop-' + cls);
+        if (el) el.textContent = fmtPidValue(val);
+      };
+      const firstValue = (...values) => values.find((value) => value !== undefined && value !== null);
+      const compactPair = (left, right) => `L/R ${fmtPidValue(left)} / ${fmtPidValue(right)}`;
+      const compactNamedPair = (name, left, right) => `${name} ${fmtPidValue(left)} / ${fmtPidValue(right)}`;
+      const compactBaseTargets = (base, diff, left, right) =>
+        `base ${fmtPidValue(base)} | diff ${fmtPidValue(diff)} | ${compactPair(left, right)}`;
+
+      setVal('pos-target', status.pid_common_position_pid_target);
+      setVal('pos-actual', status.pid_common_position_pid_error);
+      setVal('pos-output', status.pid_common_position_pid_output);
+
+      setVal('yaw-target', status.pid_common_yaw_pid_target);
+      setVal('yaw-actual', status.pid_common_measured_yaw_rate_dps);
+      setVal('yaw-output', status.pid_common_yaw_pid_output);
+
+      setVal('spd-target', compactBaseTargets(
+        firstValue(status.pid_common_speed_command_base, status.base_speed),
+        firstValue(status.pid_common_speed_command_diff, status.pid_common_applied_steering_output),
+        firstValue(status.pid_left_target_count, status.left_target_count),
+        firstValue(status.pid_right_target_count, status.right_target_count)
+      ));
+      setVal('spd-actual', compactNamedPair('fb',
+        firstValue(status.pid_left_feedback, status.left_filtered_count, status.pid_left_current_count, status.left_current_count),
+        firstValue(status.pid_right_feedback, status.right_filtered_count, status.pid_right_current_count, status.right_current_count)
+      ));
+      setVal('spd-output', [
+        compactNamedPair('pwm',
+        firstValue(status.pid_left_duty, status.pid_left_hardware_duty),
+        firstValue(status.pid_right_duty, status.pid_right_hardware_duty)
+        ),
+        compactNamedPair('修',
+          status.pid_left_correction,
+          status.pid_right_correction
+        )
+      ].join(' | '));
+    }
+
     function renderPidStatusPanelInto(status, commonContainer, leftContainer, rightContainer, slowdownContainer, commonFullContainer) {
       const commonRows = [
         ['vision_updated', status.pid_common_vision_updated],
@@ -3051,6 +3149,7 @@
         ['speed_scheme_point_count', status.pid_common_speed_scheme_point_count],
         ['speed_scheme_ramp(rise/drop)', [status.pid_common_speed_scheme_max_rise_ratio_per_cycle, status.pid_common_speed_scheme_max_drop_ratio_per_cycle]],
         ['speed_scheme_state(ready/triggered/winner)', [status.pid_common_speed_scheme_ready, status.pid_common_speed_scheme_triggered, slowdownWinnerLabel(status.pid_common_speed_scheme_winner_branch)]],
+        ['speed_command(base/diff)', [status.pid_common_speed_command_base, status.pid_common_speed_command_diff]],
         ['steering(raw/clamped/applied)', [status.pid_common_raw_steering_output, status.pid_common_clamped_steering_output, status.pid_common_applied_steering_output]],
         ['line_follow_targets(L/R)', [status.pid_common_left_target_count_from_line_follow, status.pid_common_right_target_count_from_line_follow]],
         ['motor_current_count(L/R)', [status.pid_left_current_count ?? status.left_current_count, status.pid_right_current_count ?? status.right_current_count]],
@@ -3096,7 +3195,11 @@
         ['dir_level', status.pid_right_dir_level]
       ].filter(([, value]) => value !== undefined && value !== null);
 
-      renderPidColumn(commonContainer, commonRows.slice(0, 10));
+      if (commonContainer && (commonContainer.classList.contains('pid-three-loop') || commonContainer.querySelector('.pid-three-loop'))) {
+        renderCommonSummary(status, commonContainer);
+      } else {
+        renderPidColumn(commonContainer, commonRows.slice(0, 10));
+      }
       renderPidColumn(commonFullContainer, commonRows);
       renderPidColumn(leftContainer, leftRows);
       renderPidColumn(rightContainer, rightRows);

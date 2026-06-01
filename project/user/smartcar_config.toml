@@ -423,15 +423,15 @@ gyro_yaw_rate_filter_alpha = 0.45
 
 [pid.motor_speed]
 # 左轮速度环 Kp。
-left_kp = 0.22
+left_kp = 0.055
 # 左轮速度环 Ki。
-left_ki = 0.0
+left_ki = 0.00078
 # 左轮速度环 Kd。
 left_kd = 0.0
 # 右轮速度环 Kp。
-right_kp = 0.19
+right_kp = 0.055
 # 右轮速度环 Ki。
-right_ki = 0.0
+right_ki = 0.00078
 # 右轮速度环 Kd。
 right_kd = 0.0
 # 速度环积分限幅。
@@ -439,31 +439,31 @@ integral_limit = 0.0
 # 单周期 PID 修正项最大变化步长。
 max_output_step = 9.0
 # PID 修正项总限幅。
-correction_limit = 8.5
+correction_limit = 60
 # 左轮前馈斜率。
-left_feedforward_gain = 0.0330
+left_feedforward_gain = 0.0
 # 右轮前馈斜率。
-right_feedforward_gain = 0.0295
+right_feedforward_gain = 0.0
 # 左轮静摩擦补偿。
-left_feedforward_bias = 11.0
+left_feedforward_bias = 0
 # 右轮静摩擦补偿。
-right_feedforward_bias = 11.0
+right_feedforward_bias = 0
 # 静摩擦补偿触发阈值。
-feedforward_bias_threshold = 5.0
+feedforward_bias_threshold = 0
 # 左轮低速额外前馈补偿，随目标速度升高线性衰减。
-left_feedforward_low_speed_boost = 11.0
+left_feedforward_low_speed_boost = 0
 # 右轮低速额外前馈补偿，随目标速度升高线性衰减。
-right_feedforward_low_speed_boost = 12.0
+right_feedforward_low_speed_boost = 0
 # 左轮低速额外前馈在该目标速度处衰减为 0。
-left_feedforward_low_speed_cutoff = 480.0
+left_feedforward_low_speed_cutoff = 0
 # 右轮低速额外前馈在该目标速度处衰减为 0。
-right_feedforward_low_speed_cutoff = 480.0
+right_feedforward_low_speed_cutoff = 0
 # 减速辅助触发误差阈值。
-decel_error_threshold = 60.0
+decel_error_threshold = 0.0
 # 减速辅助增益。
-decel_duty_gain = 0.015
+decel_duty_gain = 0.0
 # 减速辅助最大输出。
-decel_duty_limit = 2.0
+decel_duty_limit = 0.0
 # 速度反馈平均窗口长度。
 feedback_average_window = 6
 # 速度反馈低通滤波 alpha。
@@ -499,6 +499,16 @@ error_deadzone_px = 0.5
 error_low_gain_limit_px = 1.0
 # 小误差区间降增益倍率。
 error_low_gain = 0.4
+# 角速度环调试模式开关（true 时固定角速度目标，旁路位置环输出）。
+yaw_rate_debug_enabled = false
+# 角速度环调试固定目标，单位 dps（仅 yaw_rate_debug_enabled=true 生效）。
+yaw_rate_debug_target_dps = 0.0
+# 速度环调试模式开关（true 时固定 base/diff 命令，旁路上两级输出）。
+speed_loop_debug_enabled = true
+# 速度环调试固定基础速度（仅 speed_loop_debug_enabled=true 生效）。
+speed_loop_debug_base_speed = 240.0
+# 速度环调试固定差速，正值表示右轮更快（仅 speed_loop_debug_enabled=true 生效）。
+speed_loop_debug_diff_speed = 0.0
 
 [pid.route_line_follow.global]
 # 全局基础速度倍率。

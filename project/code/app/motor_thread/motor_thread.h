@@ -21,6 +21,8 @@ struct MotorPidParams
  */
 struct MotorUartStatus
 {
+    float base_speed;         // 速度环命令基础速度
+    float diff_speed;         // 速度环命令差速，正值表示右轮更快
     float left_target_count;  // 左轮目标计数值
     float right_target_count; // 右轮目标计数值
     float left_feedback;      // 左轮滤波后反馈值
@@ -86,9 +88,17 @@ struct MotorPidDebugStatus
 bool motor_thread_init();
 
 /**
+ * @brief 设置速度环命令
+ * @param base_speed 基础速度(counts/5ms)
+ * @param diff_speed 差速速度(counts/5ms)，正值表示右轮更快、左轮更慢
+ */
+void motor_thread_set_speed_command(float base_speed, float diff_speed);
+
+/**
  * @brief 设置目标计数值
  * @param left_count 左轮目标计数(counts/5ms)
  * @param right_count 右轮目标计数(counts/5ms)
+ * @note 兼容接口：内部会转换为 base=(L+R)/2、diff=(R-L)/2。
  */
 void motor_thread_set_target_count(float left_count, float right_count);
 
@@ -143,6 +153,10 @@ float motor_thread_right_hardware_duty();
 int motor_thread_left_dir_level();
 
 int motor_thread_right_dir_level();
+
+float motor_thread_base_speed_command();
+
+float motor_thread_diff_speed_command();
 
 /**
  * @brief 获取左轮目标计数值
