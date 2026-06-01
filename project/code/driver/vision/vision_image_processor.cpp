@@ -4419,54 +4419,6 @@ static int trim_initial_artificial_frame_prefix_inplace(maze_point_t *pts,
     return prefix_end;
 }
 
-static void truncate_regular_boundary_at_touch_y_inplace(maze_point_t *pts, int *num, int touch_y)
-{
-    if (pts == nullptr || num == nullptr || *num <= 0)
-    {
-        return;
-    }
-
-    const int in_num = std::clamp(*num, 0, VISION_BOUNDARY_NUM);
-    if (in_num <= 0)
-    {
-        *num = 0;
-        return;
-    }
-
-    // 每行规则数组按 y 由大到小排列：
-    // 首个 y <= touch_y 的点即“触边起点行”，该点及其后续（更远处）全部丢弃。
-    for (int i = 0; i < in_num; ++i)
-    {
-        if (pts[i].y <= touch_y)
-        {
-            *num = i;
-            return;
-        }
-    }
-}
-
-static int rebuild_boundary_points_from_row_table(const std::array<int, kProcHeight> &border_x,
-                                                  maze_point_t *pts,
-                                                  int max_pts)
-{
-    if (pts == nullptr || max_pts <= 0)
-    {
-        return 0;
-    }
-
-    int out_num = 0;
-    for (int y = kProcHeight - 2; y >= 1 && out_num < max_pts; --y)
-    {
-        if (border_x[y] < 0)
-        {
-            continue;
-        }
-        pts[out_num++] = {std::clamp(border_x[y], 0, kProcWidth - 1), y};
-    }
-    return out_num;
-}
-
-
 static int truncate_boundary_at_cross_lower_corner_inplace(maze_point_t *pts,
                                                            int num,
                                                            int corner_x,
@@ -4478,25 +4430,20 @@ static int truncate_boundary_at_cross_lower_corner_inplace(maze_point_t *pts,
         return num;
     }
 
-    std::array<int, kProcHeight> border_x{};
-    border_x.fill(-1);
-    for (int i = 0; i < num; ++i)
+    // 在边界点序列中查找最接近角点坐标的点（优先 y 方向，y 相同优先 x）。
+    // 角点下方的点全部保留，角点本身保留，角点上方丢弃。
+    int best_idx = 0;
+    int best_score = std::abs(pts[0].y - corner_y) * 128 + std::abs(pts[0].x - corner_x);
+    for (int i = 1; i < num; ++i)
     {
-        const int y = std::clamp(pts[i].y, 0, kProcHeight - 1);
-        if (y <= 0 || y >= kProcHeight - 1)
+        int score = std::abs(pts[i].y - corner_y) * 128 + std::abs(pts[i].x - corner_x);
+        if (score < best_score)
         {
-            continue;
+            best_score = score;
+            best_idx = i;
         }
-        // 角点之后的真实边界不再使用，仅保留角点及其下方边界。
-        if (y < corner_y)
-        {
-            continue;
-        }
-        border_x[y] = std::clamp(pts[i].x, 0, kProcWidth - 1);
     }
-
-    border_x[std::clamp(corner_y, 1, kProcHeight - 2)] = std::clamp(corner_x, 0, kProcWidth - 1);
-    return rebuild_boundary_points_from_row_table(border_x, pts, std::min(max_pts, VISION_BOUNDARY_NUM));
+    return std::min(best_idx + 1, std::min(num, max_pts));
 }
 
 static int complete_boundary_with_corners(maze_point_t *pts,
@@ -5131,6 +5078,7 @@ bool vision_image_processor_process_step()
         g_src_right_boundary_straight_detected.store(
             detect_src_straight_boundary_from_dirs(right_trace_dirs.data(), right_corner_trace_num));
 
+        // 规则边界保留用于特征检测（角点、跳变等），不做主数据路径。
         left_regular_num = extract_one_point_per_row_from_contour(left_trace_pts.data(),
                                                                   left_trace_num,
                                                                   true,
@@ -5143,12 +5091,13 @@ bool vision_image_processor_process_step()
                                                                    false,
                                                                    right_regular_pts.data(),
                                                                    static_cast<int>(right_regular_pts.size()));
-        left_num = copy_boundary_points(left_regular_pts.data(),
-                                        left_regular_num,
+        // 主数据路径直接使用八邻域 trace 点，保留轮廓完整性以处理赛道回环。
+        left_num = copy_boundary_points(left_trace_pts.data(),
+                                        left_trace_num,
                                         left_pts.data(),
                                         static_cast<int>(left_pts.size()));
-        right_num = copy_boundary_points(right_regular_pts.data(),
-                                         right_regular_num,
+        right_num = copy_boundary_points(right_trace_pts.data(),
+                                         right_trace_num,
                                          right_pts.data(),
                                          static_cast<int>(right_pts.size()));
 
@@ -5444,7 +5393,7 @@ bool vision_image_processor_process_step()
     }
 
     // 在上一帧主状态为 NORMAL/STRAIGHT 时：
-    // 在八邻域工作层检测“第一次触边”行坐标，再作用到按行规则边界。
+    // 在八邻域 trace 上从头查找首次触边点，按索引截断其后所有点。
     // 使用 before_trace 状态，避免本帧已切入 CROSS 导致 NORMAL/STRAIGHT 策略失效。
     // 触边截断后再执行一次角点截断，确保两种截断规则同时生效。
     if (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_NORMAL ||
@@ -5457,13 +5406,19 @@ bool vision_image_processor_process_step()
         g_src_left_first_frame_touch_after_valid_y.store(left_touch_found ? left_touch_y : -1);
         g_src_right_first_frame_touch_after_valid_y.store(right_touch_found ? right_touch_y : -1);
 
-        if (left_touch_found && left_regular_num > 0)
+        if (left_touch_found && left_num > 0)
         {
-            truncate_regular_boundary_at_touch_y_inplace(left_regular_pts.data(), &left_regular_num, left_touch_y);
-            left_num = copy_boundary_points(left_regular_pts.data(),
-                                            left_regular_num,
-                                            left_pts.data(),
-                                            static_cast<int>(left_pts.size()));
+            const int left_touch_idx = find_first_artificial_frame_touch_index(left_pts.data(), left_num);
+            if (left_touch_idx >= 0)
+            {
+                left_num = left_touch_idx;
+            }
+            left_regular_num = extract_one_point_per_row_from_contour(left_pts.data(),
+                                                                      left_num,
+                                                                      true,
+                                                                      false,
+                                                                      left_regular_pts.data(),
+                                                                      static_cast<int>(left_regular_pts.size()));
             if (g_cross_lower_left_corner_found.load())
             {
                 left_num = truncate_boundary_at_cross_lower_corner_inplace(left_pts.data(),
@@ -5473,13 +5428,19 @@ bool vision_image_processor_process_step()
                                                                            static_cast<int>(left_pts.size()));
             }
         }
-        if (right_touch_found && right_regular_num > 0)
+        if (right_touch_found && right_num > 0)
         {
-            truncate_regular_boundary_at_touch_y_inplace(right_regular_pts.data(), &right_regular_num, right_touch_y);
-            right_num = copy_boundary_points(right_regular_pts.data(),
-                                             right_regular_num,
-                                             right_pts.data(),
-                                             static_cast<int>(right_pts.size()));
+            const int right_touch_idx = find_first_artificial_frame_touch_index(right_pts.data(), right_num);
+            if (right_touch_idx >= 0)
+            {
+                right_num = right_touch_idx;
+            }
+            right_regular_num = extract_one_point_per_row_from_contour(right_pts.data(),
+                                                                        right_num,
+                                                                        false,
+                                                                        false,
+                                                                        right_regular_pts.data(),
+                                                                        static_cast<int>(right_regular_pts.size()));
             if (g_cross_lower_right_corner_found.load())
             {
                 right_num = truncate_boundary_at_cross_lower_corner_inplace(right_pts.data(),
@@ -5555,8 +5516,8 @@ bool vision_image_processor_process_step()
     {
         if (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_LEFT_3)
         {
-            const maze_point_t fixed_start = (right_regular_num > 0) ? right_regular_pts[0]
-                                                                     : ((right_num > 0) ? right_pts[0] : maze_point_t{kProcWidth - 2, maze_start_row});
+            const maze_point_t fixed_start = (right_num > 0) ? right_pts[0]
+                                                                     : ((right_regular_num > 0) ? right_regular_pts[0] : maze_point_t{kProcWidth - 2, maze_start_row});
             maze_point_t target = fixed_start;
             const bool target_found = find_nth_dir_point_from_trace_end(left_trace_pts_raw.data(),
                                                                          left_trace_dirs_raw.data(),
@@ -5651,8 +5612,8 @@ bool vision_image_processor_process_step()
     {
         if (route_snapshot.sub_state == VISION_ROUTE_SUB_CIRCLE_RIGHT_3)
         {
-            const maze_point_t fixed_start = (left_regular_num > 0) ? left_regular_pts[0]
-                                                                    : ((left_num > 0) ? left_pts[0] : maze_point_t{1, maze_start_row});
+            const maze_point_t fixed_start = (left_num > 0) ? left_pts[0]
+                                                                    : ((left_regular_num > 0) ? left_regular_pts[0] : maze_point_t{1, maze_start_row});
             maze_point_t target = fixed_start;
             const bool target_found = find_nth_dir_point_from_trace_end(right_trace_pts_raw.data(),
                                                                          right_trace_dirs_raw.data(),

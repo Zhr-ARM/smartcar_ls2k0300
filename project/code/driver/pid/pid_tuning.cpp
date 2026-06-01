@@ -119,6 +119,8 @@ WeightedProfile kCircleExitWeightedProfile = {
 namespace route_line_follow
 {
 float kGlobalBaseSpeedScale = 1.00f;
+float kCornerDecelMaxGyroDps = 300.0f;
+float kCornerDecelMinSpeedScale = 0.60f;
 
 
 bool is_line_error_prefix_exp_valid(const Profile &profile)

@@ -507,9 +507,22 @@ void line_follow_loop()
                                                                     g_yaw_rate_output_state);
         const float delta_v_cmd = g_yaw_rate_output_state;
 
+        // 弯道降速：用滤波后的陀螺角速度大小线性映射到 [k, 1.0] 速率倍率。
+        // gyro_abs = 0        → scale = 1.0（直道全速）
+        // gyro_abs >= max_dps → scale = k  （急弯最低速）
+        const float corner_gyro_abs_dps = std::fabs(g_filtered_yaw_rate_dps);
+        const float corner_max_dps = pid_tuning::route_line_follow::kCornerDecelMaxGyroDps;
+        const float corner_min_scale = pid_tuning::route_line_follow::kCornerDecelMinSpeedScale;
+        float corner_speed_scale = 1.0f;
+        if (corner_max_dps > 0.0f && corner_gyro_abs_dps > 0.0f)
+        {
+            const float ratio = std::min(corner_gyro_abs_dps / corner_max_dps, 1.0f);
+            corner_speed_scale = 1.0f - (1.0f - corner_min_scale) * ratio;
+        }
+
         const float speed_command_base = speed_loop_debug_enabled
                                              ? pid_tuning::line_follow::kSpeedLoopDebugBaseSpeed
-                                             : profile_base_speed;
+                                             : profile_base_speed * corner_speed_scale;
         const float speed_command_diff = speed_loop_debug_enabled
                                              ? pid_tuning::line_follow::kSpeedLoopDebugDiffSpeed
                                              : delta_v_cmd;
@@ -537,7 +550,7 @@ void line_follow_loop()
             g_pid_debug_status.normal_speed_reference = current_normal_speed_reference;
             g_pid_debug_status.profile_base_speed = profile_base_speed;
             g_pid_debug_status.desired_base_speed = profile_base_speed;
-            g_pid_debug_status.applied_base_speed = profile_base_speed;
+            g_pid_debug_status.applied_base_speed = profile_base_speed * corner_speed_scale;
             g_pid_debug_status.raw_error_px = pos_error_px;
             g_pid_debug_status.filtered_error_px = pos_error_px;
             g_pid_debug_status.abs_filtered_error_px = std::fabs(pos_error_px);
@@ -554,7 +567,7 @@ void line_follow_loop()
             g_pid_debug_status.yaw_rate_error_dps = yaw_rate_error_dps;
             g_pid_debug_status.delta_v_cmd = delta_v_cmd;
             g_pid_debug_status.target_yaw_rate_abs_filtered_dps = 0.0f;
-            g_pid_debug_status.target_yaw_rate_speed_scale = 1.0f;
+            g_pid_debug_status.target_yaw_rate_speed_scale = corner_speed_scale;
             g_pid_debug_status.dynamic_position_kp = route_profile.position_kp;
             g_pid_debug_status.dynamic_yaw_rate_kp = route_profile.yaw_rate_kp;
             g_pid_debug_status.applied_yaw_rate_kp = route_profile.yaw_rate_kp;
@@ -584,7 +597,7 @@ void line_follow_loop()
             g_pid_debug_status.speed_scheme_blended_abs_error_sum = 0.0f;
             g_pid_debug_status.speed_scheme_realtime_speed = 0.0f;
             g_pid_debug_status.speed_scheme_error_scale_raw = 1.0f;
-            g_pid_debug_status.speed_scheme_final_speed_scale = 1.0f;
+            g_pid_debug_status.speed_scheme_final_speed_scale = corner_speed_scale;
             g_pid_debug_status.speed_scheme_split_ratio = 0.0f;
             g_pid_debug_status.speed_scheme_point_count = 0;
             g_pid_debug_status.speed_scheme_ready = true;

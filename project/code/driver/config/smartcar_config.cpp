@@ -89,6 +89,8 @@ struct PidSnapshot
     pid_tuning::line_error_preview::WeightedProfile circle_exit_weighted_profile{};
 
     float route_global_base_speed_scale = 0.0f;
+    float route_corner_decel_max_gyro_dps = 0.0f;
+    float route_corner_decel_min_speed_scale = 0.0f;
     pid_tuning::route_line_follow::Profile normal_profile{};
 };
 
@@ -753,6 +755,8 @@ PidSnapshot capture_pid_snapshot()
     snapshot.circle_exit_weighted_profile = pid_tuning::line_error_preview::kCircleExitWeightedProfile;
 
     snapshot.route_global_base_speed_scale = pid_tuning::route_line_follow::kGlobalBaseSpeedScale;
+    snapshot.route_corner_decel_max_gyro_dps = pid_tuning::route_line_follow::kCornerDecelMaxGyroDps;
+    snapshot.route_corner_decel_min_speed_scale = pid_tuning::route_line_follow::kCornerDecelMinSpeedScale;
     snapshot.normal_profile = pid_tuning::route_line_follow::kNormalProfile;
     return snapshot;
 }
@@ -810,6 +814,8 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
     pid_tuning::line_error_preview::kCircleExitWeightedProfile = snapshot.circle_exit_weighted_profile;
 
     pid_tuning::route_line_follow::kGlobalBaseSpeedScale = snapshot.route_global_base_speed_scale;
+    pid_tuning::route_line_follow::kCornerDecelMaxGyroDps = snapshot.route_corner_decel_max_gyro_dps;
+    pid_tuning::route_line_follow::kCornerDecelMinSpeedScale = snapshot.route_corner_decel_min_speed_scale;
     pid_tuning::route_line_follow::kNormalProfile = snapshot.normal_profile;
 }
 
@@ -1243,6 +1249,8 @@ bool load_from_path(const std::string &path, std::string *error_message)
                     pid_tuning::line_follow::kSpeedLoopDebugLeftTarget);
     }
     REQUIRE_PID_FLOAT("pid.route_line_follow.global.base_speed_scale", pid_tuning::route_line_follow::kGlobalBaseSpeedScale);
+    REQUIRE_PID_FLOAT("pid.route_line_follow.global.corner_decel_max_gyro_dps", pid_tuning::route_line_follow::kCornerDecelMaxGyroDps);
+    REQUIRE_PID_FLOAT("pid.route_line_follow.global.corner_decel_min_speed_scale", pid_tuning::route_line_follow::kCornerDecelMinSpeedScale);
 
 #undef REQUIRE_PID_FLOAT
 #undef REQUIRE_PID_INT

@@ -63,9 +63,9 @@ ipm_triangle_filter_enabled = true
 # IPM 边界等距采样开关。
 ipm_resample_enabled = true
 # IPM 边界等距采样步长，单位像素。
-ipm_resample_step_px = 3.0
+ipm_resample_step_px = 5.0
 # IPM 边界顺序近点去重阈值，单位像素。
-ipm_boundary_min_point_dist_px = 1.4
+ipm_boundary_min_point_dist_px = 2
 # IPM 边界回跳毛刺判定中的短段长度阈值，单位像素。
 ipm_boundary_spike_short_seg_max_px = 2.0
 # IPM 边界回跳毛刺判定中的反向 cos 阈值。
@@ -106,11 +106,11 @@ ipm_centerline_triangle_filter_enabled = true
 # IPM 中线等距采样开关。
 ipm_centerline_resample_enabled = true
 # IPM 中线等距采样步长，单位像素。
-ipm_centerline_resample_step_px = 3.0
+ipm_centerline_resample_step_px = 5.0
 # IPM 回投到原图后的左右边界/中线二次等距采样开关。
 src_backproj_resample_enabled = true
 # IPM 回投到原图后的左右边界/中线二次等距采样步长，单位像素。
-src_backproj_resample_step_px = 2.0
+src_backproj_resample_step_px = 3.0
 # IPM 中线曲率计算开关。
 ipm_centerline_curvature_enabled = true
 # IPM 中线曲率计算步长。
@@ -180,11 +180,11 @@ ipm_line_error_source = 2
 # 0=固定索引，1=离散点位加权索引，2=随速度索引，3=前缀指数加权索引。
 ipm_line_error_method = 0
 # line_error 固定索引模式下的中线点索引（0-based，仅 method=0 生效）。
-ipm_line_error_fixed_index = 6
+ipm_line_error_fixed_index = 4
 # line_error 离散加权模式使用的点数量（仅 method=1 生效）。
 ipm_line_error_weighted_point_count = 3
 # line_error 离散加权模式的索引点（0-based，仅 method=1 生效）。
-ipm_line_error_point_indices = [2, 6, 10]
+ipm_line_error_point_indices = [0, 3, 6]
 # line_error 离散加权模式的各索引点权重（仅 method=1 生效）。
 ipm_line_error_weights = [0.6, 0.3, 0.1]
 # line_error 随速度索引公式系数 k（idx = k * speed + b，仅 method=2 生效）。
@@ -224,7 +224,7 @@ square_side_px = 8.0
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
-enabled = true
+enabled = false
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
 max_fps = 30
@@ -247,7 +247,7 @@ rgb_image_format = 1
 # 0=FULL，1=RAW_MINIMAL。
 data_profile = 0
 # 网页端 TCP 状态发送总开关。
-tcp_enabled = true
+tcp_enabled = false
 # PC 接收端 IP 地址。
 server_ip = "192.168.3.9"
 # PC 接收端 UDP 视频端口。
@@ -423,15 +423,15 @@ gyro_yaw_rate_filter_alpha = 0.45
 
 [pid.motor_speed]
 # 左轮速度环 Kp。
-left_kp = 0.03
+left_kp = 0.145
 # 左轮速度环 Ki。
-left_ki = 0.006
+left_ki = 0.012
 # 左轮速度环 Kd。
 left_kd = 0.0
 # 右轮速度环 Kp。
 right_kp = 0.145
 # 右轮速度环 Ki。
-right_ki = 0.006
+right_ki = 0.012
 # 右轮速度环 Kd。
 right_kd = 0.0
 # 速度环积分限幅。
@@ -500,16 +500,20 @@ speed_loop_debug_diff_speed = 150.0
 # 全局基础速度倍率。
 # 用于整体提速或降速，不改变各状态之间的相对比例。
 base_speed_scale = 1.0
+# 弯道降速：角速度绝对值区间上限（dps）。超过此值使用最低速度比例。
+corner_decel_max_gyro_dps = 250.0
+# 弯道降速：最低速度比例 k ∈ (0,1]。实际速度 = base_speed * [k, 1.0]。
+corner_decel_min_speed_scale = 0.60
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 250.0
+base_speed = 350.0
 # NORMAL 档位置环 Kp。
-position_kp = 25.0
+position_kp = 8.0
 # NORMAL 档位置环 Ki。
 position_ki = 0.0
 # NORMAL 档位置环 Kd 基础值。
-position_kd = 0.0
+position_kd = 0.001
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。

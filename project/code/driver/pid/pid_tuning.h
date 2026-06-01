@@ -103,6 +103,8 @@ struct Profile
 };
 
 extern float kGlobalBaseSpeedScale;
+extern float kCornerDecelMaxGyroDps;
+extern float kCornerDecelMinSpeedScale;
 
 bool is_line_error_prefix_exp_valid(const Profile &profile);
 
