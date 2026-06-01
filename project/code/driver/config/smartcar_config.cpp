@@ -70,15 +70,9 @@ struct PidSnapshot
     float brushless_left_duty_percent = 0.0f;
     float brushless_right_duty_percent = 0.0f;
 
-    float yaw_rate_visual_curvature_filter_alpha = 0.0f;
-    float yaw_rate_track_point_angle_filter_alpha = 0.0f;
 
-    float line_follow_error_filter_alpha = 0.0f;
     float line_follow_target_count_min = 0.0f;
     float line_follow_target_count_max = 0.0f;
-    float line_follow_error_deadzone_px = 0.0f;
-    float line_follow_error_low_gain_limit_px = 0.0f;
-    float line_follow_error_low_gain = 0.0f;
     bool line_follow_yaw_rate_debug_enabled = false;
     float line_follow_yaw_rate_debug_target_dps = 0.0f;
     bool line_follow_speed_loop_debug_enabled = false;
@@ -692,14 +686,7 @@ bool load_route_profile(const RawMap &values,
                         std::string *error_message)
 {
     return require_float(values, consumed, prefix + ".base_speed", &profile->base_speed, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_quad_a", &profile->position_dynamic_kp_quad_a, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_base", &profile->position_dynamic_kp_base, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_min", &profile->position_dynamic_kp_min, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_max", &profile->position_dynamic_kp_max, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_low_error_threshold_px", &profile->position_dynamic_kp_low_error_threshold_px, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_mid_a", &profile->position_dynamic_kp_mid_a, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_mid_error_threshold_px", &profile->position_dynamic_kp_mid_error_threshold_px, error_message) &&
-           require_float(values, consumed, prefix + ".position_dynamic_kp_high_a", &profile->position_dynamic_kp_high_a, error_message) &&
+           require_float(values, consumed, prefix + ".position_kp", &profile->position_kp, error_message) &&
            require_float(values, consumed, prefix + ".position_ki", &profile->position_ki, error_message) &&
            require_float(values, consumed, prefix + ".position_kd", &profile->position_kd, error_message) &&
            require_float(values, consumed, prefix + ".position_max_integral", &profile->position_max_integral, error_message) &&
@@ -709,15 +696,7 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".yaw_rate_kd", &profile->yaw_rate_kd, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_max_integral", &profile->yaw_rate_max_integral, error_message) &&
            require_float(values, consumed, prefix + ".yaw_rate_max_output", &profile->yaw_rate_max_output, error_message) &&
-           require_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_max_drop_ratio_per_cycle", &profile->speed_scheme_max_drop_ratio_per_cycle, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_max_rise_ratio_per_cycle", &profile->speed_scheme_max_rise_ratio_per_cycle, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_min_base_speed", &profile->speed_scheme_min_base_speed, error_message) &&
-           require_bool(values, consumed, prefix + ".speed_scheme_target_yaw_rate_enabled", &profile->speed_scheme_target_yaw_rate_enabled, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_start_dps", &profile->speed_scheme_target_yaw_rate_start_dps, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_full_dps", &profile->speed_scheme_target_yaw_rate_full_dps, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_min_scale", &profile->speed_scheme_target_yaw_rate_min_scale, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_filter_alpha", &profile->speed_scheme_target_yaw_rate_filter_alpha, error_message);
+           require_float(values, consumed, prefix + ".line_error_prefix_ratio", &profile->line_error_prefix_ratio, error_message);
 }
 
 PidSnapshot capture_pid_snapshot()
@@ -755,15 +734,9 @@ PidSnapshot capture_pid_snapshot()
     snapshot.brushless_left_duty_percent = pid_tuning::brushless::kLeftDutyPercent;
     snapshot.brushless_right_duty_percent = pid_tuning::brushless::kRightDutyPercent;
 
-    snapshot.yaw_rate_visual_curvature_filter_alpha = pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha;
-    snapshot.yaw_rate_track_point_angle_filter_alpha = pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha;
 
-    snapshot.line_follow_error_filter_alpha = pid_tuning::line_follow::kErrorFilterAlpha;
     snapshot.line_follow_target_count_min = pid_tuning::line_follow::kTargetCountMin;
     snapshot.line_follow_target_count_max = pid_tuning::line_follow::kTargetCountMax;
-    snapshot.line_follow_error_deadzone_px = pid_tuning::line_follow::kErrorDeadzonePx;
-    snapshot.line_follow_error_low_gain_limit_px = pid_tuning::line_follow::kErrorLowGainLimitPx;
-    snapshot.line_follow_error_low_gain = pid_tuning::line_follow::kErrorLowGain;
     snapshot.line_follow_yaw_rate_debug_enabled = pid_tuning::line_follow::kYawRateDebugEnabled;
     snapshot.line_follow_yaw_rate_debug_target_dps = pid_tuning::line_follow::kYawRateDebugTargetDps;
     snapshot.line_follow_speed_loop_debug_enabled = pid_tuning::line_follow::kSpeedLoopDebugEnabled;
@@ -818,15 +791,9 @@ void restore_pid_snapshot(const PidSnapshot &snapshot)
     pid_tuning::brushless::kLeftDutyPercent = snapshot.brushless_left_duty_percent;
     pid_tuning::brushless::kRightDutyPercent = snapshot.brushless_right_duty_percent;
 
-    pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha = snapshot.yaw_rate_visual_curvature_filter_alpha;
-    pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha = snapshot.yaw_rate_track_point_angle_filter_alpha;
 
-    pid_tuning::line_follow::kErrorFilterAlpha = snapshot.line_follow_error_filter_alpha;
     pid_tuning::line_follow::kTargetCountMin = snapshot.line_follow_target_count_min;
     pid_tuning::line_follow::kTargetCountMax = snapshot.line_follow_target_count_max;
-    pid_tuning::line_follow::kErrorDeadzonePx = snapshot.line_follow_error_deadzone_px;
-    pid_tuning::line_follow::kErrorLowGainLimitPx = snapshot.line_follow_error_low_gain_limit_px;
-    pid_tuning::line_follow::kErrorLowGain = snapshot.line_follow_error_low_gain;
     pid_tuning::line_follow::kYawRateDebugEnabled = snapshot.line_follow_yaw_rate_debug_enabled;
     pid_tuning::line_follow::kYawRateDebugTargetDps = snapshot.line_follow_yaw_rate_debug_target_dps;
     pid_tuning::line_follow::kSpeedLoopDebugEnabled = snapshot.line_follow_speed_loop_debug_enabled;
@@ -1236,14 +1203,8 @@ bool load_from_path(const std::string &path, std::string *error_message)
     }
     REQUIRE_PID_FLOAT("pid.brushless.left_duty_percent", pid_tuning::brushless::kLeftDutyPercent);
     REQUIRE_PID_FLOAT("pid.brushless.right_duty_percent", pid_tuning::brushless::kRightDutyPercent);
-    REQUIRE_PID_FLOAT("pid.yaw_rate_loop.visual_curvature_filter_alpha", pid_tuning::yaw_rate_loop::kVisualCurvatureFilterAlpha);
-    REQUIRE_PID_FLOAT("pid.yaw_rate_loop.track_point_angle_filter_alpha", pid_tuning::yaw_rate_loop::kTrackPointAngleFilterAlpha);
-    REQUIRE_PID_FLOAT("pid.line_follow.error_filter_alpha", pid_tuning::line_follow::kErrorFilterAlpha);
     REQUIRE_PID_FLOAT("pid.line_follow.target_count_min", pid_tuning::line_follow::kTargetCountMin);
     REQUIRE_PID_FLOAT("pid.line_follow.target_count_max", pid_tuning::line_follow::kTargetCountMax);
-    REQUIRE_PID_FLOAT("pid.line_follow.error_deadzone_px", pid_tuning::line_follow::kErrorDeadzonePx);
-    REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain_limit_px", pid_tuning::line_follow::kErrorLowGainLimitPx);
-    REQUIRE_PID_FLOAT("pid.line_follow.error_low_gain", pid_tuning::line_follow::kErrorLowGain);
     if (!require_bool(values, &consumed, "pid.line_follow.yaw_rate_debug_enabled", &pid_tuning::line_follow::kYawRateDebugEnabled, error_message))
     {
         return false;
@@ -1309,10 +1270,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
     }
 
     const auto route_valid = [](const pid_tuning::route_line_follow::Profile &profile) {
-        return pid_tuning::route_line_follow::is_dynamic_kp_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_position_kp_piecewise_range_valid(profile) &&
-               pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile) &&
-               pid_tuning::route_line_follow::is_speed_scheme_range_valid(profile);
+        return pid_tuning::route_line_follow::is_line_error_prefix_exp_valid(profile);
     };
     if (!route_valid(pid_tuning::route_line_follow::kNormalProfile))
     {

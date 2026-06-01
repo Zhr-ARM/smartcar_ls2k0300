@@ -44,20 +44,10 @@ float kLeftDutyPercent = 0.0f;
 float kRightDutyPercent = 0.0f;
 } // namespace brushless
 
-namespace yaw_rate_loop
-{
-float kVisualCurvatureFilterAlpha = 0.25f;
-float kTrackPointAngleFilterAlpha = 0.6f;
-} // namespace yaw_rate_loop
-
 namespace line_follow
 {
-float kErrorFilterAlpha = 0.95f;
 float kTargetCountMin = -200.0f;
 float kTargetCountMax = 1550.0f;
-float kErrorDeadzonePx = 0.6f;
-float kErrorLowGainLimitPx = 3.0f;
-float kErrorLowGain = 0.70f;
 bool kYawRateDebugEnabled = false;
 float kYawRateDebugTargetDps = 0.0f;
 bool kSpeedLoopDebugEnabled = false;
@@ -130,18 +120,6 @@ namespace route_line_follow
 {
 float kGlobalBaseSpeedScale = 1.00f;
 
-bool is_dynamic_kp_range_valid(const Profile &profile)
-{
-    return (profile.position_dynamic_kp_min <= profile.position_dynamic_kp_base) &&
-           (profile.position_dynamic_kp_base <= profile.position_dynamic_kp_max);
-}
-
-bool is_position_kp_piecewise_range_valid(const Profile &profile)
-{
-    return (profile.position_dynamic_kp_low_error_threshold_px >= 0.0f) &&
-           (profile.position_dynamic_kp_low_error_threshold_px <=
-            profile.position_dynamic_kp_mid_error_threshold_px);
-}
 
 bool is_line_error_prefix_exp_valid(const Profile &profile)
 {
@@ -149,48 +127,11 @@ bool is_line_error_prefix_exp_valid(const Profile &profile)
            (profile.line_error_prefix_ratio <= 1.0f);
 }
 
-bool is_speed_scheme_range_valid(const Profile &profile)
-{
-    if (profile.speed_scheme_max_drop_ratio_per_cycle < 0.0f ||
-        profile.speed_scheme_max_drop_ratio_per_cycle > 1.0f)
-    {
-        return false;
-    }
-    if (profile.speed_scheme_max_rise_ratio_per_cycle < 0.0f ||
-        profile.speed_scheme_max_rise_ratio_per_cycle > 1.0f)
-    {
-        return false;
-    }
-    if (profile.speed_scheme_min_base_speed < 0.0f)
-    {
-        return false;
-    }
-    if (profile.speed_scheme_target_yaw_rate_start_dps < 0.0f ||
-        profile.speed_scheme_target_yaw_rate_full_dps < 0.0f ||
-        profile.speed_scheme_target_yaw_rate_full_dps < profile.speed_scheme_target_yaw_rate_start_dps)
-    {
-        return false;
-    }
-    if (profile.speed_scheme_target_yaw_rate_min_scale < 0.0f ||
-        profile.speed_scheme_target_yaw_rate_min_scale > 1.0f)
-    {
-        return false;
-    }
-    if (profile.speed_scheme_target_yaw_rate_filter_alpha < 0.0f ||
-        profile.speed_scheme_target_yaw_rate_filter_alpha > 1.0f)
-    {
-        return false;
-    }
-    return true;
-}
-
 Profile kNormalProfile = {
     350.0f,
-    3.0f, 2.1f, 0.0f, 50.0f, 3.0f, 4.6f, 10.0f, 5.6f, 0.0f, 0.15f, 0.0f, 210.0f,
+    6.0f, 0.0f, 0.15f, 0.0f, 210.0f,
     1.0f, 0.0f, 0.0f, 0.0f, 200.0f,
-    0.6f,
-    0.82f, 0.01f, 270.0f,
-    true, 60.0f, 180.0f, 0.60f, 0.5f
+    0.6f
 };
 } // namespace route_line_follow
 } // namespace pid_tuning

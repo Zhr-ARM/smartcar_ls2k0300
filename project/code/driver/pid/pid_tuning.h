@@ -47,20 +47,10 @@ extern float kLeftDutyPercent;
 extern float kRightDutyPercent;
 } // namespace brushless
 
-namespace yaw_rate_loop
-{
-extern float kVisualCurvatureFilterAlpha;
-extern float kTrackPointAngleFilterAlpha;
-} // namespace yaw_rate_loop
-
 namespace line_follow
 {
-extern float kErrorFilterAlpha;
 extern float kTargetCountMin;
 extern float kTargetCountMax;
-extern float kErrorDeadzonePx;
-extern float kErrorLowGainLimitPx;
-extern float kErrorLowGain;
 extern bool kYawRateDebugEnabled;
 extern float kYawRateDebugTargetDps;
 extern bool kSpeedLoopDebugEnabled;
@@ -97,14 +87,7 @@ struct Profile
 {
     float base_speed;
 
-    float position_dynamic_kp_quad_a;
-    float position_dynamic_kp_base;
-    float position_dynamic_kp_min;
-    float position_dynamic_kp_max;
-    float position_dynamic_kp_low_error_threshold_px;
-    float position_dynamic_kp_mid_a;
-    float position_dynamic_kp_mid_error_threshold_px;
-    float position_dynamic_kp_high_a;
+    float position_kp;
     float position_ki;
     float position_kd;
     float position_max_integral;
@@ -117,24 +100,11 @@ struct Profile
 
     // line_error 前缀指数加权参数（新方案，按状态独立）。
     float line_error_prefix_ratio;
-
-    // base_speed 速度方案参数。
-    float speed_scheme_max_drop_ratio_per_cycle;
-    float speed_scheme_max_rise_ratio_per_cycle;
-    float speed_scheme_min_base_speed;
-    bool speed_scheme_target_yaw_rate_enabled;
-    float speed_scheme_target_yaw_rate_start_dps;
-    float speed_scheme_target_yaw_rate_full_dps;
-    float speed_scheme_target_yaw_rate_min_scale;
-    float speed_scheme_target_yaw_rate_filter_alpha;
 };
 
 extern float kGlobalBaseSpeedScale;
 
-bool is_dynamic_kp_range_valid(const Profile &profile);
-bool is_position_kp_piecewise_range_valid(const Profile &profile);
 bool is_line_error_prefix_exp_valid(const Profile &profile);
-bool is_speed_scheme_range_valid(const Profile &profile);
 
 extern Profile kNormalProfile;
 } // namespace route_line_follow

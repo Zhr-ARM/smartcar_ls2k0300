@@ -178,9 +178,9 @@ cross_aux_history_x_offset = 3
 ipm_line_error_source = 2
 # line_error 计算方法。
 # 0=固定索引，1=离散点位加权索引，2=随速度索引，3=前缀指数加权索引。
-ipm_line_error_method = 1
+ipm_line_error_method = 0
 # line_error 固定索引模式下的中线点索引（0-based，仅 method=0 生效）。
-ipm_line_error_fixed_index = 8
+ipm_line_error_fixed_index = 6
 # line_error 离散加权模式使用的点数量（仅 method=1 生效）。
 ipm_line_error_weighted_point_count = 3
 # line_error 离散加权模式的索引点（0-based，仅 method=1 生效）。
@@ -480,25 +480,11 @@ left_duty_percent = 0.0
 # 右侧无刷目标占空比，单位百分比 [0, 100]。
 right_duty_percent = 0.0
 
-[pid.yaw_rate_loop]
-# 视觉曲率滤波 alpha。
-visual_curvature_filter_alpha = 0.25
-# 跟踪点夹角滤波 alpha。
-track_point_angle_filter_alpha = 0.65
-
 [pid.line_follow]
-# 视觉误差滤波 alpha。
-error_filter_alpha = 0.99
 # 左右轮目标最小值。
 target_count_min = -100.0
 # 左右轮目标最大值。
 target_count_max = 1550.0
-# 误差死区，单位像素。
-error_deadzone_px = 0.5
-# 小误差降增益区间上限，单位像素。
-error_low_gain_limit_px = 1.0
-# 小误差区间降增益倍率。
-error_low_gain = 0.4
 # 角速度环调试模式开关（true 时固定角速度目标，旁路位置环输出）。
 yaw_rate_debug_enabled = false
 # 角速度环调试固定目标，单位 dps（仅 yaw_rate_debug_enabled=true 生效）。
@@ -517,31 +503,17 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 0.0
-# NORMAL 档位置环动态 Kp 低误差段一次项系数。
-position_dynamic_kp_quad_a = 0.0
-# NORMAL 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 6.0
-# NORMAL 档位置环动态 Kp 下限。
-position_dynamic_kp_min = 0.0
-# NORMAL 档位置环动态 Kp 上限。
-position_dynamic_kp_max = 200.0
-# NORMAL 档位置环动态 Kp 低误差段结束阈值。
-position_dynamic_kp_low_error_threshold_px = 10.0
-# NORMAL 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 0.0
-# NORMAL 档位置环动态 Kp 中误差段结束阈值。
-position_dynamic_kp_mid_error_threshold_px = 20.0
-# NORMAL 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 0.0
+base_speed = 250.0
+# NORMAL 档位置环 Kp。
+position_kp = 25.0
 # NORMAL 档位置环 Ki。
 position_ki = 0.0
 # NORMAL 档位置环 Kd 基础值。
-position_kd = 0.02
+position_kd = 0.0
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
-position_max_output = 3500.0
+position_max_output = 1000.0
 
 # NORMAL 档角速度环 Kp。
 yaw_rate_kp = 2.5
@@ -555,24 +527,6 @@ yaw_rate_max_integral = 0.0
 yaw_rate_max_output =300.0
 # NORMAL 档 line_error 前缀比例（0,1]。
 line_error_prefix_ratio = 0.4
-
-# 速度方案单周期最大降速比例。
-speed_scheme_max_drop_ratio_per_cycle = 0.95
-# 速度方案单周期最大升速比例。
-speed_scheme_max_rise_ratio_per_cycle = 0.05
-# 速度方案基础速度下限。
-speed_scheme_min_base_speed = 80.0
-# 目标角速度降速开关。
-speed_scheme_target_yaw_rate_enabled = true
-# 目标角速度降速起始阈值，单位 dps。
-# 目标角速度绝对值低于此值时不降速。
-speed_scheme_target_yaw_rate_start_dps = 25.0
-# 目标角速度达到此阈值时进入最大降速，单位 dps。
-speed_scheme_target_yaw_rate_full_dps = 26.0
-# 目标角速度最大时的最低速度倍率。
-speed_scheme_target_yaw_rate_min_scale = 0.2
-# 目标角速度低通滤波 alpha。
-speed_scheme_target_yaw_rate_filter_alpha = 0.99
 
 [cpu_monitor]
 # 终端 CPU 使用率打印开关。
