@@ -511,7 +511,7 @@ base_speed = 230.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # NORMAL 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 14.0
+position_dynamic_kp_base = 10.5
 # NORMAL 档位置环动态 Kp 下限。
 position_dynamic_kp_min = 0.0
 # NORMAL 档位置环动态 Kp 上限。
@@ -527,13 +527,13 @@ position_dynamic_kp_high_a = 0.0
 # NORMAL 档位置环 Ki。
 position_ki = 0.0
 # NORMAL 档位置环 Kd 基础值。
-position_kd = 0.30
+position_kd = 0.05
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
 position_max_output = 3500.0
 # NORMAL 档总转向输出限幅。
-steering_max_output = 210.0
+steering_max_output = 207.0
 
 # NORMAL 档由横向误差生成目标横摆角速度的增益。
 yaw_rate_ref_from_error_gain_dps = 1.0
@@ -542,7 +542,7 @@ yaw_rate_ref_from_track_point_gain_dps = 9.0
 # NORMAL 档目标横摆角速度限幅。
 yaw_rate_ref_limit_dps = 360.0
 # NORMAL 档角速度环 Kp。
-yaw_rate_kp = 0.5
+yaw_rate_kp = 0.4
 # NORMAL 档角速度环动态 Kp 一次项系数。
 yaw_rate_dynamic_kp_quad_a = 0.0
 # NORMAL 档角速度环动态 Kp 下限。
