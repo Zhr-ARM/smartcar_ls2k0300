@@ -447,25 +447,25 @@ max_output_step = 9.0
 # PID 修正项总限幅。
 correction_limit = 9.0
 # 左轮前馈斜率。
-left_feedforward_gain = 0.15
+left_feedforward_gain =  0.0330
 # 右轮前馈斜率。
-right_feedforward_gain = 0.15
+right_feedforward_gain =  0.0295
 # 左轮静摩擦补偿。
-left_feedforward_bias = 2.8
+left_feedforward_bias = 11.0
 # 右轮静摩擦补偿。
-right_feedforward_bias = 2.8
+right_feedforward_bias = 11.0
 # 静摩擦补偿触发阈值。
 feedforward_bias_threshold = 5.0
 # 减速辅助触发误差阈值。
-decel_error_threshold = 5.0
+decel_error_threshold = 60.0
 # 减速辅助增益。
-decel_duty_gain = 0.18
+decel_duty_gain =  0.015
 # 减速辅助最大输出。
-decel_duty_limit = 14.0
+decel_duty_limit = 2.0
 # 速度反馈平均窗口长度。
-feedback_average_window = 2
+feedback_average_window = 6
 # 速度反馈低通滤波 alpha。
-feedback_low_pass_alpha = 0.95
+feedback_low_pass_alpha =  0.52
 
 [pid.brushless]
 # 是否启用主循环实时无刷控制。
