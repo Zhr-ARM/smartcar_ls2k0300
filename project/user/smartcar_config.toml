@@ -429,23 +429,23 @@ gyro_yaw_rate_filter_alpha = 0.45
 
 [pid.motor_speed]
 # 左轮速度环 Kp。
-left_kp = 300.0
+left_kp = 0.22
 # 左轮速度环 Ki。
-left_ki = 80.0
+left_ki = 0.0
 # 左轮速度环 Kd。
 left_kd = 0.0
 # 右轮速度环 Kp。
-right_kp = 300.0
+right_kp = 0.19
 # 右轮速度环 Ki。
-right_ki = 80.0
+right_ki = 0.0
 # 右轮速度环 Kd。
 right_kd = 0.0
 # 速度环积分限幅。
-integral_limit = 4500.0
+integral_limit = 0
 # 单周期 PID 修正项最大变化步长。
-max_output_step = 30.0
+max_output_step = 9.0
 # PID 修正项总限幅。
-correction_limit = 24.0
+correction_limit = 9.0
 # 左轮前馈斜率。
 left_feedforward_gain = 0.15
 # 右轮前馈斜率。
