@@ -7,15 +7,12 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
 const WebSocket = require('ws');
-const { summarizeSyncStatus } = require('../pc_receiver_local_compute/wasm_sync_meta.js');
 
 const MAGIC = 0x56535544; // VSUD
 const HEADER_SIZE = 20;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const RECORDINGS_DIR = path.join(__dirname, 'recordings');
-const WASM_DIR = path.join(PUBLIC_DIR, 'wasm');
 const ROOT_DIR = path.join(__dirname, '..', '..');
-const WASM_SYNC_METADATA_PATH = path.join(WASM_DIR, 'vision_pipeline.sync.json');
 const SHARED_CONNECTION_PRESETS_PATH = path.join(ROOT_DIR, 'project', 'user', 'connection_presets.json');
 const LOCAL_SMARTCAR_CONFIG_PATH = path.resolve(
   process.env.LOCAL_SMARTCAR_CONFIG_PATH || path.join(ROOT_DIR, 'project', 'user', 'smartcar_config.toml')
@@ -24,7 +21,7 @@ const LOCAL_SMARTCAR_CONFIG_PATH = path.resolve(
 const BIND_HOST = process.env.BIND_HOST || '0.0.0.0';
 const UDP_PORT = Number(process.env.UDP_PORT || 10000);
 const TCP_PORT = Number(process.env.TCP_PORT || 10001);
-const HTTP_PORT = Number(process.env.HTTP_PORT || 8080);
+const HTTP_PORT = Number(process.env.HTTP_PORT || 9090);
 const WEB_IMAGE_FORMAT_JPEG = 0;
 const WEB_IMAGE_FORMAT_PNG = 1;
 const WEB_IMAGE_FORMAT_BMP = 2;
@@ -82,9 +79,15 @@ let latestStatus = { message: 'waiting' };
 const inflightFrames = new Map();
 const udpByteEvents = [];
 const udpFrameEvents = [];
-let cachedWasmSyncStatus = null;
-let cachedWasmSyncStatusAtMs = 0;
+const tcpStatusEvents = [];
 let boardConnectionStore = loadBoardConnectionStore();
+let backendRecording = null;
+let projectControlState = {
+  last_action: 'idle',
+  last_message: '',
+  last_error: '',
+  last_updated_at_ms: 0
+};
 
 let wss = null;
 
@@ -112,16 +115,6 @@ function toBool01(value) {
 
 function round3(value) {
   return Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null;
-}
-
-function getWasmSyncStatus() {
-  const now = Date.now();
-  if (cachedWasmSyncStatus && (now - cachedWasmSyncStatusAtMs) < 2000) {
-    return cachedWasmSyncStatus;
-  }
-  cachedWasmSyncStatus = summarizeSyncStatus(ROOT_DIR, WASM_SYNC_METADATA_PATH);
-  cachedWasmSyncStatusAtMs = now;
-  return cachedWasmSyncStatus;
 }
 
 function ensureRecordingsDir() {
@@ -900,10 +893,6 @@ function startHttpServer() {
       serveFile(res, path.join(PUBLIC_DIR, 'playback.html'), 'text/html; charset=utf-8');
       return;
     }
-    if (pathname === '/local_compute.html') {
-      serveFile(res, path.join(PUBLIC_DIR, 'local_compute.html'), 'text/html; charset=utf-8');
-      return;
-    }
     if (pathname === '/playback_app.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'playback_app.js'), 'application/javascript; charset=utf-8');
       return;
@@ -912,30 +901,10 @@ function startHttpServer() {
       serveFile(res, path.join(PUBLIC_DIR, 'config_app.js'), 'application/javascript; charset=utf-8');
       return;
     }
-    if (pathname === '/local_compute_app.js') {
-      serveFile(res, path.join(PUBLIC_DIR, 'local_compute_app.js'), 'application/javascript; charset=utf-8');
-      return;
-    }
     if (pathname === '/shared_receiver_core.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'shared_receiver_core.js'), 'application/javascript; charset=utf-8');
       return;
     }
-    if (pathname === '/pipeline_worker.js') {
-      serveFile(res, path.join(PUBLIC_DIR, 'pipeline_worker.js'), 'application/javascript; charset=utf-8');
-      return;
-    }
-    if (pathname.startsWith('/wasm/')) {
-      const rel = pathname.slice('/wasm/'.length);
-      const safeName = path.basename(rel);
-      const filePath = path.join(WASM_DIR, safeName);
-      const ext = path.extname(safeName).toLowerCase();
-      const contentType = ext === '.js'
-        ? 'application/javascript; charset=utf-8'
-        : (ext === '.wasm' ? 'application/wasm' : 'application/octet-stream');
-      serveFile(res, filePath, contentType);
-      return;
-    }
-
     if (pathname === '/api/status') {
       const payload = JSON.stringify(Object.assign({}, latestStatus, buildTransportTelemetry(latestStatus)));
       res.writeHead(200, {
@@ -1151,11 +1120,6 @@ function startHttpServer() {
           }
         });
       });
-      return;
-    }
-
-    if (pathname === '/api/wasm_sync_status') {
-      sendJson(res, 200, getWasmSyncStatus());
       return;
     }
 
