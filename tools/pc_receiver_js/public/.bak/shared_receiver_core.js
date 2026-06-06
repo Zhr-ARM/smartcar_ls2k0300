@@ -89,31 +89,12 @@
     return '透视中线来源：自动选择（未知）';
   }
 
-  function routeSubStateIsLeftCircle(state) {
-    return state >= 4 && state <= 9;
-  }
-
-  function routeSubStateIsRightCircle(state) {
-    return state >= 10 && state <= 15;
-  }
-
-  function routeSubStateIsCircle(state) {
-    return routeSubStateIsLeftCircle(state) || routeSubStateIsRightCircle(state);
-  }
-
-  function routeSubStateIsCross(state) {
-    return state >= 1 && state <= 3;
-  }
-
-  function formatRouteMainState(state, subState) {
+  function formatRouteMainState(state) {
     if (state === 0) return '正常巡线';
-    if (state === 1) {
-      if (routeSubStateIsLeftCircle(subState)) return '左环岛';
-      if (routeSubStateIsRightCircle(subState)) return '右环岛';
-      return '环岛';
-    }
-    if (state === 2) return '直道态';
-    if (state === 3) return '十字态';
+    if (state === 1) return '直道态';
+    if (state === 2) return '左环岛';
+    if (state === 3) return '右环岛';
+    if (state === 4) return '十字态';
     return `未知主状态(${state})`;
   }
 
@@ -137,36 +118,11 @@
     return `未知子状态(${state})`;
   }
 
-  function formatRouteSubStateForMain(mainState, subState) {
-    if (subState === null || subState === undefined || !Number.isFinite(Number(subState))) return '--';
-    const n = Number(subState);
-    if (mainState === 0) return n === 0 ? '无子状态' : `待切换-${formatRouteSubState(n)}`;
-    if (mainState === 1) return routeSubStateIsCircle(n) ? formatRouteSubState(n) : '环岛子状态待同步';
-    if (mainState === 2) return n === 0 ? '无子状态' : '直道态';
-    if (mainState === 3) return routeSubStateIsCross(n) ? formatRouteSubState(n) : '十字子状态待同步';
-    return formatRouteSubState(n);
-  }
-
   function formatRoutePreferredSource(source) {
     if (source === -1) return '自动';
     if (source === 0) return '左边界';
     if (source === 1) return '右边界';
     return `未知(${source})`;
-  }
-
-  function formatTargetBoardState(state) {
-    const label = String(state || '').trim().toLowerCase();
-    if (label === 'none') return '无目标';
-    if (label === 'weapon') return '武器左绕';
-    if (label === 'supply') return '物资右绕';
-    if (label === 'vehicle') return '车辆直行';
-    const n = Number(state);
-    if (n === 0) return '无目标';
-    if (n === 1) return '武器左绕';
-    if (n === 2) return '物资右绕';
-    if (n === 3) return '车辆直行';
-    if (!Number.isFinite(n)) return '未知';
-    return `未知(${n})`;
   }
 
   function pointDistance(pointA, pointB) {
@@ -521,7 +477,7 @@
       } else {
         nextReasons.push('圆环入口条件未全部命中，继续保持正常巡线。');
       }
-    } else if (mainState === 2) {
+    } else if (mainState === 1) {
       const straightKeepHit = straightStateHit;
       judgments.push('当前处于直道态：只要中线点数条件和误差和条件任一失效，就会退回 normal。');
       pushCondition('直道点数条件', formatHit(!!straightPointCountOk), `${straightSelectedCenterlineCount !== null ? straightSelectedCenterlineCount : '--'} >= ${straightMinCenterlinePoints !== null ? straightMinCenterlinePoints : '--'}`);
@@ -532,7 +488,7 @@
         nextStateLabel = '正常巡线';
         nextReasons[0] = '直道态保持条件被破坏，状态机先退回 normal，再按 normal 规则判断后续状态。';
       }
-    } else if (mainState === 3) {
+    } else if (mainState === 4) {
       judgments.push('当前处于十字主状态，十字逻辑会优先于圆环逻辑继续推进。');
       pushCondition('cross_1 -> cross_2', formatHit(crossStage2ReadyNow), `任一角点 y 达标；当前 L=${leftCornerY !== null ? leftCornerY : '--'} R=${rightCornerY !== null ? rightCornerY : '--'}`);
       pushCondition('cross_2 -> cross_3', formatHit(crossStage3ReadyNow), `起始贴边 左=${leftStartFrameRows !== null ? leftStartFrameRows : '--'} 右=${rightStartFrameRows !== null ? rightStartFrameRows : '--'} >= ${crossStage2StartFrameRowsMin !== null ? crossStage2StartFrameRowsMin : '--'}`);
@@ -551,26 +507,46 @@
       } else {
         nextReasons.push('等待十字子状态稳定。');
       }
-    } else if (mainState === 1) {
-      const isLeftCircle = routeSubStateIsLeftCircle(subState);
-      const isRightCircle = routeSubStateIsRightCircle(subState);
-      judgments.push(`${isLeftCircle ? '左环岛' : (isRightCircle ? '右环岛' : '环岛')}状态下，当前固定偏向 ${formatRoutePreferredSource(preferredSource)}。`);
+    } else if (mainState === 2) {
+      judgments.push(`左环岛状态下，当前固定偏向 ${formatRoutePreferredSource(preferredSource)}。`);
       if (subState === 6 || subState === 8) {
         judgments.push(`当前处于补右线阶段，右侧辅助线点数=${rightGuideCount !== null ? rightGuideCount : 0}。`);
-      } else if (subState === 12 || subState === 14) {
+      }
+      pushCondition('左起始贴边行数', leftStartFrameRows !== null ? leftStartFrameRows : '--', `circle_1 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}，circle_2 需回到 0`);
+      pushCondition('右起始贴边行数', rightStartFrameRows !== null ? rightStartFrameRows : '--', `circle_3 > ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'}，circle_5 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}`);
+      pushCondition('右侧角点', formatHit(rightCornerFound), 'circle_4 进入 circle_5');
+      pushCondition('右侧辅助线', rightGuideCount !== null ? rightGuideCount : '--', `stage3 offset=${circleGuideTargetOffsetStage3 !== null ? circleGuideTargetOffsetStage3 : '--'} stage5 offset=${circleGuideAnchorOffsetStage5 !== null ? circleGuideAnchorOffsetStage5 : '--'} 最短贴边段=${circleGuideMinSegmentLen !== null ? circleGuideMinSegmentLen : '--'}`);
+      pushCondition('双侧直边', formatHit(leftStraight && rightStraight), `circle_6 返回正常巡线，maze_start_row >= ${circleStage6MazeStartRow !== null ? circleStage6MazeStartRow : '--'}`);
+      if (subState === 4) {
+        nextStateLabel = '左环岛-circle_2';
+        nextReasons.push(`左边界起始连续贴左边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_2。`);
+      } else if (subState === 5) {
+        nextStateLabel = '左环岛-circle_3';
+        nextReasons.push('左边界起始行不再贴左边框时，进入 circle_3。');
+      } else if (subState === 6) {
+        nextStateLabel = '左环岛-circle_4';
+        nextReasons.push(`右边界起始连续贴右边框超过 ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'} 行时，进入 circle_4。`);
+      } else if (subState === 7) {
+        nextStateLabel = '左环岛-circle_5';
+        nextReasons.push('右边界检测到角点后，进入 circle_5。');
+      } else if (subState === 8) {
+        nextStateLabel = '左环岛-circle_6';
+        nextReasons.push(`右边界起始连续贴右边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_6。`);
+      } else if (subState === 9) {
+        nextStateLabel = '正常巡线';
+        nextReasons.push('双侧重新同时识别为直边后，退出左环岛。');
+      } else {
+        nextReasons.push('等待左环内部子状态推进。');
+      }
+    } else if (mainState === 3) {
+      judgments.push(`右环岛状态下，当前固定偏向 ${formatRoutePreferredSource(preferredSource)}。`);
+      if (subState === 12 || subState === 14) {
         judgments.push(`当前处于补左线阶段，左侧辅助线点数=${leftGuideCount !== null ? leftGuideCount : 0}。`);
       }
-      if (isRightCircle) {
-        pushCondition('右起始贴边行数', rightStartFrameRows !== null ? rightStartFrameRows : '--', `circle_1 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}，circle_2 需回到 0`);
-        pushCondition('左起始贴边行数', leftStartFrameRows !== null ? leftStartFrameRows : '--', `circle_3 > ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'}，circle_5 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}`);
-        pushCondition('左侧角点', formatHit(leftCornerFound), 'circle_4 进入 circle_5');
-        pushCondition('左侧辅助线', leftGuideCount !== null ? leftGuideCount : '--', `stage3 offset=${circleGuideTargetOffsetStage3 !== null ? circleGuideTargetOffsetStage3 : '--'} stage5 offset=${circleGuideAnchorOffsetStage5 !== null ? circleGuideAnchorOffsetStage5 : '--'} 最短贴边段=${circleGuideMinSegmentLen !== null ? circleGuideMinSegmentLen : '--'}`);
-      } else {
-        pushCondition('左起始贴边行数', leftStartFrameRows !== null ? leftStartFrameRows : '--', `circle_1 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}，circle_2 需回到 0`);
-        pushCondition('右起始贴边行数', rightStartFrameRows !== null ? rightStartFrameRows : '--', `circle_3 > ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'}，circle_5 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}`);
-        pushCondition('右侧角点', formatHit(rightCornerFound), 'circle_4 进入 circle_5');
-        pushCondition('右侧辅助线', rightGuideCount !== null ? rightGuideCount : '--', `stage3 offset=${circleGuideTargetOffsetStage3 !== null ? circleGuideTargetOffsetStage3 : '--'} stage5 offset=${circleGuideAnchorOffsetStage5 !== null ? circleGuideAnchorOffsetStage5 : '--'} 最短贴边段=${circleGuideMinSegmentLen !== null ? circleGuideMinSegmentLen : '--'}`);
-      }
+      pushCondition('右起始贴边行数', rightStartFrameRows !== null ? rightStartFrameRows : '--', `circle_1 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}，circle_2 需回到 0`);
+      pushCondition('左起始贴边行数', leftStartFrameRows !== null ? leftStartFrameRows : '--', `circle_3 > ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'}，circle_5 >= ${circleStageEnterRows !== null ? circleStageEnterRows : '--'}`);
+      pushCondition('左侧角点', formatHit(leftCornerFound), 'circle_4 进入 circle_5');
+      pushCondition('左侧辅助线', leftGuideCount !== null ? leftGuideCount : '--', `stage3 offset=${circleGuideTargetOffsetStage3 !== null ? circleGuideTargetOffsetStage3 : '--'} stage5 offset=${circleGuideAnchorOffsetStage5 !== null ? circleGuideAnchorOffsetStage5 : '--'} 最短贴边段=${circleGuideMinSegmentLen !== null ? circleGuideMinSegmentLen : '--'}`);
       pushCondition('双侧直边', formatHit(leftStraight && rightStraight), `circle_6 返回正常巡线，maze_start_row >= ${circleStage6MazeStartRow !== null ? circleStage6MazeStartRow : '--'}`);
       if (subState === 10) {
         nextStateLabel = '右环岛-circle_2';
@@ -590,26 +566,8 @@
       } else if (subState === 15) {
         nextStateLabel = '正常巡线';
         nextReasons.push('双侧重新同时识别为直边后，退出右环岛。');
-      } else if (subState === 4) {
-        nextStateLabel = '左环岛-circle_2';
-        nextReasons.push(`左边界起始连续贴左边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_2。`);
-      } else if (subState === 5) {
-        nextStateLabel = '左环岛-circle_3';
-        nextReasons.push('左边界起始行不再贴左边框时，进入 circle_3。');
-      } else if (subState === 6) {
-        nextStateLabel = '左环岛-circle_4';
-        nextReasons.push(`右边界起始连续贴右边框超过 ${circleStage3RowsTrigger !== null ? circleStage3RowsTrigger : '--'} 行时，进入 circle_4。`);
-      } else if (subState === 7) {
-        nextStateLabel = '左环岛-circle_5';
-        nextReasons.push('右边界检测到角点后，进入 circle_5。');
-      } else if (subState === 8) {
-        nextStateLabel = '左环岛-circle_6';
-        nextReasons.push(`右边界起始连续贴右边框达到 ${circleStageEnterRows !== null ? circleStageEnterRows : '--'} 行后，进入 circle_6。`);
-      } else if (subState === 9) {
-        nextStateLabel = '正常巡线';
-        nextReasons.push('双侧重新同时识别为直边后，退出左环岛。');
       } else {
-        nextReasons.push('等待环岛内部子状态同步。');
+        nextReasons.push('等待右环内部子状态推进。');
       }
     } else {
       judgments.push('等待状态机首次更新。');
@@ -642,8 +600,8 @@
       subState,
       preferredSource,
       encoderSinceEnter,
-      mainStateLabel: mainState !== null ? formatRouteMainState(mainState, subState) : '--',
-      subStateLabel: mainState !== null ? formatRouteSubStateForMain(mainState, subState) : '--',
+      mainStateLabel: mainState !== null ? formatRouteMainState(mainState) : '--',
+      subStateLabel: subState !== null ? formatRouteSubState(subState) : '--',
       preferredSourceLabel: preferredSource !== null ? formatRoutePreferredSource(preferredSource) : '--',
       crossLossCount,
       leftLossCount,
@@ -921,8 +879,8 @@
     push('ipm_track_valid', status.ipm_track_valid);
     if (hasValue(status.ipm_track_method)) push('ipm_track_method', formatTrackMethod(status.ipm_track_method));
     if (hasValue(status.ipm_centerline_source)) push('ipm_centerline_source', formatCenterlineSource(status.ipm_centerline_source));
-    if (Number.isFinite(Number(status.route_main_state))) push('route_main_state', formatRouteMainState(Number(status.route_main_state), Number(status.route_sub_state)));
-    if (Number.isFinite(Number(status.route_sub_state))) push('route_sub_state', formatRouteSubStateForMain(Number(status.route_main_state), Number(status.route_sub_state)));
+    if (Number.isFinite(Number(status.route_main_state))) push('route_main_state', formatRouteMainState(Number(status.route_main_state)));
+    if (Number.isFinite(Number(status.route_sub_state))) push('route_sub_state', formatRouteSubState(Number(status.route_sub_state)));
     if (Number.isFinite(Number(status.route_preferred_source))) push('route_preferred_source', formatRoutePreferredSource(Number(status.route_preferred_source)));
     if (Number.isFinite(Number(status.route_encoder_since_enter))) push('route_encoder_since_enter', status.route_encoder_since_enter);
     if (Number.isFinite(Number(status.route_cross_loss_count))) push('route_cross_loss_count', status.route_cross_loss_count);
@@ -980,12 +938,9 @@
     push('cross_lower_corner_pre_min_votes', status.cross_lower_corner_pre_min_votes);
     push('cross_lower_corner_post_min_votes', status.cross_lower_corner_post_min_votes);
     push('cross_lower_corner_transition_max_len', status.cross_lower_corner_transition_max_len);
+    push('cross_lower_corner_transition_max_dir3_count', status.cross_lower_corner_transition_max_dir3_count);
+    push('cross_lower_corner_post_max_dir3_count', status.cross_lower_corner_post_max_dir3_count);
     push('cross_lower_corner_pair_y_diff_max', status.cross_lower_corner_pair_y_diff_max);
-    push('cross_aux_reacquire_up_px', status.cross_aux_reacquire_up_px);
-    push('cross_aux_reacquire_down_px', status.cross_aux_reacquire_down_px);
-    push('cross_aux_fit_prev_points', status.cross_aux_fit_prev_points);
-    push('cross_aux_fit_slope_bias', status.cross_aux_fit_slope_bias);
-    push('cross_upper_dir5_post_check_count', status.cross_upper_dir5_post_check_count);
     if (Array.isArray(status.gray_size)) push('gray_size', formatArrayInline(status.gray_size));
     if (Array.isArray(status.ipm_size)) push('ipm_size', formatArrayInline(status.ipm_size));
     pushCount('left_boundary_count', status.left_boundary);
@@ -1024,9 +979,7 @@
     formatCenterlineSourceLabel,
     formatRouteMainState,
     formatRouteSubState,
-    formatRouteSubStateForMain,
     formatRoutePreferredSource,
-    formatTargetBoardState,
     buildRouteStateSummary,
     drawCurveChartToCanvas,
     drawPolyline,

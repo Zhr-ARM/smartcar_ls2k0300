@@ -5,26 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Vision JS Receiver</title>
   <style>
-    :root {
-      --console-bg: #080a0d;
-      --console-surface: #0d1116;
-      --console-panel: #10141a;
-      --console-panel-2: #151b22;
-      --console-line: #2a343f;
-      --console-line-soft: #202933;
-      --console-text: #eef3f4;
-      --console-muted: #8c9aa5;
-      --console-dim: #65727d;
-      --console-cyan: #33d6c4;
-      --console-amber: #f2b84b;
-      --console-red: #ef5b5b;
-      --console-green: #5fc878;
-    }
     body {
       margin: 0;
-      font-family: "Noto Sans Mono CJK SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
-      background: var(--console-bg);
-      color: var(--console-text);
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.10), transparent 24%),
+        radial-gradient(circle at top right, rgba(16, 185, 129, 0.08), transparent 24%),
+        linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
+      color: #e2e8f0;
     }
     .wrap {
       max-width: 1680px;
@@ -108,24 +96,6 @@
       gap: 8px;
       flex-wrap: wrap;
       margin: 0;
-    }
-    .replay-toolbar {
-      display: none;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      flex: 1 1 100%;
-      padding-top: 4px;
-    }
-    .replay-toolbar.active {
-      display: flex;
-    }
-    .replay-time {
-      color: #dbeafe;
-      font-size: 13px;
-      line-height: 1.4;
-      min-width: 132px;
-      font-variant-numeric: tabular-nums;
     }
     .control-grid {
       display: grid;
@@ -849,26 +819,22 @@
       word-break: break-word;
     }
     pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; color: #93c5fd; max-height: 280px; overflow: auto; }
-    #routeStateCard { grid-column: span 12; order: 1; }
-    #grayCard { grid-column: span 6; order: 2; }
-    #binaryCard { grid-column: span 6; order: 3; }
+    #inferCard { grid-column: span 7; order: 1; }
+    #routeStateCard { grid-column: span 5; order: 2; }
+    #grayCard { grid-column: span 4; order: 3; }
+    #binaryCard { grid-column: span 4; order: 4; }
+    #rgbCard { grid-column: span 4; order: 5; }
     #ipmCard, #ipmRawCard, #slowdownCard { grid-column: span 4; }
     #ipmCard { order: 6; }
     #ipmRawCard { order: 7; }
     #slowdownCard { order: 8; }
-    #leftTraceDirCard, #rightTraceDirCard,
-    #leftAuxTraceDirCard, #rightAuxTraceDirCard { grid-column: span 6; }
+    #leftTraceDirCard, #rightTraceDirCard { grid-column: span 6; }
     #leftTraceDirCard { order: 9; }
     #rightTraceDirCard { order: 10; }
-    #leftAuxTraceDirCard { order: 11; }
-    #rightAuxTraceDirCard { order: 12; }
-    #leftTraceDirZoomCard, #rightTraceDirZoomCard,
-    #leftAuxTraceDirZoomCard, #rightAuxTraceDirZoomCard { grid-column: span 6; }
-    #leftTraceDirZoomCard { order: 13; }
-    #rightTraceDirZoomCard { order: 14; }
-    #leftAuxTraceDirZoomCard { order: 15; }
-    #rightAuxTraceDirZoomCard { order: 16; }
-    #pidStatusCard { grid-column: span 12; order: 17; }
+    #leftTraceDirZoomCard, #rightTraceDirZoomCard { grid-column: span 6; }
+    #leftTraceDirZoomCard { order: 11; }
+    #rightTraceDirZoomCard { order: 12; }
+    #pidStatusCard { grid-column: span 12; order: 13; }
     #statusCard { grid-column: span 12; order: 20; }
     #statusCard pre { max-height: 520px; }
     @media (max-width: 1400px) {
@@ -878,22 +844,19 @@
       .control-grid {
         grid-template-columns: 1fr;
       }
+      #inferCard,
       #routeStateCard,
       #ipmCard,
       #ipmRawCard,
       #slowdownCard,
-	      #leftTraceDirCard,
-	      #rightTraceDirCard,
-	      #leftAuxTraceDirCard,
-	      #rightAuxTraceDirCard,
-	      #leftTraceDirZoomCard,
-	      #rightTraceDirZoomCard,
-	      #leftAuxTraceDirZoomCard,
-	      #rightAuxTraceDirZoomCard,
-	      #pidStatusCard {
+      #leftTraceDirCard,
+      #rightTraceDirCard,
+      #leftTraceDirZoomCard,
+      #rightTraceDirZoomCard,
+      #pidStatusCard {
         grid-column: span 12;
       }
-      #grayCard, #binaryCard {
+      #rgbCard, #grayCard, #binaryCard {
         grid-column: span 6;
       }
       #statusCard {
@@ -919,1133 +882,345 @@
       .pid-panel { grid-template-columns: 1fr; }
       .pid-slowdown-grid { grid-template-columns: 1fr; }
       .transport-panel { position: static; min-height: 0; }
+      #inferCard,
       #routeStateCard,
+      #rgbCard,
       #grayCard,
       #binaryCard,
       #statusCard,
       #ipmCard,
       #ipmRawCard,
       #slowdownCard,
-	      #leftTraceDirCard,
-	      #rightTraceDirCard,
-	      #leftAuxTraceDirCard,
-	      #rightAuxTraceDirCard,
-	      #leftTraceDirZoomCard,
-	      #rightTraceDirZoomCard,
-	      #leftAuxTraceDirZoomCard,
-	      #rightAuxTraceDirZoomCard,
-	      #pidStatusCard { grid-column: auto; }
+      #leftTraceDirCard,
+      #rightTraceDirCard,
+      #leftTraceDirZoomCard,
+      #rightTraceDirZoomCard,
+      #pidStatusCard { grid-column: auto; }
       .route-state-top,
       .route-state-counters {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
-
-    /* Compact operator console layout. */
-    .wrap.console-wrap {
-      max-width: none;
-      padding: 10px 12px 18px;
-    }
-    * {
-      box-sizing: border-box;
-    }
-    .console-topbar {
-      display: grid;
-      grid-template-columns: minmax(220px, 0.75fr) minmax(360px, 1.25fr) minmax(560px, 1.8fr);
-      gap: 10px;
-      align-items: stretch;
-      position: sticky;
-      top: 0;
-      z-index: 30;
-      padding: 8px;
-      margin-bottom: 8px;
-      border: 1px solid var(--console-line);
-      border-radius: 6px;
-      background: #0a0d11;
-      box-shadow: none;
-      backdrop-filter: none;
-    }
-    .console-brand {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 4px;
-      padding: 4px 8px;
-    }
-    .console-title {
-      margin: 0;
-      color: var(--console-text);
-      font-size: 18px;
-      line-height: 1.15;
-      letter-spacing: 0;
-    }
-    .console-subtitle {
-      color: var(--console-muted);
-      font-size: 11px;
-      line-height: 1.35;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .console-status {
-      display: flex;
-      gap: 6px;
-      align-content: center;
-    }
-    .console-status .meta-pill {
-      flex: 1 1 0;
-    }
-    .console-actions {
-      display: grid;
-      gap: 6px;
-      align-content: center;
-    }
-    .console-actions .toolbar,
-    .console-options {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin: 0;
-    }
-    .console-options label {
-      padding: 4px 8px;
-      border-radius: 7px;
-      font-size: 11px;
-      line-height: 1.2;
-      background: var(--console-panel-2);
-      border-color: var(--console-line);
-    }
-    .console-topbar .meta-pill {
-      min-height: 32px;
-      padding: 6px 8px;
-      border-radius: 8px;
-      font-size: 11px;
-      line-height: 1.25;
-      display: flex;
-      align-items: center;
-    }
-    .console-topbar .btn {
-      min-height: 28px;
-      padding: 5px 9px;
-      border-radius: 7px;
-      font-size: 12px;
-      line-height: 1.2;
-      text-decoration: none;
-      white-space: nowrap;
-    }
-    .console-note-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .console-note-row .control-note {
-      padding: 5px 8px;
-      border-radius: 7px;
-      font-size: 11px;
-      line-height: 1.25;
-    }
-    .grid.dashboard-shell {
-      display: grid;
-      grid-template-columns: minmax(460px, 1.1fr) minmax(520px, 1.24fr) minmax(390px, 0.86fr);
-      gap: 10px;
-      align-items: start;
-    }
-    .dashboard-column {
-      min-width: 0;
-      display: grid;
-      gap: 10px;
-      align-content: start;
-    }
-    .card {
-      border-radius: 8px;
-      padding: 10px;
-      background: var(--console-panel);
-      border-color: var(--console-line);
-      box-shadow: none;
-    }
-    .title {
-      margin-bottom: 7px;
-      font-size: 12px;
-      line-height: 1.25;
-      color: var(--console-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .vision-column .card {
-      padding: 9px;
-    }
-    .vision-column canvas {
-      border-radius: 6px;
-      max-height: 266px;
-      object-fit: contain;
-    }
-    #ipmCard canvas {
-      max-height: 212px;
-    }
-    #grayCard,
-    #binaryCard,
-    #ipmCard,
-    #ipmRawCard,
-    #slowdownCard,
-    #statusCard,
-    #pidStatusCard,
-    #routeStateCard,
-	    #leftTraceDirCard,
-	    #rightTraceDirCard,
-	    #leftAuxTraceDirCard,
-	    #rightAuxTraceDirCard,
-	    #leftTraceDirZoomCard,
-	    #rightTraceDirZoomCard,
-	    #leftAuxTraceDirZoomCard,
-	    #rightAuxTraceDirZoomCard {
-      grid-column: auto;
-      order: initial;
-    }
-    .transport-panel {
-      position: static;
-      min-height: 0;
-      padding: 10px;
-      border-radius: 6px;
-      box-shadow: none;
-      background: var(--console-panel);
-      border-color: var(--console-line);
-      backdrop-filter: none;
-    }
-    .transport-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 6px;
-    }
-    .transport-stat {
-      border-radius: 5px;
-      padding: 6px 7px;
-      background: #0b0f14;
-      border-color: var(--console-line-soft);
-    }
-    .transport-label,
-    .transport-subvalue,
-    .transport-note {
-      font-size: 10px;
-      line-height: 1.25;
-    }
-    .transport-value {
-      color: var(--console-text);
-      font-size: 14px;
-      line-height: 1.15;
-    }
-    .dense-telemetry .transport-note {
-      color: var(--console-muted);
-      border-top: 1px solid var(--console-line-soft);
-      padding-top: 6px;
-    }
-    .dashboard-shell .route-state-card {
-      padding: 0;
-      background: transparent;
-      border: none;
-      box-shadow: none;
-    }
-    .state-machine-pair {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .machine-card {
-      min-height: 146px;
-      padding: 14px;
-      background: linear-gradient(180deg, #161c22 0%, #0f1419 100%);
-      border: 1px solid var(--console-line);
-      border-left: 4px solid var(--console-amber);
-      border-radius: 6px;
-    }
-    .machine-card-primary {
-      border-left-color: var(--console-cyan);
-    }
-    .machine-label {
-      color: var(--console-muted);
-      font-size: 12px;
-      line-height: 1.2;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-    .machine-state {
-      color: var(--console-text);
-      font-size: 30px;
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: 0;
-      overflow-wrap: anywhere;
-    }
-    .machine-sub {
-      min-height: 22px;
-      margin-top: 7px;
-      color: #b7c2ca;
-      font-size: 14px;
-      line-height: 1.35;
-      overflow-wrap: anywhere;
-    }
-    .machine-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-      margin-top: 12px;
-    }
-    .machine-meta span {
-      display: inline-flex;
-      align-items: baseline;
-      gap: 5px;
-      padding: 4px 7px;
-      border: 1px solid var(--console-line-soft);
-      border-radius: 4px;
-      background: #0b0f14;
-      color: var(--console-muted);
-      font-size: 11px;
-      line-height: 1.2;
-    }
-    .machine-meta strong {
-      color: var(--console-text);
-      font-weight: 700;
-    }
-    .roi64-card {
-      margin-top: 10px;
-      padding: 10px;
-      background:
-        linear-gradient(90deg, rgba(51, 214, 196, 0.08), transparent 42%),
-        linear-gradient(180deg, #141a21 0%, #0e1319 100%);
-      border: 1px solid var(--console-line);
-      border-radius: 6px;
-    }
-    .roi64-title {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 10px;
-      color: var(--console-text);
-      font-size: 11px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-    .roi64-title span {
-      color: var(--console-cyan);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-    }
-    .roi64-layout {
-      display: grid;
-      grid-template-columns: 116px minmax(0, 1fr);
-      gap: 10px;
-      align-items: stretch;
-    }
-    .roi64-left {
-      display: grid;
-      align-content: start;
-      justify-items: center;
-      gap: 6px;
-      text-align: center;
-    }
-    .roi64-left canvas {
-      display: block;
-      width: 112px;
-      height: 112px;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      border-radius: 4px;
-      border: 1px solid rgba(51, 214, 196, 0.45);
-      background: #000;
-      box-shadow: 0 0 0 1px rgba(2, 6, 23, 0.7), 0 10px 22px rgba(0, 0, 0, 0.26);
-    }
-    .roi64-hint {
-      color: var(--console-dim);
-      font-size: 10px;
-      line-height: 1.35;
-      max-width: 112px;
-    }
-    .roi64-right {
-      min-width: 0;
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 5px;
-      align-content: start;
-    }
-    .roi64-debug-row {
-      min-width: 0;
-      padding: 5px 6px;
-      border: 1px solid rgba(42, 52, 63, 0.72);
-      border-radius: 4px;
-      background: rgba(8, 10, 13, 0.48);
-    }
-    .roi64-debug-label {
-      color: var(--console-dim);
-      display: block;
-      font-size: 9px;
-      line-height: 1.15;
-      margin-bottom: 3px;
-      white-space: nowrap;
-    }
-    .roi64-debug-value {
-      color: var(--console-text);
-      display: block;
-      font-size: 10px;
-      line-height: 1.2;
-      font-family: "Noto Sans Mono CJK SC", monospace;
-      text-align: left;
-      word-break: break-word;
-    }
-    .roi64-debug-row.primary {
-      border-color: rgba(51, 214, 196, 0.5);
-      background: rgba(51, 214, 196, 0.07);
-    }
-    .roi64-debug-row.wide {
-      grid-column: span 2;
-    }
-    .state-detail-panel {
-      margin-top: 10px;
-    }
-    .state-detail-body {
-      padding: 10px;
-    }
-    .route-state-top {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 6px;
-    }
-    .route-state-stat {
-      min-height: 58px;
-      padding: 7px 8px;
-      border-radius: 8px;
-    }
-    .route-state-label,
-    .straight-focus-label,
-    .route-state-counter-label {
-      font-size: 10px;
-      letter-spacing: 0;
-      text-transform: none;
-    }
-    .route-state-value {
-      font-size: 16px;
-    }
-    .straight-focus-panel {
-      margin-top: 8px;
-      padding: 8px;
-      border-radius: 8px;
-    }
-    .straight-focus-head {
-      gap: 8px;
-      margin-bottom: 7px;
-    }
-    .straight-focus-title {
-      font-size: 13px;
-    }
-    .straight-focus-badge {
-      padding: 4px 8px;
-      font-size: 11px;
-      letter-spacing: 0;
-    }
-    .straight-focus-grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 6px;
-    }
-    #speedFocusPanel .straight-focus-grid {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
-    .straight-focus-stat {
-      padding: 7px;
-      border-radius: 7px;
-    }
-    .straight-focus-value {
-      font-size: 18px;
-    }
-    .straight-focus-detail,
-    .route-state-lines {
-      font-size: 11px;
-      line-height: 1.35;
-    }
-    .route-state-judgment {
-      margin-top: 8px;
-      min-height: 0;
-      padding: 8px 9px;
-      border-radius: 5px;
-      font-size: 12px;
-      line-height: 1.35;
-      color: #d6ebe8;
-      background: #0b0f14;
-      border-color: var(--console-line-soft);
-    }
-    .route-state-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .route-state-block {
-      min-height: 0;
-      max-height: 148px;
-      overflow: auto;
-      padding: 8px;
-      border-radius: 5px;
-      background: #0b0f14;
-      border-color: var(--console-line-soft);
-    }
-    .route-state-block-title {
-      font-size: 11px;
-      margin-bottom: 5px;
-    }
-    .route-state-next {
-      font-size: 14px;
-      margin-bottom: 5px;
-    }
-    .route-state-clues {
-      gap: 5px;
-      margin-top: 8px;
-      max-height: 58px;
-      overflow: auto;
-    }
-    .route-state-chip {
-      padding: 4px 7px;
-      border-radius: 7px;
-      font-size: 10px;
-      white-space: normal;
-    }
-    .route-state-counters {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 6px;
-      margin-top: 8px;
-    }
-    .route-state-counter {
-      padding: 6px 7px;
-      border-radius: 7px;
-    }
-    .route-state-counter-value {
-      font-size: 14px;
-    }
-    .pid-panel {
-      grid-template-columns: 1fr;
-      gap: 7px;
-    }
-    .pid-column {
-      padding: 8px;
-      border-radius: 5px;
-      background: #0b0f14;
-      border-color: var(--console-line-soft);
-    }
-    .pid-column-title {
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-    .pid-list {
-      gap: 5px;
-    }
-    .pid-item {
-      padding: 6px 7px;
-      border-radius: 4px;
-      background: #10161c;
-      border-color: var(--console-line-soft);
-    }
-    .pid-item strong {
-      font-size: 10px;
-      margin-bottom: 2px;
-    }
-    .pid-item span {
-      font-size: 11px;
-      line-height: 1.25;
-    }
-    #pidStatusCard .pid-panel {
-      max-height: none;
-      overflow: visible;
-      padding-right: 2px;
-    }
-    .pid-status-body {
-      padding: 10px;
-    }
-    .pid-three-loop {
-      display: grid;
-      gap: 5px;
-    }
-    .pid-loop-header,
-    .pid-loop-row {
-      display: grid;
-      grid-template-columns: 58px minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
-      gap: 6px;
-      align-items: stretch;
-    }
-    .pid-loop-header {
-      color: var(--console-muted);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      padding: 0 6px;
-    }
-    .pid-loop-row {
-      background: #10161c;
-      border-radius: 4px;
-      padding: 5px 6px;
-    }
-    .pid-loop-title {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--console-cyan);
-      align-self: center;
-      white-space: nowrap;
-    }
-    .pid-loop-value {
-      font-size: 11px;
-      line-height: 1.28;
-      word-break: break-all;
-      min-width: 0;
-    }
-    .pid-deep-panel {
-      border: 1px solid var(--console-line-soft);
-      border-radius: 5px;
-      background: #0b0f14;
-      overflow: hidden;
-    }
-    .pid-deep-panel > summary {
-      cursor: pointer;
-      padding: 7px 8px;
-      color: var(--console-muted);
-      font-size: 11px;
-      font-weight: 700;
-      list-style-position: inside;
-      border-bottom: 1px solid transparent;
-    }
-    .pid-deep-panel[open] > summary {
-      border-bottom-color: var(--console-line-soft);
-    }
-    .pid-deep-panel .pid-list {
-      max-height: 230px;
-      overflow: auto;
-    }
-    .pid-slowdown-wrap {
-      margin-top: 0;
-      padding: 0;
-      border: none;
-      background: transparent;
-    }
-    .pid-slowdown-wrap.standalone {
-      min-height: 0;
-    }
-    .pid-slowdown-grid {
-      grid-template-columns: 1fr;
-      gap: 6px;
-    }
-    .pid-slowdown-card {
-      padding: 8px;
-      border-radius: 5px;
-      background: #0b0f14;
-      border-color: var(--console-line-soft);
-    }
-    .pid-slowdown-card.active {
-      background: #101a1c;
-      border-color: rgba(51, 214, 196, 0.55);
-      box-shadow: inset 3px 0 0 var(--console-cyan);
-      transform: none;
-    }
-    .pid-slowdown-card-head {
-      margin-bottom: 4px;
-    }
-    .pid-slowdown-name,
-    .pid-slowdown-lines {
-      font-size: 11px;
-      line-height: 1.25;
-    }
-    .pid-slowdown-lines {
-      max-height: none;
-      overflow: visible;
-    }
-    .pixel-info {
-      left: 6px;
-      bottom: 6px;
-      max-width: calc(100% - 12px);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      font-size: 10px;
-    }
-    .detail-stack {
-      display: grid;
-      gap: 10px;
-      grid-column: 1 / -1;
-    }
-    .detail-panel {
-      border: 1px solid var(--console-line);
-      border-radius: 6px;
-      background: var(--console-panel);
-      overflow: hidden;
-    }
-    .detail-panel > summary {
-      cursor: pointer;
-      padding: 9px 11px;
-      color: var(--console-text);
-      font-size: 12px;
-      font-weight: 700;
-      list-style-position: inside;
-      background: var(--console-panel-2);
-      border-bottom: 1px solid var(--console-line);
-    }
-    .detail-panel:not([open]) > summary {
-      border-bottom: none;
-    }
-    .detail-panel-body {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-      padding: 10px;
-    }
-    .detail-panel-body.single {
-      grid-template-columns: 1fr;
-    }
-    .detail-panel-body canvas {
-      max-height: 460px;
-      object-fit: contain;
-    }
-    .pid-chart-panel .chart-card {
-      padding: 8px 10px;
-    }
-    .chart-legend {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 4px;
-      font-size: 11px;
-      color: var(--console-dim);
-    }
-    .legend-dot {
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
-      margin-right: 2px;
-    }
-    pre {
-      font-size: 11px;
-      line-height: 1.35;
-      max-height: 420px;
-    }
-    #statusCard pre {
-      max-height: 520px;
-    }
-    @media (max-width: 1500px) {
-      .console-topbar {
-        grid-template-columns: 1fr;
-      }
-      .grid.dashboard-shell {
-        grid-template-columns: 1fr;
-      }
-      .detail-panel-body {
-        grid-template-columns: 1fr;
-      }
-      .vision-column canvas,
-      #ipmCard canvas {
-        max-height: none;
-      }
-    }
   </style>
 </head>
 <body>
-  <div class="wrap console-wrap">
-    <header class="console-topbar">
-      <div class="console-brand">
-        <h1 class="console-title">智能车视觉接收端</h1>
-        <div class="console-subtitle">实时图像 / 状态机 / PID / 图传概览</div>
-      </div>
-      <div class="console-status">
-        <div class="meta-pill" id="meta">connecting...</div>
-        <div class="meta-pill" id="modeNote">当前模式说明加载中...</div>
-        <div class="meta-pill" id="recordingMeta">录制未开始</div>
-      </div>
-      <div class="console-actions">
-        <div class="toolbar">
-          <button class="btn btn-primary" id="startRecordBtn">开始录制</button>
-          <button class="btn btn-danger" id="stopRecordBtn" disabled>停止录制</button>
-          <button class="btn" id="playRecordBtn" disabled>打开回放界面</button>
-          <a class="btn" href="/config.html">参数配置</a>
-          <button class="btn" id="saveRecordBtn" disabled>保存录制</button>
-          <button class="btn" id="openSavedModalBtn">已保存回放</button>
-          <div class="replay-toolbar" id="replayToolbar">
-            <button class="btn btn-primary" id="replayToggleBtn">播放</button>
-            <button class="btn" id="replayRestartBtn">重置</button>
-            <button class="btn" id="replayBackwardBtn">-1s</button>
-            <button class="btn" id="replayForwardBtn">+1s</button>
-            <button class="btn" id="replaySpeedBtn">1.00x</button>
-            <a class="btn" href="/">退出回放</a>
-            <div class="replay-time" id="replayTimeLabel">00:00.00 / 00:00.00</div>
-          </div>
+  <div class="wrap">
+    <div class="page-header">
+      <div class="hero-card">
+        <h1 class="hero-title">智能车视觉接收端</h1>
+        <div class="hero-subtitle">
+          把主板图像、推理结果、状态机和关键曲线集中到同一页里。首屏优先看红框识别、ROI、二值与巡线状态，深度数组和调试明细放在下面连续展开。
         </div>
-        <div class="option-panel console-options">
-          <label><input type="checkbox" id="toggleGrayBoundaries" checked /> 灰度边界</label>
-          <label><input type="checkbox" id="toggleMeanCenterline" /> 均值中线</label>
-          <label><input type="checkbox" id="toggleIpmAnchorDot" checked /> IPM 锚点</label>
-          <label><input type="checkbox" id="toggleBoundaryPointMode" checked /> 采样点</label>
-          <label><input type="checkbox" id="toggleTraceDirCharts" checked /> dir 图</label>
-          <label><input type="checkbox" id="toggleLocalCompute" /> 本地复算已移除</label>
-        </div>
-        <div class="console-note-row">
-          <div class="control-note" id="ipmCenterlineSourceLabel">透视中线来源：自动</div>
+        <div class="header-meta">
+          <div class="meta-pill" id="meta">connecting...</div>
+          <div class="meta-pill" id="modeNote">当前模式说明加载中...</div>
+          <div class="meta-pill" id="recordingMeta">录制未开始</div>
         </div>
       </div>
-    </header>
-
-    <div class="grid dashboard-shell">
-      <section class="dashboard-column vision-column">
-        <div class="card" id="grayCard">
-          <div class="title">灰度图与左右边界</div>
-          <div class="view">
-            <canvas id="grayCanvas" width="160" height="120"></canvas>
-            <div class="pixel-info" id="grayPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+      <div class="transport-panel" id="transportPanel">
+        <div class="title">图传概览</div>
+        <div class="transport-grid">
+          <div class="transport-stat">
+            <div class="transport-label">当前传输速度</div>
+            <div class="transport-value" id="transportRateValue">-- Mbps</div>
+            <div class="transport-subvalue" id="transportRateSub">-- KiB/s</div>
+          </div>
+          <div class="transport-stat">
+            <div class="transport-label">当前图像帧率</div>
+            <div class="transport-value" id="transportFpsValue">-- fps</div>
+            <div class="transport-subvalue" id="transportFpsSub">gray -- / rgb -- / binary --</div>
+          </div>
+          <div class="transport-stat">
+            <div class="transport-label">当前图传配置</div>
+            <div class="transport-value" id="transportModeValue">--</div>
+            <div class="transport-subvalue" id="transportModeSub">max fps --</div>
+          </div>
+          <div class="transport-stat">
+            <div class="transport-label">本地复算同步</div>
+            <div class="transport-value" id="transportSyncValue">--</div>
+            <div class="transport-subvalue" id="transportSyncSub">等待同步信息...</div>
+          </div>
+          <div class="transport-stat">
+            <div class="transport-label">主板 CPU 占用</div>
+            <div class="transport-value" id="transportCpuValue">-- %</div>
+            <div class="transport-subvalue" id="transportCpuSub">主板端每秒采样</div>
+          </div>
+          <div class="transport-stat">
+            <div class="transport-label">主板内存占用</div>
+            <div class="transport-value" id="transportMemValue">-- %</div>
+            <div class="transport-subvalue" id="transportMemSub">主板端每秒采样</div>
           </div>
         </div>
-        <div class="card" id="binaryCard">
-          <div class="title" id="binaryTitle">二值图</div>
-          <div class="view">
-            <canvas id="binaryCanvas" width="160" height="120"></canvas>
-            <div class="pixel-info" id="binaryPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        <div class="transport-note" id="transportNote">等待图传数据...</div>
+      </div>
+    </div>
+    <div class="card control-card">
+      <div class="control-grid">
+        <div>
+          <div class="title">录制与回放</div>
+          <div class="toolbar">
+            <button class="btn btn-primary" id="startRecordBtn">开始录制</button>
+            <button class="btn btn-danger" id="stopRecordBtn" disabled>停止录制</button>
+            <button class="btn" id="playRecordBtn" disabled>打开回放界面</button>
+            <a class="btn" href="/config.html">参数配置</a>
+            <button class="btn" id="saveRecordBtn" disabled>保存录制</button>
+            <button class="btn" id="openSavedModalBtn">已保存回放</button>
+          </div>
+          <div class="control-notes">
+            <div class="control-note">原始状态全文保留在“状态数据”卡片里，首屏优先展示关键结果。</div>
+            <div class="control-note" id="ipmCenterlineSourceLabel">透视中线来源：自动</div>
           </div>
         </div>
-        <div class="card" id="ipmCard">
-          <div class="title">透视边界图-处理链数组（可三角滤波）</div>
-          <div class="view">
-            <canvas id="ipmCanvas" width="280" height="140"></canvas>
-            <div class="pixel-info" id="ipmPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        <div>
+          <div class="title">显示开关</div>
+          <div class="option-panel">
+            <label><input type="checkbox" id="toggleGrayBoundaries" checked /> 灰度图显示左右边界</label>
+            <label><input type="checkbox" id="toggleMeanCenterline" /> 灰度图显示左右均值中线</label>
+            <label><input type="checkbox" id="toggleIpmAnchorDot" checked /> 透视图显示锚点圆</label>
+            <label><input type="checkbox" id="toggleBoundaryPointMode" checked /> 边界/中线按采样点显示</label>
+            <label><input type="checkbox" id="toggleTraceDirCharts" checked /> 显示八邻域 dir 图</label>
+            <label><input type="checkbox" id="toggleLocalCompute" /> 启用本地复算补数</label>
           </div>
         </div>
-      </section>
-
-      <section class="dashboard-column state-column">
+      </div>
+    </div>
+    <div class="grid">
+      <div class="card" id="rgbCard">
+        <div class="title">原始彩图</div>
+        <div class="view">
+          <canvas id="rgbCanvas" width="160" height="120"></canvas>
+          <div class="pixel-info" id="rgbPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
+      </div>
+      <div class="card" id="grayCard">
+        <div class="title">灰度图与左右边界</div>
+        <div class="view">
+          <canvas id="grayCanvas" width="160" height="120"></canvas>
+          <div class="pixel-info" id="grayPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
+      </div>
+      <div class="card" id="inferCard">
+        <div class="title">识别主视图</div>
+        <div class="infer-grid">
+          <div>
+            <div class="view">
+              <canvas id="inferCanvas" width="160" height="120"></canvas>
+            </div>
+            <div class="infer-meta-grid" id="inferMetaGrid"></div>
+          </div>
+          <div class="infer-side">
+            <div>
+              <div class="title" style="margin-bottom:8px;">ROI 64x64</div>
+              <div class="view">
+                <canvas id="roi64Canvas" width="64" height="64"></canvas>
+              </div>
+              <div class="infer-hint" id="roi64Hint">还没有可显示的 ROI64 图像。</div>
+            </div>
+            <div>
+              <div class="title" style="margin-bottom:8px;">分类概率</div>
+              <div class="prob-list" id="inferProbList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="binaryCard">
+        <div class="title" id="binaryTitle">二值图</div>
+        <div class="view">
+          <canvas id="binaryCanvas" width="160" height="120"></canvas>
+          <div class="pixel-info" id="binaryPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
+      </div>
+      <div class="card" id="ipmCard">
+        <div class="title">透视边界图-处理链数组（可三角滤波）</div>
+        <div class="view">
+          <canvas id="ipmCanvas" width="280" height="140"></canvas>
+          <div class="pixel-info" id="ipmPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
+      </div>
+      <div class="card" id="ipmRawCard">
+        <div class="title">透视边界图-原始拷贝数组（角点识别）</div>
+        <div class="view">
+          <canvas id="ipmRawCanvas" width="280" height="140"></canvas>
+          <div class="pixel-info" id="ipmRawPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
+        </div>
+      </div>
+      <div class="card" id="slowdownCard">
+        <div class="title">速度方案判定</div>
+        <div class="pid-slowdown-wrap standalone">
+          <div class="pid-slowdown-grid" id="pidSlowdownCards"></div>
+        </div>
+      </div>
+      <div class="card" id="statusCard">
+        <div class="title">原始状态全文</div>
+        <pre id="status">loading...</pre>
+      </div>
+      <div class="card" id="pidStatusCard">
+        <div class="title">PID 专用状态栏</div>
+        <div class="pid-panel">
+          <div class="pid-column">
+            <div class="pid-column-title">共同部分</div>
+            <div class="pid-list" id="pidCommonList"></div>
+          </div>
+          <div class="pid-column">
+            <div class="pid-column-title">左侧 PID 与执行链</div>
+            <div class="pid-list" id="pidLeftList"></div>
+          </div>
+          <div class="pid-column">
+            <div class="pid-column-title">右侧 PID 与执行链</div>
+            <div class="pid-list" id="pidRightList"></div>
+          </div>
+        </div>
+      </div>
       <div class="card route-state-card" id="routeStateCard">
-        <div class="state-machine-pair">
-          <div class="machine-card machine-card-primary" id="elementMachineCard">
-            <div class="machine-label">元素状态机</div>
-            <div class="machine-state" id="routeMainStateValue">--</div>
-            <div class="machine-sub" id="routeSubStateValue">--</div>
-            <div class="machine-meta">
-              <span>偏向 <strong id="routePreferredSourceValue">--</strong></span>
-              <span>编码器 <strong id="routeEncoderValue">--</strong></span>
-            </div>
+        <div class="title">状态机数据</div>
+        <div class="route-state-top">
+          <div class="route-state-stat">
+            <div class="route-state-label">当前主状态</div>
+            <div class="route-state-value" id="routeMainStateValue">--</div>
           </div>
-          <div class="machine-card" id="bypassMachineCard">
-            <div class="machine-label">绕行状态机</div>
-            <div class="machine-state" id="targetBoardStateValue">--</div>
-            <div class="machine-sub" id="targetBoardActiveValue">--</div>
-            <div class="machine-meta">
-              <span>确认 <strong id="targetBoardConfirmValue">--</strong></span>
-              <span>偏移 <strong id="targetBoardOffsetValue">--</strong></span>
-              <span>无红 <strong id="targetBoardNoRedValue">--</strong></span>
-            </div>
+          <div class="route-state-stat">
+            <div class="route-state-label">当前子状态</div>
+            <div class="route-state-value" id="routeSubStateValue">--</div>
+          </div>
+          <div class="route-state-stat">
+            <div class="route-state-label">偏向来源</div>
+            <div class="route-state-value" id="routePreferredSourceValue">--</div>
+          </div>
+          <div class="route-state-stat">
+            <div class="route-state-label">进入当前状态后编码器</div>
+            <div class="route-state-value" id="routeEncoderValue">--</div>
           </div>
         </div>
-        <div class="roi64-card">
-          <div class="roi64-title">ROI / 目标板几何 <span>64×64 resized preview</span></div>
-          <div class="roi64-layout">
-            <div class="roi64-left">
-              <canvas id="roi64Canvas" width="64" height="64"></canvas>
-              <div class="roi64-hint" id="roi64Hint">还没有可显示的 ROI64 图像。</div>
+        <div class="straight-focus-panel" id="straightFocusPanel">
+          <div class="straight-focus-head">
+            <div class="straight-focus-title">直道判定高亮</div>
+            <div class="straight-focus-badge" id="straightFocusBadge">等待数据</div>
+          </div>
+          <div class="straight-focus-grid">
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">中线点数</div>
+              <div class="straight-focus-value" id="straightFocusCenterlineCount">--</div>
             </div>
-            <div class="roi64-right" id="roi64Debug">
-              <div class="roi64-debug-row primary"><span class="roi64-debug-label">红框</span><span class="roi64-debug-value" id="roi64DbRedFound">--</span></div>
-              <div class="roi64-debug-row primary"><span class="roi64-debug-label">dist_ipm</span><span class="roi64-debug-value" id="roi64DbDistIpm">--</span></div>
-              <div class="roi64-debug-row wide"><span class="roi64-debug-label">失败原因</span><span class="roi64-debug-value" id="roi64DbFailReason">--</span></div>
-              <div class="roi64-debug-row"><span class="roi64-debug-label">红框下底 IPM</span><span class="roi64-debug-value" id="roi64DbIpmRedBottom">--</span></div>
-              <div class="roi64-debug-row"><span class="roi64-debug-label">目标下底 IPM</span><span class="roi64-debug-value" id="roi64DbIpmBottom">--</span></div>
-              <div class="roi64-debug-row"><span class="roi64-debug-label">目标上底 IPM</span><span class="roi64-debug-value" id="roi64DbIpmTop">--</span></div>
-              <div class="roi64-debug-row"><span class="roi64-debug-label">目标下底 crop</span><span class="roi64-debug-value" id="roi64DbBottom">--</span></div>
-              <div class="roi64-debug-row"><span class="roi64-debug-label">红框命中 proc</span><span class="roi64-debug-value" id="roi64DbHit">--</span></div>
-              <div class="roi64-debug-row"><span class="roi64-debug-label">目标尺寸</span><span class="roi64-debug-value" id="roi64DbSize">--</span></div>
-              <div class="roi64-debug-row"><span class="roi64-debug-label">BL crop</span><span class="roi64-debug-value" id="roi64DbCornerBL">--</span></div>
-              <div class="roi64-debug-row"><span class="roi64-debug-label">BR crop</span><span class="roi64-debug-value" id="roi64DbCornerBR">--</span></div>
-              <div class="roi64-debug-row"><span class="roi64-debug-label">TR/TL crop</span><span class="roi64-debug-value" id="roi64DbCornerTop">--</span></div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">最后索引</div>
+              <div class="straight-focus-value" id="straightFocusLastIndex">--</div>
             </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">误差和</div>
+              <div class="straight-focus-value" id="straightFocusErrorSum">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">误差阈值</div>
+              <div class="straight-focus-value" id="straightFocusErrorMax">--</div>
+            </div>
+          </div>
+          <div class="straight-focus-detail" id="straightFocusDetail">等待直道判定数据...</div>
+        </div>
+        <div class="straight-focus-panel" id="crossFocusPanel">
+          <div class="straight-focus-head">
+            <div class="straight-focus-title">十字判定高亮</div>
+            <div class="straight-focus-badge" id="crossFocusBadge">等待数据</div>
+          </div>
+          <div class="straight-focus-grid">
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">左角点后贴边</div>
+              <div class="straight-focus-value" id="crossFocusLeftRows">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">右角点后贴边</div>
+              <div class="straight-focus-value" id="crossFocusRightRows">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">起始 Gap</div>
+              <div class="straight-focus-value" id="crossFocusGap">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">辅助线命中</div>
+              <div class="straight-focus-value" id="crossFocusAux">--</div>
+            </div>
+          </div>
+          <div class="straight-focus-detail" id="crossFocusDetail">等待十字判定数据...</div>
+        </div>
+        <div class="straight-focus-panel" id="speedFocusPanel">
+          <div class="straight-focus-head">
+            <div class="straight-focus-title">速度决策状态</div>
+            <div class="straight-focus-badge" id="speedFocusBadge">等待数据</div>
+          </div>
+          <div class="straight-focus-grid">
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">中线点数</div>
+              <div class="straight-focus-value" id="speedFocusCenterlineCount">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">决策后速度</div>
+              <div class="straight-focus-value" id="speedFocusMinCount">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">决策后速度</div>
+              <div class="straight-focus-value" id="speedFocusDesiredSpeed">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">角速度变化率</div>
+              <div class="straight-focus-value" id="speedFocusErrorSum">--</div>
+            </div>
+            <div class="straight-focus-stat">
+              <div class="straight-focus-label">目标/实测取大</div>
+              <div class="straight-focus-value" id="speedFocusErrorThreshold">--</div>
+            </div>
+          </div>
+          <div class="straight-focus-detail" id="speedFocusDetail">等待加减速数据...</div>
+        </div>
+        <div class="route-state-judgment" id="routeStateJudgment">waiting...</div>
+        <div class="route-state-grid">
+          <div class="route-state-block">
+            <div class="route-state-block-title">下一步状态</div>
+            <div class="route-state-next" id="routeNextStateValue">--</div>
+            <div class="route-state-lines" id="routeNextReason"></div>
+          </div>
+          <div class="route-state-block">
+            <div class="route-state-block-title">触发条件与当前判定</div>
+            <div class="route-state-lines" id="routeConditionLines"></div>
           </div>
         </div>
-        <details class="detail-panel state-detail-panel">
-          <summary>状态机判定细节</summary>
-          <div class="state-detail-body">
-            <div class="route-state-judgment" id="routeStateJudgment">waiting...</div>
-            <div class="route-state-grid">
-              <div class="route-state-block">
-                <div class="route-state-block-title">下一步状态</div>
-                <div class="route-state-next" id="routeNextStateValue">--</div>
-                <div class="route-state-lines" id="routeNextReason"></div>
-              </div>
-              <div class="route-state-block">
-                <div class="route-state-block-title">触发条件与当前判定</div>
-                <div class="route-state-lines" id="routeConditionLines"></div>
-              </div>
-              <div class="route-state-block">
-                <div class="route-state-block-title">原图标志层（当前值）</div>
-                <div class="route-state-lines" id="routeRawFlagLines"></div>
-              </div>
-              <div class="route-state-block">
-                <div class="route-state-block-title">状态判断（实际 / 标准）</div>
-                <div class="route-state-lines" id="routeJudgeMetricLines"></div>
-              </div>
-            </div>
-            <div class="route-state-clues" id="routeStateClues"></div>
-            <div class="route-state-counters" id="routeStateCounters"></div>
+        <div class="route-state-grid">
+          <div class="route-state-block">
+            <div class="route-state-block-title">原图标志层（当前值）</div>
+            <div class="route-state-lines" id="routeRawFlagLines"></div>
           </div>
-        </details>
-        <div class="compat-hidden" hidden>
-          <div id="straightFocusPanel">
-            <span id="straightFocusBadge"></span><span id="straightFocusCenterlineCount"></span><span id="straightFocusLastIndex"></span>
-            <span id="straightFocusErrorSum"></span><span id="straightFocusErrorMax"></span><span id="straightFocusDetail"></span>
+          <div class="route-state-block">
+            <div class="route-state-block-title">状态判断（实际 / 标准）</div>
+            <div class="route-state-lines" id="routeJudgeMetricLines"></div>
           </div>
-          <div id="crossFocusPanel">
-            <span id="crossFocusBadge"></span><span id="crossFocusLeftRows"></span><span id="crossFocusRightRows"></span>
-            <span id="crossFocusGap"></span><span id="crossFocusAux"></span><span id="crossFocusDetail"></span>
-          </div>
-          <div id="speedFocusPanel">
-            <span id="speedFocusBadge"></span><span id="speedFocusCenterlineCount"></span><span id="speedFocusDesiredSpeed"></span>
-            <span id="speedFocusMinCount"></span><span id="speedFocusErrorSum"></span><span id="speedFocusErrorThreshold"></span>
-            <span id="speedFocusDetail"></span>
-          </div>
+        </div>
+        <div class="route-state-clues" id="routeStateClues"></div>
+        <div class="route-state-counters" id="routeStateCounters"></div>
+      </div>
+      <div class="card" id="leftTraceDirCard">
+        <div class="title">左八邻域 dir 图（横轴=索引，纵轴=dir）</div>
+        <div class="view">
+          <canvas id="leftTraceDirCanvas" width="480" height="220"></canvas>
         </div>
       </div>
-      </section>
-
-      <section class="dashboard-column telemetry-column">
-        <div class="transport-panel dense-telemetry" id="transportPanel">
-          <div class="title">图传数据概览</div>
-          <div class="transport-grid">
-            <div class="transport-stat">
-              <div class="transport-label">传输速度</div>
-              <div class="transport-value" id="transportRateValue">-- Mbps</div>
-              <div class="transport-subvalue" id="transportRateSub">-- KiB/s</div>
-            </div>
-            <div class="transport-stat">
-              <div class="transport-label">图像帧率</div>
-              <div class="transport-value" id="transportFpsValue">-- fps</div>
-              <div class="transport-subvalue" id="transportFpsSub">gray -- / rgb -- / binary --</div>
-            </div>
-            <div class="transport-stat">
-              <div class="transport-label">图传配置</div>
-              <div class="transport-value" id="transportModeValue">--</div>
-              <div class="transport-subvalue" id="transportModeSub">max fps --</div>
-            </div>
-            <div class="transport-stat">
-              <div class="transport-label">复算功能</div>
-              <div class="transport-value" id="transportSyncValue">--</div>
-              <div class="transport-subvalue" id="transportSyncSub">等待同步信息...</div>
-            </div>
-            <div class="transport-stat">
-              <div class="transport-label">CPU</div>
-              <div class="transport-value" id="transportCpuValue">-- %</div>
-              <div class="transport-subvalue" id="transportCpuSub">主板端每秒采样</div>
-            </div>
-            <div class="transport-stat">
-              <div class="transport-label">内存</div>
-              <div class="transport-value" id="transportMemValue">-- %</div>
-              <div class="transport-subvalue" id="transportMemSub">主板端每秒采样</div>
-            </div>
-          </div>
-          <div class="transport-note" id="transportNote">等待图传数据...</div>
+      <div class="card" id="leftTraceDirZoomCard">
+        <div class="title">左八邻域 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
+        <div class="meta" id="leftTraceDirZoomMeta">等待 dir 数据</div>
+        <div class="view">
+          <canvas id="leftTraceDirZoomCanvas" width="720" height="260"></canvas>
         </div>
-        <div class="card speed-summary-card" id="slowdownCard">
-          <div class="title">速度方案判定</div>
-          <div class="pid-slowdown-wrap standalone">
-            <div class="pid-slowdown-grid" id="pidSlowdownCards"></div>
-          </div>
+      </div>
+      <div class="card" id="rightTraceDirCard">
+        <div class="title">右八邻域 dir 图（横轴=索引，纵轴=dir）</div>
+        <div class="view">
+          <canvas id="rightTraceDirCanvas" width="480" height="220"></canvas>
         </div>
-        <details class="detail-panel pid-summary-panel" open>
-          <summary>PID 概览</summary>
-          <div class="pid-status-body" id="pidStatusCard">
-            <div class="pid-panel">
-              <div class="pid-column pid-column-common">
-                <div class="pid-column-title">共同摘要</div>
-                <div class="pid-three-loop" id="pidCommonList">
-                  <div class="pid-loop-header">
-                    <span>环路</span>
-                    <span>目标</span>
-                    <span>实际</span>
-                    <span>输出</span>
-                  </div>
-                  <div class="pid-loop-row">
-                    <div class="pid-loop-title">位置环</div>
-                    <div class="pid-loop-value loop-pos-target">--</div>
-                    <div class="pid-loop-value loop-pos-actual">--</div>
-                    <div class="pid-loop-value loop-pos-output">--</div>
-                  </div>
-                  <div class="pid-loop-row">
-                    <div class="pid-loop-title">角速度环</div>
-                    <div class="pid-loop-value loop-yaw-target">--</div>
-                    <div class="pid-loop-value loop-yaw-actual">--</div>
-                    <div class="pid-loop-value loop-yaw-output">--</div>
-                  </div>
-                  <div class="pid-loop-row">
-                    <div class="pid-loop-title">速度环</div>
-                    <div class="pid-loop-value loop-spd-target">--</div>
-                    <div class="pid-loop-value loop-spd-actual">--</div>
-                    <div class="pid-loop-value loop-spd-output">--</div>
-                  </div>
-                </div>
-              </div>
-              <details class="pid-deep-panel">
-                <summary>共同完整执行链</summary>
-                <div class="pid-column">
-                  <div class="pid-list" id="pidCommonFullList"></div>
-                </div>
-              </details>
-              <details class="pid-deep-panel">
-                <summary>左侧 PID 与执行链</summary>
-                <div class="pid-column">
-                  <div class="pid-list" id="pidLeftList"></div>
-                </div>
-              </details>
-              <details class="pid-deep-panel">
-                <summary>右侧 PID 与执行链</summary>
-                <div class="pid-column">
-                  <div class="pid-list" id="pidRightList"></div>
-                </div>
-              </details>
-              </div>
-            </div>
-        </details>
-      </section>
-
-      <section class="detail-stack">
-        <details class="detail-panel">
-          <summary>IPM 原始图 / 八邻域 dir 图</summary>
-          <div class="detail-panel-body">
-            <div class="card" id="ipmRawCard">
-              <div class="title">透视边界图-原始拷贝数组（角点识别）</div>
-              <div class="view">
-                <canvas id="ipmRawCanvas" width="280" height="140"></canvas>
-                <div class="pixel-info" id="ipmRawPixelInfo">x:- y:- | Gray:- Bin:- RGB:(-,-,-)</div>
-              </div>
-            </div>
-            <div class="card" id="leftTraceDirCard">
-              <div class="title">左八邻域 dir 图（横轴=索引，纵轴=dir）</div>
-              <div class="view">
-                <canvas id="leftTraceDirCanvas" width="480" height="220"></canvas>
-              </div>
-            </div>
-            <div class="card" id="rightTraceDirCard">
-              <div class="title">右八邻域 dir 图（横轴=索引，纵轴=dir）</div>
-              <div class="view">
-                <canvas id="rightTraceDirCanvas" width="480" height="220"></canvas>
-              </div>
-            </div>
-            <div class="card" id="leftAuxTraceDirCard">
-              <div class="title">左辅助边界 dir 图（横轴=索引，纵轴=dir）</div>
-              <div class="view">
-                <canvas id="leftAuxTraceDirCanvas" width="480" height="220"></canvas>
-              </div>
-            </div>
-            <div class="card" id="rightAuxTraceDirCard">
-              <div class="title">右辅助边界 dir 图（横轴=索引，纵轴=dir）</div>
-              <div class="view">
-                <canvas id="rightAuxTraceDirCanvas" width="480" height="220"></canvas>
-              </div>
-            </div>
-            <div class="card" id="leftTraceDirZoomCard">
-              <div class="title">左八邻域 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
-              <div class="meta" id="leftTraceDirZoomMeta">等待 dir 数据</div>
-              <div class="view">
-                <canvas id="leftTraceDirZoomCanvas" width="720" height="260"></canvas>
-              </div>
-            </div>
-            <div class="card" id="rightTraceDirZoomCard">
-              <div class="title">右八邻域 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
-              <div class="meta" id="rightTraceDirZoomMeta">等待 dir 数据</div>
-              <div class="view">
-                <canvas id="rightTraceDirZoomCanvas" width="720" height="260"></canvas>
-              </div>
-            </div>
-            <div class="card" id="leftAuxTraceDirZoomCard">
-              <div class="title">左辅助边界 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
-              <div class="meta" id="leftAuxTraceDirZoomMeta">等待 dir 数据</div>
-              <div class="view">
-                <canvas id="leftAuxTraceDirZoomCanvas" width="720" height="260"></canvas>
-              </div>
-            </div>
-            <div class="card" id="rightAuxTraceDirZoomCard">
-              <div class="title">右辅助边界 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
-              <div class="meta" id="rightAuxTraceDirZoomMeta">等待 dir 数据</div>
-              <div class="view">
-                <canvas id="rightAuxTraceDirZoomCanvas" width="720" height="260"></canvas>
-              </div>
-            </div>
-          </div>
-        </details>
-        <details class="detail-panel">
-          <summary>历史角点 7x7 ROI 二值图（初始位置，未平移）</summary>
-          <div class="detail-panel-body">
-            <div class="card" id="leftHistoryRoi7x7Card">
-              <div class="title">左侧 7x7 ROI（史上角点初始窗口）</div>
-              <div class="meta" id="leftHistoryRoi7x7Meta">等待数据</div>
-              <div class="view" style="display:flex;align-items:center;gap:8px;">
-                <canvas id="leftHistoryRoi7x7Canvas" width="140" height="140"></canvas>
-                <div style="font-size:11px;color:var(--console-dim);line-height:1.6;">
-                  <div>■ = 黑(0)</div>
-                  <div>□ = 白(255)</div>
-                  <div><span style="color:#fbbf24">■</span> = 越界(128)</div>
-                </div>
-              </div>
-            </div>
-            <div class="card" id="rightHistoryRoi7x7Card">
-              <div class="title">右侧 7x7 ROI（史上角点初始窗口）</div>
-              <div class="meta" id="rightHistoryRoi7x7Meta">等待数据</div>
-              <div class="view" style="display:flex;align-items:center;gap:8px;">
-                <canvas id="rightHistoryRoi7x7Canvas" width="140" height="140"></canvas>
-                <div style="font-size:11px;color:var(--console-dim);line-height:1.6;">
-                  <div>■ = 黑(0)</div>
-                  <div>□ = 白(255)</div>
-                  <div><span style="color:#fbbf24">■</span> = 越界(128)</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </details>
-        <details class="detail-panel pid-chart-panel" id="posChartPanel" open>
-          <summary>位置环 — 目标值 vs 实际偏差 (px)</summary>
-          <div class="detail-panel-body single">
-            <div class="card chart-card">
-              <div class="chart-legend">
-                <span class="legend-dot" style="background:#fbbf24;"></span> 目标值(0)
-                <span class="legend-dot" style="background:#38bdf8;"></span> 实际偏差(px)
-              </div>
-              <canvas id="posChartCanvas" width="900" height="220"></canvas>
-            </div>
-          </div>
-        </details>
-        <details class="detail-panel pid-chart-panel" id="yawChartPanel" open>
-          <summary>角速度环 — 目标值 vs 实际值 (dps)</summary>
-          <div class="detail-panel-body single">
-            <div class="card chart-card">
-              <div class="chart-legend">
-                <span class="legend-dot" style="background:#fbbf24;"></span> 目标角速度(dps)
-                <span class="legend-dot" style="background:#38bdf8;"></span> 实测角速度(dps)
-              </div>
-              <canvas id="yawChartCanvas" width="900" height="220"></canvas>
-            </div>
-          </div>
-        </details>
-        <details class="detail-panel pid-chart-panel" id="spdChartPanel" open>
-          <summary>速度环 — 左右轮 目标值 vs 实际反馈 (counts/5ms)</summary>
-          <div class="detail-panel-body">
-            <div class="card chart-card">
-              <div class="chart-legend">
-                <span class="legend-dot" style="background:#fbbf24;"></span> 左轮目标
-                <span class="legend-dot" style="background:#38bdf8;"></span> 左轮反馈
-              </div>
-              <canvas id="spdLeftChartCanvas" width="680" height="420"></canvas>
-            </div>
-            <div class="card chart-card">
-              <div class="chart-legend">
-                <span class="legend-dot" style="background:#fbbf24;"></span> 右轮目标
-                <span class="legend-dot" style="background:#38bdf8;"></span> 右轮反馈
-              </div>
-              <canvas id="spdRightChartCanvas" width="680" height="420"></canvas>
-            </div>
-          </div>
-        </details>
-        <details class="detail-panel">
-          <summary>原始状态全文</summary>
-          <div class="detail-panel-body single">
-            <div class="card" id="statusCard">
-              <div class="title">原始状态全文</div>
-              <pre id="status">loading...</pre>
-            </div>
-          </div>
-        </details>
-      </section>
+      </div>
+      <div class="card" id="rightTraceDirZoomCard">
+        <div class="title">右八邻域 dir 放大镜（滑动主图联动，横轴精确到 1）</div>
+        <div class="meta" id="rightTraceDirZoomMeta">等待 dir 数据</div>
+        <div class="view">
+          <canvas id="rightTraceDirZoomCanvas" width="720" height="260"></canvas>
+        </div>
+      </div>
     </div>
   </div>
   <div class="param-modal" id="paramModal">
@@ -2265,27 +1440,14 @@
     </div>
   </div>
   <script src="/shared_receiver_core.js?v=20260419-route-state-input-judge"></script>
-  <script src="/receiver_frame_source.js"></script>
-  <script src="/receiver_recording.js"></script>
   <script>
-    function getCanvasOrCreate(id, width, height) {
-      const canvas = document.getElementById(id) || document.createElement('canvas');
-      canvas.width = canvas.width || width;
-      canvas.height = canvas.height || height;
-      return canvas;
-    }
-
-    function getElementOrCreate(id, tagName = 'div') {
-      return document.getElementById(id) || document.createElement(tagName);
-    }
-
-    const rgbCanvas = getCanvasOrCreate('rgbCanvas', 160, 120);
+    const rgbCanvas = document.getElementById('rgbCanvas');
     const rgbCtx = rgbCanvas.getContext('2d');
     const grayCanvas = document.getElementById('grayCanvas');
     const grayCtx = grayCanvas.getContext('2d');
-    const inferCanvas = getCanvasOrCreate('inferCanvas', 160, 120);
+    const inferCanvas = document.getElementById('inferCanvas');
     const inferCtx = inferCanvas.getContext('2d');
-    const roi64Canvas = getCanvasOrCreate('roi64Canvas', 64, 64);
+    const roi64Canvas = document.getElementById('roi64Canvas');
     const roi64Ctx = roi64Canvas.getContext('2d');
     const binaryCanvas = document.getElementById('binaryCanvas');
     const binaryCtx = binaryCanvas.getContext('2d');
@@ -2297,46 +1459,19 @@
     const leftTraceDirCtx = leftTraceDirCanvas.getContext('2d');
     const rightTraceDirCanvas = document.getElementById('rightTraceDirCanvas');
     const rightTraceDirCtx = rightTraceDirCanvas.getContext('2d');
-    const leftAuxTraceDirCanvas = document.getElementById('leftAuxTraceDirCanvas');
-    const leftAuxTraceDirCtx = leftAuxTraceDirCanvas.getContext('2d');
-    const rightAuxTraceDirCanvas = document.getElementById('rightAuxTraceDirCanvas');
-    const rightAuxTraceDirCtx = rightAuxTraceDirCanvas.getContext('2d');
     const leftTraceDirZoomCanvas = document.getElementById('leftTraceDirZoomCanvas');
     const leftTraceDirZoomCtx = leftTraceDirZoomCanvas.getContext('2d');
     const rightTraceDirZoomCanvas = document.getElementById('rightTraceDirZoomCanvas');
     const rightTraceDirZoomCtx = rightTraceDirZoomCanvas.getContext('2d');
-    const leftAuxTraceDirZoomCanvas = document.getElementById('leftAuxTraceDirZoomCanvas');
-    const leftAuxTraceDirZoomCtx = leftAuxTraceDirZoomCanvas.getContext('2d');
-    const rightAuxTraceDirZoomCanvas = document.getElementById('rightAuxTraceDirZoomCanvas');
-    const rightAuxTraceDirZoomCtx = rightAuxTraceDirZoomCanvas.getContext('2d');
-    const leftHistoryRoi7x7Canvas = document.getElementById('leftHistoryRoi7x7Canvas');
-    const leftHistoryRoi7x7Ctx = leftHistoryRoi7x7Canvas.getContext('2d');
-    const rightHistoryRoi7x7Canvas = document.getElementById('rightHistoryRoi7x7Canvas');
-    const rightHistoryRoi7x7Ctx = rightHistoryRoi7x7Canvas.getContext('2d');
-    const leftHistoryRoi7x7Meta = document.getElementById('leftHistoryRoi7x7Meta');
-    const rightHistoryRoi7x7Meta = document.getElementById('rightHistoryRoi7x7Meta');
-    const rgbPixelInfo = getElementOrCreate('rgbPixelInfo');
+    const rgbPixelInfo = document.getElementById('rgbPixelInfo');
     const grayPixelInfo = document.getElementById('grayPixelInfo');
     const binaryPixelInfo = document.getElementById('binaryPixelInfo');
     const ipmPixelInfo = document.getElementById('ipmPixelInfo');
     const ipmRawPixelInfo = document.getElementById('ipmRawPixelInfo');
-    const inferMetaGrid = getElementOrCreate('inferMetaGrid');
-    const inferProbList = getElementOrCreate('inferProbList');
-    const roi64Hint = getElementOrCreate('roi64Hint');
-    const roi64DbRedFound = getElementOrCreate('roi64DbRedFound');
-    const roi64DbFailReason = getElementOrCreate('roi64DbFailReason');
-    const roi64DbDistIpm = getElementOrCreate('roi64DbDistIpm');
-    const roi64DbIpmRedBottom = getElementOrCreate('roi64DbIpmRedBottom');
-    const roi64DbIpmBottom = getElementOrCreate('roi64DbIpmBottom');
-    const roi64DbIpmTop = getElementOrCreate('roi64DbIpmTop');
-    const roi64DbBottom = getElementOrCreate('roi64DbBottom');
-    const roi64DbHit = getElementOrCreate('roi64DbHit');
-    const roi64DbSize = getElementOrCreate('roi64DbSize');
-    const roi64DbCornerBL = getElementOrCreate('roi64DbCornerBL');
-    const roi64DbCornerBR = getElementOrCreate('roi64DbCornerBR');
-    const roi64DbCornerTop = getElementOrCreate('roi64DbCornerTop');
+    const inferMetaGrid = document.getElementById('inferMetaGrid');
+    const inferProbList = document.getElementById('inferProbList');
+    const roi64Hint = document.getElementById('roi64Hint');
     const pidCommonList = document.getElementById('pidCommonList');
-    const pidCommonFullList = document.getElementById('pidCommonFullList');
     const pidLeftList = document.getElementById('pidLeftList');
     const pidRightList = document.getElementById('pidRightList');
     const pidSlowdownCards = document.getElementById('pidSlowdownCards');
@@ -2361,13 +1496,6 @@
     const playRecordBtn = document.getElementById('playRecordBtn');
     const saveRecordBtn = document.getElementById('saveRecordBtn');
     const openSavedModalBtn = document.getElementById('openSavedModalBtn');
-    const replayToolbar = document.getElementById('replayToolbar');
-    const replayToggleBtn = document.getElementById('replayToggleBtn');
-    const replayRestartBtn = document.getElementById('replayRestartBtn');
-    const replayBackwardBtn = document.getElementById('replayBackwardBtn');
-    const replayForwardBtn = document.getElementById('replayForwardBtn');
-    const replaySpeedBtn = document.getElementById('replaySpeedBtn');
-    const replayTimeLabel = document.getElementById('replayTimeLabel');
     const closeParamPanelBtn = document.getElementById('closeParamPanelBtn');
     const closeSavedModalBtn = document.getElementById('closeSavedModalBtn');
     const playbackToggleBtn = document.getElementById('playbackToggleBtn');
@@ -2387,11 +1515,6 @@
     const routeSubStateValue = document.getElementById('routeSubStateValue');
     const routePreferredSourceValue = document.getElementById('routePreferredSourceValue');
     const routeEncoderValue = document.getElementById('routeEncoderValue');
-    const targetBoardStateValue = document.getElementById('targetBoardStateValue');
-    const targetBoardActiveValue = document.getElementById('targetBoardActiveValue');
-    const targetBoardConfirmValue = document.getElementById('targetBoardConfirmValue');
-    const targetBoardOffsetValue = document.getElementById('targetBoardOffsetValue');
-    const targetBoardNoRedValue = document.getElementById('targetBoardNoRedValue');
     const straightFocusPanel = document.getElementById('straightFocusPanel');
     const straightFocusBadge = document.getElementById('straightFocusBadge');
     const straightFocusCenterlineCount = document.getElementById('straightFocusCenterlineCount');
@@ -2462,16 +1585,10 @@
     const playbackPidSlowdownCards = document.getElementById('playbackPidSlowdownCards');
     const leftTraceDirCard = document.getElementById('leftTraceDirCard');
     const rightTraceDirCard = document.getElementById('rightTraceDirCard');
-    const leftAuxTraceDirCard = document.getElementById('leftAuxTraceDirCard');
-    const rightAuxTraceDirCard = document.getElementById('rightAuxTraceDirCard');
     const leftTraceDirZoomCard = document.getElementById('leftTraceDirZoomCard');
     const rightTraceDirZoomCard = document.getElementById('rightTraceDirZoomCard');
-    const leftAuxTraceDirZoomCard = document.getElementById('leftAuxTraceDirZoomCard');
-    const rightAuxTraceDirZoomCard = document.getElementById('rightAuxTraceDirZoomCard');
     const leftTraceDirZoomMeta = document.getElementById('leftTraceDirZoomMeta');
     const rightTraceDirZoomMeta = document.getElementById('rightTraceDirZoomMeta');
-    const leftAuxTraceDirZoomMeta = document.getElementById('leftAuxTraceDirZoomMeta');
-    const rightAuxTraceDirZoomMeta = document.getElementById('rightAuxTraceDirZoomMeta');
     const playbackStatus = document.getElementById('playbackStatus');
     const playbackGrid = document.getElementById('playbackGrid');
     const paramModal = document.getElementById('paramModal');
@@ -2498,233 +1615,7 @@
     const rawGrayCanvas = document.createElement('canvas');
     const rawGrayCtx = rawGrayCanvas.getContext('2d');
     const receiverCore = window.SharedReceiverCore;
-    const frameSource = window.ReceiverFrameSource.createReceiverFrameSource(receiverCore);
-    const LIVE_FRAME_INTERVAL_MS = 33;
-    const RECORDING_INTERVAL_MS = 33;
-    const REPLAY_FRAME_INTERVAL_MS = 33;
-    const sourceRecorder = window.ReceiverRecording.createSourceRecorder(receiverCore, () => latestStatus, getRecordingFrameModes);
-    const pageParams = new URLSearchParams(window.location.search || '');
-    const requestedReplayFolder = String(pageParams.get('replay') || '').trim();
     let latestStatus = {};
-    const PID_CHART_RING_CAPACITY = 300;
-    const pidHistory = {
-      pos_target:   new Float32Array(PID_CHART_RING_CAPACITY),
-      pos_actual:   new Float32Array(PID_CHART_RING_CAPACITY),
-      yaw_target:   new Float32Array(PID_CHART_RING_CAPACITY),
-      yaw_actual:   new Float32Array(PID_CHART_RING_CAPACITY),
-      spd_left_target:  new Float32Array(PID_CHART_RING_CAPACITY),
-      spd_left_actual:  new Float32Array(PID_CHART_RING_CAPACITY),
-      spd_right_target: new Float32Array(PID_CHART_RING_CAPACITY),
-      spd_right_actual: new Float32Array(PID_CHART_RING_CAPACITY),
-      timestamps: new Float64Array(PID_CHART_RING_CAPACITY),
-      head: 0,
-      count: 0,
-    };
-
-    function pushPidHistory(status) {
-      var i = pidHistory.head;
-      var fn = function(chain) {
-        for (var k = 0; k < chain.length; k++) {
-          var v = chain[k];
-          if (v !== undefined && v !== null && Number.isFinite(v)) return v;
-        }
-        return 0;
-      };
-
-      pidHistory.pos_target[i]   = fn([status.pid_common_position_pid_target]) || 0;
-      pidHistory.pos_actual[i]   = fn([status.pid_common_control_error_px]) || 0;
-      pidHistory.yaw_target[i]   = fn([status.pid_common_yaw_rate_ref_dps]) || 0;
-      pidHistory.yaw_actual[i]   = fn([status.pid_common_measured_yaw_rate_dps]) || 0;
-      pidHistory.spd_left_target[i]  = fn([status.pid_left_target_count, status.left_target_count]) || 0;
-      pidHistory.spd_left_actual[i]  = fn([status.pid_left_feedback, status.left_filtered_count, status.pid_left_current_count, status.left_current_count]) || 0;
-      pidHistory.spd_right_target[i] = fn([status.pid_right_target_count, status.right_target_count]) || 0;
-      pidHistory.spd_right_actual[i] = fn([status.pid_right_feedback, status.right_filtered_count, status.pid_right_current_count, status.right_current_count]) || 0;
-      pidHistory.timestamps[i] = Date.now();
-
-      pidHistory.head = (i + 1) % PID_CHART_RING_CAPACITY;
-      if (pidHistory.count < PID_CHART_RING_CAPACITY) pidHistory.count++;
-    }
-
-    var pidChartAutoRangeCounter = 0;
-    var pidChartRanges = {
-      pos:  { min: -40, max: 40,  step: 5 },
-      yaw:  { min: -200, max: 200, step: 0 },
-      spdL: { min: -600, max: 600, step: 10 },
-      spdR: { min: -600, max: 600, step: 10 },
-    };
-
-    function updateAutoRange(series1, series2, range) {
-      var total = pidHistory.count;
-      if (total < 2) return;
-      var cap = PID_CHART_RING_CAPACITY;
-      var head = pidHistory.head;
-      var vmin = Infinity, vmax = -Infinity;
-      for (var j = 0; j < total; j++) {
-        var idx = (head - total + j + cap) % cap;
-        var a = series1[idx], b = series2[idx];
-        if (Number.isFinite(a)) { if (a < vmin) vmin = a; if (a > vmax) vmax = a; }
-        if (Number.isFinite(b)) { if (b < vmin) vmin = b; if (b > vmax) vmax = b; }
-      }
-      if (!isFinite(vmin) || !isFinite(vmax)) return;
-      var pad = Math.max((vmax - vmin) * 0.15, 1);
-      range.min = vmin - pad;
-      range.max = vmax + pad;
-    }
-
-    function drawPidChart(canvas, seriesList, minY, maxY, title, step) {
-      var ctx = canvas.getContext('2d');
-      var w = canvas.width;
-      var h = canvas.height;
-      var M = { left: 50, right: 14, top: 14, bottom: 28 };
-      var pw = Math.max(1, w - M.left - M.right);
-      var ph = Math.max(1, h - M.top - M.bottom);
-
-      // background
-      ctx.fillStyle = '#0d1116';
-      ctx.fillRect(0, 0, w, h);
-
-      var yRange = maxY - minY || 1;
-      var yAt = function(v) { return M.top + ((maxY - v) / yRange) * ph; };
-
-      // grid: use step if given, otherwise 5 divisions
-      var gridStep = (step > 0) ? step : (yRange / 5);
-      var gridCount = Math.round(yRange / gridStep);
-
-      ctx.strokeStyle = 'rgba(51,65,85,0.4)';
-      ctx.lineWidth = 0.5;
-      var i, gx, gy;
-      var vGridCount = 5;
-      for (i = 0; i <= vGridCount; i++) {
-        gx = M.left + (i / vGridCount) * pw;
-        ctx.beginPath(); ctx.moveTo(gx, M.top); ctx.lineTo(gx, M.top + ph); ctx.stroke();
-      }
-      for (i = 0; i <= gridCount; i++) {
-        gy = yAt(maxY - i * gridStep);
-        ctx.beginPath(); ctx.moveTo(M.left, gy); ctx.lineTo(M.left + pw, gy); ctx.stroke();
-      }
-
-      // Y-axis labels at step interval, coarsened if too many
-      ctx.fillStyle = '#64748b';
-      ctx.font = '10px "Noto Sans SC", "Microsoft YaHei", sans-serif';
-      ctx.textAlign = 'right';
-      var labelStep = gridStep;
-      var labelEvery = 1;
-      if (gridCount > 18) { labelEvery = Math.ceil(gridCount / 12); labelStep = gridStep * labelEvery; }
-      for (i = 0; i <= gridCount; i++) {
-        if (i % labelEvery !== 0 && i !== gridCount) continue;
-        var v = maxY - i * gridStep;
-        gy = yAt(v);
-        ctx.fillText(v.toFixed(step > 0 && step < 1 ? 1 : 0), M.left - 6, gy + 4);
-      }
-
-      // zero line
-      if (minY < 0 && maxY > 0) {
-        var yz = yAt(0);
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath(); ctx.moveTo(M.left, yz); ctx.lineTo(M.left + pw, yz); ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      // title
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '11px "Noto Sans SC", "Microsoft YaHei", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(title || '', M.left, M.top - 2);
-
-      var totalCount = pidHistory.count;
-      if (totalCount < 2) {
-        ctx.fillStyle = '#64748b';
-        ctx.textAlign = 'center';
-        ctx.fillText('Waiting for data...', w / 2, h / 2);
-        return;
-      }
-
-      var head = pidHistory.head;
-      var cap = PID_CHART_RING_CAPACITY;
-      var xAt = function(idx) { return M.left + (idx / (PID_CHART_RING_CAPACITY - 1)) * pw; };
-
-      // draw each series
-      var s, j, idx, val, sx, sy, started;
-      for (s = 0; s < seriesList.length; s++) {
-        var series = seriesList[s];
-        var vals = series.values;
-        ctx.strokeStyle = series.color;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        started = false;
-        for (j = 0; j < totalCount; j++) {
-          idx = (head - totalCount + j + cap) % cap;
-          val = vals[idx];
-          if (!Number.isFinite(val)) val = 0;
-          if (val < minY) val = minY;
-          if (val > maxY) val = maxY;
-          sx = xAt(j);
-          sy = yAt(val);
-          if (!started) { ctx.moveTo(sx, sy); started = true; }
-          else ctx.lineTo(sx, sy);
-        }
-        ctx.stroke();
-      }
-
-      // legend at bottom
-      ctx.textAlign = 'left';
-      var legendX = M.left;
-      for (s = 0; s < seriesList.length; s++) {
-        var ser = seriesList[s];
-        ctx.fillStyle = ser.color;
-        ctx.fillRect(legendX, M.top + ph + 10, 10, 10);
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '10px "Noto Sans SC", "Microsoft YaHei", sans-serif';
-        ctx.fillText(ser.name, legendX + 14, M.top + ph + 20);
-        legendX += ctx.measureText(ser.name).width + 36;
-      }
-    }
-
-    function renderPidCharts() {
-      // auto-range every 50 samples
-      pidChartAutoRangeCounter++;
-      if (pidChartAutoRangeCounter % 50 === 1) {
-        updateAutoRange(pidHistory.yaw_target, pidHistory.yaw_actual, pidChartRanges.yaw);
-      }
-
-      var h = pidHistory;
-
-      // Position loop chart
-      var posCanvas = document.getElementById('posChartPanel');
-      if (posCanvas && posCanvas.open) {
-        drawPidChart(document.getElementById('posChartCanvas'), [
-          { name: 'Target', values: h.pos_target, color: '#fbbf24' },
-          { name: 'Actual', values: h.pos_actual, color: '#38bdf8' },
-        ], pidChartRanges.pos.min, pidChartRanges.pos.max, 'Position Loop (px)', pidChartRanges.pos.step);
-      }
-
-      // Yaw rate loop chart
-      var yawCanvas = document.getElementById('yawChartPanel');
-      if (yawCanvas && yawCanvas.open) {
-        drawPidChart(document.getElementById('yawChartCanvas'), [
-          { name: 'Target', values: h.yaw_target, color: '#fbbf24' },
-          { name: 'Actual', values: h.yaw_actual, color: '#38bdf8' },
-        ], pidChartRanges.yaw.min, pidChartRanges.yaw.max, 'Yaw Rate Loop (dps)', pidChartRanges.yaw.step);
-      }
-
-      // Speed loop - left wheel
-      var spdPanel = document.getElementById('spdChartPanel');
-      if (spdPanel && spdPanel.open) {
-        drawPidChart(document.getElementById('spdLeftChartCanvas'), [
-          { name: 'L Target', values: h.spd_left_target, color: '#fbbf24' },
-          { name: 'L Feedback', values: h.spd_left_actual, color: '#38bdf8' },
-        ], pidChartRanges.spdL.min, pidChartRanges.spdL.max, 'Left Wheel Speed (counts/5ms)', pidChartRanges.spdL.step);
-
-        // Speed loop - right wheel
-        drawPidChart(document.getElementById('spdRightChartCanvas'), [
-          { name: 'R Target', values: h.spd_right_target, color: '#fbbf24' },
-          { name: 'R Feedback', values: h.spd_right_actual, color: '#38bdf8' },
-        ], pidChartRanges.spdR.min, pidChartRanges.spdR.max, 'Right Wheel Speed (counts/5ms)', pidChartRanges.spdR.step);
-      }
-    }
-
     let latestLocalPayload = null;
     let latestWasmSyncStatus = null;
     let showGrayBoundaries = true;
@@ -2733,49 +1624,28 @@
     let boundaryPointMode = true;
     let showTraceDirCharts = true;
     let recordingState = null;
-    let recordingTimer = null;
-    let recordingCaptureBusy = false;
     let lastRecording = null;
     let paramPanelOpen = false;
     let savedPanelOpen = false;
     let isSyncingPlayback = false;
     let playbackVideoEntries = [];
     let playbackPrimaryKey = '';
-    let replayMode = !!requestedReplayFolder;
-    let replayRecording = null;
-    let replayPlaybackMs = 0;
-    let replayDurationMs = 0;
-    let replayPlaying = false;
-    let replayRate = 1.0;
-    let replayLastTickMs = 0;
-    const replayRates = [0.25, 0.5, 1.0, 1.5, 2.0];
     let fullDebugModeActive = true;
-    const localComputeFeatureAvailable = false;
-    let localComputeEnabled = false;
+    let localComputeEnabled = new URLSearchParams(window.location.search).get('local_compute') === '1';
     let localWorkerBusy = false;
     let grayFrameReady = false;
-    let binaryFrameReady = false;
     let rgbFrameReady = false;
     let roi64FrameReady = false;
     let grayFetchSeq = 0;
-    let binaryFetchSeq = 0;
     let grayFetchInFlight = false;
-    let binaryFetchInFlight = false;
-    let binaryFetchRetryAtMs = 0;
-    let lastReplayGrayUrl = '';
-    let lastReplayBinaryUrl = '';
-    let lastReplayRgbUrl = '';
-    let lastReplayRoi64Url = '';
     let activeGraySource = 'none';
     const traceDirZoomHalfWindow = 10;
     const SPEED_SCHEME_MODE = 'yaw_rate_change';
     const traceDirZoomState = {
       left: { hoverIndex: null },
-      right: { hoverIndex: null },
-      leftAux: { hoverIndex: null },
-      rightAux: { hoverIndex: null }
+      right: { hoverIndex: null }
     };
-    const localWorker = null;
+    const localWorker = new Worker('/pipeline_worker.js');
 
     function hasValue(value) {
       return value !== undefined && value !== null;
@@ -2818,16 +1688,12 @@
       receiverCore.setElementVisible(ipmRawCard, active);
       receiverCore.setElementVisible(leftTraceDirCard, active && toggleTraceDirCharts.checked);
       receiverCore.setElementVisible(rightTraceDirCard, active && toggleTraceDirCharts.checked);
-      receiverCore.setElementVisible(leftAuxTraceDirCard, active && toggleTraceDirCharts.checked);
-      receiverCore.setElementVisible(rightAuxTraceDirCard, active && toggleTraceDirCharts.checked);
       receiverCore.setElementVisible(leftTraceDirZoomCard, active && toggleTraceDirCharts.checked);
       receiverCore.setElementVisible(rightTraceDirZoomCard, active && toggleTraceDirCharts.checked);
-      receiverCore.setElementVisible(leftAuxTraceDirZoomCard, active && toggleTraceDirCharts.checked);
-      receiverCore.setElementVisible(rightAuxTraceDirZoomCard, active && toggleTraceDirCharts.checked);
     }
 
     function shouldUseLocalCompute() {
-      return localComputeFeatureAvailable && !!localComputeEnabled;
+      return !!localComputeEnabled;
     }
 
     function buildLocalAugmentedStatus(status, payload) {
@@ -2873,7 +1739,7 @@
     }
 
     function requestLocalCompute() {
-      if (!shouldUseLocalCompute() || localWorkerBusy || !localWorker) return;
+      if (!shouldUseLocalCompute() || localWorkerBusy) return;
       const w = rawGrayCanvas.width;
       const h = rawGrayCanvas.height;
       if (!w || !h) return;
@@ -2897,7 +1763,6 @@
     }
 
     function getSelectedSrcCenterline(status) {
-      if (Array.isArray(status.src_centerline_selected_resampled) && status.src_centerline_selected_resampled.length > 0) return status.src_centerline_selected_resampled;
       if (Array.isArray(status.src_centerline_selected_shift)) return status.src_centerline_selected_shift;
       if (status.ipm_centerline_source === 1) return status.src_centerline_from_right_shift || [];
       return status.src_centerline_from_left_shift || [];
@@ -3001,13 +1866,13 @@
       const hasData = Number.isFinite(leftRows) || Number.isFinite(rightRows) || Number.isFinite(gap);
 
       refs.panel.classList.remove('ready', 'not-ready');
-      refs.panel.classList.add((entryReady || stage2Ready || stage3Ready || exitReady || mainState === 3) ? 'ready' : 'not-ready');
+      refs.panel.classList.add((entryReady || stage2Ready || stage3Ready || exitReady || mainState === 4) ? 'ready' : 'not-ready');
       let crossStateLabel = '十字-cross_1 运行中';
       if (subState === 2) crossStateLabel = '十字-cross_2 运行中';
       if (subState === 3) crossStateLabel = '十字-cross_3 运行中';
       refs.badge.textContent = !hasData
         ? '等待数据'
-        : (mainState === 3
+        : (mainState === 4
             ? crossStateLabel
             : (entryReady ? '满足十字入口' : '未满足十字入口'));
       refs.leftRows.textContent = Number.isFinite(leftRows) ? String(leftRows) : '--';
@@ -3207,11 +2072,6 @@
         stateClues: routeStateClues,
         stateCounters: routeStateCounters
       });
-      targetBoardStateValue.textContent = receiverCore.formatTargetBoardState(status && status.target_board_state);
-      targetBoardActiveValue.textContent = isBool01(status && status.target_board_active) ? '激活' : '未激活';
-      targetBoardConfirmValue.textContent = hasValue(status && status.target_board_confirm_count) ? String(status.target_board_confirm_count) : '--';
-      targetBoardOffsetValue.textContent = hasValue(status && status.target_board_offset_px) ? String(status.target_board_offset_px) : '--';
-      targetBoardNoRedValue.textContent = hasValue(status && status.target_board_no_red_count) ? String(status.target_board_no_red_count) : '--';
     }
 
     function renderPlaybackRouteStatePanel(status) {
@@ -3317,15 +2177,18 @@
       const branches = [
         {
           id: 1,
-          name: 'Speed Scheme 当前支路',
+          name: 'Speed Scheme',
           lines: [
-            `模式 <span>${SPEED_SCHEME_MODE}</span>`,
-            `速度 desired/applied <span>${fmtPidValue(status.pid_common_desired_base_speed)} / ${fmtPidValue(status.pid_common_applied_base_speed)}</span>`,
-            `实时速度 <span>${fmtPidValue(realtimeSpeed)}</span>`,
-            `目标角速度 <span>${fmtPidValue(status.pid_common_target_yaw_rate_abs_filtered_dps)}</span>`,
-            `比例 raw/final <span>${fmtPidValue(errorScaleRaw)} / ${fmtPidValue(status.pid_common_speed_scheme_final_speed_scale)}</span>`,
-            `中线点数 <span>${fmtPidValue(status.pid_common_speed_scheme_point_count)}</span>`,
-            `ready/triggered <span>${fmtPidValue(status.pid_common_speed_scheme_ready)} / ${fmtPidValue(status.pid_common_speed_scheme_triggered)}</span>`
+            `模式: <span>${SPEED_SCHEME_MODE}</span>`,
+            `split_ratio: <span>${fmtPidValue(splitRatio)}</span>（前段 0~split，后段 split~1）`,
+            `后段指数权重 lambda: <span>${fmtPidValue(rearExpLambda)}</span>`,
+            `目标角速度(dps): <span>${fmtPidValue(status.pid_common_target_yaw_rate_abs_filtered_dps)}</span>`,
+            `目标角速度参考: <span>${fmtPidValue(status.pid_common_yaw_rate_ref_dps)}</span>`,
+            `实时速度: <span>${fmtPidValue(realtimeSpeed)}</span>`,
+            `比例(raw/final): <span>${fmtPidValue(errorScaleRaw)} / ${fmtPidValue(status.pid_common_speed_scheme_final_speed_scale)}</span>`,
+            `中线点数 current: <span>${fmtPidValue(status.pid_common_speed_scheme_point_count)}</span>`,
+            `单周期升降速(rise/drop): <span>${fmtPidValue(status.pid_common_speed_scheme_max_rise_ratio_per_cycle)} / ${fmtPidValue(status.pid_common_speed_scheme_max_drop_ratio_per_cycle)}</span>`,
+            `判定(ready/triggered): <span>${fmtPidValue(status.pid_common_speed_scheme_ready)} / ${fmtPidValue(status.pid_common_speed_scheme_triggered)}</span>`
           ]
         }
       ];
@@ -3344,49 +2207,7 @@
       }).join('');
     }
 
-    function renderCommonSummary(status, container) {
-      if (!container) return;
-      const setVal = (cls, val) => {
-        const el = container.querySelector('.loop-' + cls);
-        if (el) el.textContent = fmtPidValue(val);
-      };
-      const firstValue = (...values) => values.find((value) => value !== undefined && value !== null);
-      const compactPair = (left, right) => `L/R ${fmtPidValue(left)} / ${fmtPidValue(right)}`;
-      const compactNamedPair = (name, left, right) => `${name} ${fmtPidValue(left)} / ${fmtPidValue(right)}`;
-      const compactBaseTargets = (base, diff, left, right) =>
-        `base ${fmtPidValue(base)} | diff ${fmtPidValue(diff)} | ${compactPair(left, right)}`;
-
-      setVal('pos-target', status.pid_common_position_pid_target);
-      setVal('pos-actual', status.pid_common_position_pid_error);
-      setVal('pos-output', status.pid_common_position_pid_output);
-
-      setVal('yaw-target', status.pid_common_yaw_rate_ref_dps);
-      setVal('yaw-actual', status.pid_common_measured_yaw_rate_dps);
-      setVal('yaw-output', status.pid_common_yaw_pid_output);
-
-      setVal('spd-target', compactBaseTargets(
-        firstValue(status.pid_common_speed_command_base, status.base_speed),
-        firstValue(status.pid_common_speed_command_diff, status.pid_common_applied_steering_output),
-        firstValue(status.pid_left_target_count, status.left_target_count),
-        firstValue(status.pid_right_target_count, status.right_target_count)
-      ));
-      setVal('spd-actual', compactNamedPair('fb',
-        firstValue(status.pid_left_feedback, status.left_filtered_count, status.pid_left_current_count, status.left_current_count),
-        firstValue(status.pid_right_feedback, status.right_filtered_count, status.pid_right_current_count, status.right_current_count)
-      ));
-      setVal('spd-output', [
-        compactNamedPair('pwm',
-        firstValue(status.pid_left_duty, status.pid_left_hardware_duty),
-        firstValue(status.pid_right_duty, status.pid_right_hardware_duty)
-        ),
-        compactNamedPair('修',
-          status.pid_left_correction,
-          status.pid_right_correction
-        )
-      ].join(' | '));
-    }
-
-    function renderPidStatusPanelInto(status, commonContainer, leftContainer, rightContainer, slowdownContainer, commonFullContainer) {
+    function renderPidStatusPanelInto(status, commonContainer, leftContainer, rightContainer, slowdownContainer) {
       const commonRows = [
         ['vision_updated', status.pid_common_vision_updated],
         ['imu_updated', status.pid_common_imu_updated],
@@ -3429,7 +2250,6 @@
         ['speed_scheme_point_count', status.pid_common_speed_scheme_point_count],
         ['speed_scheme_ramp(rise/drop)', [status.pid_common_speed_scheme_max_rise_ratio_per_cycle, status.pid_common_speed_scheme_max_drop_ratio_per_cycle]],
         ['speed_scheme_state(ready/triggered/winner)', [status.pid_common_speed_scheme_ready, status.pid_common_speed_scheme_triggered, slowdownWinnerLabel(status.pid_common_speed_scheme_winner_branch)]],
-        ['speed_command(base/diff)', [status.pid_common_speed_command_base, status.pid_common_speed_command_diff]],
         ['steering(raw/clamped/applied)', [status.pid_common_raw_steering_output, status.pid_common_clamped_steering_output, status.pid_common_applied_steering_output]],
         ['line_follow_targets(L/R)', [status.pid_common_left_target_count_from_line_follow, status.pid_common_right_target_count_from_line_follow]],
         ['motor_current_count(L/R)', [status.pid_left_current_count ?? status.left_current_count, status.pid_right_current_count ?? status.right_current_count]],
@@ -3475,38 +2295,30 @@
         ['dir_level', status.pid_right_dir_level]
       ].filter(([, value]) => value !== undefined && value !== null);
 
-      if (commonContainer && (commonContainer.classList.contains('pid-three-loop') || commonContainer.querySelector('.pid-three-loop'))) {
-        renderCommonSummary(status, commonContainer);
-      } else {
-        renderPidColumn(commonContainer, commonRows.slice(0, 10));
-      }
-      renderPidColumn(commonFullContainer, commonRows);
+      renderPidColumn(commonContainer, commonRows);
       renderPidColumn(leftContainer, leftRows);
       renderPidColumn(rightContainer, rightRows);
       renderSlowdownCards(status, slowdownContainer);
     }
 
     function renderPidStatusPanel(status) {
-      renderPidStatusPanelInto(status, pidCommonList, pidLeftList, pidRightList, pidSlowdownCards, pidCommonFullList);
+      renderPidStatusPanelInto(status, pidCommonList, pidLeftList, pidRightList, pidSlowdownCards);
     }
 
     function renderPlaybackPidStatusPanel(status) {
       renderPidStatusPanelInto(status, playbackPidCommonList, playbackPidLeftList, playbackPidRightList, playbackPidSlowdownCards);
     }
 
-    if (localWorker) {
-      localWorker.onmessage = (ev) => {
-        localWorkerBusy = false;
-        latestLocalPayload = ev.data || {};
-        if (!fullDebugModeActive) return;
-        const renderStatus = getRenderStatus();
-        renderStatusPanels(renderStatus);
-        renderPidStatusPanel(renderStatus);
-        drawIpmBoundaries(renderStatus);
-        drawTraceDirCharts(renderStatus);
-        drawHistoryRoi7x7(renderStatus);
-      };
-    }
+    localWorker.onmessage = (ev) => {
+      localWorkerBusy = false;
+      latestLocalPayload = ev.data || {};
+      if (!fullDebugModeActive) return;
+      const renderStatus = getRenderStatus();
+      renderStatusPanels(renderStatus);
+      renderPidStatusPanel(renderStatus);
+      drawIpmBoundaries(renderStatus);
+      drawTraceDirCharts(renderStatus);
+    };
 
     function setCardVisible(el, visible) {
       receiverCore.setElementVisible(el, visible);
@@ -3606,7 +2418,6 @@
       push(detectRows, 'target_board_no_red_count', status.target_board_no_red_count);
       push(detectRows, 'target_board_offset_px', status.target_board_offset_px);
       push(detectRows, 'ipm_center_target_offset_px', status.ipm_center_target_offset_px);
-      push(detectRows, 'board_fail_reason', status.board_fail_reason);
       addSection('检测结果', detectRows);
 
       const trackRows = [];
@@ -3683,11 +2494,9 @@
       push(cornerRows, 'cross_aux_vertical_scan_max_rows', status.cross_aux_vertical_scan_max_rows);
       push(cornerRows, 'cross_aux_trace_max_points', status.cross_aux_trace_max_points);
       push(cornerRows, 'cross_aux_trace_upward_rows_max', status.cross_aux_trace_upward_rows_max);
-      push(cornerRows, 'cross_aux_reacquire_up_px', status.cross_aux_reacquire_up_px);
-      push(cornerRows, 'cross_aux_reacquire_down_px', status.cross_aux_reacquire_down_px);
-      push(cornerRows, 'cross_aux_fit_prev_points', status.cross_aux_fit_prev_points);
-      push(cornerRows, 'cross_aux_fit_slope_bias', status.cross_aux_fit_slope_bias);
-      push(cornerRows, 'cross_upper_dir5_post_check_count', status.cross_upper_dir5_post_check_count);
+      push(cornerRows, 'cross_upper_dir4_pre_run_len', status.cross_upper_dir4_pre_run_len);
+      push(cornerRows, 'cross_upper_transition_max_len', status.cross_upper_transition_max_len);
+      push(cornerRows, 'cross_upper_dir6_post_run_len', status.cross_upper_dir6_post_run_len);
       addSection('角点与直边', cornerRows);
 
       const arrayRows = [];
@@ -3991,146 +2800,6 @@
       setParamPanelText('waiting...');
     }
 
-    function formatReplayRate(rate) {
-      return `${Number(rate).toFixed(2)}x`;
-    }
-
-    function countReplaySourceFrames(recording) {
-      const sourceFrames = recording && recording.source_frames && typeof recording.source_frames === 'object'
-        ? recording.source_frames
-        : {};
-      return Object.values(sourceFrames).reduce((sum, frames) => (
-        sum + (Array.isArray(frames) ? frames.length : 0)
-      ), 0);
-    }
-
-    function sortedReplaySourceFrames(sourceFrames) {
-      const input = sourceFrames && typeof sourceFrames === 'object' ? sourceFrames : {};
-      const output = {};
-      ['gray', 'binary', 'rgb', 'roi64'].forEach((mode) => {
-        const frames = Array.isArray(input[mode]) ? input[mode] : [];
-        output[mode] = frames.slice().sort((a, b) => (
-          (Number(a && a.client_ts_ms) || 0) - (Number(b && b.client_ts_ms) || 0)
-        ));
-      });
-      return output;
-    }
-
-    function updateReplayControls() {
-      if (!replayToolbar) return;
-      replayToolbar.classList.toggle('active', replayMode);
-      if (!replayMode) return;
-      replayToggleBtn.textContent = replayPlaying ? '暂停' : '播放';
-      replaySpeedBtn.textContent = formatReplayRate(replayRate);
-      replayTimeLabel.textContent = `${fmtPlaybackTime(replayPlaybackMs / 1000)} / ${fmtPlaybackTime(replayDurationMs / 1000)}`;
-      const disabled = !replayRecording;
-      replayToggleBtn.disabled = disabled;
-      replayRestartBtn.disabled = disabled;
-      replayBackwardBtn.disabled = disabled;
-      replayForwardBtn.disabled = disabled;
-      replaySpeedBtn.disabled = disabled;
-    }
-
-    function setReplayPlaybackMs(nextMs) {
-      const maxMs = Math.max(0, Number(replayDurationMs) || 0);
-      replayPlaybackMs = Math.max(0, Math.min(maxMs, Number(nextMs) || 0));
-      replayLastTickMs = Date.now();
-      renderReplayFrame();
-    }
-
-    function updateReplayClock() {
-      if (!replayMode || !replayRecording || !replayPlaying) return;
-      const now = Date.now();
-      const deltaMs = replayLastTickMs ? (now - replayLastTickMs) : 0;
-      replayLastTickMs = now;
-      if (deltaMs <= 0) return;
-      const nextMs = replayPlaybackMs + deltaMs * replayRate;
-      if (nextMs >= replayDurationMs) {
-        replayPlaybackMs = Math.max(0, replayDurationMs);
-        replayPlaying = false;
-        renderReplayFrame();
-        return;
-      }
-      replayPlaybackMs = nextMs;
-      renderReplayFrame();
-    }
-
-    function renderReplayFrame() {
-      if (!replayMode || !replayRecording) return;
-      const replayStatus = ReceiverRecording.statusAt(replayRecording.status, replayPlaybackMs);
-      latestStatus = replayStatus || {};
-      latestLocalPayload = null;
-      frameSource.setReplay(replayRecording, replayPlaybackMs);
-      const renderStatus = getRenderStatus();
-      const isFull = receiverCore.isFullDebugProfile(renderStatus && renderStatus.web_data_profile);
-      setDebugPageActive(isFull || shouldUseLocalCompute());
-      updateTransportPanel(renderStatus || {});
-      modeNote.textContent = `回放模式：${replayRecording.folder || requestedReplayFolder}`;
-      renderStatusPanels(renderStatus || {});
-      renderPidStatusPanel(renderStatus || {});
-      renderInferFrame(renderStatus || {});
-      drawIpmBoundaries(renderStatus || {});
-      drawTraceDirCharts(renderStatus || {});
-      drawHistoryRoi7x7(renderStatus || {});
-      if (hasValue(renderStatus && renderStatus.ipm_centerline_source)) {
-        ipmCenterlineSourceLabel.style.display = '';
-        ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(renderStatus.ipm_centerline_source);
-      } else {
-        ipmCenterlineSourceLabel.style.display = 'none';
-      }
-      pullFramesForCurrentSource();
-      metaEl.textContent = `replay ${fmtPlaybackTime(replayPlaybackMs / 1000)} / ${fmtPlaybackTime(replayDurationMs / 1000)}`;
-      recordingMeta.textContent = `回放目录：${replayRecording.folder || requestedReplayFolder}，源帧 ${countReplaySourceFrames(replayRecording)} 张`;
-      updateReplayControls();
-    }
-
-    async function loadSourceReplayFolder(folderName) {
-      const folder = String(folderName || '').trim();
-      if (!folder) return;
-      replayMode = true;
-      replayPlaying = false;
-      frameSource.setReplay({ source_frames: {} }, 0);
-      updateReplayControls();
-      recordingMeta.textContent = `正在加载回放目录：${folder}`;
-      try {
-        const j = await receiverCore.fetchJsonNoStore(`/api/recordings/load?folder=${encodeURIComponent(folder)}`);
-        if (!j.ok) throw new Error(j.error || 'load failed');
-        const sourceFrames = sortedReplaySourceFrames(j.source_frames);
-        const sourceFrameCount = Object.values(sourceFrames).reduce((sum, frames) => (
-          sum + (Array.isArray(frames) ? frames.length : 0)
-        ), 0);
-        if (sourceFrameCount < 1) {
-          replayRecording = null;
-          frameSource.setReplay({ source_frames: {} }, 0);
-          recordingMeta.textContent = `回放目录 ${folder} 没有 source_frames；这是旧的视频录制格式，无法驱动实时控制台回放。`;
-          metaEl.textContent = 'replay load error: missing source_frames';
-          updateReplayControls();
-          return;
-        }
-        replayRecording = {
-          ok: true,
-          folder: j.folder || folder,
-          status: j.status || {},
-          meta: j.meta || {},
-          videos: j.videos || {},
-          source_frames: sourceFrames,
-          recorded_at_ms: Number(j.status && j.status.recorded_at_ms) || Number(j.meta && j.meta.recorded_at_ms) || 0
-        };
-        replayDurationMs = Number(replayRecording.status && replayRecording.status.duration_ms)
-          || Number(replayRecording.meta && replayRecording.meta.duration_ms)
-          || 0;
-        replayPlaybackMs = 0;
-        replayLastTickMs = Date.now();
-        resetReplayFrameUrlCache();
-        renderReplayFrame();
-      } catch (err) {
-        replayRecording = null;
-        recordingMeta.textContent = `加载回放失败：${err}`;
-        metaEl.textContent = `replay load error: ${err}`;
-        updateReplayControls();
-      }
-    }
-
     function detectRecordMimeType() {
       if (typeof MediaRecorder === 'undefined') return '';
       const candidates = [
@@ -4145,28 +2814,22 @@
     }
 
     function updateRecordingUi() {
-      if (replayMode) {
-        startRecordBtn.disabled = true;
-        stopRecordBtn.disabled = true;
-        playRecordBtn.disabled = true;
-        saveRecordBtn.disabled = true;
-        updateReplayControls();
-        return;
-      }
       const isRecording = !!(recordingState && recordingState.active);
-      startRecordBtn.disabled = isRecording;
+      startRecordBtn.disabled = isRecording || typeof MediaRecorder === 'undefined';
       stopRecordBtn.disabled = !isRecording;
       playRecordBtn.disabled = !lastRecording;
-      saveRecordBtn.disabled = true;
+      saveRecordBtn.disabled = !lastRecording || !!(lastRecording && lastRecording.folder);
       if (isRecording) {
         const elapsedSec = Math.max(0, Math.floor((Date.now() - recordingState.startedAtMs) / 1000));
-        recordingMeta.innerHTML = `<span class="recording-dot"></span>后端录制中 ${elapsedSec}s，UDP/TCP 原始数据正在落盘`;
+        recordingMeta.innerHTML = `<span class="recording-dot"></span>录制中 ${elapsedSec}s，全部在网页端本地缓存`;
       } else if (lastRecording) {
         if (lastRecording.folder) {
-          recordingMeta.textContent = `后端录制已保存：${lastRecording.folder}，${lastRecording.durationSec}s`;
+          recordingMeta.textContent = `已加载保存目录：${lastRecording.folder}，${lastRecording.durationSec}s`;
         } else {
           recordingMeta.textContent = `最近一次录制：${lastRecording.frameCount} 条状态快照，${lastRecording.durationSec}s`;
         }
+      } else if (typeof MediaRecorder === 'undefined') {
+        recordingMeta.textContent = '当前浏览器不支持录制功能';
       } else {
         recordingMeta.textContent = '录制未开始';
       }
@@ -4270,7 +2933,7 @@
     }
 
     function openPlaybackWindowForSavedFolder(folder) {
-      const popup = window.open(`/?replay=${encodeURIComponent(folder)}`, '_blank', 'noopener,noreferrer');
+      const popup = window.open(`/playback.html?folder=${encodeURIComponent(folder)}`, '_blank', 'noopener,noreferrer');
       if (!popup) {
         alert('浏览器拦截了新标签页，请允许当前页面弹出新标签。');
         return false;
@@ -4302,56 +2965,21 @@
       return { key, recorder, stopped };
     }
 
-    function getRecordingFrameModes(status) {
-      const modes = [];
-      const hasAnySendFlag = isBool01(status && status.udp_web_send_gray)
-        || isBool01(status && status.udp_web_send_binary)
-        || isBool01(status && status.udp_web_send_rgb)
-        || isBool01(status && status.udp_web_send_roi64);
-      if (!hasAnySendFlag || Number(status && status.udp_web_send_gray) === 1) modes.push('gray');
-      if (Number(status && status.udp_web_send_binary) === 1) modes.push('binary');
-      if (Number(status && status.udp_web_send_rgb) === 1) modes.push('rgb');
-      if (Number(status && status.udp_web_send_roi64) === 1) modes.push('roi64');
-      return modes;
-    }
-
-    function clearRecordingTimer() {
-      if (recordingTimer) {
-        clearInterval(recordingTimer);
-        recordingTimer = null;
-      }
-    }
-
-    function captureRecordingTick() {
-      if (!sourceRecorder.active() || recordingCaptureBusy) return;
-      recordingCaptureBusy = true;
-      sourceRecorder.captureTick().catch((err) => {
-        recordingMeta.textContent = `源数据录制采样失败：${err}`;
-      }).finally(() => {
-        recordingCaptureBusy = false;
-      });
-    }
-
-    async function postRecordingControl(path, payload = {}) {
-      const r = await fetch(path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const j = await r.json();
-      if (!r.ok || !j.ok) throw new Error(j.error || `request failed ${r.status}`);
-      return j;
-    }
-
     async function startRecording() {
-      if (recordingState && recordingState.active) return;
-      const started = await postRecordingControl('/api/recordings/backend/start');
+      if (recordingState || typeof MediaRecorder === 'undefined') return;
+      const recorders = [];
+      const canvasItems = listRecordableCanvases();
+      for (const item of canvasItems) {
+        const recorder = createCanvasRecorder(item.key, item.title, item.canvas, true);
+        if (recorder) recorders.push(recorder);
+      }
       recordingState = {
         active: true,
-        startedAtMs: Number(started.started_at_ms) || Date.now(),
-        folder: started.folder || ''
+        startedAtMs: Date.now(),
+        recorders,
+        recordedViews: canvasItems.map((item) => ({ key: item.key, title: item.title })),
+        statusFrames: []
       };
-      lastRecording = null;
       updateRecordingUi();
     }
 
@@ -4362,51 +2990,81 @@
       });
     }
 
-    async function stopRecording(options = {}) {
+    async function stopRecording() {
       if (!recordingState || !recordingState.active) return;
-      const stopped = await postRecordingControl('/api/recordings/backend/stop');
+      const state = recordingState;
       recordingState = null;
+      updateRecordingUi();
+      state.recorders.forEach(({ recorder }) => recorder.stop());
+      const results = await Promise.all(state.recorders.map((item) => item.stopped));
       if (lastRecording) revokeRecordingUrls(lastRecording);
-      const meta = stopped.meta || {};
+
+      const videos = {};
+      const urls = {};
+      const videoLabels = {};
+      for (const result of results) {
+        videos[result.key] = result.blob;
+        urls[result.key] = result.blob ? URL.createObjectURL(result.blob) : '';
+        videoLabels[result.key] = result.title || result.key;
+      }
+
+      const savedAtMs = Date.now();
+      const sessionMeta = buildRecordingSessionMeta(state);
+      const statusPayload = {
+        recorded_at_ms: savedAtMs,
+        duration_ms: savedAtMs - state.startedAtMs,
+        frame_count: state.statusFrames.length,
+        video_labels: videoLabels,
+        statuses: state.statusFrames,
+        session_meta: sessionMeta
+      };
+      const statusBlob = new Blob([JSON.stringify(statusPayload, null, 2)], { type: 'application/json' });
+      urls.status = URL.createObjectURL(statusBlob);
 
       lastRecording = {
-        savedAtMs: Number(meta.saved_at_ms) || Date.now(),
-        startedAtMs: Number(meta.recorded_at_ms) || Date.now(),
-        durationMs: Number(meta.duration_ms) || 0,
-        frameCount: Number(meta.frame_count) || 0,
-        durationSec: ((Number(meta.duration_ms) || 0) / 1000).toFixed(1),
-        folder: stopped.folder || meta.folder || '',
-        sessionMeta: meta.session_meta || {}
+        savedAtMs,
+        startedAtMs: state.startedAtMs,
+        durationMs: savedAtMs - state.startedAtMs,
+        frameCount: state.statusFrames.length,
+        durationSec: ((savedAtMs - state.startedAtMs) / 1000).toFixed(1),
+        statusFrames: state.statusFrames,
+        videoLabels,
+        statusBlob,
+        videos,
+        urls,
+        sessionMeta
       };
-      savedFolderInput.value = lastRecording.folder || '';
-      savedLoadInfo.textContent =
-        `后端录制完成\nfolder: ${lastRecording.folder}\n时长: ${lastRecording.durationSec}s\nTCP状态: ${lastRecording.frameCount}\nUDP图像帧: ${Number(meta.udp_frame_count) || 0}`;
-      if (Number(meta.udp_packet_bytes) > 0) {
-        savedLoadInfo.textContent += `\nUDP原始包: ${(Number(meta.udp_packet_bytes) / 1024).toFixed(1)} KiB`;
-      }
       updateRecordingUi();
 
-      if (options && options.silent) return;
-      if (confirm('后端录制完成，是否立即用统一界面回放？')) {
-        await loadSourceReplayFolder(lastRecording.folder);
+      if (confirm('录制完成，是否立即查看回放？')) {
+        playLastRecording().catch((err) => {
+          recordingMeta.textContent = `打开回放失败：${err}`;
+          alert(`打开回放失败: ${err}`);
+        });
+      } else if (confirm('是否立即保存录制到本地？')) {
+        saveLastRecording().catch((err) => {
+          recordingMeta.textContent = `保存录制失败：${err}`;
+          alert(`保存录制失败: ${err}`);
+        });
       }
     }
 
-    window.smartcarRecordingControls = {
-      isReplayMode: () => !!replayMode,
-      isRecording: () => !!(recordingState && recordingState.active),
-      start: () => startRecording(),
-      stop: () => stopRecording({ silent: true }),
-      refresh: () => updateRecordingUi()
-    };
-
     async function playLastRecording() {
       if (!lastRecording) return;
-      if (!lastRecording.folder) {
-        await saveLastRecording();
+      if (!lastRecording.videos || Object.keys(lastRecording.videos).length < 1) {
+        if (lastRecording.folder) {
+          openPlaybackWindowForSavedFolder(lastRecording.folder);
+          return;
+        }
+        throw new Error('当前没有可用于回放的视频数据');
       }
-      if (!lastRecording.folder) throw new Error('保存源数据录制失败');
-      await loadSourceReplayFolder(lastRecording.folder);
+      const autoFolder = `vision_autoplay_${Date.now()}`;
+      const saved = await persistRecordingToServer(lastRecording, autoFolder);
+      if (!saved || !saved.folder) {
+        throw new Error('自动保存录制失败');
+      }
+      lastRecording.folder = saved.folder;
+      openPlaybackWindowForSavedFolder(saved.folder);
     }
 
     function blobToBase64(blob) {
@@ -4427,14 +3085,25 @@
     }
 
     async function buildPersistableRecordingPayload(recording) {
-      if (recording && recording.sourcePayload) return recording.sourcePayload;
+      const labels = Object.assign({}, (recording && recording.videoLabels) || {});
+      const videos = {};
+      for (const key of Object.keys((recording && recording.videos) || {})) {
+        const blob = recording.videos[key];
+        if (!blob) continue;
+        videos[key] = {
+          mime: blob.type || 'video/webm',
+          title: labels[key] || key,
+          data_b64: await blobToBase64(blob)
+        };
+      }
       return {
         recorded_at_ms: Number(recording && recording.startedAtMs) || Date.now(),
         duration_ms: Number(recording && recording.durationMs) || 0,
         frame_count: Number(recording && recording.frameCount) || 0,
+        video_labels: labels,
         statuses: Array.isArray(recording && recording.statusFrames) ? recording.statusFrames : [],
-        source_frames: (recording && recording.sourceFrames) || {},
-        session_meta: { recording_kind: 'source_frames' }
+        session_meta: (recording && recording.sessionMeta && typeof recording.sessionMeta === 'object') ? recording.sessionMeta : {},
+        videos
       };
     }
 
@@ -4455,8 +3124,8 @@
 
     async function saveLastRecording() {
       if (!lastRecording) return;
-      if (lastRecording.folder) {
-        alert('当前录制已经保存。');
+      if (!lastRecording.videos || Object.keys(lastRecording.videos).length < 1) {
+        alert('当前回放来自已保存目录，无法再次打包保存。');
         return;
       }
 
@@ -4467,7 +3136,6 @@
         savedLoadInfo.textContent = `保存成功\nfolder: ${j.folder}\n时长: ${lastRecording.durationSec}s\n帧数: ${lastRecording.frameCount}`;
         if (j.folder) {
           lastRecording.folder = j.folder;
-          if (lastRecording.sourcePayload) lastRecording.sourcePayload.folder = j.folder;
         }
         await refreshSavedFolders();
       } catch (err) {
@@ -4553,42 +3221,6 @@
         ctx.beginPath();
         ctx.arc(cx, cy, 1, 0, Math.PI * 2);
         ctx.fill();
-      }
-
-      // 目标板 IPM 覆盖：上下底边中点 + 四角点连线。
-      if (isBool01(status.board_debug_valid)) {
-        const ipmBl = Array.isArray(status.board_ipm_bl) ? status.board_ipm_bl : null;
-        const ipmBr = Array.isArray(status.board_ipm_br) ? status.board_ipm_br : null;
-        const ipmTr = Array.isArray(status.board_ipm_tr) ? status.board_ipm_tr : null;
-        const ipmTl = Array.isArray(status.board_ipm_tl) ? status.board_ipm_tl : null;
-        const ipmBottom = Array.isArray(status.board_ipm_bottom) ? status.board_ipm_bottom : null;
-        const ipmTop = Array.isArray(status.board_ipm_top) ? status.board_ipm_top : null;
-
-        const corners = [ipmBl, ipmBr, ipmTr, ipmTl, ipmBl].filter(Boolean);
-        if (corners.length >= 4) {
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(Math.floor(corners[0][0]) + 0.5, Math.floor(corners[0][1]) + 0.5);
-          for (let ci = 1; ci < corners.length; ++ci) {
-            ctx.lineTo(Math.floor(corners[ci][0]) + 0.5, Math.floor(corners[ci][1]) + 0.5);
-          }
-          ctx.stroke();
-        }
-
-        // 四角点：黄色 1px。
-        [ipmBl, ipmBr, ipmTr, ipmTl].forEach(function(pt) {
-          if (!pt) return;
-          ctx.fillStyle = '#ffff00';
-          ctx.fillRect(Math.floor(pt[0]), Math.floor(pt[1]), 1, 1);
-        });
-
-        // 上下底边中点：蓝色 1px。
-        [ipmBottom, ipmTop].forEach(function(pt) {
-          if (!pt) return;
-          ctx.fillStyle = '#38bdf8';
-          ctx.fillRect(Math.floor(pt[0]), Math.floor(pt[1]), 1, 1);
-        });
       }
     }
 
@@ -4961,13 +3593,7 @@
 
     function updateTraceDirHoverFromEvent(canvas, event, sideKey) {
       const status = getRenderStatus();
-      const dirKeyBySide = {
-        left: 'eight_left_trace_dir',
-        right: 'eight_right_trace_dir',
-        leftAux: 'cross_left_aux_trace_dir',
-        rightAux: 'cross_right_aux_trace_dir'
-      };
-      const values = getTraceDirSeries(status, dirKeyBySide[sideKey] || 'eight_left_trace_dir');
+      const values = getTraceDirSeries(status, sideKey === 'left' ? 'eight_left_trace_dir' : 'eight_right_trace_dir');
       if (!values.length) {
         traceDirZoomState[sideKey].hoverIndex = null;
         return;
@@ -4998,12 +3624,8 @@
     function drawTraceDirCharts(status) {
       setCardVisible(leftTraceDirCard, showTraceDirCharts);
       setCardVisible(rightTraceDirCard, showTraceDirCharts);
-      setCardVisible(leftAuxTraceDirCard, showTraceDirCharts);
-      setCardVisible(rightAuxTraceDirCard, showTraceDirCharts);
       setCardVisible(leftTraceDirZoomCard, showTraceDirCharts);
       setCardVisible(rightTraceDirZoomCard, showTraceDirCharts);
-      setCardVisible(leftAuxTraceDirZoomCard, showTraceDirCharts);
-      setCardVisible(rightAuxTraceDirZoomCard, showTraceDirCharts);
       if (!showTraceDirCharts) return;
       drawTraceDirChart(leftTraceDirCanvas,
                         leftTraceDirCtx,
@@ -5021,22 +3643,6 @@
                         status.cross_lower_right_corner_index,
                         status.cross_lower_corner_pair_valid,
                         'right');
-      drawTraceDirChart(leftAuxTraceDirCanvas,
-                        leftAuxTraceDirCtx,
-                        getTraceDirSeries(status, 'cross_left_aux_trace_dir'),
-                        '#0ea5e9',
-                        'Left Aux',
-                        status.cross_left_upper_corner_index,
-                        status.cross_left_upper_corner_found,
-                        'leftAux');
-      drawTraceDirChart(rightAuxTraceDirCanvas,
-                        rightAuxTraceDirCtx,
-                        getTraceDirSeries(status, 'cross_right_aux_trace_dir'),
-                        '#10b981',
-                        'Right Aux',
-                        status.cross_right_upper_corner_index,
-                        status.cross_right_upper_corner_found,
-                        'rightAux');
       drawTraceDirZoomChart(leftTraceDirZoomCanvas,
                             leftTraceDirZoomCtx,
                             leftTraceDirZoomMeta,
@@ -5055,117 +3661,6 @@
                             status.cross_lower_right_corner_index,
                             status.cross_lower_corner_pair_valid,
                             'right');
-      drawTraceDirZoomChart(leftAuxTraceDirZoomCanvas,
-                            leftAuxTraceDirZoomCtx,
-                            leftAuxTraceDirZoomMeta,
-                            getTraceDirSeries(status, 'cross_left_aux_trace_dir'),
-                            '#0ea5e9',
-                            'Left Aux',
-                            status.cross_left_upper_corner_index,
-                            status.cross_left_upper_corner_found,
-                            'leftAux');
-      drawTraceDirZoomChart(rightAuxTraceDirZoomCanvas,
-                            rightAuxTraceDirZoomCtx,
-                            rightAuxTraceDirZoomMeta,
-                            getTraceDirSeries(status, 'cross_right_aux_trace_dir'),
-                            '#10b981',
-                            'Right Aux',
-                            status.cross_right_upper_corner_index,
-                            status.cross_right_upper_corner_found,
-                            'rightAux');
-    }
-
-    function drawHistoryRoi7x7(status) {
-      const cellSize = 20;
-      const gridSize = 7;
-      const canvasWidth = cellSize * gridSize;
-      const canvasHeight = cellSize * gridSize;
-
-      function renderSide(canvas, ctx, metaEl, dataKey, cornerKey, sourceKey, sideLabel) {
-        const raw = Array.isArray(status[dataKey]) ? status[dataKey] : [];
-        const hasData = raw.length === gridSize * gridSize;
-        const cornerArr = Array.isArray(status[cornerKey]) ? status[cornerKey] : [];
-        const hasCorner = cornerArr.length === 2 && cornerArr[0] >= 0 && cornerArr[1] >= 0;
-        const sourceMap = {'-1':'未找到', '0':'历史跟踪', '1':'辅助边界', '2':'下角点重构'};
-        const sourceLabel = sourceMap[String(status[sourceKey])] || '未知';
-        metaEl.textContent = sideLabel + (hasData ? ' — 有数据' : ' — 等待数据') + '  检测:' + sourceLabel;
-        if (hasCorner && hasData) {
-          metaEl.textContent += '  角点@(' + cornerArr[0] + ',' + cornerArr[1] + ')';
-        }
-
-        if (canvas.width !== canvasWidth) canvas.width = canvasWidth;
-        if (canvas.height !== canvasHeight) canvas.height = canvasHeight;
-        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-        ctx.fillStyle = '#020617';
-        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-        if (!hasData) {
-          ctx.fillStyle = '#475569';
-          ctx.font = '12px monospace';
-          ctx.textAlign = 'center';
-          ctx.fillText('无数据', canvasWidth / 2, canvasHeight / 2);
-          ctx.textAlign = 'start';
-          return;
-        }
-
-        for (let row = 0; row < gridSize; ++row) {
-          for (let col = 0; col < gridSize; ++col) {
-            const val = Number(raw[row * gridSize + col]);
-            const x = col * cellSize;
-            const y = row * cellSize;
-            if (val === 0) {
-              ctx.fillStyle = '#000000';
-            } else if (val === 255) {
-              ctx.fillStyle = '#ffffff';
-            } else if (val === 128) {
-              ctx.fillStyle = '#fbbf24';
-            } else {
-              ctx.fillStyle = '#6366f1';
-            }
-            ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
-          }
-        }
-
-        ctx.strokeStyle = '#1e293b';
-        ctx.lineWidth = 0.5;
-        for (let i = 0; i <= gridSize; ++i) {
-          const pos = i * cellSize;
-          ctx.beginPath();
-          ctx.moveTo(pos, 0);
-          ctx.lineTo(pos, canvasHeight);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(0, pos);
-          ctx.lineTo(canvasWidth, pos);
-          ctx.stroke();
-        }
-
-        if (hasCorner) {
-          const cx = cornerArr[0], cy = cornerArr[1];
-          if (cx >= 0 && cx < gridSize && cy >= 0 && cy < gridSize) {
-            const mx = cx * cellSize + cellSize / 2;
-            const my = cy * cellSize + cellSize / 2;
-            const r = cellSize / 2 - 1;
-            ctx.beginPath();
-            ctx.arc(mx, my, r, 0, 2 * Math.PI);
-            ctx.strokeStyle = '#ef4444';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(mx, my, r - 2, 0, 2 * Math.PI);
-            ctx.strokeStyle = '#22d3ee';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          }
-        }
-      }
-
-      renderSide(leftHistoryRoi7x7Canvas, leftHistoryRoi7x7Ctx, leftHistoryRoi7x7Meta,
-                  'cross_left_history_roi_7x7', 'cross_left_history_roi_corner',
-                  'cross_left_upper_corner_source', '左侧 7x7 ROI');
-      renderSide(rightHistoryRoi7x7Canvas, rightHistoryRoi7x7Ctx, rightHistoryRoi7x7Meta,
-                  'cross_right_history_roi_7x7', 'cross_right_history_roi_corner',
-                  'cross_right_upper_corner_source', '右侧 7x7 ROI');
     }
 
     function renderGrayFrameFromSource(source, w, h, sourceMode) {
@@ -5199,12 +3694,12 @@
       grayCtx.moveTo(centerX + 0.5, 0);
       grayCtx.lineTo(centerX + 0.5, h);
       grayCtx.stroke();
-      const cropLineY = Math.round(h * 0.8);
+      const guideY = Math.max(0, Math.min(h - 1, 100));
       grayCtx.strokeStyle = '#ffffff';
       grayCtx.lineWidth = 1;
       grayCtx.beginPath();
-      grayCtx.moveTo(0, cropLineY + 0.5);
-      grayCtx.lineTo(w, cropLineY + 0.5);
+      grayCtx.moveTo(0, guideY + 0.5);
+      grayCtx.lineTo(w, guideY + 0.5);
       grayCtx.stroke();
       const renderStatus = getRenderStatus();
       const left = renderStatus.left_boundary || [];
@@ -5217,43 +3712,8 @@
         const meanCenterline = getMeanCenterlineFromBoundaries(renderStatus);
         drawSeries(grayCtx, meanCenterline, '#facc15', 2, 1);
       }
-      const srcCenterline = getSelectedSrcCenterline(renderStatus);
-      drawSeries(grayCtx, srcCenterline, '#ec4899', 2, 1);
-
-      // 下底边命中点：黄色 1px，覆盖在最上层。
-      if (isBool01(renderStatus.board_debug_valid) &&
-          Number.isFinite(Number(renderStatus.board_hit_x)) &&
-          Number.isFinite(Number(renderStatus.board_hit_y))) {
-        grayCtx.fillStyle = '#ffff00';
-        grayCtx.fillRect(Math.floor(Number(renderStatus.board_hit_x)), Math.floor(Number(renderStatus.board_hit_y)), 1, 1);
-      }
-
-      // 回投原图角点（proc 坐标系）：黄色 1px + 白色连线。
-      if (isBool01(renderStatus.board_debug_valid)) {
-        var srcBl = Array.isArray(renderStatus.board_src_bl) ? renderStatus.board_src_bl : null;
-        var srcBr = Array.isArray(renderStatus.board_src_br) ? renderStatus.board_src_br : null;
-        var srcTr = Array.isArray(renderStatus.board_src_tr) ? renderStatus.board_src_tr : null;
-        var srcTl = Array.isArray(renderStatus.board_src_tl) ? renderStatus.board_src_tl : null;
-        var srcPts = [srcBl, srcBr, srcTr, srcTl, srcBl].filter(Boolean);
-        if (srcPts.length >= 4) {
-          grayCtx.strokeStyle = '#ffffff';
-          grayCtx.lineWidth = 1;
-          grayCtx.beginPath();
-          grayCtx.moveTo(Math.floor(srcPts[0][0]) + 0.5, Math.floor(srcPts[0][1]) + 0.5);
-          for (var si = 1; si < srcPts.length; ++si) {
-            grayCtx.lineTo(Math.floor(srcPts[si][0]) + 0.5, Math.floor(srcPts[si][1]) + 0.5);
-          }
-          grayCtx.stroke();
-        }
-        [srcBl, srcBr, srcTr, srcTl].forEach(function(pt) {
-          if (!pt) return;
-          grayCtx.fillStyle = '#ffff00';
-          grayCtx.fillRect(Math.floor(pt[0]), Math.floor(pt[1]), 1, 1);
-        });
-      }
-
       renderInferFrame(renderStatus);
-      if (!binaryFrameReady) renderBinaryFromGray();
+      renderBinaryFromGray();
       requestLocalCompute();
     }
 
@@ -5322,35 +3782,18 @@
     }
 
     function renderRoi64Frame(status) {
-      const fmtPoint = (pt) => Array.isArray(pt) && pt.length >= 2 ? '(' + pt[0] + ', ' + pt[1] + ')' : '--';
-      const fmtMaybePoint = (x, y) => dbValid ? '(' + x + ', ' + y + ')' : '--';
       roi64Ctx.clearRect(0, 0, roi64Canvas.width, roi64Canvas.height);
       if (roi64FrameReady && roi64Img.complete && roi64Img.naturalWidth > 0) {
         roi64Ctx.imageSmoothingEnabled = false;
         roi64Ctx.drawImage(roi64Img, 0, 0, roi64Canvas.width, roi64Canvas.height);
-        roi64Hint.textContent = 'full 图 ROI 裁剪后缩放到 64×64，界面放大显示。';
-      } else {
-        roi64Ctx.fillStyle = '#000000';
-        roi64Ctx.fillRect(0, 0, roi64Canvas.width, roi64Canvas.height);
-        roi64Hint.textContent = isBool01(status && status.roi_valid)
-          ? 'ROI 已有效，但 ROI64 图像还未收到。'
-          : '还没有可显示的 ROI64 图像。';
+        roi64Hint.textContent = '当前送入 ncnn 的 ROI 已缩放到 64x64。';
+        return;
       }
-
-      // 调试信息。
-      const dbValid = isBool01(status && status.board_debug_valid);
-      roi64DbRedFound.textContent = isBool01(status && status.red_found) ? '找到' : '未找到';
-      roi64DbFailReason.textContent = status && status.board_fail_reason ? String(status.board_fail_reason) : '--';
-      roi64DbDistIpm.textContent = dbValid && typeof status.board_dist_ipm === 'number' ? status.board_dist_ipm.toFixed(2) : '--';
-      roi64DbIpmRedBottom.textContent = dbValid ? fmtPoint(status.board_ipm_red_bottom) : '--';
-      roi64DbIpmBottom.textContent = dbValid ? fmtPoint(status.board_ipm_bottom) : '--';
-      roi64DbIpmTop.textContent = dbValid ? fmtPoint(status.board_ipm_top) : '--';
-      roi64DbBottom.textContent = fmtMaybePoint(status && status.board_bottom_cx, status && status.board_bottom_cy);
-      roi64DbHit.textContent = fmtMaybePoint(status && status.board_hit_x, status && status.board_hit_y);
-      roi64DbSize.textContent = dbValid ? String(status.board_width_px) + '×' + String(status.board_height_px) + ' px' : '--';
-      roi64DbCornerBL.textContent = dbValid ? fmtPoint(status.board_corner_bl) : '--';
-      roi64DbCornerBR.textContent = dbValid ? fmtPoint(status.board_corner_br) : '--';
-      roi64DbCornerTop.textContent = dbValid ? 'TR ' + fmtPoint(status.board_corner_tr) + ' / TL ' + fmtPoint(status.board_corner_tl) : '--';
+      roi64Ctx.fillStyle = '#000000';
+      roi64Ctx.fillRect(0, 0, roi64Canvas.width, roi64Canvas.height);
+      roi64Hint.textContent = isBool01(status && status.roi_valid)
+        ? 'ROI 已有效，但 ROI64 图像还未收到。'
+        : '还没有可显示的 ROI64 图像。';
     }
 
     function renderInferFrame(status) {
@@ -5371,6 +3814,17 @@
       } else {
         inferCtx.fillStyle = '#000000';
         inferCtx.fillRect(0, 0, w, h);
+      }
+
+      if (Array.isArray(status.red) && status.red.length >= 4 && isBool01(status.red_found)) {
+        inferCtx.strokeStyle = '#ff4d4f';
+        inferCtx.lineWidth = 1.5;
+        inferCtx.strokeRect(Number(status.red[0]), Number(status.red[1]), Number(status.red[2]), Number(status.red[3]));
+      }
+      if (Array.isArray(status.roi) && status.roi.length >= 4 && isBool01(status.roi_valid)) {
+        inferCtx.strokeStyle = '#22c55e';
+        inferCtx.lineWidth = 1.5;
+        inferCtx.strokeRect(Number(status.roi[0]), Number(status.roi[1]), Number(status.roi[2]), Number(status.roi[3]));
       }
 
       const topLabel = typeof status.ncnn_top_label === 'string' ? status.ncnn_top_label.trim() : '';
@@ -5396,16 +3850,6 @@
       renderInferMeta(status);
       renderInferProbList(status);
       renderRoi64Frame(status);
-    }
-
-    function renderBinaryFrameFromSource(source, w, h) {
-      if (!source || !w || !h) return;
-      setCardVisible(binaryCard, true);
-      binaryTitle.textContent = '二值图（下位机发送）';
-      if (binaryCanvas.width !== w) binaryCanvas.width = w;
-      if (binaryCanvas.height !== h) binaryCanvas.height = h;
-      binaryCtx.drawImage(source, 0, 0, w, h);
-      drawBinaryTraceOverlay(getRenderStatus() || {});
     }
 
     function renderBinaryFromGray() {
@@ -5444,31 +3888,27 @@
     }
 
     function drawBinaryTraceOverlay(status) {
-      const showCrossAux =
-        Array.isArray(status.cross_left_aux_trace) ||
-        Array.isArray(status.cross_right_aux_trace) ||
-        Array.isArray(status.cross_left_aux_regular) ||
-        Array.isArray(status.cross_right_aux_regular);
+      const routeSubState = Number(status && status.route_sub_state);
+      const showCrossAux = routeSubState === 1;
       drawSeries(binaryCtx, status.eight_left_trace || [], '#ff4d4f', 2, 1);
       drawSeries(binaryCtx, status.eight_right_trace || [], '#c084fc', 2, 1);
       drawSeries(binaryCtx, status.left_boundary || [], '#38bdf8', 2, 1);
       drawSeries(binaryCtx, status.right_boundary || [], '#22c55e', 2, 1);
       drawSeries(binaryCtx, status.left_circle_guide_line || [], '#f59e0b', 2, 1);
       drawSeries(binaryCtx, status.right_circle_guide_line || [], '#f97316', 2, 1);
-      drawSeries(binaryCtx, getSelectedSrcCenterline(status), '#ec4899', 2, 1);
       if (showCrossAux) {
-        drawSeries(binaryCtx, status.cross_left_aux_trace || [], '#0ea5e9', 2, 0.8);
-        drawSeries(binaryCtx, status.cross_right_aux_trace || [], '#10b981', 2, 0.8);
-        drawSeries(binaryCtx, status.cross_left_aux_regular || [], '#7dd3fc', 1.5, 0.8);
-        drawSeries(binaryCtx, status.cross_right_aux_regular || [], '#86efac', 1.5, 0.8);
+        drawSeries(binaryCtx, status.cross_left_aux_trace || [], '#e11d48', 2, 1);
+        drawSeries(binaryCtx, status.cross_right_aux_trace || [], '#14b8a6', 2, 1);
+        drawSeries(binaryCtx, status.cross_left_aux_regular || [], '#fb7185', 2, 1);
+        drawSeries(binaryCtx, status.cross_right_aux_regular || [], '#2dd4bf', 2, 1);
       }
 
       const leftTouch = getTraceTouchPoint(status.eight_left_trace, status.eight_left_first_frame_touch_index, status.eight_left_first_frame_touch_point);
       const rightTouch = getTraceTouchPoint(status.eight_right_trace, status.eight_right_first_frame_touch_index, status.eight_right_first_frame_touch_point);
       drawPointSet(binaryCtx, leftTouch ? [leftTouch] : [], '#facc15', 3);
       drawPointSet(binaryCtx, rightTouch ? [rightTouch] : [], '#facc15', 3);
-      drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_left_corner_point, 'L下角', status.cross_lower_left_corner_found);
-      drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_right_corner_point, 'R下角', status.cross_lower_right_corner_found);
+      drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_left_corner_point, 'L下角', status.cross_lower_corner_pair_valid);
+      drawCrossLowerCornerPoint(binaryCtx, status.cross_lower_right_corner_point, 'R下角', status.cross_lower_corner_pair_valid);
       if (showCrossAux) {
         drawCrossLowerCornerPoint(binaryCtx, status.cross_left_aux_transition_point, 'L辅起', status.cross_left_aux_found);
         drawCrossLowerCornerPoint(binaryCtx, status.cross_right_aux_transition_point, 'R辅起', status.cross_right_aux_found);
@@ -5477,51 +3917,27 @@
       drawCrossLowerCornerPoint(binaryCtx, status.cross_right_upper_corner_point, 'R上角', status.cross_right_upper_corner_found);
       drawBoundaryStraightLabel(binaryCtx, isActiveFlag(status.left_boundary_straight), 'L直边', 6, 14, 'left');
       drawBoundaryStraightLabel(binaryCtx, isActiveFlag(status.right_boundary_straight), 'R直边', binaryCanvas.width - 6, 14, 'right');
-
-      // 下底边命中点：黄色 1px 像素点，覆盖在最上层。
-      if (isBool01(status.board_debug_valid) &&
-          Number.isFinite(Number(status.board_hit_x)) &&
-          Number.isFinite(Number(status.board_hit_y))) {
-        const hx = Number(status.board_hit_x);
-        const hy = Number(status.board_hit_y);
-        binaryCtx.fillStyle = '#ffff00';
-        binaryCtx.fillRect(Math.floor(hx), Math.floor(hy), 1, 1);
-      }
     }
 
-    const cornerPalette = {
-      lowerLeft: '#f97316',
-      lowerRight: '#facc15',
-      upperLeft: '#a855f7',
-      upperRight: '#ef4444',
-      auxLeft: '#0ea5e9',
-      auxRight: '#10b981'
-    };
-
-    function drawCornerMarker(ctx, point, color, active) {
-      if (!Array.isArray(point) || point.length < 2 || !active) return;
+    function drawCrossLowerCornerPoint(ctx, point, label, pairValid) {
+      if (!Array.isArray(point) || point.length < 2) return;
       const x = Number(point[0]);
       const y = Number(point[1]);
       if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
-      ctx.fillStyle = color;
-      ctx.strokeStyle = '#020617';
-      ctx.lineWidth = 1;
+      const fill = pairValid ? '#fb923c' : '#fde047';
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = '#111827';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-    }
 
-    function drawCrossLowerCornerPoint(ctx, point, label, active) {
-      const color = label === 'L下角' ? cornerPalette.lowerLeft
-        : label === 'R下角' ? cornerPalette.lowerRight
-        : label === 'L上角' ? cornerPalette.upperLeft
-        : label === 'R上角' ? cornerPalette.upperRight
-        : label === 'L辅起' ? cornerPalette.auxLeft
-        : label === 'R辅起' ? cornerPalette.auxRight
-        : '#f8fafc';
-      drawCornerMarker(ctx, point, color, active);
+      ctx.font = '10px "Noto Sans SC", "Microsoft YaHei", sans-serif';
+      ctx.textBaseline = 'bottom';
+      ctx.fillStyle = fill;
+      ctx.fillText(label, Math.min(binaryCanvas.width - 28, x + 5), Math.max(10, y - 4));
     }
 
     function drawBoundaryStraightLabel(ctx, active, label, anchorX, anchorY, side) {
@@ -5570,9 +3986,8 @@
     }
 
     function binaryTraceHoverText(status, x, y) {
-      const showCrossAux =
-        Array.isArray(status.cross_left_aux_trace) ||
-        Array.isArray(status.cross_right_aux_trace);
+      const routeSubState = Number(status && status.route_sub_state);
+      const showCrossAux = routeSubState === 1;
       const candidates = [
         {
           label: '原始巡线:L',
@@ -5712,20 +4127,11 @@
       renderRoi64Frame(getRenderStatus() || {});
     };
 
-    function resetReplayFrameUrlCache() {
-      lastReplayGrayUrl = '';
-      lastReplayBinaryUrl = '';
-      lastReplayRgbUrl = '';
-      lastReplayRoi64Url = '';
-    }
-
-    async function fetchGrayFrameDirect(urlOverride) {
+    async function fetchGrayFrameDirect() {
       const seq = ++grayFetchSeq;
       grayFetchInFlight = true;
-      const grayUrl = urlOverride || frameSource.urlForMode('gray');
       try {
-        if (!grayUrl) throw new Error('gray frame unavailable');
-        const response = await fetch(grayUrl, { cache: 'no-store' });
+        const response = await fetch(receiverCore.frameUrlForMode('gray'), { cache: 'no-store' });
         if (!response.ok) throw new Error(`gray frame ${response.status}`);
         const blob = await response.blob();
         const bitmap = await createImageBitmap(blob);
@@ -5735,41 +4141,12 @@
         }
         grayFrameReady = true;
         renderGrayFrameFromSource(bitmap, bitmap.width || 160, bitmap.height || 120, 'gray');
-        if (frameSource.isReplay()) lastReplayGrayUrl = grayUrl;
         bitmap.close();
       } catch (_) {
         grayFrameReady = false;
         if (rgbFrameReady) renderGrayFrame();
       } finally {
         if (seq === grayFetchSeq) grayFetchInFlight = false;
-      }
-    }
-
-    async function fetchBinaryFrameDirect(urlOverride) {
-      const seq = ++binaryFetchSeq;
-      binaryFetchInFlight = true;
-      const binaryUrl = urlOverride || frameSource.urlForMode('binary');
-      try {
-        if (!binaryUrl) throw new Error('binary frame unavailable');
-        const response = await fetch(binaryUrl, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`binary frame ${response.status}`);
-        const blob = await response.blob();
-        const bitmap = await createImageBitmap(blob);
-        if (seq !== binaryFetchSeq) {
-          bitmap.close();
-          return;
-        }
-        binaryFrameReady = true;
-        binaryFetchRetryAtMs = 0;
-        renderBinaryFrameFromSource(bitmap, bitmap.width || 160, bitmap.height || 120);
-        if (frameSource.isReplay()) lastReplayBinaryUrl = binaryUrl;
-        bitmap.close();
-      } catch (_) {
-        binaryFrameReady = false;
-        binaryFetchRetryAtMs = Date.now() + 1000;
-        renderBinaryFromGray();
-      } finally {
-        if (seq === binaryFetchSeq) binaryFetchInFlight = false;
       }
     }
 
@@ -5849,36 +4226,35 @@
       if (isFull) {
         if (localOn) {
           return syncState === 'synced'
-            ? '当前是 FULL 全量模式，页面直接显示主板完整结果。'
-            : '当前是 FULL 全量模式，页面直接显示主板完整结果。';
+            ? '当前是 FULL 全量模式，页面主要直接显示主板完整结果；本地复算已同步，可用于补数和一致性比对。'
+            : '当前是 FULL 全量模式，页面主要直接显示主板完整结果；即使本地复算未同步或未构建，主画面仍然可以正常渲染。';
         }
-        return '当前是 FULL 全量模式，页面直接显示主板完整结果。';
+        return '当前是 FULL 全量模式，页面直接显示主板完整结果；这一模式不依赖本地复算 WASM，本机没有构建链也能正常看图和调试。';
       }
       if (localOn) {
         if (syncState === 'synced') {
-          return '当前是 RAW_MINIMAL 模式；本地复算功能已移除，页面只显示主板发送的数据。';
+          return '当前是 RAW_MINIMAL + 本地复算模式。主板只发基础数据，网页依赖本地 WASM 补出边界、中线等结果；当前本地复算已同步。';
         }
         if (syncState === 'missing') {
-          return '当前是 RAW_MINIMAL 模式；本地复算功能已移除，页面只显示主板发送的数据。';
+          return '当前是 RAW_MINIMAL + 本地复算模式，但本机还没有构建本地复算 WASM；原始图像仍可显示，补算结果不会完整。';
         }
-        return '当前是 RAW_MINIMAL 模式；本地复算功能已移除，页面只显示主板发送的数据。';
+        return '当前是 RAW_MINIMAL + 本地复算模式，但本地 WASM 与当前算法源码未同步；原始图像仍可显示，补算结果可能和最新算法不一致。';
       }
-      return '当前是 RAW_MINIMAL 原始最小模式，页面只显示主板传来的原始图像和基础状态。';
+      return '当前是 RAW_MINIMAL 原始最小模式，页面只显示主板传来的原始图像和基础状态；如果想补出边界、中线等结果，请打开本地复算。';
     }
 
     function updateTransportPanel(status) {
       if (!status) return;
       transportRateValueEl.textContent = fmtHumanRateMbps(status.rx_udp_mbps);
       transportRateSubEl.textContent = fmtHumanRateKiB(status.rx_udp_kib_per_sec);
-      transportFpsValueEl.textContent = receiverCore.hasValue(status.rx_overall_avg_fps) ? `${status.rx_overall_avg_fps} fps` : '-- fps';
+      transportFpsValueEl.textContent = receiverCore.hasValue(status.rx_udp_frames_per_sec) ? `${status.rx_udp_frames_per_sec} fps` : '-- fps';
       const captureThreadFps = receiverCore.hasValue(status.capture_thread_fps) ? status.capture_thread_fps : '--';
       const visionProcessFps = receiverCore.hasValue(status.vision_process_fps) ? status.vision_process_fps : '--';
       const udpTxFps = receiverCore.hasValue(status.udp_tx_fps) ? status.udp_tx_fps : '--';
       transportFpsSubEl.textContent =
         `rx gray ${receiverCore.hasValue(status.rx_udp_gray_fps) ? status.rx_udp_gray_fps : '--'} / `
         + `rgb ${receiverCore.hasValue(status.rx_udp_rgb_fps) ? status.rx_udp_rgb_fps : '--'} / `
-        + `binary ${receiverCore.hasValue(status.rx_udp_binary_fps) ? status.rx_udp_binary_fps : '--'} / `
-        + `tcp ${receiverCore.hasValue(status.rx_tcp_status_per_sec) ? status.rx_tcp_status_per_sec : '--'} | `
+        + `binary ${receiverCore.hasValue(status.rx_udp_binary_fps) ? status.rx_udp_binary_fps : '--'} | `
         + `board cap ${captureThreadFps} / proc ${visionProcessFps} / tx ${udpTxFps}`;
       transportModeValueEl.textContent = buildTransportModeSummary(status);
       transportModeSubEl.textContent = receiverCore.hasValue(status.udp_web_max_fps)
@@ -5920,7 +4296,6 @@
     }
 
     async function pullWasmSyncStatus() {
-      if (replayMode) return;
       try {
         const j = await receiverCore.fetchJsonNoStore('/api/wasm_sync_status');
         updateWasmSyncPanel(j);
@@ -5943,14 +4318,17 @@
     }
 
     async function pullStatus() {
-      if (replayMode) return;
       try {
         const j = await receiverCore.fetchJsonNoStore('/api/status');
         latestStatus = j;
-        pushPidHistory(j);
-        renderPidCharts();
         const isFull = receiverCore.isFullDebugProfile(j.web_data_profile);
         setDebugPageActive(isFull || shouldUseLocalCompute());
+        if (recordingState && recordingState.active) {
+          recordingState.statusFrames.push({
+            client_ts_ms: Date.now(),
+            status: cloneStatus(j)
+          });
+        }
         const renderStatus = getRenderStatus();
         updateTransportPanel(j);
         modeNote.textContent = buildModeExplanation(j);
@@ -5960,7 +4338,6 @@
         if (isFull || shouldUseLocalCompute()) {
           drawIpmBoundaries(renderStatus);
           drawTraceDirCharts(renderStatus);
-          drawHistoryRoi7x7(renderStatus);
           if (hasValue(renderStatus.ipm_centerline_source)) {
             ipmCenterlineSourceLabel.style.display = '';
             ipmCenterlineSourceLabel.textContent = fmtCenterlineSourceLabel(renderStatus.ipm_centerline_source);
@@ -5978,41 +4355,17 @@
       }
     }
 
-    function pullFramesForCurrentSource() {
-      const isReplaySource = frameSource.isReplay();
-      const rgbUrl = frameSource.urlForMode('rgb');
-      if (rgbUrl && (!isReplaySource || rgbUrl !== lastReplayRgbUrl)) {
-        rgbImg.src = rgbUrl;
-        if (isReplaySource) lastReplayRgbUrl = rgbUrl;
-      }
-      const grayUrl = frameSource.urlForMode('gray');
-      if (grayUrl && !grayFetchInFlight && (!isReplaySource || grayUrl !== lastReplayGrayUrl)) {
-        fetchGrayFrameDirect(grayUrl);
-      }
-      const binaryUrl = frameSource.urlForMode('binary');
-      const shouldTryBinary =
-        isBool01(latestStatus && latestStatus.udp_web_send_binary) ||
-        isReplaySource ||
-        binaryFrameReady ||
-        Date.now() >= binaryFetchRetryAtMs;
-      if (binaryUrl && shouldTryBinary && !binaryFetchInFlight && (!isReplaySource || binaryUrl !== lastReplayBinaryUrl)) {
-        fetchBinaryFrameDirect(binaryUrl);
+    function pullFrames() {
+      rgbImg.src = receiverCore.frameUrlForMode('rgb');
+      if (!grayFetchInFlight) {
+        fetchGrayFrameDirect();
       }
       if (isBool01(latestStatus && latestStatus.udp_web_send_roi64)) {
-        const roiUrl = frameSource.urlForMode('roi64');
-        if (roiUrl && (!isReplaySource || roiUrl !== lastReplayRoi64Url)) {
-          roi64Img.src = roiUrl;
-          if (isReplaySource) lastReplayRoi64Url = roiUrl;
-        }
+        roi64Img.src = receiverCore.frameUrlForMode('roi64');
       } else if (roi64FrameReady) {
         roi64FrameReady = false;
         renderRoi64Frame(getRenderStatus() || {});
       }
-    }
-
-    function pullFrames() {
-      if (replayMode) return;
-      pullFramesForCurrentSource();
     }
 
     bindPixelProbe(rgbCanvas, rgbCtx, rgbPixelInfo);
@@ -6086,28 +4439,6 @@
         loadSavedFolder(savedFolderInput.value);
       }
     });
-    replayToggleBtn.addEventListener('click', () => {
-      if (!replayRecording) return;
-      replayPlaying = !replayPlaying;
-      replayLastTickMs = Date.now();
-      updateReplayControls();
-    });
-    replayRestartBtn.addEventListener('click', () => {
-      replayPlaying = false;
-      setReplayPlaybackMs(0);
-    });
-    replayBackwardBtn.addEventListener('click', () => {
-      setReplayPlaybackMs(replayPlaybackMs - 1000);
-    });
-    replayForwardBtn.addEventListener('click', () => {
-      setReplayPlaybackMs(replayPlaybackMs + 1000);
-    });
-    replaySpeedBtn.addEventListener('click', () => {
-      const idx = replayRates.indexOf(replayRate);
-      const nextIdx = idx >= 0 ? ((idx + 1) % replayRates.length) : replayRates.indexOf(1.0);
-      replayRate = replayRates[nextIdx >= 0 ? nextIdx : 0];
-      updateReplayControls();
-    });
     playbackToggleBtn.addEventListener('click', async () => {
       const video = currentPlaybackVideo();
       if (!video) return;
@@ -6150,31 +4481,29 @@
     });
     bindTraceDirZoomHandlers(leftTraceDirCanvas, 'left');
     bindTraceDirZoomHandlers(rightTraceDirCanvas, 'right');
-    bindTraceDirZoomHandlers(leftAuxTraceDirCanvas, 'leftAux');
-    bindTraceDirZoomHandlers(rightAuxTraceDirCanvas, 'rightAux');
-    if (toggleLocalCompute) {
-      toggleLocalCompute.checked = false;
-      toggleLocalCompute.disabled = true;
-      toggleLocalCompute.closest('label').style.display = 'none';
-    }
+    toggleLocalCompute.checked = localComputeEnabled;
+    toggleLocalCompute.addEventListener('change', () => {
+      localComputeEnabled = !!toggleLocalCompute.checked;
+      latestLocalPayload = null;
+      const isFull = receiverCore.isFullDebugProfile(latestStatus.web_data_profile);
+      setDebugPageActive(isFull || shouldUseLocalCompute());
+      modeNote.textContent = buildModeExplanation(latestStatus || {});
+      renderStatusPanels(getRenderStatus() || {});
+      drawIpmBoundaries(getRenderStatus() || {});
+      drawTraceDirCharts(getRenderStatus() || {});
+      if (grayFrameReady) renderGrayFrame();
+    });
     showTraceDirCharts = !!toggleTraceDirCharts.checked;
     rebuildPlaybackGrid({}, {});
     setDebugPageActive(true);
     setInterval(pullStatus, 120);
     setInterval(pullWasmSyncStatus, 2000);
-    setInterval(pullFrames, LIVE_FRAME_INTERVAL_MS);
-    setInterval(updateReplayClock, REPLAY_FRAME_INTERVAL_MS);
+    setInterval(pullFrames, 60);
     setInterval(updateRecordingUi, 500);
     updateRecordingUi();
-    if (requestedReplayFolder) {
-      loadSourceReplayFolder(requestedReplayFolder);
-    } else {
-      frameSource.setLive();
-      pullStatus();
-      pullWasmSyncStatus();
-      pullFrames();
-    }
+    pullStatus();
+    pullWasmSyncStatus();
+    pullFrames();
   </script>
-  <script src="/project_control.js"></script>
 </body>
 </html>
