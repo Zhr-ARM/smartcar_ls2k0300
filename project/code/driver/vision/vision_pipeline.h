@@ -35,15 +35,6 @@ bool vision_pipeline_step();
 // 意义：供调试显示/发送等模块直接复用。
 const uint8 *vision_pipeline_bgr_image();
 
-// 作用：发送配置透传给 transport。
-// 如何修改：在 main.cpp 通过 vision_thread 接口设置。
-void vision_pipeline_set_send_mode(vision_send_mode_enum mode);
-vision_send_mode_enum vision_pipeline_get_send_mode();
-void vision_pipeline_set_send_max_fps(uint32 max_fps);
-uint32 vision_pipeline_get_send_max_fps();
-void vision_pipeline_set_send_enabled(bool enabled);
-bool vision_pipeline_is_send_enabled();
-
 // 作用：推理总开关（关闭后跳过红色检测与 ncnn 推理）。
 // 如何修改：运行时可动态切换。
 // 是否调用：是，main.cpp -> vision_thread -> pipeline 调用。

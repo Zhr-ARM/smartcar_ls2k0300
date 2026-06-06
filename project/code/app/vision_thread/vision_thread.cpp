@@ -2,7 +2,6 @@
 
 #include "driver/vision/vision_image_processor.h"
 #include "driver/vision/vision_pipeline.h"
-#include "driver/vision/vision_transport.h"
 
 #include <atomic>
 #include <chrono>
@@ -16,15 +15,6 @@ std::atomic<bool> g_vision_running(false);
 std::atomic<uint32> g_vision_process_fps(0);
 
 constexpr int64_t VISION_PERF_LOG_INTERVAL_US = 1000 * 1000;
-
-static vision_thread_send_mode_enum vision_thread_sanitize_send_mode(vision_thread_send_mode_enum mode)
-{
-    if (mode == VISION_THREAD_SEND_BINARY)
-    {
-        return VISION_THREAD_SEND_BINARY;
-    }
-    return VISION_THREAD_SEND_GRAY;
-}
 
 struct vision_perf_accum_t
 {
@@ -44,7 +34,6 @@ struct vision_perf_accum_t
     uint64_t maze_left_ok_frames = 0;
     uint64_t maze_right_ok_frames = 0;
     uint64_t process_us = 0;
-    uint64_t send_us = 0;
     uint64_t loop_us = 0;
 };
 
@@ -71,7 +60,6 @@ void vision_loop()
     while (g_vision_running.load())
     {
         auto loop_start = std::chrono::steady_clock::now();
-        uint32 send_us_this_frame = 0;
 
         if (!vision_pipeline_process_step())
         {
@@ -80,7 +68,6 @@ void vision_loop()
         }
 
         vision_pipeline_send_step();
-        send_us_this_frame = vision_transport_get_last_send_time_us();
 
         uint32 capture_wait_us = 0;
         uint32 preprocess_us = 0;
@@ -128,7 +115,6 @@ void vision_loop()
         perf_acc.maze_left_ok_frames += maze_left_ok ? 1U : 0U;
         perf_acc.maze_right_ok_frames += maze_right_ok ? 1U : 0U;
         perf_acc.process_us += process_us;
-        perf_acc.send_us += send_us_this_frame;
         perf_acc.loop_us += loop_us_this_frame;
 
         int64_t window_us = std::chrono::duration_cast<std::chrono::microseconds>(loop_end - perf_window_start).count();
@@ -178,37 +164,6 @@ void vision_thread_cleanup()
 bool vision_thread_is_running()
 {
     return g_vision_running.load();
-}
-
-void vision_thread_set_send_mode(vision_thread_send_mode_enum mode)
-{
-    const vision_thread_send_mode_enum mode_sanitized = vision_thread_sanitize_send_mode(mode);
-    vision_pipeline_set_send_mode(static_cast<vision_send_mode_enum>(mode_sanitized));
-}
-
-vision_thread_send_mode_enum vision_thread_get_send_mode()
-{
-    return static_cast<vision_thread_send_mode_enum>(vision_pipeline_get_send_mode());
-}
-
-void vision_thread_set_send_max_fps(uint32 max_fps)
-{
-    vision_pipeline_set_send_max_fps(max_fps);
-}
-
-uint32 vision_thread_get_send_max_fps()
-{
-    return vision_pipeline_get_send_max_fps();
-}
-
-void vision_thread_set_client_sender_enabled(bool enabled)
-{
-    vision_pipeline_set_send_enabled(enabled);
-}
-
-bool vision_thread_client_sender_enabled()
-{
-    return vision_pipeline_is_send_enabled();
 }
 
 void vision_thread_set_infer_enabled(bool enabled)
