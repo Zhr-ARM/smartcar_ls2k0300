@@ -384,6 +384,205 @@ function execFileAsync(file, args) {
   });
 }
 
+function shellQuote(value) {
+  return `'${String(value || '').replace(/'/g, `'\\''`)}'`;
+}
+
+function getProjectControlTarget() {
+  const settings = getBoardConnectionSettings();
+  const host = String(settings.build_target_host || settings.board_ssh_host || '').trim();
+  const user = String(settings.build_target_user || settings.board_ssh_user || 'root').trim();
+  const port = Number(settings.build_target_port || settings.board_ssh_port || 22);
+  const appPath = String(settings.build_target_app_path || '/home/root/tst').trim();
+  return {
+    preset_id: settings.id || '',
+    preset_label: settings.label || settings.id || '',
+    host,
+    user,
+    port: Number.isFinite(port) && port > 0 ? Math.round(port) : 22,
+    app_path: appPath,
+    executable_path: path.posix.join(appPath, 'project'),
+    pid_file_path: path.posix.join(appPath, '.pc_receiver_project.pid'),
+    log_file_path: path.posix.join(appPath, 'project_control.log')
+  };
+}
+
+async function execProjectControlRemote(command) {
+  const target = getProjectControlTarget();
+  const remote = `${target.user}@${target.host}`;
+  const result = await execFileAsync('ssh', [
+    '-p', String(target.port),
+    '-o', 'BatchMode=yes',
+    '-o', 'ConnectTimeout=5',
+    '-o', 'StrictHostKeyChecking=accept-new',
+    remote,
+    command
+  ]);
+  return { target, stdout: result.stdout, stderr: result.stderr };
+}
+
+function parseProjectControlOutput(stdout) {
+  const result = {};
+  const text = String(stdout || '');
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    const value = line.slice(eq + 1).trim();
+    result[key] = value;
+  }
+  return result;
+}
+
+function normalizeProjectControlPayload(parsed, target) {
+  const running = parsed.running === '1' || parsed.running === 'true';
+  const pidText = String(parsed.pid || '').trim();
+  const pid = /^\d+$/.test(pidText) ? Number(pidText) : null;
+  return {
+    ok: parsed.ok !== '0',
+    running,
+    pid,
+    message: parsed.message || '',
+    target
+  };
+}
+
+async function getProjectStatus() {
+  const target = getProjectControlTarget();
+  const command = `
+APP_PATH=${shellQuote(target.app_path)}
+EXE_PATH=${shellQuote(target.executable_path)}
+PID_FILE=${shellQuote(target.pid_file_path)}
+
+if [ ! -d "$APP_PATH" ]; then
+  printf 'ok=0\\nrunning=0\\nmessage=app_path_not_found\\n'
+  exit 0
+fi
+if [ ! -x "$EXE_PATH" ]; then
+  printf 'ok=0\\nrunning=0\\nmessage=project_not_executable\\n'
+  exit 0
+fi
+PID=''
+if [ -f "$PID_FILE" ]; then
+  PID=$(tr -cd '0-9' < "$PID_FILE" 2>/dev/null || true)
+fi
+if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+  printf 'ok=1\\nrunning=1\\nmessage=running\\npid=%s\\n' "$PID"
+  exit 0
+fi
+if [ -f "$PID_FILE" ]; then
+  rm -f "$PID_FILE"
+fi
+PID=$(pgrep -x -n project || true)
+if [ -n "$PID" ]; then
+  printf '%s\\n' "$PID" > "$PID_FILE"
+  printf 'ok=1\\nrunning=1\\nmessage=running\\npid=%s\\n' "$PID"
+  exit 0
+fi
+printf 'ok=1\\nrunning=0\\nmessage=not_running\\n'
+`.trim();
+  const remoteResult = await execProjectControlRemote(command);
+  return normalizeProjectControlPayload(parseProjectControlOutput(remoteResult.stdout), target);
+}
+
+async function startProjectRemote() {
+  const target = getProjectControlTarget();
+  const command = `
+APP_PATH=${shellQuote(target.app_path)}
+EXE_PATH=${shellQuote(target.executable_path)}
+PID_FILE=${shellQuote(target.pid_file_path)}
+LOG_FILE=${shellQuote(target.log_file_path)}
+
+if [ ! -d "$APP_PATH" ]; then
+  printf 'ok=0\\nrunning=0\\nmessage=app_path_not_found\\n'
+  exit 0
+fi
+if [ ! -x "$EXE_PATH" ]; then
+  printf 'ok=0\\nrunning=0\\nmessage=project_not_executable\\n'
+  exit 0
+fi
+PID=''
+if [ -f "$PID_FILE" ]; then
+  PID=$(tr -cd '0-9' < "$PID_FILE" 2>/dev/null || true)
+fi
+if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+  printf 'ok=1\\nrunning=1\\nmessage=already_running\\npid=%s\\n' "$PID"
+  exit 0
+fi
+PID=$(pgrep -x -n project || true)
+if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+  printf '%s\\n' "$PID" > "$PID_FILE"
+  printf 'ok=1\\nrunning=1\\nmessage=already_running\\npid=%s\\n' "$PID"
+  exit 0
+fi
+if [ -f "$PID_FILE" ]; then
+  rm -f "$PID_FILE"
+fi
+cd "$APP_PATH" || exit 11
+nohup "$EXE_PATH" > "$LOG_FILE" 2>&1 &
+PID=$!
+printf '%s\\n' "$PID" > "$PID_FILE"
+sleep 1
+if kill -0 "$PID" 2>/dev/null; then
+  printf 'ok=1\\nrunning=1\\nmessage=started\\npid=%s\\n' "$PID"
+  exit 0
+fi
+rm -f "$PID_FILE"
+printf 'ok=0\\nrunning=0\\nmessage=start_failed\\n'
+`.trim();
+  const remoteResult = await execProjectControlRemote(command);
+  return normalizeProjectControlPayload(parseProjectControlOutput(remoteResult.stdout), target);
+}
+
+async function stopProjectRemote() {
+  const target = getProjectControlTarget();
+  const command = `
+PID_FILE=${shellQuote(target.pid_file_path)}
+PID=''
+if [ -f "$PID_FILE" ]; then
+  PID=$(tr -cd '0-9' < "$PID_FILE" 2>/dev/null || true)
+fi
+if [ -z "$PID" ]; then
+  PID=$(pgrep -x -n project || true)
+fi
+if [ -z "$PID" ]; then
+  rm -f "$PID_FILE" 2>/dev/null || true
+  printf 'ok=1\\nrunning=0\\nmessage=not_running\\n'
+  exit 0
+fi
+kill -INT "$PID" 2>/dev/null || true
+for _i in 1 2 3 4 5 6 7 8 9 10; do
+  if ! kill -0 "$PID" 2>/dev/null; then
+    rm -f "$PID_FILE" 2>/dev/null || true
+    printf 'ok=1\\nrunning=0\\nmessage=stopped\\npid=%s\\n' "$PID"
+    exit 0
+  fi
+  sleep 0.2
+done
+kill -TERM "$PID" 2>/dev/null || true
+for _i in 1 2 3 4 5; do
+  if ! kill -0 "$PID" 2>/dev/null; then
+    rm -f "$PID_FILE" 2>/dev/null || true
+    printf 'ok=1\\nrunning=0\\nmessage=stopped\\npid=%s\\n' "$PID"
+    exit 0
+  fi
+  sleep 0.2
+done
+kill -KILL "$PID" 2>/dev/null || true
+sleep 0.2
+if ! kill -0 "$PID" 2>/dev/null; then
+  rm -f "$PID_FILE" 2>/dev/null || true
+  printf 'ok=1\\nrunning=0\\nmessage=stopped\\npid=%s\\n' "$PID"
+  exit 0
+fi
+printf 'ok=0\\nrunning=1\\nmessage=sigint_sent_still_running\\npid=%s\\n' "$PID"
+`.trim();
+  const remoteResult = await execProjectControlRemote(command);
+  return normalizeProjectControlPayload(parseProjectControlOutput(remoteResult.stdout), target);
+}
+
 function persistLocalConfigToml(tomlText) {
   const targetPath = LOCAL_SMARTCAR_CONFIG_PATH;
   const parentDir = path.dirname(targetPath);
@@ -540,6 +739,9 @@ function readJsonBody(req, limitBytes = 300 * 1024 * 1024) {
 
 function extByMime(mime) {
   if (mime === 'video/webm' || mime === 'video/webm;codecs=vp8' || mime === 'video/webm;codecs=vp9') return '.webm';
+  if (mime === 'image/jpeg') return '.jpg';
+  if (mime === 'image/png') return '.png';
+  if (mime === 'image/bmp') return '.bmp';
   if (mime === 'application/json') return '.json';
   return '.bin';
 }
@@ -555,7 +757,9 @@ function writeRecordingFiles(folderName, payload) {
     frame_count: payload.frame_count,
     video_labels: (payload.video_labels && typeof payload.video_labels === 'object') ? payload.video_labels : {},
     statuses: Array.isArray(payload.statuses) ? payload.statuses : [],
-    session_meta: (payload.session_meta && typeof payload.session_meta === 'object') ? payload.session_meta : {}
+    session_meta: (payload.session_meta && typeof payload.session_meta === 'object') ? payload.session_meta : {},
+    udp_frame_count: Number(payload.udp_frame_count) || 0,
+    udp_packet_bytes: Number(payload.udp_packet_bytes) || 0
   };
   fs.writeFileSync(path.join(folderPath, 'status.json'), JSON.stringify(statusPayload, null, 2), 'utf8');
 
@@ -574,15 +778,50 @@ function writeRecordingFiles(folderName, payload) {
     videoMeta[key] = { file: fileName, mime, title };
   }
 
+  const sourceFramesInput = payload.source_frames && typeof payload.source_frames === 'object'
+    ? payload.source_frames
+    : {};
+  const sourceFramesMeta = {};
+  for (const [mode, frames] of Object.entries(sourceFramesInput)) {
+    if (!/^[A-Za-z0-9._-]+$/.test(mode) || !Array.isArray(frames)) continue;
+    const sanitizedFrames = [];
+    for (let idx = 0; idx < frames.length; idx += 1) {
+      const frame = frames[idx];
+      if (!frame || typeof frame.data_b64 !== 'string' || !frame.data_b64) continue;
+      const mime = (typeof frame.mime === 'string' && frame.mime) ? frame.mime : 'image/jpeg';
+      const ext = extByMime(mime);
+      const ts = Number(frame.client_ts_ms) || 0;
+      const frameId = Number(frame.frame_id);
+      const fileName = `${mode}_${String(idx).padStart(6, '0')}_${ts}${ext}`;
+      fs.writeFileSync(path.join(folderPath, fileName), Buffer.from(frame.data_b64, 'base64'));
+      sanitizedFrames.push({
+        mode,
+        client_ts_ms: ts,
+        frame_id: Number.isFinite(frameId) ? frameId : -1,
+        width: Number(frame.width) || 0,
+        height: Number(frame.height) || 0,
+        mime,
+        file: fileName
+      });
+    }
+    if (sanitizedFrames.length > 0) {
+      sourceFramesMeta[mode] = sanitizedFrames;
+    }
+  }
+  fs.writeFileSync(path.join(folderPath, 'source_frames.json'), JSON.stringify(sourceFramesMeta, null, 2), 'utf8');
+
   const meta = {
     folder: folderName,
     saved_at_ms: Date.now(),
     recorded_at_ms: payload.recorded_at_ms,
     duration_ms: payload.duration_ms,
     frame_count: payload.frame_count,
+    udp_frame_count: Number(payload.udp_frame_count) || 0,
+    udp_packet_bytes: Number(payload.udp_packet_bytes) || 0,
     video_labels: statusPayload.video_labels,
     session_meta: statusPayload.session_meta,
-    videos: videoMeta
+    videos: videoMeta,
+    source_frame_counts: Object.fromEntries(Object.entries(sourceFramesMeta).map(([mode, frames]) => [mode, frames.length]))
   };
   fs.writeFileSync(path.join(folderPath, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
   return meta;
@@ -666,6 +905,75 @@ function shouldAcceptFrame(mode, frameId, nowMs) {
   return false;
 }
 
+function startBackendRecording() {
+  if (backendRecording && backendRecording.active) {
+    return {
+      ok: true,
+      active: true,
+      started_at_ms: backendRecording.startedAtMs,
+      folder: backendRecording.folder
+    };
+  }
+  backendRecording = {
+    active: true,
+    startedAtMs: Date.now(),
+    folder: `vision_record_${Date.now()}`,
+    statusFrames: [],
+    sourceFrames: { gray: [], binary: [], rgb: [], roi64: [] },
+    udpFrameCount: 0,
+    udpPacketBytes: 0
+  };
+  return {
+    ok: true,
+    active: true,
+    started_at_ms: backendRecording.startedAtMs,
+    folder: backendRecording.folder
+  };
+}
+
+function backendRecordingStatusPayload() {
+  return {
+    ok: true,
+    active: !!(backendRecording && backendRecording.active),
+    started_at_ms: backendRecording && backendRecording.startedAtMs ? backendRecording.startedAtMs : null,
+    folder: backendRecording && backendRecording.folder ? backendRecording.folder : '',
+    udp_frame_count: backendRecording ? backendRecording.udpFrameCount : 0,
+    udp_packet_bytes: backendRecording ? backendRecording.udpPacketBytes : 0
+  };
+}
+
+function stopBackendRecording() {
+  if (!backendRecording || !backendRecording.active) {
+    return {
+      ok: true,
+      active: false,
+      folder: '',
+      meta: null
+    };
+  }
+  backendRecording.active = false;
+  const finished = backendRecording;
+  backendRecording = null;
+  const durationMs = Math.max(0, Date.now() - finished.startedAtMs);
+  const payload = {
+    recorded_at_ms: finished.startedAtMs,
+    duration_ms: durationMs,
+    frame_count: finished.statusFrames.length,
+    statuses: finished.statusFrames,
+    source_frames: finished.sourceFrames,
+    session_meta: { recording_kind: 'source_frames' },
+    udp_frame_count: finished.udpFrameCount,
+    udp_packet_bytes: finished.udpPacketBytes
+  };
+  const meta = writeRecordingFiles(finished.folder, payload);
+  return {
+    ok: true,
+    active: false,
+    folder: finished.folder,
+    meta
+  };
+}
+
 function onUdpMessage(msg) {
   udpByteEvents.push({ ts: Date.now(), bytes: msg.length });
   const hdr = parseHeader(msg);
@@ -716,6 +1024,22 @@ function onUdpMessage(msg) {
         format: sanitizeImageFormat(hdr.format),
         wireBytes
       };
+      if (backendRecording && backendRecording.active) {
+        const mode = modeName(hdr.mode);
+        if (backendRecording.sourceFrames[mode]) {
+          backendRecording.sourceFrames[mode].push({
+            mode,
+            client_ts_ms: nowMs,
+            frame_id: hdr.frameId >>> 0,
+            width: hdr.width,
+            height: hdr.height,
+            mime: contentTypeByImageFormat(sanitizeImageFormat(hdr.format)),
+            data_b64: image.toString('base64')
+          });
+          backendRecording.udpFrameCount += 1;
+          backendRecording.udpPacketBytes += wireBytes;
+        }
+      }
       
       broadcastWs('frame', {
         mode: hdr.mode,
@@ -829,6 +1153,12 @@ function startTcpReceiver() {
         if (line) {
           try {
             latestStatus = JSON.parse(line);
+            if (backendRecording && backendRecording.active) {
+              backendRecording.statusFrames.push({
+                client_ts_ms: Date.now(),
+                status: JSON.parse(JSON.stringify(latestStatus))
+              });
+            }
             broadcastWs('status', latestStatus);
           } catch (_) {
             // ignore malformed lines
@@ -903,6 +1233,18 @@ function startHttpServer() {
     }
     if (pathname === '/shared_receiver_core.js') {
       serveFile(res, path.join(PUBLIC_DIR, 'shared_receiver_core.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/receiver_frame_source.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'receiver_frame_source.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/receiver_recording.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'receiver_recording.js'), 'application/javascript; charset=utf-8');
+      return;
+    }
+    if (pathname === '/project_control.js') {
+      serveFile(res, path.join(PUBLIC_DIR, 'project_control.js'), 'application/javascript; charset=utf-8');
       return;
     }
     if (pathname === '/api/status') {
@@ -1123,6 +1465,77 @@ function startHttpServer() {
       return;
     }
 
+    if (pathname === '/api/project/status') {
+      getProjectStatus()
+        .then((result) => sendJson(res, result.ok ? 200 : 500, result))
+        .catch((err) => {
+          const target = getProjectControlTarget();
+          sendJson(res, 502, {
+            ok: false,
+            running: false,
+            pid: null,
+            message: String(err && err.message ? err.message : err),
+            target
+          });
+        });
+      return;
+    }
+
+    if (pathname === '/api/project/start' && req.method === 'POST') {
+      startProjectRemote()
+        .then((result) => sendJson(res, result.ok ? 200 : 500, result))
+        .catch((err) => {
+          const target = getProjectControlTarget();
+          sendJson(res, 502, {
+            ok: false,
+            running: false,
+            pid: null,
+            message: String(err && err.message ? err.message : err),
+            target
+          });
+        });
+      return;
+    }
+
+    if (pathname === '/api/project/stop' && req.method === 'POST') {
+      stopProjectRemote()
+        .then((result) => sendJson(res, result.ok ? 200 : 500, result))
+        .catch((err) => {
+          const target = getProjectControlTarget();
+          sendJson(res, 502, {
+            ok: false,
+            running: false,
+            pid: null,
+            message: String(err && err.message ? err.message : err),
+            target
+          });
+        });
+      return;
+    }
+
+    if (pathname === '/api/recordings/backend/status') {
+      sendJson(res, 200, backendRecordingStatusPayload());
+      return;
+    }
+
+    if (pathname === '/api/recordings/backend/start' && req.method === 'POST') {
+      try {
+        sendJson(res, 200, startBackendRecording());
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: String(err && err.message ? err.message : err) });
+      }
+      return;
+    }
+
+    if (pathname === '/api/recordings/backend/stop' && req.method === 'POST') {
+      try {
+        sendJson(res, 200, stopBackendRecording());
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: String(err && err.message ? err.message : err) });
+      }
+      return;
+    }
+
     if (pathname === '/api/frame_meta') {
       sendJson(res, 200, {
         gray: latestByMode[1],
@@ -1180,6 +1593,7 @@ function startHttpServer() {
 
       let status = null;
       let meta = null;
+      let sourceFrames = {};
       try {
         const statusPath = path.join(folderPath, 'status.json');
         if (fs.existsSync(statusPath)) {
@@ -1188,6 +1602,10 @@ function startHttpServer() {
         const metaPath = path.join(folderPath, 'meta.json');
         if (fs.existsSync(metaPath)) {
           meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+        }
+        const sourceFramesPath = path.join(folderPath, 'source_frames.json');
+        if (fs.existsSync(sourceFramesPath)) {
+          sourceFrames = JSON.parse(fs.readFileSync(sourceFramesPath, 'utf8'));
         }
       } catch (err) {
         sendJson(res, 500, { ok: false, error: String(err && err.message ? err.message : err) });
@@ -1210,7 +1628,21 @@ function startHttpServer() {
           videos[key] = `/api/recordings/file?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(name)}`;
         }
       }
-      sendJson(res, 200, { ok: true, folder, status, meta, videos });
+      const sourceFramesPayload = {};
+      if (sourceFrames && typeof sourceFrames === 'object') {
+        for (const [mode, frames] of Object.entries(sourceFrames)) {
+          if (!Array.isArray(frames)) continue;
+          sourceFramesPayload[mode] = frames.map((frame) => {
+            const fileName = typeof frame.file === 'string' ? frame.file : '';
+            return Object.assign({}, frame, {
+              url: fileName
+                ? `/api/recordings/file?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(fileName)}`
+                : ''
+            });
+          });
+        }
+      }
+      sendJson(res, 200, { ok: true, folder, status, meta, videos, source_frames: sourceFramesPayload });
       return;
     }
 
