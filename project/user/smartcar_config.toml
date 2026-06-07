@@ -63,10 +63,10 @@ cross_lower_corner_extrapolate_min_y = 35
 # 原图下角点外推补线的向上延伸行数。
 cross_lower_corner_extrapolate_y_span = 30
 # 原图直边判断时检查的边界前部点数。
-src_boundary_straight_check_count = 80
+src_boundary_straight_check_count = 40
 # 原图直边判断中 dir=4/5 的最小占比阈值。
 # 取值范围通常为 [0,1]。
-src_boundary_straight_dir45_ratio_min = 0.95
+src_boundary_straight_dir45_ratio_min = 0.98
 # 去畸变开关。
 # true 时使用相机标定参数做去畸变。
 undistort_enabled = false
@@ -135,7 +135,7 @@ route_cross_entry_corner_post_frame_wall_rows_min = 5
 # cross_1 进入 cross_2 的起始贴边连续行数阈值。
 route_cross_stage2_enter_start_frame_wall_rows_min = 1
 # cross_1 进入 cross_2 时角点 y 的最小阈值（任一侧满足即可）。
-route_cross_stage1_enter_corner_y_min = 75
+route_cross_stage1_enter_corner_y_min = 60
 # cross_2 退出到 normal 的起始左右边界 x 差最大阈值。
 route_cross_exit_start_gap_x_max = 155
 # cross_3 规则边界跳变检测阈值（相邻点 x 差）。
@@ -161,13 +161,13 @@ route_circle_entry_gap_check_rows = 0
 # 圆环入口判定中原始左右边界最小间距阈值。
 route_circle_entry_min_raw_boundary_gap = 0
 # 圆环入口判定中角点 y 最小阈值。
-route_circle_entry_corner_y_min = 60
+route_circle_entry_corner_y_min = 50
 # 圆环状态 1/5 进入下一阶段的起始贴边连续行数阈值。
-route_circle_stage_frame_wall_rows_enter = 30
+route_circle_stage_frame_wall_rows_enter = 10
 # 圆环状态 3 进入下一阶段的对侧起始贴边连续行数阈值。
-route_circle_stage3_frame_wall_rows_trigger = 70
+route_circle_stage3_frame_wall_rows_trigger = 30
 # 圆环状态 6 抬高迷宫法搜线起始行的上限（行号越小越靠上）。
-route_circle_stage6_maze_start_row = 80
+route_circle_stage6_maze_start_row = 110
 # 圆环状态 circle4/5 的目标中线相对左边界偏移。
 route_circle_center_target_offset_from_left_px = 15.0
 # 圆环补线中贴边连续段的最小长度阈值。
@@ -237,14 +237,14 @@ offset_ratio = 0.0
 enabled = true
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
-max_fps = 10
+max_fps = 25
 # 是否发送灰度图。
-send_gray_jpeg = true
+send_gray_jpeg = false
 # 灰度图发送格式。
 # 0=JPEG，1=PNG，2=BMP。
 gray_image_format = 0
 # 是否发送二值图。
-send_binary_jpeg = false
+send_binary_jpeg = true
 # 二值图发送格式。
 # 0=JPEG，1=PNG，2=BMP。
 binary_image_format = 0

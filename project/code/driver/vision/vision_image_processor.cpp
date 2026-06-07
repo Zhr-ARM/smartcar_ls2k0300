@@ -492,6 +492,7 @@ static int concatenate_boundary_segments(const maze_point_t *segment_a,
                                          maze_point_t *out_pts,
                                          int max_out_pts);
 static bool point_touches_artificial_frame(int x, int y);
+static bool point_touches_opposite_side_artificial_frame(int x, bool is_left_boundary);
 static bool init_undistort_remap_table();
 static bool init_ipm_forward_matrix();
 static bool ipm_point_to_src_point(int ipm_x, int ipm_y, int *src_x, int *src_y);
@@ -860,11 +861,6 @@ static void draw_binary_black_frame(uint8 *binary_img)
         binary_img[y * kProcWidth + 1] = 0;
         binary_img[y * kProcWidth + (kProcWidth - 2)] = 0;
         binary_img[y * kProcWidth + (kProcWidth - 1)] = 0;
-    }
-    for (int x = 0; x < kProcWidth; ++x)
-    {
-        binary_img[x] = 0;
-        binary_img[kProcWidth + x] = 0;
     }
 }
 
@@ -1808,7 +1804,7 @@ static bool detect_src_straight_boundary_from_dirs(const uint8 *dirs, int count)
     int dir45_count = 0;
     for (int i = 0; i < sample_count; ++i)
     {
-        if (cross_lower_pre_dir(dirs[i]))
+        if (dirs[i] == 4 || dirs[i] == 5)
         {
             ++dir45_count;
         }
@@ -3215,7 +3211,13 @@ static bool binary_point_in_trace_range(int x, int y, int y_min, int x_min, int 
 
 static bool point_touches_artificial_frame(int x, int y)
 {
-    return x <= 1 || x >= (kProcWidth - 2) || y <= 1;
+    (void)y;
+    return x <= 1 || x >= (kProcWidth - 2);
+}
+
+static bool point_touches_opposite_side_artificial_frame(int x, bool is_left_boundary)
+{
+    return is_left_boundary ? (x >= (kProcWidth - 2)) : (x <= 1);
 }
 
 static int trace_boundary_eight_neighbor(const uint8 *classify_img,
@@ -3256,6 +3258,10 @@ static int trace_boundary_eight_neighbor(const uint8 *classify_img,
             first_touch = step;
         }
         ++step;
+        if (point_touches_opposite_side_artificial_frame(x, prefer_left_bias))
+        {
+            break;
+        }
 
         maze_point_t candidates[8]{};
         int candidate_dirs[8]{};
