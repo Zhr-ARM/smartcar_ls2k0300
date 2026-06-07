@@ -10,7 +10,6 @@
 #include "screen_display_thread.h"
 #include "driver/pid/pid_tuning.h"
 #include "driver/config/smartcar_config.h"
-#include "driver/vision/vision_assistant_udp.h"
 #include "driver/vision/vision_config.h"
 #include "driver/vision/vision_infer_async.h"
 #include "driver/vision/vision_transport.h"
@@ -42,7 +41,6 @@ void cleanup_worker_threads_once()
     line_follow_thread_cleanup();
     vision_thread_cleanup();
     config_http_thread_cleanup();
-    vision_assistant_udp_cleanup();
     vision_transport_udp_cleanup();
     motor_thread_cleanup();
     imu_thread_cleanup();
@@ -212,26 +210,6 @@ int main(int, char**)
     }
     printf("[CONFIG_HTTP] ready=1 port=18080\r\n");
 
-    if (g_vision_runtime_config.assistant_udp_enabled)
-    {
-        if (!vision_assistant_udp_init(g_vision_runtime_config.assistant_server_ip,
-                                       g_vision_runtime_config.assistant_server_port))
-        {
-            printf("[ASSISTANT_UDP] init failed ip=%s port=%u\r\n",
-                   g_vision_runtime_config.assistant_server_ip,
-                   static_cast<unsigned int>(g_vision_runtime_config.assistant_server_port));
-        }
-        else
-        {
-            printf("[ASSISTANT_UDP] ready=1 ip=%s port=%u\r\n",
-                   g_vision_runtime_config.assistant_server_ip,
-                   static_cast<unsigned int>(g_vision_runtime_config.assistant_server_port));
-        }
-    }
-    else
-    {
-        printf("[ASSISTANT_UDP] disabled\r\n");
-    }
 
     // 初始化 UDP/TCP 到电脑端的数据通道（UDP=视频，TCP=状态）。
     if (!vision_transport_udp_init(g_vision_runtime_config.udp_web_server_ip,
@@ -301,13 +279,10 @@ int main(int, char**)
         return -1;
     }
 
-    // 下发视觉配置参数（按“网页发送 / 视觉处理 / 偏差计算”分组）。
+    // 下发视觉配置参数（按”网页发送 / 视觉处理 / 偏差计算”分组）。
     // [网页发送]
-    vision_thread_set_send_mode(static_cast<vision_thread_send_mode_enum>(g_vision_runtime_config.send_mode)); // 图像模式
-    vision_thread_set_send_max_fps(g_vision_runtime_config.send_max_fps); // 客户端发送限频
     vision_thread_set_infer_enabled(g_vision_runtime_config.infer_enabled); // 推理开关
     vision_thread_set_ncnn_enabled(g_vision_runtime_config.ncnn_enabled); // ncnn 子开关
-    vision_thread_set_client_sender_enabled(g_vision_runtime_config.client_sender_enabled); // 逐飞发送开关
 
     // [视觉处理]
     vision_image_processor_set_maze_start_row(g_vision_runtime_config.maze_start_row); // 迷宫法起始搜索行
@@ -340,12 +315,9 @@ int main(int, char**)
     vision_image_processor_set_ipm_line_error_index_range(g_vision_runtime_config.ipm_line_error_index_min,
                                                           g_vision_runtime_config.ipm_line_error_index_max); // line_error 随速度索引区间
 
-    printf("[VISION CFG] mode=%d max_fps=%u infer=%d ncnn=%d client_send=%d screen=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_angle_step=%d ipm_straight_min_pts=%d ipm_straight_check=%d ipm_straight_min_cos=%.2f ipm_track_w=%.2f ipm_target_left=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
-           static_cast<int>(vision_thread_get_send_mode()),
-           static_cast<unsigned int>(vision_thread_get_send_max_fps()),
+    printf("[VISION CFG] infer=%d ncnn=%d screen=%d maze_row=%d undistort=%d ipm_tri=%d ipm_resample=%d ipm_step=%.2f ipm_angle_step=%d ipm_straight_min_pts=%d ipm_straight_check=%d ipm_straight_min_cos=%.2f ipm_track_w=%.2f ipm_target_left=%.2f center_post=%d center_tri=%d center_resample=%d center_kappa_en=%d center_step=%.2f line_src=%d line_method=%d line_fixed_idx=%d line_weighted_cnt=%u line_speed_k=%.4f line_speed_b=%.2f line_idx_min=%d line_idx_max=%d\r\n",
            vision_thread_infer_enabled() ? 1 : 0,
            vision_thread_ncnn_enabled() ? 1 : 0,
-           vision_thread_client_sender_enabled() ? 1 : 0,
            g_vision_runtime_config.screen_display_enabled ? 1 : 0,
            vision_image_processor_get_maze_start_row(),
            vision_image_processor_undistort_enabled() ? 1 : 0,

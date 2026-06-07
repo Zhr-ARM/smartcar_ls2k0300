@@ -103,19 +103,6 @@ void screen_display_loop()
 
     while (g_screen_display_running.load())
     {
-        vision_thread_send_mode_enum mode = vision_thread_get_send_mode();
-
-        if (mode == VISION_THREAD_SEND_BINARY)
-        {
-            const uint8 *img = vision_image_processor_binary_downsampled_u8_image();
-            if (img != nullptr)
-            {
-                std::memcpy(img_snapshot.data(), img, VISION_PROC_WIDTH * VISION_PROC_HEIGHT);
-                // 二值图(0/255的数组)作为灰度图画出来就是黑白的
-                ips200_show_gray_image(0, 0, img_snapshot.data(), VISION_PROC_WIDTH, VISION_PROC_HEIGHT);
-            }
-        }
-        else // VISION_THREAD_SEND_GRAY
         {
             const uint8 *img = vision_image_processor_gray_downsampled_image();
             if (img != nullptr)

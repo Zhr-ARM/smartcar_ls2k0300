@@ -905,11 +905,8 @@ void apply_runtime_changes_after_commit()
     vision_transport_udp_set_max_fps(g_vision_runtime_config.udp_web_max_fps);
     vision_transport_udp_set_tcp_enabled(g_vision_runtime_config.udp_web_tcp_enabled);
 
-    vision_thread_set_send_mode(static_cast<vision_thread_send_mode_enum>(g_vision_runtime_config.send_mode));
-    vision_thread_set_send_max_fps(g_vision_runtime_config.send_max_fps);
     vision_thread_set_infer_enabled(g_vision_runtime_config.infer_enabled);
     vision_thread_set_ncnn_enabled(g_vision_runtime_config.ncnn_enabled);
-    vision_thread_set_client_sender_enabled(g_vision_runtime_config.client_sender_enabled);
 
     vision_image_processor_reload_config_from_globals();
     line_follow_thread_set_normal_speed_reference(pid_tuning::route_line_follow::kNormalProfile.base_speed);
