@@ -30,6 +30,9 @@ screen_display_enabled = false
 # 迷宫法起始搜索行。
 # 值越大越靠近图像底部。
 maze_start_row = 75
+# 预裁剪终止行（按 120 高基准定义）。
+# 实际生效行为：crop_row = round(pre_crop_row_ref120 / 120 * 当前未裁剪处理图高度)。
+pre_crop_row_ref120 = 75
 # 原图巡线方法。
 # 0=迷宫法，1=八邻域法。
 maze_trace_method = 1

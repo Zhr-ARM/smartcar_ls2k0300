@@ -54,6 +54,10 @@ void vision_image_processor_cleanup();
 // 返回：true=处理成功，false=当前周期未取到新帧。
 // 是否调用：是，vision_pipeline_process_step 每帧调用。
 bool vision_image_processor_process_step();
+// 当前处理图尺寸与 full 图裁剪窗口。
+void vision_image_processor_get_processed_size(int *w, int *h);
+void vision_image_processor_get_full_crop_rect(int *x, int *y, int *w, int *h);
+int vision_image_processor_get_effective_crop_row();
 // 作用：读取“最近一次成功完成处理”的视觉帧序号。
 // 约定：仅当 process_step 成功处理完一帧时递增，供控制层判断是否拿到了新视觉样本。
 uint32 vision_image_processor_processed_frame_seq();
@@ -212,7 +216,7 @@ void vision_image_processor_get_last_maze_detail_us(uint32 *maze_setup_us,
                                                     bool *right_ok);
 
 // 图像数据访问接口。
-// 当前阶段处理图像统一为 VISION_DOWNSAMPLED_WIDTH x VISION_DOWNSAMPLED_HEIGHT。
+// 当前阶段处理图像宽度固定为 VISION_DOWNSAMPLED_WIDTH，高度由运行时预裁剪决定。
 // 是否调用：被 transport/pipeline/web 状态发送等路径复用。
 const uint8 *vision_image_processor_gray_image();
 const uint8 *vision_image_processor_binary_u8_image();

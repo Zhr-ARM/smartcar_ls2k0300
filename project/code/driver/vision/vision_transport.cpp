@@ -318,8 +318,9 @@ static bool build_gray_image(std::vector<uint8> *image_out, int *width, int *hei
     {
         return false;
     }
-    const int w = VISION_DOWNSAMPLED_WIDTH;
-    const int h = VISION_DOWNSAMPLED_HEIGHT;
+    int w = VISION_DOWNSAMPLED_WIDTH;
+    int h = VISION_DOWNSAMPLED_HEIGHT;
+    vision_image_processor_get_processed_size(&w, &h);
     const uint8 *gray = vision_image_processor_gray_downsampled_image();
     const vision_web_image_format_enum format =
         sanitize_web_image_format(g_vision_runtime_config.udp_web_gray_image_format);
@@ -339,8 +340,9 @@ static bool build_binary_image(std::vector<uint8> *image_out, int *width, int *h
     {
         return false;
     }
-    const int w = VISION_DOWNSAMPLED_WIDTH;
-    const int h = VISION_DOWNSAMPLED_HEIGHT;
+    int w = VISION_DOWNSAMPLED_WIDTH;
+    int h = VISION_DOWNSAMPLED_HEIGHT;
+    vision_image_processor_get_processed_size(&w, &h);
     const uint8 *binary = vision_image_processor_binary_downsampled_u8_image();
     const vision_web_image_format_enum format =
         sanitize_web_image_format(g_vision_runtime_config.udp_web_binary_image_format);
@@ -360,8 +362,9 @@ static bool build_rgb_image(std::vector<uint8> *image_out, int *width, int *heig
     {
         return false;
     }
-    const int w = VISION_DOWNSAMPLED_WIDTH;
-    const int h = VISION_DOWNSAMPLED_HEIGHT;
+    int w = VISION_DOWNSAMPLED_WIDTH;
+    int h = VISION_DOWNSAMPLED_HEIGHT;
+    vision_image_processor_get_processed_size(&w, &h);
     const uint8 *bgr = vision_image_processor_bgr_downsampled_image();
     if (bgr == nullptr)
     {
@@ -431,7 +434,10 @@ static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *he
     }
     else if (const uint8 *bgr = vision_image_processor_bgr_downsampled_image())
     {
-        cv::Mat full(VISION_DOWNSAMPLED_HEIGHT, VISION_DOWNSAMPLED_WIDTH, CV_8UC3, const_cast<uint8 *>(bgr));
+        int proc_w = VISION_DOWNSAMPLED_WIDTH;
+        int proc_h = VISION_DOWNSAMPLED_HEIGHT;
+        vision_image_processor_get_processed_size(&proc_w, &proc_h);
+        cv::Mat full(proc_h, proc_w, CV_8UC3, const_cast<uint8 *>(bgr));
         cv::Rect safe = roi_rect & cv::Rect(0, 0, full.cols, full.rows);
         if (safe.width <= 0 || safe.height <= 0)
         {
@@ -452,7 +458,10 @@ static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *he
         {
             return false;
         }
-        cv::Mat full(VISION_DOWNSAMPLED_HEIGHT, VISION_DOWNSAMPLED_WIDTH, CV_8UC1, const_cast<uint8 *>(gray));
+        int proc_w = VISION_DOWNSAMPLED_WIDTH;
+        int proc_h = VISION_DOWNSAMPLED_HEIGHT;
+        vision_image_processor_get_processed_size(&proc_w, &proc_h);
+        cv::Mat full(proc_h, proc_w, CV_8UC1, const_cast<uint8 *>(gray));
         cv::Rect safe = roi_rect & cv::Rect(0, 0, full.cols, full.rows);
         if (safe.width <= 0 || safe.height <= 0)
         {
@@ -827,7 +836,10 @@ static void send_tcp_status()
         for (int i = 0; i < rows_to_check; ++i)
         {
             const int target_y = start_y - i;
-            if (target_y <= 0 || target_y >= (VISION_DOWNSAMPLED_HEIGHT - 1))
+            int proc_w = VISION_DOWNSAMPLED_WIDTH;
+            int proc_h = VISION_DOWNSAMPLED_HEIGHT;
+            vision_image_processor_get_processed_size(&proc_w, &proc_h);
+            if (target_y <= 0 || target_y >= (proc_h - 1))
             {
                 debug.failed_row_y = target_y;
                 return debug;
@@ -1175,8 +1187,10 @@ static void send_tcp_status()
         append_pid_debug(true);
         append_bool(true, "udp_web_send_roi64", roi_valid);
         append_int_array(true, "roi64_size", {kRoi64Size, kRoi64Size});
-        append_int_array(true, "gray_size",
-                         {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
+        int proc_w = VISION_DOWNSAMPLED_WIDTH;
+        int proc_h = VISION_DOWNSAMPLED_HEIGHT;
+        vision_image_processor_get_processed_size(&proc_w, &proc_h);
+        append_int_array(true, "gray_size", {proc_w, proc_h});
         line += "}";
         line += "\n";
         tcp_client_send_data(reinterpret_cast<const uint8 *>(line.data()), static_cast<uint32>(line.size()));
@@ -1386,38 +1400,41 @@ static void send_tcp_status()
         line += "]";
     };
 
+    int proc_w = VISION_DOWNSAMPLED_WIDTH;
+    int proc_h = VISION_DOWNSAMPLED_HEIGHT;
+    vision_image_processor_get_processed_size(&proc_w, &proc_h);
     append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
-                  "left_boundary", x1, y1, left_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+                  "left_boundary", x1, y1, left_dot_num, proc_w, proc_h);
     append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
-                  "right_boundary", x3, y3, right_dot_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+                  "right_boundary", x3, y3, right_dot_num, proc_w, proc_h);
     append_points(true,
                   "left_circle_guide_line",
                   src_left_circle_guide_x,
                   src_left_circle_guide_y,
                   src_left_circle_guide_num,
-                  VISION_DOWNSAMPLED_WIDTH,
-                  VISION_DOWNSAMPLED_HEIGHT);
+                  proc_w,
+                  proc_h);
     append_points(true,
                   "right_circle_guide_line",
                   src_right_circle_guide_x,
                   src_right_circle_guide_y,
                   src_right_circle_guide_num,
-                  VISION_DOWNSAMPLED_WIDTH,
-                  VISION_DOWNSAMPLED_HEIGHT);
+                  proc_w,
+                  proc_h);
     append_points(true,
                   "cross_left_aux_trace",
                   cross_left_aux_trace_x,
                   cross_left_aux_trace_y,
                   cross_left_aux_trace_num,
-                  VISION_DOWNSAMPLED_WIDTH,
-                  VISION_DOWNSAMPLED_HEIGHT);
+                  proc_w,
+                  proc_h);
     append_points(true,
                   "cross_right_aux_trace",
                   cross_right_aux_trace_x,
                   cross_right_aux_trace_y,
                   cross_right_aux_trace_num,
-                  VISION_DOWNSAMPLED_WIDTH,
-                  VISION_DOWNSAMPLED_HEIGHT);
+                  proc_w,
+                  proc_h);
     append_u8_array(true, "cross_left_aux_trace_dir", cross_left_aux_trace_dir, cross_left_aux_trace_num);
     append_u8_array(true, "cross_right_aux_trace_dir", cross_right_aux_trace_dir, cross_right_aux_trace_num);
     append_points(true,
@@ -1425,19 +1442,19 @@ static void send_tcp_status()
                   cross_left_aux_regular_x,
                   cross_left_aux_regular_y,
                   cross_left_aux_regular_num,
-                  VISION_DOWNSAMPLED_WIDTH,
-                  VISION_DOWNSAMPLED_HEIGHT);
+                  proc_w,
+                  proc_h);
     append_points(true,
                   "cross_right_aux_regular",
                   cross_right_aux_regular_x,
                   cross_right_aux_regular_y,
                   cross_right_aux_regular_num,
-                  VISION_DOWNSAMPLED_WIDTH,
-                  VISION_DOWNSAMPLED_HEIGHT);
+                  proc_w,
+                  proc_h);
     append_points(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
-                  "eight_left_trace", eight_left_x, eight_left_y, eight_left_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+                  "eight_left_trace", eight_left_x, eight_left_y, eight_left_num, proc_w, proc_h);
     append_points(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
-                  "eight_right_trace", eight_right_x, eight_right_y, eight_right_num, VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT);
+                  "eight_right_trace", eight_right_x, eight_right_y, eight_right_num, proc_w, proc_h);
     append_u8_array(g_vision_runtime_config.udp_web_tcp_send_left_boundary,
                     "eight_left_trace_dir", eight_left_dir, eight_left_num);
     append_u8_array(g_vision_runtime_config.udp_web_tcp_send_right_boundary,
@@ -1539,8 +1556,8 @@ static void send_tcp_status()
                   selected_src_center_x,
                   selected_src_center_y,
                   selected_src_center_num,
-                  VISION_DOWNSAMPLED_WIDTH,
-                  VISION_DOWNSAMPLED_HEIGHT);
+                  proc_w,
+                  proc_h);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_centerline_selected_count,
                "ipm_centerline_selected_count",
                selected_ipm_center_num);
@@ -1548,7 +1565,7 @@ static void send_tcp_status()
                "src_centerline_selected_count",
                selected_src_center_num);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_gray_size, "gray_size",
-                     {VISION_DOWNSAMPLED_WIDTH, VISION_DOWNSAMPLED_HEIGHT});
+                     {proc_w, proc_h});
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_ipm_size, "ipm_size",
                      {kIpmCanvasWidth, kIpmCanvasHeight});
 

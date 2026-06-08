@@ -703,13 +703,14 @@ void vision_infer_async_submit_frame(const uint8 *bgr_proc_data,
     {
         return;
     }
-    // 尺寸不匹配时直接丢弃（保护当前固定分辨率流程）。
-    if (proc_width != kProcWidth || proc_height != kProcHeight || full_width != kFullWidth || full_height != kFullHeight)
+    // 宽度与 full 尺寸仍需匹配；处理图高度允许在预裁剪后动态变化。
+    if (proc_width != kProcWidth || proc_height <= 0 || proc_height > kProcHeight ||
+        full_width != kFullWidth || full_height != kFullHeight)
     {
         return;
     }
 
-    cv::Mat proc_frame(kProcHeight, kProcWidth, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
+    cv::Mat proc_frame(proc_height, kProcWidth, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
     {
         std::lock_guard<std::mutex> lock(g_infer_mutex);
         g_infer_job.proc_bgr = proc_frame.clone();

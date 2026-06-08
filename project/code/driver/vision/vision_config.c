@@ -260,6 +260,8 @@ vision_runtime_config_t g_vision_runtime_config = {
     // 说明：视觉处理链参数（迷宫法、去畸变、IPM 边界/中线后处理）集中在这里。
     // 迷宫法左右起点搜索行，值越大越靠近图像底部。
     .maze_start_row = 100,
+    // 预裁剪终止行（按 120 高基准定义）。
+    .pre_crop_row_ref120 = 75,
     // 原图巡线方法：0=迷宫法，1=八邻域法。
     .maze_trace_method = 1,
     // 迷宫法巡线回退停止阈值（y > min_y + 阈值即停）。

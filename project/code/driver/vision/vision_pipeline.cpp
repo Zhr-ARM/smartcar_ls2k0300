@@ -212,12 +212,28 @@ static cv::Rect map_full_rect_to_proc_rect(int x, int y, int w, int h)
     {
         return cv::Rect();
     }
-    const int x0 = static_cast<int>(std::floor(static_cast<double>(x) * kProcWidth / kFullWidth));
-    const int y0 = static_cast<int>(std::floor(static_cast<double>(y) * kProcHeight / kFullHeight));
-    const int x1 = static_cast<int>(std::ceil(static_cast<double>(x + w) * kProcWidth / kFullWidth));
-    const int y1 = static_cast<int>(std::ceil(static_cast<double>(y + h) * kProcHeight / kFullHeight));
+    int crop_x = 0;
+    int crop_y = 0;
+    int crop_w = kFullWidth;
+    int crop_h = kFullHeight;
+    int proc_w = kProcWidth;
+    int proc_h = kProcHeight;
+    vision_image_processor_get_full_crop_rect(&crop_x, &crop_y, &crop_w, &crop_h);
+    vision_image_processor_get_processed_size(&proc_w, &proc_h);
+    if (crop_w <= 0 || crop_h <= 0 || proc_w <= 0 || proc_h <= 0)
+    {
+        return cv::Rect();
+    }
+    const double local_x0 = static_cast<double>(x - crop_x);
+    const double local_y0 = static_cast<double>(y - crop_y);
+    const double local_x1 = static_cast<double>(x + w - crop_x);
+    const double local_y1 = static_cast<double>(y + h - crop_y);
+    const int x0 = static_cast<int>(std::floor(local_x0 * proc_w / crop_w));
+    const int y0 = static_cast<int>(std::floor(local_y0 * proc_h / crop_h));
+    const int x1 = static_cast<int>(std::ceil(local_x1 * proc_w / crop_w));
+    const int y1 = static_cast<int>(std::ceil(local_y1 * proc_h / crop_h));
     return cv::Rect(x0, y0, std::max(0, x1 - x0), std::max(0, y1 - y0)) &
-           cv::Rect(0, 0, kProcWidth, kProcHeight);
+           cv::Rect(0, 0, proc_w, proc_h);
 }
 
 // 作用：清空 image_processor 内缓存的推理结果。
@@ -281,7 +297,10 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
                                                               result->ncnn_roi_h);
     if (bgr_proc_data != nullptr)
     {
-        cv::Mat proc_frame(kProcHeight, kProcWidth, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
+        int proc_w = kProcWidth;
+        int proc_h = kProcHeight;
+        vision_image_processor_get_processed_size(&proc_w, &proc_h);
+        cv::Mat proc_frame(proc_h, proc_w, CV_8UC3, const_cast<uint8 *>(bgr_proc_data));
         if (red_proc_rect.width > 0 && red_proc_rect.height > 0)
         {
             cv::rectangle(proc_frame, red_proc_rect, cv::Scalar(0, 0, 255), 1, cv::LINE_8);
@@ -293,7 +312,10 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
     }
     if (gray_data != nullptr)
     {
-        cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, const_cast<uint8 *>(gray_data));
+        int proc_w = kProcWidth;
+        int proc_h = kProcHeight;
+        vision_image_processor_get_processed_size(&proc_w, &proc_h);
+        cv::Mat gray(proc_h, proc_w, CV_8UC1, const_cast<uint8 *>(gray_data));
         if (red_proc_rect.width > 0 && red_proc_rect.height > 0)
         {
             cv::rectangle(gray, red_proc_rect, cv::Scalar(200), 1, cv::LINE_8);
@@ -356,9 +378,12 @@ bool vision_pipeline_process_step()
     }
 
     // 3) 提交当前帧到异步推理线程（不会阻塞主线程）。
+    int proc_w = kProcWidth;
+    int proc_h = kProcHeight;
+    vision_image_processor_get_processed_size(&proc_w, &proc_h);
     vision_infer_async_submit_frame(bgr_proc_data,
-                                    kProcWidth,
-                                    kProcHeight,
+                                    proc_w,
+                                    proc_h,
                                     bgr_full_data,
                                     kFullWidth,
                                     kFullHeight);

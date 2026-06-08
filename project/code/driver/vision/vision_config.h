@@ -185,6 +185,9 @@ typedef struct
     // 包括迷宫法起点、去畸变、IPM 边界/中线后处理。
     // 迷宫法左右起点搜索行，固定单行搜索。
     int maze_start_row;
+    // 预裁剪终止行（按 120 高参考定义）。
+    // 实际生效行为：effective_crop_row = round(pre_crop_row_ref120 / 120.0 * base_proc_height)。
+    int pre_crop_row_ref120;
     // 原图巡线方法：0=迷宫法，1=八邻域法。
     int maze_trace_method;
     // 迷宫法巡线回退停止阈值：若后续 y > 当前最小 y + 阈值，则停止巡线。

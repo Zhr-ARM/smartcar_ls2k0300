@@ -1078,6 +1078,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
     if (!require_size_t(values, &consumed, "vision.runtime." #name, &g_vision_runtime_config.name, error_message)) return false
 
     REQUIRE_RUNTIME_INT(maze_start_row);
+    REQUIRE_RUNTIME_INT(pre_crop_row_ref120);
     REQUIRE_RUNTIME_INT(maze_trace_method);
     REQUIRE_RUNTIME_INT(maze_trace_y_fallback_stop_delta);
     REQUIRE_RUNTIME_BOOL(cross_lower_corner_dir_enabled);

@@ -266,9 +266,18 @@ static std::atomic<uint32> g_processed_frame_seq(0);
 // 记录“最近一次成功识别”的左右起点 x，用于下一帧起点搜索偏移。
 static int g_last_maze_left_start_x = -1;
 static int g_last_maze_right_start_x = -1;
+// 当前处理图有效尺寸与 full 图裁剪窗口。
+static std::atomic<int> g_processed_width(kProcWidth);
+static std::atomic<int> g_processed_height(kProcHeight);
+static std::atomic<int> g_effective_crop_row(kProcHeight - 1);
+static std::atomic<int> g_full_crop_x(0);
+static std::atomic<int> g_full_crop_y(0);
+static std::atomic<int> g_full_crop_w(UVC_WIDTH);
+static std::atomic<int> g_full_crop_h(UVC_HEIGHT);
 
 // 迷宫法起始搜索行（可运行时配置）。
 static std::atomic<int> g_maze_start_row(g_vision_runtime_config.maze_start_row);
+static std::atomic<int> g_pre_crop_row_ref120(g_vision_runtime_config.pre_crop_row_ref120);
 static std::atomic<int> g_maze_trace_method(g_vision_runtime_config.maze_trace_method);
 static std::atomic<int> g_maze_trace_y_fallback_stop_delta(g_vision_runtime_config.maze_trace_y_fallback_stop_delta);
 static std::atomic<bool> g_cross_lower_corner_dir_enabled(g_vision_runtime_config.cross_lower_corner_dir_enabled);
@@ -314,6 +323,37 @@ static int g_last_applied_line_error_profile_id = -1;
 // 对外暴露控制量（line_follow_thread 直接读取）。
 int line_error = 0;
 float line_sample_ratio = g_vision_processor_config.default_line_sample_ratio;
+
+static inline int current_proc_width()
+{
+    return kProcWidth;
+}
+
+static inline int current_base_proc_height()
+{
+    return std::max(1, UVC_HEIGHT / 2);
+}
+
+static inline int current_proc_height()
+{
+    return std::clamp(g_processed_height.load(), 1, kProcHeight);
+}
+
+static inline int clamp_ref120_crop_row(int ref120_row)
+{
+    return std::clamp(ref120_row, 1, kRefProcHeight - 1);
+}
+
+static inline int effective_crop_row_from_ref120(int ref120_row)
+{
+    const int base_height = current_base_proc_height();
+    const int safe_ref120 = clamp_ref120_crop_row(ref120_row);
+    return std::clamp(static_cast<int>(std::lround(static_cast<double>(safe_ref120) *
+                                                   static_cast<double>(base_height) /
+                                                   static_cast<double>(kRefProcHeight))),
+                      3,
+                      std::max(3, base_height - 1));
+}
 
 static bool route_sub_state_is_left_circle(int sub_state)
 {
@@ -744,9 +784,9 @@ static uint8 compute_global_otsu_threshold_u8(const uint8 *gray_img)
 
     std::array<uint32, 256> histogram{};
     uint64_t gray_sum = 0;
-    constexpr int kPixelCount = kProcWidth * kProcHeight;
+    const int pixel_count = kProcWidth * current_proc_height();
 
-    for (int i = 0; i < kPixelCount; ++i)
+    for (int i = 0; i < pixel_count; ++i)
     {
         uint8 v = gray_img[i];
         ++histogram[v];
@@ -766,7 +806,7 @@ static uint8 compute_global_otsu_threshold_u8(const uint8 *gray_img)
             continue;
         }
 
-        uint32 weight_fg = static_cast<uint32>(kPixelCount) - weight_bg;
+        uint32 weight_fg = static_cast<uint32>(pixel_count) - weight_bg;
         if (weight_fg == 0)
         {
             break;
@@ -807,10 +847,16 @@ static void build_binary_image_from_gray_threshold(const uint8 *gray_img, uint8 
         return;
     }
 
-    constexpr int kPixelCount = kProcWidth * kProcHeight;
-    for (int i = 0; i < kPixelCount; ++i)
+    const int pixel_count = kProcWidth * current_proc_height();
+    for (int i = 0; i < pixel_count; ++i)
     {
         g_image_binary_u8[i] = (gray_img[i] > threshold) ? static_cast<uint8>(255) : static_cast<uint8>(0);
+    }
+    if (pixel_count < (kProcWidth * kProcHeight))
+    {
+        std::fill_n(g_image_binary_u8 + pixel_count,
+                    (kProcWidth * kProcHeight) - pixel_count,
+                    static_cast<uint8>(0));
     }
 }
 
@@ -821,7 +867,8 @@ static void filter_binary_image_inplace(uint8 *binary_img)
         return;
     }
 
-    for (int y = 1; y < kProcHeight - 1; ++y)
+    const int proc_height = current_proc_height();
+    for (int y = 1; y < proc_height - 1; ++y)
     {
         for (int x = 1; x < kProcWidth - 1; ++x)
         {
@@ -855,12 +902,17 @@ static void draw_binary_black_frame(uint8 *binary_img)
         return;
     }
 
-    for (int y = 0; y < kProcHeight; ++y)
+    const int proc_height = current_proc_height();
+    for (int y = 0; y < proc_height; ++y)
     {
         binary_img[y * kProcWidth + 0] = 0;
         binary_img[y * kProcWidth + 1] = 0;
         binary_img[y * kProcWidth + (kProcWidth - 2)] = 0;
         binary_img[y * kProcWidth + (kProcWidth - 1)] = 0;
+    }
+    for (int y = proc_height; y < kProcHeight; ++y)
+    {
+        std::fill_n(binary_img + y * kProcWidth, kProcWidth, static_cast<uint8>(0));
     }
 }
 
@@ -1505,7 +1557,7 @@ static int build_line_points_between_with_y_step(const maze_point_t &a,
 
     if (out_num < max_out_pts)
     {
-        const maze_point_t end_point{std::clamp(b.x, 0, kProcWidth - 1), std::clamp(b.y, 0, kProcHeight - 1)};
+        const maze_point_t end_point{std::clamp(b.x, 0, kProcWidth - 1), std::clamp(b.y, 0, current_proc_height() - 1)};
         if (out_num <= 0 || out_pts[out_num - 1].x != end_point.x || out_pts[out_num - 1].y != end_point.y)
         {
             out_pts[out_num++] = end_point;
@@ -1524,7 +1576,7 @@ static int find_first_frame_touch_index_with_margin(const maze_point_t *pts, int
 
     const int safe_margin = std::max(0, margin_px);
     const int right_limit = std::max(0, kProcWidth - 1 - safe_margin);
-    const int bottom_limit = std::max(0, kProcHeight - 1 - safe_margin);
+    const int bottom_limit = std::max(0, current_proc_height() - 1 - safe_margin);
     int out = 0;
     for (int i = 0; i < num && out < VISION_BOUNDARY_NUM; ++i)
     {
@@ -1977,8 +2029,9 @@ static bool init_undistort_remap_table()
         return true;
     }
 
-    g_undistort_map_x = cv::Mat(kProcHeight, kProcWidth, CV_32FC1);
-    g_undistort_map_y = cv::Mat(kProcHeight, kProcWidth, CV_32FC1);
+    const int base_proc_height = current_base_proc_height();
+    g_undistort_map_x = cv::Mat(base_proc_height, kProcWidth, CV_32FC1);
+    g_undistort_map_y = cv::Mat(base_proc_height, kProcWidth, CV_32FC1);
 
     const double fx = g_vision_processor_config.camera_matrix[0][0];
     const double fy = g_vision_processor_config.camera_matrix[1][1];
@@ -1998,7 +2051,7 @@ static bool init_undistort_remap_table()
     const int move_x = g_vision_processor_config.undistort_move_x;
     const int move_y = g_vision_processor_config.undistort_move_y;
 
-    for (int y = 0; y < kProcHeight; ++y)
+    for (int y = 0; y < base_proc_height; ++y)
     {
         float *row_x = g_undistort_map_x.ptr<float>(y);
         float *row_y = g_undistort_map_y.ptr<float>(y);
@@ -3203,8 +3256,9 @@ static inline bool pixel_is_path(const uint8 *img, int x, int y, uint8 white_thr
 
 static bool binary_point_in_trace_range(int x, int y, int y_min, int x_min, int x_max)
 {
+    const int proc_height = current_proc_height();
     return x > 0 && x < (kProcWidth - 1) &&
-           y > 0 && y < (kProcHeight - 1) &&
+           y > 0 && y < (proc_height - 1) &&
            x >= x_min && x <= x_max &&
            y >= y_min;
 }
@@ -4093,27 +4147,49 @@ bool vision_image_processor_process_step()
 
     auto t_pre_start = t1;
 
-    // 处理分辨率固定为 kProcWidth x kProcHeight（160x120）。
-    // 当前默认采图为 320x240，因此除 ncnn 高清 ROI 外，主处理链在这里降采样到 160x120。
-    // 在“未开启去畸变”路径也需要先正确缩放，再进入灰度/二值/巡线流程。
+    // 处理图宽度固定 160，高度由预裁剪参数按当前基础处理高度换算后动态决定。
     cv::Mat bgr_full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, g_image_bgr_full);
-    cv::Mat bgr(kProcHeight, kProcWidth, CV_8UC3, g_image_bgr);
+    const int base_proc_height = current_base_proc_height();
+    const int effective_crop_row = effective_crop_row_from_ref120(g_pre_crop_row_ref120.load());
+    const int proc_height = std::clamp(effective_crop_row, 1, base_proc_height - 1);
+    const int full_crop_height = std::clamp(proc_height * 2, 2, UVC_HEIGHT);
+    g_processed_width.store(kProcWidth);
+    g_processed_height.store(proc_height);
+    g_effective_crop_row.store(effective_crop_row);
+    g_full_crop_x.store(0);
+    g_full_crop_y.store(0);
+    g_full_crop_w.store(UVC_WIDTH);
+    g_full_crop_h.store(full_crop_height);
+    cv::Rect full_crop_rect(0, 0, UVC_WIDTH, full_crop_height);
+    cv::Mat bgr(proc_height, kProcWidth, CV_8UC3, g_image_bgr);
     if (g_undistort_enabled.load() && init_undistort_remap_table())
     {
-        cv::remap(bgr_full, bgr, g_undistort_map_x, g_undistort_map_y, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+        cv::Mat base_proc(base_proc_height, kProcWidth, CV_8UC3);
+        cv::remap(bgr_full, base_proc, g_undistort_map_x, g_undistort_map_y, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+        base_proc(cv::Rect(0, 0, kProcWidth, proc_height)).copyTo(bgr);
     }
     else
     {
-        if (UVC_WIDTH == kProcWidth && UVC_HEIGHT == kProcHeight)
+        if (UVC_WIDTH == kProcWidth && UVC_HEIGHT == proc_height)
         {
-            std::memcpy(g_image_bgr, g_image_bgr_full, sizeof(g_image_bgr));
+            std::memcpy(g_image_bgr, g_image_bgr_full, static_cast<size_t>(kProcWidth * proc_height * 3));
         }
         else
         {
-            cv::resize(bgr_full, bgr, cv::Size(kProcWidth, kProcHeight), 0.0, 0.0, cv::INTER_AREA);
+            cv::Mat cropped = bgr_full(full_crop_rect);
+            cv::resize(cropped, bgr, cv::Size(kProcWidth, proc_height), 0.0, 0.0, cv::INTER_AREA);
         }
     }
-    cv::Mat gray(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
+    if (proc_height < kProcHeight)
+    {
+        std::fill_n(g_image_bgr + static_cast<size_t>(kProcWidth * proc_height * 3),
+                    static_cast<size_t>(kProcWidth * (kProcHeight - proc_height) * 3),
+                    static_cast<uint8>(0));
+        std::fill_n(g_image_gray + static_cast<size_t>(kProcWidth * proc_height),
+                    static_cast<size_t>(kProcWidth * (kProcHeight - proc_height)),
+                    static_cast<uint8>(0));
+    }
+    cv::Mat gray(proc_height, kProcWidth, CV_8UC1, g_image_gray);
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
 
     // 斑马线检测：在灰度图 y=40 行按步长 3 采样，统计相邻采样点灰度跳变次数。
@@ -4122,8 +4198,8 @@ bool vision_image_processor_process_step()
     {
         const int jump_count = count_gray_row_threshold_jumps(g_image_gray,
                                                               kProcWidth,
-                                                              kProcHeight,
-                                                              80,
+                                                              proc_height,
+                                                              std::min(80, proc_height - 1),
                                                               3,
                                                               50);
         if (jump_count > 7)
@@ -4143,8 +4219,8 @@ bool vision_image_processor_process_step()
     }
     else
     {
-        cv::Mat gray_ipm(kProcHeight, kProcWidth, CV_8UC1, g_image_gray);
-        cv::Mat binary(kProcHeight, kProcWidth, CV_8UC1, g_image_binary_u8);
+        cv::Mat gray_ipm(proc_height, kProcWidth, CV_8UC1, g_image_gray);
+        cv::Mat binary(proc_height, kProcWidth, CV_8UC1, g_image_binary_u8);
         const double otsu_value = cv::threshold(gray_ipm, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
         otsu_threshold = static_cast<uint8>(std::clamp(static_cast<int>(std::lround(otsu_value)), 0, 255));
     }
@@ -4154,7 +4230,7 @@ bool vision_image_processor_process_step()
     auto t_otsu_end = std::chrono::steady_clock::now();
 
     auto t_maze_start = t_otsu_end;
-    const int y_min = std::max(1, kProcHeight - (kProcHeight * g_vision_processor_config.maze_lower_region_percent) / 100);
+    const int y_min = std::max(1, proc_height - (proc_height * g_vision_processor_config.maze_lower_region_percent) / 100);
     const uint8 *classify_img = g_image_binary_u8;
     uint8 classify_white_threshold = 127;
 
@@ -4249,7 +4325,7 @@ bool vision_image_processor_process_step()
 
     get_maze_trace_x_range_clamped(&maze_trace_x_min, &maze_trace_x_max);
     const int fallback_center_x = std::clamp(previous_src_centerline_first_x(), maze_trace_x_min, maze_trace_x_max);
-    int maze_start_row = std::clamp(g_maze_start_row.load(), 1, kProcHeight - 2);
+    int maze_start_row = std::clamp(g_maze_start_row.load(), 1, proc_height - 2);
     const vision_route_state_snapshot_t route_snapshot_before_trace = vision_route_state_machine_snapshot();
     const bool left_circle_stage6_active =
         (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CIRCLE) &&
@@ -4277,7 +4353,7 @@ bool vision_image_processor_process_step()
     {
         maze_start_row = std::clamp(std::min(maze_start_row, g_vision_runtime_config.route_circle_stage6_maze_start_row),
                                     1,
-                                    kProcHeight - 2);
+                                    proc_height - 2);
     }
 
     // 起点搜索改为“基于同侧历史起点向对侧偏移10像素”：
@@ -5543,9 +5619,29 @@ uint32 vision_image_processor_processed_frame_seq()
     return g_processed_frame_seq.load();
 }
 
+void vision_image_processor_get_processed_size(int *w, int *h)
+{
+    if (w) *w = current_proc_width();
+    if (h) *h = current_proc_height();
+}
+
+void vision_image_processor_get_full_crop_rect(int *x, int *y, int *w, int *h)
+{
+    if (x) *x = g_full_crop_x.load();
+    if (y) *y = g_full_crop_y.load();
+    if (w) *w = g_full_crop_w.load();
+    if (h) *h = g_full_crop_h.load();
+}
+
+int vision_image_processor_get_effective_crop_row()
+{
+    return g_effective_crop_row.load();
+}
+
 void vision_image_processor_reload_config_from_globals()
 {
     g_maze_start_row.store(g_vision_runtime_config.maze_start_row);
+    g_pre_crop_row_ref120.store(clamp_ref120_crop_row(g_vision_runtime_config.pre_crop_row_ref120));
     g_maze_trace_method.store(g_vision_runtime_config.maze_trace_method);
     g_maze_trace_y_fallback_stop_delta.store(g_vision_runtime_config.maze_trace_y_fallback_stop_delta);
     g_cross_lower_corner_dir_enabled.store(g_vision_runtime_config.cross_lower_corner_dir_enabled);
@@ -5590,8 +5686,8 @@ void vision_image_processor_reload_config_from_globals()
 
 void vision_image_processor_set_maze_start_row(int row)
 {
-    // 如何修改：建议保持在 [1, kProcHeight-2] 内。
-    g_maze_start_row.store(std::clamp(row, 1, kProcHeight - 2));
+    // 如何修改：建议保持在 [1, 当前处理图高-2] 内。
+    g_maze_start_row.store(std::clamp(row, 1, current_proc_height() - 2));
 }
 
 int vision_image_processor_get_maze_start_row()
@@ -6319,14 +6415,15 @@ int vision_image_processor_get_red_rect_area()
 
 void vision_image_processor_set_red_rect(bool found, int x, int y, int w, int h, int cx, int cy, int area)
 {
+    const int proc_height = current_proc_height();
     std::lock_guard<std::mutex> lk(g_detect_result_mutex);
     g_red_rect_found = found;
     g_red_rect_x = std::clamp(x, 0, kProcWidth - 1);
-    g_red_rect_y = std::clamp(y, 0, kProcHeight - 1);
+    g_red_rect_y = std::clamp(y, 0, proc_height - 1);
     g_red_rect_w = std::clamp(w, 0, kProcWidth);
-    g_red_rect_h = std::clamp(h, 0, kProcHeight);
+    g_red_rect_h = std::clamp(h, 0, proc_height);
     g_red_rect_cx = std::clamp(cx, 0, kProcWidth - 1);
-    g_red_rect_cy = std::clamp(cy, 0, kProcHeight - 1);
+    g_red_rect_cy = std::clamp(cy, 0, proc_height - 1);
     g_red_rect_area = std::max(0, area);
 }
 
