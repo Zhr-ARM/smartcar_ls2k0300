@@ -144,10 +144,10 @@ route_cross_stage3_jump_x_threshold_px = 15
 route_cross_stage3_cut_forward_points = 8
 # cross_3 左侧桥接锚点坐标。
 route_cross_stage3_left_anchor_x = 15
-route_cross_stage3_left_anchor_y = 100
+route_cross_stage3_left_anchor_y = 75
 # cross_3 右侧桥接锚点坐标。
 route_cross_stage3_right_anchor_x = 145
-route_cross_stage3_right_anchor_y = 100
+route_cross_stage3_right_anchor_y = 75
 # 圆环状态识别开关。
 route_circle_detection_enabled = true
 # 圆环入口判定中对侧边界最少点数要求。
@@ -185,7 +185,7 @@ route_straight_enter_consecutive_frames = 2
 # straight 判定中固定窗口（前 N 点）绝对误差和上限。
 route_straight_abs_error_sum_max = 50.0
 # cross_1 中辅助点同 x 向上扫描白黑转变的最大行数。
-cross_aux_vertical_scan_max_rows = 75
+cross_aux_vertical_scan_max_rows = 50
 # cross_1 辅助八邻域边界允许的最大点数。
 cross_aux_trace_max_points = 50
 # cross_1 辅助边界向上延伸的最大行数。
