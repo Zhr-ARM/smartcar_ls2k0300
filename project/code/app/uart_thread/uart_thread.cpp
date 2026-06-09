@@ -1,6 +1,8 @@
 #include "uart_thread.h"
 
+#include "motor_thread.h"
 #include "uart.h"
+#include "driver/vision/vision_config.h"
 #include "zf_common_headfile.h"
 
 #ifdef BOARD_IS_SENDER
@@ -9,11 +11,14 @@
 
 #ifdef BOARD_IS_RECEIVER
 #include "driver/vision/vision_image_processor.h"
-#include "driver/vision/vision_config.h"
 #endif
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <cstdint>
 #include <cstring>
 #include <mutex>
 #include <thread>
@@ -46,6 +51,91 @@ bool g_restore_offset_saved = false;
 // 工作线程
 std::thread g_worker_thread;
 std::atomic<bool> g_worker_running(false);
+std::atomic<bool> g_speed_tuning_active(false);
+
+constexpr int32_t kSpeedTuningVofaPeriodMs = 10;
+constexpr int32_t kSpeedTuningStageDurationMs = 2000;
+
+struct SpeedTuningTarget
+{
+    float left;
+    float right;
+};
+
+bool speed_tuning_mode_enabled()
+{
+    return g_speed_tuning_active.load();
+}
+
+SpeedTuningTarget speed_tuning_target_for_elapsed_ms(int64_t elapsed_ms)
+{
+    if (elapsed_ms < kSpeedTuningStageDurationMs)
+    {
+        return {-200.0f, 200.0f};
+    }
+    if (elapsed_ms < 2 * kSpeedTuningStageDurationMs)
+    {
+        return {-300.0f, 300.0f};
+    }
+    return {-400.0f, 400.0f};
+}
+
+int rounded_count(float value)
+{
+    return static_cast<int>(std::lround(value));
+}
+
+void send_speed_tuning_vofa_line()
+{
+    char line[96];
+    const int len = std::snprintf(line,
+                                  sizeof(line),
+                                  "%d,%d,%d,%d\n",
+                                  rounded_count(motor_thread_left_count()),
+                                  rounded_count(motor_thread_left_target_count()),
+                                  rounded_count(motor_thread_right_count()),
+                                  rounded_count(motor_thread_right_target_count()));
+    if (len <= 0)
+    {
+        return;
+    }
+
+    const size_t send_len = static_cast<size_t>(std::min(len, static_cast<int>(sizeof(line) - 1)));
+    g_dual_uart.send(reinterpret_cast<const uint8_t *>(line), send_len);
+}
+
+void speed_tuning_loop()
+{
+    motor_thread_set_target_count(0.0f, 0.0f);
+
+    const auto start = std::chrono::steady_clock::now();
+    int last_stage = -1;
+
+    while (g_worker_running.load())
+    {
+        const auto now = std::chrono::steady_clock::now();
+        const auto elapsed_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
+        const int stage = (elapsed_ms < kSpeedTuningStageDurationMs)
+                              ? 0
+                              : ((elapsed_ms < 2 * kSpeedTuningStageDurationMs) ? 1 : 2);
+        const SpeedTuningTarget target = speed_tuning_target_for_elapsed_ms(elapsed_ms);
+
+        if (stage != last_stage)
+        {
+            motor_thread_set_target_count(target.left, target.right);
+            printf("[SPEED_TUNING] target left=%.0f right=%.0f\r\n",
+                   static_cast<double>(target.left),
+                   static_cast<double>(target.right));
+            last_stage = stage;
+        }
+
+        send_speed_tuning_vofa_line();
+        std::this_thread::sleep_for(std::chrono::milliseconds(kSpeedTuningVofaPeriodMs));
+    }
+
+    motor_thread_set_target_count(0.0f, 0.0f);
+}
 
 // ============================================================
 // 协议编解码
@@ -315,14 +405,29 @@ void sender_monitor_loop()
 
 bool uart_thread_init()
 {
+    g_speed_tuning_active = g_vision_runtime_config.speed_tuning_mode_enabled;
+
     if (!g_dual_uart.init())
     {
+        if (speed_tuning_mode_enabled())
+        {
+            printf("[SPEED_TUNING] UART init failed (ttyS1)\r\n");
+            return false;
+        }
 #ifdef BOARD_IS_SENDER
         printf("[SENDER] dual-board UART init failed (ttyS1)\r\n");
 #else
         printf("[RECEIVER] dual-board UART init failed (ttyS1)\r\n");
 #endif
         return false;
+    }
+
+    if (speed_tuning_mode_enabled())
+    {
+        g_worker_running = true;
+        g_worker_thread = std::thread(speed_tuning_loop);
+        printf("[SPEED_TUNING] VOFA UART ready on ttyS1, dual-board UART disabled\r\n");
+        return true;
     }
 
 #ifdef BOARD_IS_RECEIVER
@@ -349,19 +454,26 @@ bool uart_thread_init()
 
 void uart_thread_cleanup()
 {
-#ifdef BOARD_IS_SENDER
+    const bool was_speed_tuning = speed_tuning_mode_enabled();
+
     g_worker_running = false;
     if (g_worker_thread.joinable())
     {
         g_worker_thread.join();
     }
-#endif
 
-#ifdef BOARD_IS_RECEIVER
     g_dual_uart.stop_receive_callback();
-#endif
 
     g_dual_uart.close();
+
+    if (was_speed_tuning)
+    {
+        printf("[SPEED_TUNING] VOFA UART closed\r\n");
+        g_speed_tuning_active = false;
+        return;
+    }
+
+    g_speed_tuning_active = false;
 
 #ifdef BOARD_IS_SENDER
     printf("[SENDER] dual-board UART closed\r\n");
@@ -377,6 +489,11 @@ void uart_thread_print_threads(timer_fd * /*motor_timer*/)
 
 DualBoardStrategy dual_board_get_strategy()
 {
+    if (speed_tuning_mode_enabled())
+    {
+        return STRATEGY_NONE;
+    }
+
     std::lock_guard<std::mutex> lock(g_strategy_mutex);
 
     // 超时回退检查
@@ -412,6 +529,11 @@ DualBoardStrategy dual_board_get_strategy()
 
 void dual_board_send_strategy(DualBoardStrategy s)
 {
+    if (speed_tuning_mode_enabled())
+    {
+        return;
+    }
+
     uint8_t frame[DUAL_BOARD_FRAME_LEN];
     encode_frame(s, frame);
 

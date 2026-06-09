@@ -11,25 +11,25 @@ float kGyroYawRateFilterAlpha = 0.45f;
 
 namespace motor_speed
 {
-float kLeftKp = 0.0850f;
-float kLeftKi = 0.00078f;
+float kLeftKp = 0.1850f;
+float kLeftKi = 0.00065f;
 float kLeftKd = 0.0f;
-float kRightKp = 0.0850f;
-float kRightKi = 0.00078f;
+float kRightKp = 0.1900f;
+float kRightKi = 0.00070f;
 float kRightKd = 0.0f;
-float kIntegralLimit = 180.0f;
-float kMaxOutputStep = 15.0f;
-float kCorrectionLimit = 24.0f;
-float kLeftFeedforwardGain = 0.090f;
-float kRightFeedforwardGain = 0.090f;
-float kLeftFeedforwardBias = 1.4f;
-float kRightFeedforwardBias = 1.4f;
-float kFeedforwardBiasThreshold = 5.0f;
-float kDecelErrorThreshold = 5.0f;
-float kDecelDutyGain = 0.18f;
-float kDecelDutyLimit = 14.0f;
-int32 kFeedbackAverageWindow = 2;
-float kFeedbackLowPassAlpha = 0.95f;
+float kIntegralLimit = 0.0f;
+float kMaxOutputStep = 1000.0f;
+float kCorrectionLimit = 100.0f;
+float kLeftFeedforwardGain = 0.0f;
+float kRightFeedforwardGain = 0.0f;
+float kLeftFeedforwardBias = 0.0f;
+float kRightFeedforwardBias = 0.0f;
+float kFeedforwardBiasThreshold = 0.0f;
+float kDecelErrorThreshold = 0.0f;
+float kDecelDutyGain = 0.0f;
+float kDecelDutyLimit = 0.0f;
+int32 kFeedbackAverageWindow = 1;
+float kFeedbackLowPassAlpha = 1.0f;
 } // namespace motor_speed
 
 namespace brushless

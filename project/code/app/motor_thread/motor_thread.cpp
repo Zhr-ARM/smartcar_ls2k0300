@@ -15,7 +15,7 @@
 namespace
 {
 constexpr int32 MOTOR_PERIOD_MS = 5;
-constexpr float TARGET_COUNT_MIN = -8.0f;
+constexpr float TARGET_COUNT_MIN = -1500.0f;
 constexpr float TARGET_COUNT_MAX = 1500.0f;
 
 std::thread g_motor_thread;

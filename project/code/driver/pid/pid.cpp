@@ -48,7 +48,7 @@ float PidController::get_target() const
 }
 
 /**
- * @brief 执行一次增量式 PID 计算
+ * @brief 执行一次原始增量式 PID 计算
  * @param current_value 当前反馈值
  * @return 当前输出结果
  */
@@ -56,17 +56,11 @@ float PidController::compute(float current_value)
 {
     error_ = target_ - current_value;
 
-    float proportional_increment = kp_ * (error_ - error_prev_);
-    float integral_error = error_;
-    if (integral_limit_ > 0.0f)
-    {
-        integral_error = clamp(integral_error, -integral_limit_, integral_limit_);
-    }
-    float integral_increment = ki_ * integral_error;
-    float derivative_increment = kd_ * (error_ - 2.0f * error_prev_ + error_prev2_);
-    float delta_output = proportional_increment + integral_increment + derivative_increment;
+    const float delta_output =
+        kp_ * (error_ - error_prev_) +
+        ki_ * error_ +
+        kd_ * (error_ - 2.0f * error_prev_ + error_prev2_);
 
-    delta_output = clamp(delta_output, -max_output_step_, max_output_step_);
     output_ = last_output_ + delta_output;
     output_ = clamp(output_, output_min_, output_max_);
     last_output_ = output_;
@@ -477,7 +471,7 @@ void MotorSpeedPidController::init(const MotorSpeedPidConfig &config)
     pid_.init(config_.pid_params.left_kp, config_.pid_params.left_ki, config_.pid_params.left_kd,
               config_.pid_params.right_kp, config_.pid_params.right_ki, config_.pid_params.right_kd);
     pid_.set_target(0.0f, 0.0f);
-    pid_.set_output_limit(-config_.correction_limit, config_.correction_limit);
+    pid_.set_output_limit(-config_.duty_limit, config_.duty_limit);
     pid_.left_pid().set_integral_limit(config_.integral_limit);
     pid_.right_pid().set_integral_limit(config_.integral_limit);
     pid_.left_pid().set_max_output_step(config_.max_output_step);
@@ -743,19 +737,14 @@ MotorSpeedControlState MotorSpeedPidController::compute(float left_target, float
     std::lock_guard<std::mutex> lock(mutex_);
 
     MotorSpeedControlState state;
-    state.left_feedback = update_feedback_filter(left_filter_, left_raw_feedback);
-    state.right_feedback = update_feedback_filter(right_filter_, right_raw_feedback);
+    state.left_feedback = left_raw_feedback;
+    state.right_feedback = right_raw_feedback;
     state.left_error = left_target - state.left_feedback;
     state.right_error = right_target - state.right_feedback;
-
-    state.left_feedforward = compute_feedforward_duty(left_target,
-                                                      config_.left_feedforward_gain,
-                                                      config_.left_feedforward_bias);
-    state.right_feedforward = compute_feedforward_duty(right_target,
-                                                       config_.right_feedforward_gain,
-                                                       config_.right_feedforward_bias);
-    state.left_decel_assist = compute_decel_assist_duty(left_target, state.left_feedback);
-    state.right_decel_assist = compute_decel_assist_duty(right_target, state.right_feedback);
+    state.left_feedforward = 0.0f;
+    state.right_feedforward = 0.0f;
+    state.left_decel_assist = 0.0f;
+    state.right_decel_assist = 0.0f;
 
     pid_.set_target(left_target, right_target);
 
@@ -763,12 +752,12 @@ MotorSpeedControlState MotorSpeedPidController::compute(float left_target, float
     state.right_correction = 0.0f;
     pid_.compute(state.left_feedback, state.right_feedback, state.left_correction, state.right_correction);
 
-    state.left_duty = state.left_feedforward + state.left_correction + state.left_decel_assist;
-    state.right_duty = state.right_feedforward + state.right_correction + state.right_decel_assist;
+    state.left_duty = state.left_correction;
+    state.right_duty = state.right_correction;
     state.left_duty = clamp_float(state.left_duty, -config_.duty_limit, config_.duty_limit);
     state.right_duty = clamp_float(state.right_duty, -config_.duty_limit, config_.duty_limit);
-    pid_.left_pid().track_output(state.left_duty - state.left_feedforward - state.left_decel_assist);
-    pid_.right_pid().track_output(state.right_duty - state.right_feedforward - state.right_decel_assist);
+    pid_.left_pid().track_output(state.left_duty);
+    pid_.right_pid().track_output(state.right_duty);
     return state;
 }
 

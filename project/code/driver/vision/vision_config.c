@@ -77,6 +77,8 @@ vision_runtime_config_t g_vision_runtime_config = {
     .client_sender_enabled = false,
     // 车载屏显示开关。
     .screen_display_enabled = false,
+    // 速度环调参模式。
+    .speed_tuning_mode_enabled = false,
 
     // ==================== 网页端 UDP 视频发送配置 ====================
     // UDP 网页图传总开关。

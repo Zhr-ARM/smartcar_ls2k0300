@@ -56,6 +56,8 @@ typedef struct
     bool client_sender_enabled;
     // 车载屏显示开关：true 时启动 screen_display_thread。
     bool screen_display_enabled;
+    // 速度环调参模式：true 时关闭双板通信和巡线控制，串口输出 VOFA 调参数据。
+    bool speed_tuning_mode_enabled;
     // ==================== 网页图传选型说明 ====================
     // 当前代码已实现的网页图片格式：JPEG / PNG / BMP（灰度 / 二值 / 彩图）。
     //

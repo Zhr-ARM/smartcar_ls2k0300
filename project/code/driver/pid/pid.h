@@ -217,28 +217,28 @@ struct DualPidParams
 
 /**
  * @brief 电机速度环配置
- * 作用：集中管理双轮速度环的前馈、滤波与 PID 限制参数
+ * 作用：集中管理双轮速度环 PID 参数；部分旧字段仅保留用于配置兼容与调试显示
  */
 struct MotorSpeedPidConfig
 {
     DualPidParams pid_params;          // 左右轮速度环 PID 三参数
-    float integral_limit;             // 积分限幅，防止长期误差把积分项堆得过大
-    float max_output_step;            // 单个 5ms 周期内 PID 修正项最大变化步长
-    float correction_limit;           // PID 修正项总限幅，不包含前馈和减速辅助
+    float integral_limit;             // 兼容字段：原始增量式速度环不使用
+    float max_output_step;            // 兼容字段：原始增量式速度环不使用
+    float correction_limit;           // 兼容字段：原始增量式速度环不使用
     float duty_limit;                 // 最终输出 duty 绝对值上限
-    float left_feedforward_gain;      // 左轮速度前馈斜率
-    float right_feedforward_gain;     // 右轮速度前馈斜率
-    float left_feedforward_bias;      // 左轮静摩擦补偿
-    float right_feedforward_bias;     // 右轮静摩擦补偿
-    float feedforward_bias_threshold; // 前馈静摩擦补偿触发阈值
-    float decel_error_threshold;      // 减速辅助触发误差阈值
-    float decel_duty_gain;            // 减速辅助增益
-    float decel_duty_limit;           // 减速辅助最大输出
+    float left_feedforward_gain;      // 兼容字段：原始增量式速度环不使用
+    float right_feedforward_gain;     // 兼容字段：原始增量式速度环不使用
+    float left_feedforward_bias;      // 兼容字段：原始增量式速度环不使用
+    float right_feedforward_bias;     // 兼容字段：原始增量式速度环不使用
+    float feedforward_bias_threshold; // 兼容字段：原始增量式速度环不使用
+    float decel_error_threshold;      // 兼容字段：原始增量式速度环不使用
+    float decel_duty_gain;            // 兼容字段：原始增量式速度环不使用
+    float decel_duty_limit;           // 兼容字段：原始增量式速度环不使用
 };
 
 /**
  * @brief 电机速度环单次计算结果
- * 作用：返回滤波反馈、误差和最终占空比输出
+ * 作用：返回原始反馈、误差和最终占空比输出
  */
 struct MotorSpeedControlState
 {
@@ -294,7 +294,7 @@ struct MotorSpeedPidDebugInfo
 
 /**
  * @brief 双轮电机速度环控制器
- * 作用：封装反馈滤波、前馈补偿与双通道增量式 PID 修正
+ * 作用：封装双通道原始增量式 PID 速度环
  */
 class MotorSpeedPidController
 {

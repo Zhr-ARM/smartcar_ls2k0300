@@ -868,6 +868,8 @@ void collect_restart_required_keys(const ConfigSnapshot &old_config,
 
     push_if(old_config.vision_runtime.screen_display_enabled != g_vision_runtime_config.screen_display_enabled,
             "vision.runtime.screen_display_enabled");
+    push_if(old_config.vision_runtime.speed_tuning_mode_enabled != g_vision_runtime_config.speed_tuning_mode_enabled,
+            "vision.runtime.speed_tuning_mode_enabled");
     push_if(old_config.vision_runtime.udp_web_video_port != g_vision_runtime_config.udp_web_video_port,
             "vision.runtime.web.video_port");
     push_if(old_config.vision_runtime.udp_web_meta_port != g_vision_runtime_config.udp_web_meta_port,
@@ -956,7 +958,8 @@ bool load_from_path(const std::string &path, std::string *error_message)
         !require_float(values, &consumed, "vision.runtime.red_roi.red_to_target_bottom_y2", &g_vision_runtime_config.red_roi_red_to_target_bottom_y2, error_message) ||
         !require_int(values, &consumed, "vision.runtime.red_roi.square_side_px", &g_vision_runtime_config.red_roi_square_side_px, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.client_sender_enabled", &g_vision_runtime_config.client_sender_enabled, error_message) ||
-        !require_bool(values, &consumed, "vision.runtime.screen_display_enabled", &g_vision_runtime_config.screen_display_enabled, error_message))
+        !require_bool(values, &consumed, "vision.runtime.screen_display_enabled", &g_vision_runtime_config.screen_display_enabled, error_message) ||
+        !require_bool(values, &consumed, "vision.runtime.speed_tuning_mode_enabled", &g_vision_runtime_config.speed_tuning_mode_enabled, error_message))
     {
         return false;
     }

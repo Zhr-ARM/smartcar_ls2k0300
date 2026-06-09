@@ -28,6 +28,9 @@ client_sender_enabled = false
 # 车载屏显示开关。
 # true 时启动屏幕显示线程。
 screen_display_enabled = false
+# 速度环调参模式。
+# true 时关闭双板通信和巡线控制，串口输出 VOFA 调参数据并按阶跃目标原地转圈。
+speed_tuning_mode_enabled = false
 # 迷宫法起始搜索行。
 # 值越大越靠近图像底部。
 maze_start_row = 75
@@ -233,7 +236,7 @@ square_side_px = 8
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
-enabled = true
+enabled = false
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
 max_fps = 20
@@ -256,9 +259,9 @@ rgb_image_format = 1
 # 0=FULL，1=RAW_MINIMAL。
 data_profile = 0
 # 网页端 TCP 状态发送总开关。
-tcp_enabled = true
+tcp_enabled = false
 # PC 接收端 IP 地址。
-server_ip = "192.168.3.9"
+server_ip = "192.168.3.11"
 # PC 接收端 UDP 视频端口。
 video_port = 10000
 # PC 接收端 TCP 状态端口。
@@ -376,7 +379,7 @@ ipm_size = true
 # 逐飞助手 UDP 通道开关。
 enabled = false
 # 逐飞助手接收端 IP。
-server_ip = "192.168.3.9"
+server_ip = "192.168.3.11"
 # 逐飞助手接收端端口。
 server_port = 8899
 
@@ -422,49 +425,49 @@ default_maze_trace_x_max = 159
 startup_calibrate_duration_ms = 2000
 # gyro_z 方向符号。
 # 越抗漂越甩时通常要改成 -1。
-gyro_yaw_rate_sign = -1.0
+gyro_yaw_rate_sign = 1.0
 # gyro_z 低通滤波 alpha。
 gyro_yaw_rate_filter_alpha = 0.45
 
 [pid.motor_speed]
 # 左轮速度环 Kp。
-left_kp = 0.22
+left_kp = 0.185
 # 左轮速度环 Ki。
-left_ki = 0.0
+left_ki = 0.00065
 # 左轮速度环 Kd。
 left_kd = 0.0
 # 右轮速度环 Kp。
-right_kp = 0.19
+right_kp = 0.190
 # 右轮速度环 Ki。
-right_ki = 0.0
+right_ki = 0.00070
 # 右轮速度环 Kd。
 right_kd = 0.0
-# 速度环积分限幅。
+# 速度环积分限幅。原始增量式速度环不使用，保留为兼容字段。
 integral_limit = 0
-# 单周期 PID 修正项最大变化步长。
-max_output_step = 9.0
-# PID 修正项总限幅。
-correction_limit = 9.0
-# 左轮前馈斜率。
-left_feedforward_gain =  0.0330
-# 右轮前馈斜率。
-right_feedforward_gain =  0.0295
-# 左轮静摩擦补偿。
-left_feedforward_bias = 11.0
-# 右轮静摩擦补偿。
-right_feedforward_bias = 11.0
-# 静摩擦补偿触发阈值。
-feedforward_bias_threshold = 5.0
-# 减速辅助触发误差阈值。
-decel_error_threshold = 60.0
-# 减速辅助增益。
-decel_duty_gain =  0.015
-# 减速辅助最大输出。
-decel_duty_limit = 2.0
-# 速度反馈平均窗口长度。
-feedback_average_window = 6
-# 速度反馈低通滤波 alpha。
-feedback_low_pass_alpha =  0.52
+# 单周期 PID 修正项最大变化步长。原始增量式速度环不使用，给大值等效关闭。
+max_output_step = 1000.0
+# PID 修正项总限幅。原始增量式速度环实际使用电机 duty 总限幅。
+correction_limit = 100.0
+# 左轮前馈斜率。原始增量式速度环不使用。
+left_feedforward_gain = 0.0
+# 右轮前馈斜率。原始增量式速度环不使用。
+right_feedforward_gain = 0.0
+# 左轮静摩擦补偿。原始增量式速度环不使用。
+left_feedforward_bias = 0.0
+# 右轮静摩擦补偿。原始增量式速度环不使用。
+right_feedforward_bias = 0.0
+# 静摩擦补偿触发阈值。原始增量式速度环不使用。
+feedforward_bias_threshold = 0.0
+# 减速辅助触发误差阈值。原始增量式速度环不使用。
+decel_error_threshold = 0.0
+# 减速辅助增益。原始增量式速度环不使用。
+decel_duty_gain = 0.0
+# 减速辅助最大输出。原始增量式速度环不使用。
+decel_duty_limit = 0.0
+# 速度反馈平均窗口长度。原始增量式速度环直接使用原始编码器值。
+feedback_average_window = 1
+# 速度反馈低通滤波 alpha。原始增量式速度环直接使用原始编码器值。
+feedback_low_pass_alpha = 1.0
 
 [pid.brushless]
 # 是否启用主循环实时无刷控制。
@@ -501,11 +504,11 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 320.0
+base_speed = 450.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # NORMAL 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 24.5
+position_dynamic_kp_base = 9.00
 # NORMAL 档位置环动态 Kp 下限。
 position_dynamic_kp_min = 0.0
 # NORMAL 档位置环动态 Kp 上限。
@@ -513,15 +516,15 @@ position_dynamic_kp_max = 200.0
 # NORMAL 档位置环动态 Kp 低误差段结束阈值。
 position_dynamic_kp_low_error_threshold_px = 10.0
 # NORMAL 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 0.5
+position_dynamic_kp_mid_a = 0.0
 # NORMAL 档位置环动态 Kp 中误差段结束阈值。
 position_dynamic_kp_mid_error_threshold_px = 20.0
 # NORMAL 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 1.0
+position_dynamic_kp_high_a = 0.0
 # NORMAL 档位置环 Ki。
 position_ki = 0.0
 # NORMAL 档位置环 Kd 基础值。
-position_kd = 2.0
+position_kd = 0.1
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
@@ -536,7 +539,7 @@ yaw_rate_ref_from_track_point_gain_dps = 12.0
 # NORMAL 档目标横摆角速度限幅。
 yaw_rate_ref_limit_dps = 360.0
 # NORMAL 档角速度环 Kp。
-yaw_rate_kp = 1.0
+yaw_rate_kp = 0.4
 # NORMAL 档角速度环动态 Kp 一次项系数。
 yaw_rate_dynamic_kp_quad_a = 0.0
 # NORMAL 档角速度环动态 Kp 下限。
@@ -561,7 +564,7 @@ speed_scheme_max_drop_ratio_per_cycle = 0.95
 # 速度方案单周期最大升速比例。
 speed_scheme_max_rise_ratio_per_cycle = 0.05
 # 速度方案基础速度下限。
-speed_scheme_min_base_speed = 320.0
+speed_scheme_min_base_speed = 400.0
 # 目标角速度降速开关。
 speed_scheme_target_yaw_rate_enabled = true
 # 目标角速度降速起始阈值，单位 dps。

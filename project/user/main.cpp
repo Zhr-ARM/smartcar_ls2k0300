@@ -42,9 +42,9 @@ void cleanup_worker_threads_once()
     vision_thread_cleanup();
     config_http_thread_cleanup();
     vision_transport_udp_cleanup();
+    uart_thread_cleanup();
     motor_thread_cleanup();
     imu_thread_cleanup();
-    uart_thread_cleanup();
     g_worker_cleanup_done = true;
 }
 
@@ -176,7 +176,9 @@ int main(int, char**)
         return -1;
     }
     vision_image_processor_reload_config_from_globals();
+    const bool speed_tuning_mode = g_vision_runtime_config.speed_tuning_mode_enabled;
     printf("[CONFIG] loaded=%s\r\n", loaded_config_path.c_str());
+    printf("[MODE] speed_tuning=%d\r\n", speed_tuning_mode ? 1 : 0);
 
     if (!beep_thread_init())
     {
@@ -233,19 +235,27 @@ int main(int, char**)
 
     // 初始化 ncnn 模型；后续是否真正执行推理由配置中的 infer_enabled / ncnn_enabled 控制。
     LQ_NCNN ncnn;
-    bool ncnn_ready = vision_infer_init_default_model(ncnn);
+    bool ncnn_ready = false;
+    if (!speed_tuning_mode)
+    {
+        ncnn_ready = vision_infer_init_default_model(ncnn);
 #ifndef VISION_ENABLE_NCNN
-    if (g_vision_runtime_config.ncnn_enabled)
-    {
-        printf("[VISION CFG] build without NCNN, force ncnn_enabled=0\r\n");
-    }
-    g_vision_runtime_config.ncnn_enabled = false;
+        if (g_vision_runtime_config.ncnn_enabled)
+        {
+            printf("[VISION CFG] build without NCNN, force ncnn_enabled=0\r\n");
+        }
+        g_vision_runtime_config.ncnn_enabled = false;
 #endif
-    // 视觉线程初始化：统一主链（采集/处理/检测/推理/发送）。
-    if (!vision_thread_init("/dev/video0", &ncnn, ncnn_ready))
+        // 视觉线程初始化：统一主链（采集/处理/检测/推理/发送）。
+        if (!vision_thread_init("/dev/video0", &ncnn, ncnn_ready))
+        {
+            cleanup();
+            return -1;
+        }
+    }
+    else
     {
-        cleanup();
-        return -1;
+        printf("[SPEED_TUNING] vision thread disabled\r\n");
     }
 
     // 开机即启动无刷电机，校准期间保持运转。
@@ -259,10 +269,14 @@ int main(int, char**)
         cleanup();
         return -1;
     }
-    if (!line_follow_thread_init())
+    if (!speed_tuning_mode && !line_follow_thread_init())
     {
         cleanup();
         return -1;
+    }
+    if (speed_tuning_mode)
+    {
+        printf("[SPEED_TUNING] line follow disabled\r\n");
     }
 
     if (!motor_thread_init())
@@ -273,7 +287,9 @@ int main(int, char**)
     // motor_thread_init 内部会复位无刷，这里立刻恢复目标占空比。
     update_brushless_realtime_control();
 
-    if (g_vision_runtime_config.screen_display_enabled && !screen_display_thread_init())
+    if (!speed_tuning_mode &&
+        g_vision_runtime_config.screen_display_enabled &&
+        !screen_display_thread_init())
     {
         cleanup();
         return -1;
@@ -344,12 +360,19 @@ int main(int, char**)
            g_vision_runtime_config.ipm_line_error_index_min,
            g_vision_runtime_config.ipm_line_error_index_max);
 
-    uart_thread_init();
+    if (!uart_thread_init() && speed_tuning_mode)
+    {
+        cleanup();
+        return -1;
+    }
 
     // 巡线直道参考速度配置：
     // 这里默认与 NORMAL 档基础速度保持一致；若想整体统一提速/降速，可改 pid_tuning 中的全局倍率，
     // 或在这里把“期望直道参考速度”改成一个新的值，让所有状态按比例一起缩放。
-    line_follow_thread_set_normal_speed_reference(pid_tuning::route_line_follow::kNormalProfile.base_speed);
+    if (!speed_tuning_mode)
+    {
+        line_follow_thread_set_normal_speed_reference(pid_tuning::route_line_follow::kNormalProfile.base_speed);
+    }
     
     // 为motor_thread设置目标计数，单位 counts/5ms。
     // 固定左右轮目标值为 800，便于速度环调参。
@@ -359,14 +382,18 @@ int main(int, char**)
     beep_thread_print_info();
     motor_thread_print_info();
     imu_thread_print_info();
-    line_follow_thread_print_info();
+    if (!speed_tuning_mode)
+    {
+        line_follow_thread_print_info();
+    }
 
     bool zebra_cross_stop_triggered = false;
     while(!g_should_exit)
     {
         update_brushless_realtime_control();
 
-        if (!zebra_cross_stop_triggered &&
+        if (!speed_tuning_mode &&
+            !zebra_cross_stop_triggered &&
             g_vision_runtime_config.zebra_cross_detection_enabled &&
             vision_image_processor_zebra_cross_count() >= 1)
         {
