@@ -55,8 +55,8 @@ vision_runtime_config_t g_vision_runtime_config = {
     // ncnn 子开关：false 时只保留红框检测，不做 ncnn 分类。
     .ncnn_enabled = false,
     // ncnn 默认模型输入尺寸。
-    .ncnn_input_width = 64,
-    .ncnn_input_height = 64,
+    .ncnn_input_width = 32,
+    .ncnn_input_height = 32,
     // ncnn 标签顺序必须与模型输出类别索引严格一致。
     .ncnn_label_count = 6,
     .ncnn_labels = {
@@ -67,16 +67,12 @@ vision_runtime_config_t g_vision_runtime_config = {
         "medicine",
         "telescope",
     },
-    // 红框检测和 ROI 裁剪默认参数，对齐 data_gen fine_crop_debug.py。
-    .red_roi_h_span = 12,
-    .red_roi_s_min = 50,
-    .red_roi_v_min = 50,
-    .red_roi_close_iter = 1,
-    .red_roi_open_iter = 1,
-    .red_roi_area_min = 50,
-    .red_roi_ratio_w = 1.2f,
-    .red_roi_ratio_h = 1.2f,
-    .red_roi_offset_ratio = 0.0f,
+    // 目标板 ROI 几何参数：沿中线黑点回投后，在 IPM 空间推算目标板位置。
+    .red_roi_red_to_target_bottom_x1 = 0.0f,
+    .red_roi_red_to_target_bottom_y1 = 0.0f,
+    .red_roi_red_to_target_bottom_x2 = 10.0f,
+    .red_roi_red_to_target_bottom_y2 = 0.0f,
+    .red_roi_square_side_px = 8,
     // 逐飞客户端发送开关。
     .client_sender_enabled = false,
     // 车载屏显示开关。

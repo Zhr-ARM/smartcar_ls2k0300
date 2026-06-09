@@ -87,20 +87,60 @@ bool vision_infer_init_default_model(LQ_NCNN &ncnn);
 typedef struct
 {
     uint32 result_seq;     // 异步结果序号；每产生一帧新结果递增。
-    bool found;            // 是否找到红色矩形。
-    int red_x;             // 红框左上角 x（full 分辨率坐标）。
+    bool found;            // 是否成功定位目标板 ROI。
+    int red_x;             // 兼容字段：几何锚点框左上角 x（full 分辨率坐标）。
     int red_y;             // 红框左上角 y。
     int red_w;             // 红框宽。
     int red_h;             // 红框高。
     int red_cx;            // 红框中心 x。
     int red_cy;            // 红框中心 y。
     int red_area;          // 红框面积。
-    uint32 red_detect_us;  // 红框检测耗时（us）。
+    uint32 red_detect_us;  // 目标板 ROI 定位耗时（us）。
     bool ncnn_roi_valid;   // ncnn ROI 是否有效。
     int ncnn_roi_x;        // ncnn ROI 左上角 x（full 分辨率坐标）。
     int ncnn_roi_y;        // ncnn ROI 左上角 y。
     int ncnn_roi_w;        // ncnn ROI 宽。
     int ncnn_roi_h;        // ncnn ROI 高。
+    bool board_debug_valid;
+    char board_fail_reason[48];
+    float board_dist_ipm;
+    float board_target_bottom_gap_ipm;
+    int board_bottom_cx;
+    int board_bottom_cy;
+    int board_hit_x;
+    int board_hit_y;
+    int board_height_px;
+    int board_width_px;
+    int board_corner_bl_x;
+    int board_corner_bl_y;
+    int board_corner_br_x;
+    int board_corner_br_y;
+    int board_corner_tr_x;
+    int board_corner_tr_y;
+    int board_corner_tl_x;
+    int board_corner_tl_y;
+    int board_ipm_bottom_x;
+    int board_ipm_bottom_y;
+    int board_ipm_top_x;
+    int board_ipm_top_y;
+    int board_ipm_red_bottom_x;
+    int board_ipm_red_bottom_y;
+    int board_ipm_bl_x;
+    int board_ipm_bl_y;
+    int board_ipm_br_x;
+    int board_ipm_br_y;
+    int board_ipm_tr_x;
+    int board_ipm_tr_y;
+    int board_ipm_tl_x;
+    int board_ipm_tl_y;
+    int board_src_bl_x;
+    int board_src_bl_y;
+    int board_src_br_x;
+    int board_src_br_y;
+    int board_src_tr_x;
+    int board_src_tr_y;
+    int board_src_tl_x;
+    int board_src_tl_y;
     bool ncnn_enabled;     // 当前是否启用 ncnn 推理。
     bool ncnn_infer_valid; // 当前帧是否有有效 ncnn 结果。
     uint32 ncnn_infer_us;  // ncnn 推理耗时（us）。

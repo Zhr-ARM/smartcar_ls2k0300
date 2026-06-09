@@ -39,7 +39,7 @@ constexpr int kGrayJpegQuality = 100;
 constexpr int kRgbJpegQuality = 80;
 constexpr int kIpmCanvasWidth = VISION_IPM_WIDTH;
 constexpr int kIpmCanvasHeight = VISION_IPM_HEIGHT;
-constexpr int kRoi64Size = 64;
+constexpr int kRoi32Size = 32;
 constexpr int kRoiJpegQuality = 90;
 
 #pragma pack(push, 1)
@@ -62,7 +62,7 @@ std::atomic<bool> g_tcp_enabled(true);             // TCP 状态发送开关。
 std::atomic<uint32> g_udp_max_fps(kUdpDefaultMaxFps); // UDP 图像限频。
 std::atomic<uint64> g_udp_last_send_tick_us(0);    // UDP 限频时间戳。
 std::atomic<uint32> g_udp_frame_id(0);             // UDP 分片帧号。
-std::atomic<uint32> g_udp_tx_fps(0);               // UDP 发送帧率（mode 0/1/2 合计，不含 ROI64）。
+std::atomic<uint32> g_udp_tx_fps(0);               // UDP 发送帧率（mode 0/1/2 合计，不含 ROI32）。
 
 std::mutex g_init_mutex;      // UDP/TCP 初始化锁。
 bool g_udp_ready = false;     // UDP 初始化是否成功。
@@ -388,7 +388,7 @@ static bool build_rgb_image(std::vector<uint8> *image_out, int *width, int *heig
     return true;
 }
 
-static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *height, uint8 *mode_out)
+static bool build_roi32_image(std::vector<uint8> *image_out, int *width, int *height, uint8 *mode_out)
 {
     if (image_out == nullptr || width == nullptr || height == nullptr || mode_out == nullptr)
     {
@@ -415,7 +415,73 @@ static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *he
         enc_params = {cv::IMWRITE_JPEG_QUALITY, kRoiJpegQuality};
     }
 
+    vision_infer_async_result_t infer_result{};
+    const bool has_infer_result = vision_infer_async_fetch_latest(&infer_result);
     const uint8 *bgr_full = vision_image_processor_bgr_full_image();
+    if (has_infer_result && infer_result.board_debug_valid)
+    {
+        int proc_w = VISION_DOWNSAMPLED_WIDTH;
+        int proc_h = VISION_DOWNSAMPLED_HEIGHT;
+        vision_image_processor_get_processed_size(&proc_w, &proc_h);
+        int crop_x = 0;
+        int crop_y = 0;
+        int crop_w = UVC_WIDTH;
+        int crop_h = UVC_HEIGHT;
+        vision_image_processor_get_full_crop_rect(&crop_x, &crop_y, &crop_w, &crop_h);
+        const auto proc_to_crop_local = [&](int proc_x, int proc_y) -> cv::Point2f {
+            const float local_x = (proc_w > 0) ? static_cast<float>(proc_x * static_cast<double>(crop_w) / proc_w) : 0.0f;
+            const float local_y = (proc_h > 0) ? static_cast<float>(proc_y * static_cast<double>(crop_h) / proc_h) : 0.0f;
+            return cv::Point2f(local_x, local_y);
+        };
+        const cv::Point2f src_quad[4] = {
+            proc_to_crop_local(infer_result.board_src_bl_x, infer_result.board_src_bl_y),
+            proc_to_crop_local(infer_result.board_src_br_x, infer_result.board_src_br_y),
+            proc_to_crop_local(infer_result.board_src_tr_x, infer_result.board_src_tr_y),
+            proc_to_crop_local(infer_result.board_src_tl_x, infer_result.board_src_tl_y),
+        };
+        const cv::Point2f dst_quad[4] = {
+            cv::Point2f(0.0f, static_cast<float>(kRoi32Size)),
+            cv::Point2f(static_cast<float>(kRoi32Size), static_cast<float>(kRoi32Size)),
+            cv::Point2f(static_cast<float>(kRoi32Size), 0.0f),
+            cv::Point2f(0.0f, 0.0f),
+        };
+        cv::Mat warp_source;
+        if (bgr_full != nullptr &&
+            crop_x >= 0 && crop_y >= 0 &&
+            crop_w > 0 && crop_h > 0 &&
+            crop_x + crop_w <= UVC_WIDTH &&
+            crop_y + crop_h <= UVC_HEIGHT)
+        {
+            cv::Mat full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, const_cast<uint8 *>(bgr_full));
+            warp_source = full(cv::Rect(crop_x, crop_y, crop_w, crop_h));
+        }
+        else if (const uint8 *bgr = vision_image_processor_bgr_downsampled_image())
+        {
+            warp_source = cv::Mat(proc_h, proc_w, CV_8UC3, const_cast<uint8 *>(bgr));
+        }
+
+        if (!warp_source.empty())
+        {
+            cv::Mat warped;
+            const cv::Mat m = cv::getPerspectiveTransform(src_quad, dst_quad);
+            cv::warpPerspective(warp_source,
+                                warped,
+                                m,
+                                cv::Size(kRoi32Size, kRoi32Size),
+                                cv::INTER_LINEAR,
+                                cv::BORDER_CONSTANT,
+                                cv::Scalar(0, 0, 0));
+            if (!warped.empty() &&
+                cv::imencode(opencv_ext_for_web_image_format(format), warped, *image_out, enc_params))
+            {
+                *width = kRoi32Size;
+                *height = kRoi32Size;
+                *mode_out = 3;
+                return true;
+            }
+        }
+    }
+
     if (bgr_full != nullptr)
     {
         cv::Mat full(UVC_HEIGHT, UVC_WIDTH, CV_8UC3, const_cast<uint8 *>(bgr_full));
@@ -425,9 +491,9 @@ static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *he
             return false;
         }
         cv::Mat roi = full(safe);
-        cv::Mat roi64;
-        cv::resize(roi, roi64, cv::Size(kRoi64Size, kRoi64Size), 0.0, 0.0, cv::INTER_LINEAR);
-        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi64, *image_out, enc_params))
+        cv::Mat roi32;
+        cv::resize(roi, roi32, cv::Size(kRoi32Size, kRoi32Size), 0.0, 0.0, cv::INTER_LINEAR);
+        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi32, *image_out, enc_params))
         {
             return false;
         }
@@ -444,9 +510,9 @@ static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *he
             return false;
         }
         cv::Mat roi = full(safe);
-        cv::Mat roi64;
-        cv::resize(roi, roi64, cv::Size(kRoi64Size, kRoi64Size), 0.0, 0.0, cv::INTER_LINEAR);
-        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi64, *image_out, enc_params))
+        cv::Mat roi32;
+        cv::resize(roi, roi32, cv::Size(kRoi32Size, kRoi32Size), 0.0, 0.0, cv::INTER_LINEAR);
+        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi32, *image_out, enc_params))
         {
             return false;
         }
@@ -468,16 +534,16 @@ static bool build_roi64_image(std::vector<uint8> *image_out, int *width, int *he
             return false;
         }
         cv::Mat roi = full(safe);
-        cv::Mat roi64;
-        cv::resize(roi, roi64, cv::Size(kRoi64Size, kRoi64Size), 0.0, 0.0, cv::INTER_LINEAR);
-        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi64, *image_out, enc_params))
+        cv::Mat roi32;
+        cv::resize(roi, roi32, cv::Size(kRoi32Size, kRoi32Size), 0.0, 0.0, cv::INTER_LINEAR);
+        if (!cv::imencode(opencv_ext_for_web_image_format(format), roi32, *image_out, enc_params))
         {
             return false;
         }
     }
 
-    *width = kRoi64Size;
-    *height = kRoi64Size;
+    *width = kRoi32Size;
+    *height = kRoi32Size;
     *mode_out = 3;
     return true;
 }
@@ -494,7 +560,7 @@ static void send_udp_frame(const std::vector<uint8> &image_bytes,
         return;
     }
 
-    // UDP 图像发送 FPS（1 秒窗口）统计，不含 ROI64(mode=3)。
+    // UDP 图像发送 FPS（1 秒窗口）统计，不含 ROI32(mode=3)。
     static uint32 window_frames = 0;
     static uint64 window_start_us = 0;
     const uint64 now = now_us();
@@ -1168,10 +1234,66 @@ static void send_tcp_status()
         append_int_array(true, "red", {red_x, red_y, red_w, red_h, red_cx, red_cy});
         append_bool(true, "roi_valid", roi_valid);
         append_int_array(true, "roi", {roi_x, roi_y, roi_w, roi_h});
+        append_bool(true, "board_debug_valid", has_infer_result && infer_result.board_debug_valid);
+        append_string(true, "board_fail_reason", has_infer_result ? infer_result.board_fail_reason : "");
+        append_float(true, "board_dist_ipm", has_infer_result ? infer_result.board_dist_ipm : 0.0f);
+        append_float(true, "board_target_bottom_gap_ipm", has_infer_result ? infer_result.board_target_bottom_gap_ipm : 0.0f);
+        append_int_array(true, "board_ipm_red_bottom",
+                         {has_infer_result ? infer_result.board_ipm_red_bottom_x : 0,
+                          has_infer_result ? infer_result.board_ipm_red_bottom_y : 0});
+        append_int_array(true, "board_ipm_bottom",
+                         {has_infer_result ? infer_result.board_ipm_bottom_x : 0,
+                          has_infer_result ? infer_result.board_ipm_bottom_y : 0});
+        append_int_array(true, "board_ipm_top",
+                         {has_infer_result ? infer_result.board_ipm_top_x : 0,
+                          has_infer_result ? infer_result.board_ipm_top_y : 0});
+        append_int_array(true, "board_ipm_bl",
+                         {has_infer_result ? infer_result.board_ipm_bl_x : 0,
+                          has_infer_result ? infer_result.board_ipm_bl_y : 0});
+        append_int_array(true, "board_ipm_br",
+                         {has_infer_result ? infer_result.board_ipm_br_x : 0,
+                          has_infer_result ? infer_result.board_ipm_br_y : 0});
+        append_int_array(true, "board_ipm_tr",
+                         {has_infer_result ? infer_result.board_ipm_tr_x : 0,
+                          has_infer_result ? infer_result.board_ipm_tr_y : 0});
+        append_int_array(true, "board_ipm_tl",
+                         {has_infer_result ? infer_result.board_ipm_tl_x : 0,
+                          has_infer_result ? infer_result.board_ipm_tl_y : 0});
+        append_int(true, "board_bottom_cx", has_infer_result ? infer_result.board_bottom_cx : 0);
+        append_int(true, "board_bottom_cy", has_infer_result ? infer_result.board_bottom_cy : 0);
+        append_int(true, "board_hit_x", has_infer_result ? infer_result.board_hit_x : 0);
+        append_int(true, "board_hit_y", has_infer_result ? infer_result.board_hit_y : 0);
+        append_int(true, "board_width_px", has_infer_result ? infer_result.board_width_px : 0);
+        append_int(true, "board_height_px", has_infer_result ? infer_result.board_height_px : 0);
+        append_int_array(true, "board_corner_bl",
+                         {has_infer_result ? infer_result.board_corner_bl_x : 0,
+                          has_infer_result ? infer_result.board_corner_bl_y : 0});
+        append_int_array(true, "board_corner_br",
+                         {has_infer_result ? infer_result.board_corner_br_x : 0,
+                          has_infer_result ? infer_result.board_corner_br_y : 0});
+        append_int_array(true, "board_corner_tr",
+                         {has_infer_result ? infer_result.board_corner_tr_x : 0,
+                          has_infer_result ? infer_result.board_corner_tr_y : 0});
+        append_int_array(true, "board_corner_tl",
+                         {has_infer_result ? infer_result.board_corner_tl_x : 0,
+                          has_infer_result ? infer_result.board_corner_tl_y : 0});
+        append_int_array(true, "board_src_bl",
+                         {has_infer_result ? infer_result.board_src_bl_x : 0,
+                          has_infer_result ? infer_result.board_src_bl_y : 0});
+        append_int_array(true, "board_src_br",
+                         {has_infer_result ? infer_result.board_src_br_x : 0,
+                          has_infer_result ? infer_result.board_src_br_y : 0});
+        append_int_array(true, "board_src_tr",
+                         {has_infer_result ? infer_result.board_src_tr_x : 0,
+                          has_infer_result ? infer_result.board_src_tr_y : 0});
+        append_int_array(true, "board_src_tl",
+                         {has_infer_result ? infer_result.board_src_tl_x : 0,
+                          has_infer_result ? infer_result.board_src_tl_y : 0});
         append_bool(true, "infer_enabled", infer_enabled);
         append_bool(true, "ncnn_enabled", has_infer_result ? infer_result.ncnn_enabled : vision_infer_async_ncnn_enabled());
         append_bool(true, "ncnn_has_result", has_infer_result);
         append_bool(true, "ncnn_infer_valid", has_infer_result && infer_result.ncnn_infer_valid);
+        append_int(true, "roi_detect_us", has_infer_result ? static_cast<int>(infer_result.red_detect_us) : 0);
         append_int(true, "ncnn_infer_us", has_infer_result ? infer_result.ncnn_infer_us : 0);
         append_int(true, "ncnn_top_class_id", has_infer_result ? infer_result.ncnn_top_class_id : -1);
         append_float(true, "ncnn_top_score", has_infer_result ? infer_result.ncnn_top_score : 0.0f);
@@ -1186,7 +1308,7 @@ static void send_tcp_status()
         append_float(true, "ipm_center_target_offset_px", vision_image_processor_ipm_center_target_offset_from_left_px());
         append_pid_debug(true);
         append_bool(true, "udp_web_send_roi64", roi_valid);
-        append_int_array(true, "roi64_size", {kRoi64Size, kRoi64Size});
+        append_int_array(true, "roi64_size", {kRoi32Size, kRoi32Size});
         int proc_w = VISION_DOWNSAMPLED_WIDTH;
         int proc_h = VISION_DOWNSAMPLED_HEIGHT;
         vision_image_processor_get_processed_size(&proc_w, &proc_h);
@@ -1242,10 +1364,66 @@ static void send_tcp_status()
     append_bool(g_vision_runtime_config.udp_web_tcp_send_roi_valid, "roi_valid", roi_valid);
     append_int_array(g_vision_runtime_config.udp_web_tcp_send_roi_rect, "roi",
                      {roi_x, roi_y, roi_w, roi_h});
+    append_bool(true, "board_debug_valid", has_infer_result && infer_result.board_debug_valid);
+    append_string(true, "board_fail_reason", has_infer_result ? infer_result.board_fail_reason : "");
+    append_float(true, "board_dist_ipm", has_infer_result ? infer_result.board_dist_ipm : 0.0f);
+    append_float(true, "board_target_bottom_gap_ipm", has_infer_result ? infer_result.board_target_bottom_gap_ipm : 0.0f);
+    append_int_array(true, "board_ipm_red_bottom",
+                     {has_infer_result ? infer_result.board_ipm_red_bottom_x : 0,
+                      has_infer_result ? infer_result.board_ipm_red_bottom_y : 0});
+    append_int_array(true, "board_ipm_bottom",
+                     {has_infer_result ? infer_result.board_ipm_bottom_x : 0,
+                      has_infer_result ? infer_result.board_ipm_bottom_y : 0});
+    append_int_array(true, "board_ipm_top",
+                     {has_infer_result ? infer_result.board_ipm_top_x : 0,
+                      has_infer_result ? infer_result.board_ipm_top_y : 0});
+    append_int_array(true, "board_ipm_bl",
+                     {has_infer_result ? infer_result.board_ipm_bl_x : 0,
+                      has_infer_result ? infer_result.board_ipm_bl_y : 0});
+    append_int_array(true, "board_ipm_br",
+                     {has_infer_result ? infer_result.board_ipm_br_x : 0,
+                      has_infer_result ? infer_result.board_ipm_br_y : 0});
+    append_int_array(true, "board_ipm_tr",
+                     {has_infer_result ? infer_result.board_ipm_tr_x : 0,
+                      has_infer_result ? infer_result.board_ipm_tr_y : 0});
+    append_int_array(true, "board_ipm_tl",
+                     {has_infer_result ? infer_result.board_ipm_tl_x : 0,
+                      has_infer_result ? infer_result.board_ipm_tl_y : 0});
+    append_int(true, "board_bottom_cx", has_infer_result ? infer_result.board_bottom_cx : 0);
+    append_int(true, "board_bottom_cy", has_infer_result ? infer_result.board_bottom_cy : 0);
+    append_int(true, "board_hit_x", has_infer_result ? infer_result.board_hit_x : 0);
+    append_int(true, "board_hit_y", has_infer_result ? infer_result.board_hit_y : 0);
+    append_int(true, "board_width_px", has_infer_result ? infer_result.board_width_px : 0);
+    append_int(true, "board_height_px", has_infer_result ? infer_result.board_height_px : 0);
+    append_int_array(true, "board_corner_bl",
+                     {has_infer_result ? infer_result.board_corner_bl_x : 0,
+                      has_infer_result ? infer_result.board_corner_bl_y : 0});
+    append_int_array(true, "board_corner_br",
+                     {has_infer_result ? infer_result.board_corner_br_x : 0,
+                      has_infer_result ? infer_result.board_corner_br_y : 0});
+    append_int_array(true, "board_corner_tr",
+                     {has_infer_result ? infer_result.board_corner_tr_x : 0,
+                      has_infer_result ? infer_result.board_corner_tr_y : 0});
+    append_int_array(true, "board_corner_tl",
+                     {has_infer_result ? infer_result.board_corner_tl_x : 0,
+                      has_infer_result ? infer_result.board_corner_tl_y : 0});
+    append_int_array(true, "board_src_bl",
+                     {has_infer_result ? infer_result.board_src_bl_x : 0,
+                      has_infer_result ? infer_result.board_src_bl_y : 0});
+    append_int_array(true, "board_src_br",
+                     {has_infer_result ? infer_result.board_src_br_x : 0,
+                      has_infer_result ? infer_result.board_src_br_y : 0});
+    append_int_array(true, "board_src_tr",
+                     {has_infer_result ? infer_result.board_src_tr_x : 0,
+                      has_infer_result ? infer_result.board_src_tr_y : 0});
+    append_int_array(true, "board_src_tl",
+                     {has_infer_result ? infer_result.board_src_tl_x : 0,
+                      has_infer_result ? infer_result.board_src_tl_y : 0});
     append_bool(true, "infer_enabled", infer_enabled);
     append_bool(true, "ncnn_enabled", has_infer_result ? infer_result.ncnn_enabled : vision_infer_async_ncnn_enabled());
     append_bool(true, "ncnn_has_result", has_infer_result);
     append_bool(true, "ncnn_infer_valid", has_infer_result && infer_result.ncnn_infer_valid);
+    append_int(true, "roi_detect_us", has_infer_result ? static_cast<int>(infer_result.red_detect_us) : 0);
     append_int(true, "ncnn_infer_us", has_infer_result ? infer_result.ncnn_infer_us : 0);
     append_int(true, "ncnn_top_class_id", has_infer_result ? infer_result.ncnn_top_class_id : -1);
     append_float(true, "ncnn_top_score", has_infer_result ? infer_result.ncnn_top_score : 0.0f);
@@ -1260,7 +1438,7 @@ static void send_tcp_status()
     append_float(true, "ipm_center_target_offset_px", vision_image_processor_ipm_center_target_offset_from_left_px());
     append_pid_debug(true);
     append_bool(true, "udp_web_send_roi64", roi_valid);
-    append_int_array(true, "roi64_size", {kRoi64Size, kRoi64Size});
+    append_int_array(true, "roi64_size", {kRoi32Size, kRoi32Size});
     append_bool(g_vision_runtime_config.udp_web_tcp_send_ipm_track_valid, "ipm_track_valid", ipm_track_valid);
     append_int(g_vision_runtime_config.udp_web_tcp_send_ipm_track_method, "ipm_track_method",
                static_cast<int>(vision_image_processor_ipm_line_error_method()));
@@ -1626,15 +1804,15 @@ void vision_transport_send_step()
         }
         if (g_udp_enabled.load())
         {
-            std::vector<uint8> roi64_image;
+            std::vector<uint8> roi32_image;
             int width = 0;
             int height = 0;
             uint8 mode = 0;
             const vision_web_image_format_enum format =
                 sanitize_web_image_format(g_vision_runtime_config.udp_web_rgb_image_format);
-            if (build_roi64_image(&roi64_image, &width, &height, &mode))
+            if (build_roi32_image(&roi32_image, &width, &height, &mode))
             {
-                send_udp_frame(roi64_image, width, height, mode, format);
+                send_udp_frame(roi32_image, width, height, mode, format);
             }
         }
         send_tcp_status();

@@ -17,10 +17,11 @@ send_mode = 1
 send_max_fps = 60
 # 推理总开关。
 # false 时关闭红框检测和 ncnn 分类主链。
-infer_enabled = false
+infer_enabled = true
 # ncnn 分类子开关。
 # false 时即使 infer_enabled=true，也只保留红框检测，不做 ncnn 分类。
-ncnn_enabled = false
+ncnn_enabled = true
+
 # 逐飞客户端发送开关。
 # true 时启用客户端发送链路。
 client_sender_enabled = false
@@ -132,7 +133,7 @@ zebra_cross_detection_enabled = false
 # 双边都丢线时是否保留上一帧平移中线。
 keep_last_centerline_on_double_loss = true
 # 十字状态识别开关。
-route_cross_detection_enabled = true
+route_cross_detection_enabled = false
 # normal/straight 进入 cross 所需的角点后沿边框连续行数最小值。
 route_cross_entry_corner_post_frame_wall_rows_min = 5
 # cross_1 进入 cross_2 的起始贴边连续行数阈值。
@@ -152,7 +153,7 @@ route_cross_stage3_left_anchor_y = 75
 route_cross_stage3_right_anchor_x = 145
 route_cross_stage3_right_anchor_y = 75
 # 圆环状态识别开关。
-route_circle_detection_enabled = true
+route_circle_detection_enabled = false
 # 圆环入口判定中对侧边界最少点数要求。
 route_circle_entry_min_boundary_count = 20
 # 圆环入口判定中角点距离对侧边界尾部的最小保留余量。
@@ -208,9 +209,9 @@ ipm_line_error_method = 1
 
 [vision.runtime.ncnn]
 # ncnn 模型输入宽度。
-input_width = 64
+input_width = 32
 # ncnn 模型输入高度。
-input_height = 64
+input_height = 32
 # ncnn 标签数量。
 # 必须与 labels 数组长度一致。
 label_count = 6
@@ -219,35 +220,30 @@ label_count = 6
 labels = ["ambulance", "armored_car", "bomb", "gun", "medicine", "telescope"]
 
 [vision.runtime.red_roi]
-# HSV 红色 Hue 半宽，匹配 [0,h_span] 和 [180-h_span,180]。
-h_span = 12
-# HSV 饱和度/亮度下限。
-s_min = 50
-v_min = 50
-# 3x3 形态学 close/open 迭代次数。
-close_iter = 1
-open_iter = 1
-# 最大红色轮廓的最小面积阈值。
-area_min = 50
-# 基于 320x240 full 图红框宽度推导 ncnn ROI 的宽/高比例。
-ratio_w = 1.2
-ratio_h = 1.2
-# ROI 底部锚点从红框底部上抬的比例。
-offset_ratio = 0.0
+# 目标板 ROI 几何参数。
+# 通过源中线上的首个黑点回投到 IPM，再沿中线推算目标板位置。
+# 目标板下底边距离黑点命中位置的 IPM 偏移双点定义。
+# 当 dist_ipm = x1 时，前推 y1；当 dist_ipm = x2 时，前推 y2。
+red_to_target_bottom_x1 = 3.0
+red_to_target_bottom_y1 = 2.5
+red_to_target_bottom_x2 = 30.0
+red_to_target_bottom_y2 = 2.5
+# 目标板正方形边长（IPM 像素）。
+square_side_px = 8
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
 enabled = true
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
-max_fps = 25
+max_fps = 20
 # 是否发送灰度图。
-send_gray_jpeg = false
+send_gray_jpeg = true
 # 灰度图发送格式。
 # 0=JPEG，1=PNG，2=BMP。
 gray_image_format = 0
 # 是否发送二值图。
-send_binary_jpeg = true
+send_binary_jpeg = false
 # 二值图发送格式。
 # 0=JPEG，1=PNG，2=BMP。
 binary_image_format = 0

@@ -16,6 +16,7 @@ static constexpr int kProcWidth = VISION_DOWNSAMPLED_WIDTH;
 static constexpr int kProcHeight = VISION_DOWNSAMPLED_HEIGHT;
 static constexpr int kFullWidth = UVC_WIDTH;
 static constexpr int kFullHeight = UVC_HEIGHT;
+static constexpr float kTargetBoardSwitchConfidenceThreshold = 0.8f;
 
 enum target_board_state_enum
 {
@@ -28,14 +29,16 @@ enum target_board_state_enum
 static target_board_state_enum g_target_board_state = TARGET_BOARD_NONE;
 static uint32 g_last_processed_infer_result_seq = 0;
 static float g_center_target_offset_restore_px = g_vision_runtime_config.ipm_center_target_offset_from_left_px;
-static int g_target_board_candidate_class_id = -1;
+static int g_target_board_prev_class_id = -1;
+static bool g_target_board_prev_high_confidence = false;
 static int g_target_board_confirm_count = 0;
 static int g_target_board_no_red_count = 0;
 static float g_target_board_applied_offset_px = g_vision_runtime_config.ipm_center_target_offset_from_left_px;
 
 static void reset_target_board_candidate_state()
 {
-    g_target_board_candidate_class_id = -1;
+    g_target_board_prev_class_id = -1;
+    g_target_board_prev_high_confidence = false;
     g_target_board_confirm_count = 0;
 }
 
@@ -162,31 +165,28 @@ static void update_active_target_board_state(bool red_found)
 
 static void update_idle_target_board_candidate(const vision_infer_async_result_t &result)
 {
-    const float threshold = std::clamp(g_vision_runtime_config.infer_target_confidence_threshold, 0.0f, 1.0f);
-    const bool valid_candidate = result.found &&
-                                 result.ncnn_infer_valid &&
-                                 result.ncnn_top_score >= threshold &&
-                                 resolve_target_board_state_for_class_id(result.ncnn_top_class_id) != TARGET_BOARD_NONE;
-    if (!valid_candidate)
+    const target_board_state_enum candidate_state = resolve_target_board_state_for_class_id(result.ncnn_top_class_id);
+    const bool high_confidence_candidate = result.found &&
+                                           result.ncnn_infer_valid &&
+                                           result.ncnn_top_score >= kTargetBoardSwitchConfidenceThreshold &&
+                                           candidate_state != TARGET_BOARD_NONE;
+    if (!high_confidence_candidate)
     {
         reset_target_board_candidate_state();
         return;
     }
 
-    if (result.ncnn_top_class_id == g_target_board_candidate_class_id)
+    if (g_target_board_prev_high_confidence &&
+        result.ncnn_top_class_id == g_target_board_prev_class_id)
     {
-        ++g_target_board_confirm_count;
-    }
-    else
-    {
-        g_target_board_candidate_class_id = result.ncnn_top_class_id;
-        g_target_board_confirm_count = 1;
+        g_target_board_confirm_count = 2;
+        enter_target_board_state(candidate_state);
+        return;
     }
 
-    if (g_target_board_confirm_count >= std::max(1, g_vision_runtime_config.infer_target_confirm_count))
-    {
-        enter_target_board_state(resolve_target_board_state_for_class_id(result.ncnn_top_class_id));
-    }
+    g_target_board_prev_class_id = result.ncnn_top_class_id;
+    g_target_board_prev_high_confidence = true;
+    g_target_board_confirm_count = 1;
 }
 
 static void update_dynamic_center_target_offset_from_infer_result(const vision_infer_async_result_t &result)
@@ -316,14 +316,7 @@ static void apply_infer_result_to_image(vision_infer_async_result_t *result)
         int proc_h = kProcHeight;
         vision_image_processor_get_processed_size(&proc_w, &proc_h);
         cv::Mat gray(proc_h, proc_w, CV_8UC1, const_cast<uint8 *>(gray_data));
-        if (red_proc_rect.width > 0 && red_proc_rect.height > 0)
-        {
-            cv::rectangle(gray, red_proc_rect, cv::Scalar(200), 1, cv::LINE_8);
-        }
-        if (roi_proc_rect.width > 0 && roi_proc_rect.height > 0)
-        {
-            cv::rectangle(gray, roi_proc_rect, cv::Scalar(255), 1, cv::LINE_8);
-        }
+        (void)gray;
     }
 }
 

@@ -46,16 +46,12 @@ typedef struct
     size_t ncnn_label_count;
     // ncnn 默认模型标签表，索引顺序必须与模型输出类别顺序一致。
     const char *ncnn_labels[VISION_NCNN_CONFIG_MAX_LABELS];
-    // 红框 HSV 检测与 ncnn ROI 裁剪参数（full 图 320x240 坐标系）。
-    int red_roi_h_span;
-    int red_roi_s_min;
-    int red_roi_v_min;
-    int red_roi_close_iter;
-    int red_roi_open_iter;
-    int red_roi_area_min;
-    float red_roi_ratio_w;
-    float red_roi_ratio_h;
-    float red_roi_offset_ratio;
+    // 目标板 ROI 几何参数：沿中线黑点回投后，在 IPM 空间推算目标板位置。
+    float red_roi_red_to_target_bottom_x1;
+    float red_roi_red_to_target_bottom_y1;
+    float red_roi_red_to_target_bottom_x2;
+    float red_roi_red_to_target_bottom_y2;
+    int red_roi_square_side_px;
     // 客户端发送开关：控制逐飞助手发送链路是否启用。
     bool client_sender_enabled;
     // 车载屏显示开关：true 时启动 screen_display_thread。

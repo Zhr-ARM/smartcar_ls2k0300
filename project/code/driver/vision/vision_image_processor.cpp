@@ -180,12 +180,18 @@ static int g_ipm_shift_left_center_count = 0;
 static uint16 g_ipm_shift_right_center_x[VISION_BOUNDARY_NUM];
 static uint16 g_ipm_shift_right_center_y[VISION_BOUNDARY_NUM];
 static int g_ipm_shift_right_center_count = 0;
+static uint16 g_ipm_infer_center_x[VISION_BOUNDARY_NUM];
+static uint16 g_ipm_infer_center_y[VISION_BOUNDARY_NUM];
+static int g_ipm_infer_center_count = 0;
 static uint16 g_src_shift_left_center_x[VISION_BOUNDARY_NUM];
 static uint16 g_src_shift_left_center_y[VISION_BOUNDARY_NUM];
 static int g_src_shift_left_center_count = 0;
 static uint16 g_src_shift_right_center_x[VISION_BOUNDARY_NUM];
 static uint16 g_src_shift_right_center_y[VISION_BOUNDARY_NUM];
 static int g_src_shift_right_center_count = 0;
+static uint16 g_src_infer_center_x[VISION_BOUNDARY_NUM];
+static uint16 g_src_infer_center_y[VISION_BOUNDARY_NUM];
+static int g_src_infer_center_count = 0;
 
 // 图像缓存：
 // - g_image_bgr_full: full 采集分辨率原图（当前 320x240）；
@@ -309,6 +315,7 @@ static std::atomic<int> g_ipm_boundary_straight_check_count(g_vision_runtime_con
 static std::atomic<float> g_ipm_boundary_straight_min_cos(g_vision_runtime_config.ipm_boundary_straight_min_cos);
 static std::atomic<float> g_ipm_track_width_px(g_vision_runtime_config.ipm_track_width_px);
 static std::atomic<float> g_ipm_center_target_offset_from_left_px(g_vision_runtime_config.ipm_center_target_offset_from_left_px);
+static constexpr float kInferCenterTargetOffsetFromLeftPx = 15.0f;
 // 逆透视处理中线独立配置。
 static std::atomic<bool> g_ipm_centerline_postprocess_enabled(g_vision_runtime_config.ipm_centerline_postprocess_enabled);
 static std::atomic<bool> g_ipm_centerline_triangle_filter_enabled(g_vision_runtime_config.ipm_centerline_triangle_filter_enabled);
@@ -768,11 +775,23 @@ static void clear_ipm_saved_arrays()
     std::fill_n(g_ipm_shift_left_center_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_shift_right_center_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     std::fill_n(g_ipm_shift_right_center_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_infer_center_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_ipm_infer_center_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_src_shift_left_center_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_src_shift_left_center_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_src_shift_right_center_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_src_shift_right_center_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_src_infer_center_x, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
+    std::fill_n(g_src_infer_center_y, VISION_BOUNDARY_NUM, static_cast<uint16>(0));
     g_ipm_boundary_count = 0;
     g_ipm_boundary_left_count = 0;
     g_ipm_boundary_right_count = 0;
     g_ipm_shift_left_center_count = 0;
     g_ipm_shift_right_center_count = 0;
+    g_ipm_infer_center_count = 0;
+    g_src_shift_left_center_count = 0;
+    g_src_shift_right_center_count = 0;
+    g_src_infer_center_count = 0;
 }
 
 static uint8 compute_global_otsu_threshold_u8(const uint8 *gray_img)
@@ -2710,6 +2729,17 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
         return out;
     }();
     const int prev_ipm_shift_right_center_count = g_ipm_shift_right_center_count;
+    const std::array<uint16, VISION_BOUNDARY_NUM> prev_ipm_infer_center_x = [&]() {
+        std::array<uint16, VISION_BOUNDARY_NUM> out{};
+        std::copy_n(g_ipm_infer_center_x, VISION_BOUNDARY_NUM, out.data());
+        return out;
+    }();
+    const std::array<uint16, VISION_BOUNDARY_NUM> prev_ipm_infer_center_y = [&]() {
+        std::array<uint16, VISION_BOUNDARY_NUM> out{};
+        std::copy_n(g_ipm_infer_center_y, VISION_BOUNDARY_NUM, out.data());
+        return out;
+    }();
+    const int prev_ipm_infer_center_count = g_ipm_infer_center_count;
     const std::array<uint16, VISION_BOUNDARY_NUM> prev_src_shift_left_center_x = [&]() {
         std::array<uint16, VISION_BOUNDARY_NUM> out{};
         std::copy_n(g_src_shift_left_center_x, VISION_BOUNDARY_NUM, out.data());
@@ -2732,6 +2762,17 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
         return out;
     }();
     const int prev_src_shift_right_center_count = g_src_shift_right_center_count;
+    const std::array<uint16, VISION_BOUNDARY_NUM> prev_src_infer_center_x = [&]() {
+        std::array<uint16, VISION_BOUNDARY_NUM> out{};
+        std::copy_n(g_src_infer_center_x, VISION_BOUNDARY_NUM, out.data());
+        return out;
+    }();
+    const std::array<uint16, VISION_BOUNDARY_NUM> prev_src_infer_center_y = [&]() {
+        std::array<uint16, VISION_BOUNDARY_NUM> out{};
+        std::copy_n(g_src_infer_center_y, VISION_BOUNDARY_NUM, out.data());
+        return out;
+    }();
+    const int prev_src_infer_center_count = g_src_infer_center_count;
     clear_ipm_saved_arrays();
 
     std::array<maze_point_t, VISION_BOUNDARY_NUM> left_ipm{};
@@ -2806,8 +2847,15 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
     }
     const float shift_dist_from_left_px = target_offset_from_left_px;
     const float shift_dist_from_right_px = std::max(0.0f, track_width_px - target_offset_from_left_px);
+    const float infer_target_offset_from_left_px = std::clamp(kInferCenterTargetOffsetFromLeftPx,
+                                                              0.0f,
+                                                              track_width_px);
+    const float infer_shift_dist_from_left_px = infer_target_offset_from_left_px;
+    const float infer_shift_dist_from_right_px = std::max(0.0f, track_width_px - infer_target_offset_from_left_px);
     std::array<maze_point_t, VISION_BOUNDARY_NUM> center_selected{};
     int center_selected_num = 0;
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> center_infer{};
+    int center_infer_num = 0;
     if (selected_is_right)
     {
         shift_boundary_along_normal(cross_right_proc.data(),
@@ -2819,6 +2867,16 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                     kIpmOutputWidth,
                                     kIpmOutputHeight,
                                     shift_dist_from_right_px,
+                                    false);
+        shift_boundary_along_normal(cross_right_proc.data(),
+                                    cross_right_proc_num,
+                                    cross_left_proc.data(),
+                                    cross_left_proc_num,
+                                    center_infer.data(),
+                                    &center_infer_num,
+                                    kIpmOutputWidth,
+                                    kIpmOutputHeight,
+                                    infer_shift_dist_from_right_px,
                                     false);
     }
     else
@@ -2833,11 +2891,25 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                     kIpmOutputHeight,
                                     shift_dist_from_left_px,
                                     true);
+        shift_boundary_along_normal(cross_left_proc.data(),
+                                    cross_left_proc_num,
+                                    cross_right_proc.data(),
+                                    cross_right_proc_num,
+                                    center_infer.data(),
+                                    &center_infer_num,
+                                    kIpmOutputWidth,
+                                    kIpmOutputHeight,
+                                    infer_shift_dist_from_left_px,
+                                    true);
     }
 
     // 中线独立后处理：可选三角滤波、可选等距采样。
     postprocess_shifted_centerline_inplace(center_selected.data(),
                                            &center_selected_num,
+                                           kIpmOutputWidth,
+                                           kIpmOutputHeight);
+    postprocess_shifted_centerline_inplace(center_infer.data(),
+                                           &center_infer_num,
                                            kIpmOutputWidth,
                                            kIpmOutputHeight);
 
@@ -2846,6 +2918,26 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                                                   center_selected_num,
                                                                                   src_center_selected.data(),
                                                                                   static_cast<int>(src_center_selected.size()));
+    std::array<maze_point_t, VISION_BOUNDARY_NUM> src_center_infer{};
+    const int src_center_infer_num = transform_boundary_points_from_ipm_to_src(center_infer.data(),
+                                                                               center_infer_num,
+                                                                               src_center_infer.data(),
+                                                                               static_cast<int>(src_center_infer.size()));
+
+    fill_single_line_arrays_from_points(center_infer.data(),
+                                        center_infer_num,
+                                        g_ipm_infer_center_x,
+                                        g_ipm_infer_center_y,
+                                        &g_ipm_infer_center_count,
+                                        kIpmOutputWidth,
+                                        kIpmOutputHeight);
+    fill_single_line_arrays_from_points(src_center_infer.data(),
+                                        src_center_infer_num,
+                                        g_src_infer_center_x,
+                                        g_src_infer_center_y,
+                                        &g_src_infer_center_count,
+                                        kProcWidth,
+                                        kProcHeight);
 
     if (selected_is_right)
     {
@@ -2892,12 +2984,18 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
         std::copy_n(prev_ipm_shift_right_center_x.data(), VISION_BOUNDARY_NUM, g_ipm_shift_right_center_x);
         std::copy_n(prev_ipm_shift_right_center_y.data(), VISION_BOUNDARY_NUM, g_ipm_shift_right_center_y);
         g_ipm_shift_right_center_count = prev_ipm_shift_right_center_count;
+        std::copy_n(prev_ipm_infer_center_x.data(), VISION_BOUNDARY_NUM, g_ipm_infer_center_x);
+        std::copy_n(prev_ipm_infer_center_y.data(), VISION_BOUNDARY_NUM, g_ipm_infer_center_y);
+        g_ipm_infer_center_count = prev_ipm_infer_center_count;
         std::copy_n(prev_src_shift_left_center_x.data(), VISION_BOUNDARY_NUM, g_src_shift_left_center_x);
         std::copy_n(prev_src_shift_left_center_y.data(), VISION_BOUNDARY_NUM, g_src_shift_left_center_y);
         g_src_shift_left_center_count = prev_src_shift_left_center_count;
         std::copy_n(prev_src_shift_right_center_x.data(), VISION_BOUNDARY_NUM, g_src_shift_right_center_x);
         std::copy_n(prev_src_shift_right_center_y.data(), VISION_BOUNDARY_NUM, g_src_shift_right_center_y);
         g_src_shift_right_center_count = prev_src_shift_right_center_count;
+        std::copy_n(prev_src_infer_center_x.data(), VISION_BOUNDARY_NUM, g_src_infer_center_x);
+        std::copy_n(prev_src_infer_center_y.data(), VISION_BOUNDARY_NUM, g_src_infer_center_y);
+        g_src_infer_center_count = prev_src_infer_center_count;
     }
 
     fill_boundary_arrays_from_points_to_target(left_proc.data(),
@@ -6381,6 +6479,13 @@ void vision_image_processor_get_ipm_shifted_centerline_from_right(uint16 **x, ui
     if (dot_num) *dot_num = static_cast<uint16>(g_ipm_shift_right_center_count);
 }
 
+void vision_image_processor_get_ipm_infer_centerline(uint16 **x, uint16 **y, uint16 *dot_num)
+{
+    if (x) *x = g_ipm_infer_center_x;
+    if (y) *y = g_ipm_infer_center_y;
+    if (dot_num) *dot_num = static_cast<uint16>(g_ipm_infer_center_count);
+}
+
 void vision_image_processor_get_src_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num)
 {
     if (x) *x = g_src_shift_left_center_x;
@@ -6393,6 +6498,23 @@ void vision_image_processor_get_src_shifted_centerline_from_right(uint16 **x, ui
     if (x) *x = g_src_shift_right_center_x;
     if (y) *y = g_src_shift_right_center_y;
     if (dot_num) *dot_num = static_cast<uint16>(g_src_shift_right_center_count);
+}
+
+void vision_image_processor_get_src_infer_centerline(uint16 **x, uint16 **y, uint16 *dot_num)
+{
+    if (x) *x = g_src_infer_center_x;
+    if (y) *y = g_src_infer_center_y;
+    if (dot_num) *dot_num = static_cast<uint16>(g_src_infer_center_count);
+}
+
+bool vision_image_processor_src_to_ipm_point(int src_x, int src_y, int *ipm_x, int *ipm_y)
+{
+    return src_point_to_ipm_point(src_x, src_y, ipm_x, ipm_y);
+}
+
+bool vision_image_processor_ipm_to_src_point(int ipm_x, int ipm_y, int *src_x, int *src_y)
+{
+    return ipm_point_to_src_point(ipm_x, ipm_y, src_x, src_y);
 }
 
 void vision_image_processor_get_red_rect(bool *found, int *x, int *y, int *w, int *h, int *cx, int *cy)

@@ -311,9 +311,14 @@ int vision_image_processor_zebra_cross_count();
 // - from_right: 右边界向左法向平移得到。
 void vision_image_processor_get_ipm_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_ipm_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
+void vision_image_processor_get_ipm_infer_centerline(uint16 **x, uint16 **y, uint16 *dot_num);
 // 将左右偏移中线从 IPM 坐标回投到原图后的结果。
 void vision_image_processor_get_src_shifted_centerline_from_left(uint16 **x, uint16 **y, uint16 *dot_num);
 void vision_image_processor_get_src_shifted_centerline_from_right(uint16 **x, uint16 **y, uint16 *dot_num);
+void vision_image_processor_get_src_infer_centerline(uint16 **x, uint16 **y, uint16 *dot_num);
+// 当前处理图坐标系与 IPM 坐标系的单点互转。
+bool vision_image_processor_src_to_ipm_point(int src_x, int src_y, int *ipm_x, int *ipm_y);
+bool vision_image_processor_ipm_to_src_point(int ipm_x, int ipm_y, int *src_x, int *src_y);
 
 // 红色实心矩形检测结果（坐标与尺寸）。
 // set_* 接口由 infer 模块写入，get_* 接口供发送/UI读取。

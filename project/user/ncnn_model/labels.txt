@@ -1,5 +1,5 @@
 ambulance
-armored_car
+armored
 bomb
 gun
 medicine
