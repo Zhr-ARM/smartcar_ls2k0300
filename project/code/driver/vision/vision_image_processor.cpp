@@ -3930,30 +3930,32 @@ static int trim_initial_artificial_frame_prefix_inplace(maze_point_t *pts,
     return prefix_end;
 }
 
-static void truncate_regular_boundary_at_touch_y_inplace(maze_point_t *pts, int *num, int touch_y)
+// 在规则边界上找第一个触碰人工边框的点，按点索引截断：
+// 保留触边点自身（num = touch_index + 1），丢弃该点之后的所有点。
+// 返回 true 表示实际执行了截断。
+static bool truncate_regular_boundary_at_first_frame_touch_inplace(maze_point_t *pts, int *num)
 {
     if (pts == nullptr || num == nullptr || *num <= 0)
     {
-        return;
+        return false;
     }
 
     const int in_num = std::clamp(*num, 0, VISION_BOUNDARY_NUM);
     if (in_num <= 0)
     {
         *num = 0;
-        return;
+        return false;
     }
 
-    // 每行规则数组按 y 由大到小排列：
-    // 首个 y <= touch_y 的点即“触边起点行”，该点及其后续（更远处）全部丢弃。
     for (int i = 0; i < in_num; ++i)
     {
-        if (pts[i].y <= touch_y)
+        if (point_touches_artificial_frame(pts[i].x, pts[i].y))
         {
-            *num = i;
-            return;
+            *num = i + 1;
+            return true;
         }
     }
+    return false;
 }
 
 static int rebuild_boundary_points_from_row_table(const std::array<int, kProcHeight> &border_x,
@@ -4376,8 +4378,6 @@ bool vision_image_processor_process_step()
     int right_ipm_num = 0;
     int left_first_frame_touch_index = -1;
     int right_first_frame_touch_index = -1;
-    int left_trace_first_touch_y_work = -1;
-    int right_trace_first_touch_y_work = -1;
     int left_start_frame_wall_rows = 0;
     int right_start_frame_wall_rows = 0;
     int left_boundary_count_signal = 0;
@@ -4622,16 +4622,6 @@ bool vision_image_processor_process_step()
                                                                           false);
         g_src_left_start_frame_wall_rows.store(left_start_frame_wall_rows);
         g_src_right_start_frame_wall_rows.store(right_start_frame_wall_rows);
-
-        // 八邻域工作层触边检测：在任何 trim 前先记录第一次触边行坐标。
-        if (left_first_frame_touch_index >= 0 && left_first_frame_touch_index < left_trace_num)
-        {
-            left_trace_first_touch_y_work = left_trace_pts[left_first_frame_touch_index].y;
-        }
-        if (right_first_frame_touch_index >= 0 && right_first_frame_touch_index < right_trace_num)
-        {
-            right_trace_first_touch_y_work = right_trace_pts[right_first_frame_touch_index].y;
-        }
 
         if (!cross3_state_active_before_trace)
         {
@@ -4903,22 +4893,24 @@ bool vision_image_processor_process_step()
     }
 
     // 在上一帧主状态为 NORMAL/STRAIGHT 时：
-    // 在八邻域工作层检测“第一次触边”行坐标，再作用到按行规则边界。
+    // 在规则边界上直接找第一个触边点（按点索引截断），保留触边点，丢弃之后所有点。
     // 使用 before_trace 状态，避免本帧已切入 CROSS 导致 NORMAL/STRAIGHT 策略失效。
     // 触边截断后再执行一次角点截断，确保两种截断规则同时生效。
     if (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_NORMAL ||
         route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_STRAIGHT)
     {
-        const int left_touch_y = left_trace_first_touch_y_work;
-        const int right_touch_y = right_trace_first_touch_y_work;
-        const bool left_touch_found = (left_touch_y >= 0);
-        const bool right_touch_found = (right_touch_y >= 0);
-        g_src_left_first_frame_touch_after_valid_y.store(left_touch_found ? left_touch_y : -1);
-        g_src_right_first_frame_touch_after_valid_y.store(right_touch_found ? right_touch_y : -1);
+        const bool left_touch_applied = truncate_regular_boundary_at_first_frame_touch_inplace(
+            left_regular_pts.data(), &left_regular_num);
+        g_src_left_first_frame_touch_after_valid_y.store(
+            left_touch_applied ? left_regular_pts[left_regular_num - 1].y : -1);
 
-        if (left_touch_found && left_regular_num > 0)
+        const bool right_touch_applied = truncate_regular_boundary_at_first_frame_touch_inplace(
+            right_regular_pts.data(), &right_regular_num);
+        g_src_right_first_frame_touch_after_valid_y.store(
+            right_touch_applied ? right_regular_pts[right_regular_num - 1].y : -1);
+
+        if (left_touch_applied)
         {
-            truncate_regular_boundary_at_touch_y_inplace(left_regular_pts.data(), &left_regular_num, left_touch_y);
             left_num = copy_boundary_points(left_regular_pts.data(),
                                             left_regular_num,
                                             left_pts.data(),
@@ -4932,9 +4924,8 @@ bool vision_image_processor_process_step()
                                                                            static_cast<int>(left_pts.size()));
             }
         }
-        if (right_touch_found && right_regular_num > 0)
+        if (right_touch_applied)
         {
-            truncate_regular_boundary_at_touch_y_inplace(right_regular_pts.data(), &right_regular_num, right_touch_y);
             right_num = copy_boundary_points(right_regular_pts.data(),
                                              right_regular_num,
                                              right_pts.data(),
@@ -5604,9 +5595,9 @@ bool vision_image_processor_process_step()
         }
     }
 
-    // Circle 送 IPM 前，执行“首次触边即截断”硬策略：
+    // Circle 送 IPM 前，执行”首次触边即截断”硬策略：
     // - 先删起始人工边框前缀；
-    // - 再从第一处触碰人工边框的位置直接截断（不保留触边点）。
+    // - 再从第一处触碰人工边框的位置后截断（保留触边点）。
     if (route_snapshot.main_state == VISION_ROUTE_MAIN_CIRCLE)
     {
         trim_initial_artificial_frame_prefix_inplace(left_pts.data(),
@@ -5623,11 +5614,11 @@ bool vision_image_processor_process_step()
             find_first_frame_touch_index_with_margin(right_pts.data(), right_num, circle_touch_margin_px);
         if (left_first_frame_touch_index >= 0)
         {
-            left_num = std::clamp(left_first_frame_touch_index, 0, left_num);
+            left_num = std::min(left_num, left_first_frame_touch_index + 1);
         }
         if (right_first_frame_touch_index >= 0)
         {
-            right_num = std::clamp(right_first_frame_touch_index, 0, right_num);
+            right_num = std::min(right_num, right_first_frame_touch_index + 1);
         }
     }
 
