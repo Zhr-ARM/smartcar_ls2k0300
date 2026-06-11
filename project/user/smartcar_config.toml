@@ -233,10 +233,12 @@ red_to_target_bottom_x2 = 30.0
 red_to_target_bottom_y2 = 2.5
 # 目标板正方形边长（IPM 像素）。
 square_side_px = 8
+# 中线命中点最小 y 坐标（proc 坐标系，y 必须 > 该值才通过）。
+hit_min_y = 25
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
-enabled = false
+enabled = true
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
 max_fps = 20
@@ -259,7 +261,7 @@ rgb_image_format = 1
 # 0=FULL，1=RAW_MINIMAL。
 data_profile = 0
 # 网页端 TCP 状态发送总开关。
-tcp_enabled = false
+tcp_enabled = true
 # PC 接收端 IP 地址。
 server_ip = "192.168.3.9"
 # PC 接收端 UDP 视频端口。
@@ -388,12 +390,10 @@ server_port = 8899
 maze_trace_max_points = 180
 # 迷宫法允许追踪的纵向区域百分比。
 # 100 表示全高。
-maze_lower_region_percent = 85
-# OTSU 策略开关。
-# true=按需 OTSU，false=先生成整图二值图。
-demand_otsu_enable = false
-# 按需 OTSU 时是否保留全图二值缓存。
-demand_otsu_keep_full_binary_cache = true
+maze_lower_region_percent = 100
+# 全图 OTSU 执行间隔（帧数）。
+# 1=每帧都执行 OTSU；N=每 N 帧执行一次，中间帧复用上一次阈值。
+otsu_interval_frames = 5
 # 是否启用逆透视流程。
 enable_inverse_perspective = true
 # 逆透视输出宽度。

@@ -52,6 +52,8 @@ typedef struct
     float red_roi_red_to_target_bottom_x2;
     float red_roi_red_to_target_bottom_y2;
     int red_roi_square_side_px;
+    // 目标板 ROI 命中点最小 y 坐标（proc 坐标系，y 必须 > 该值才通过）。
+    int red_roi_hit_min_y;
     // 客户端发送开关：控制逐飞助手发送链路是否启用。
     bool client_sender_enabled;
     // 车载屏显示开关：true 时启动 screen_display_thread。
@@ -386,10 +388,8 @@ typedef struct
     int maze_trace_max_points;
     // 迷宫法允许追踪的纵向区域百分比（100=全高）。
     int maze_lower_region_percent;
-    // OTSU 二值化策略：true=按需 OTSU，false=先生成全图二值图。
-    bool demand_otsu_enable;
-    // 按需 OTSU 时是否保留完整二值图缓存。
-    bool demand_otsu_keep_full_binary_cache;
+    // 全图 OTSU 执行间隔（帧数），1=每帧执行，N=每 N 帧执行一次。
+    int otsu_interval_frames;
     // 是否启用“边线点逆透视 + IPM 边界输出”流程。
     bool enable_inverse_perspective;
     // 逆透视输出宽度。

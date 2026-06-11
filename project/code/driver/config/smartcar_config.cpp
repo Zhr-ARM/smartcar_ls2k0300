@@ -957,6 +957,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
         !require_float(values, &consumed, "vision.runtime.red_roi.red_to_target_bottom_x2", &g_vision_runtime_config.red_roi_red_to_target_bottom_x2, error_message) ||
         !require_float(values, &consumed, "vision.runtime.red_roi.red_to_target_bottom_y2", &g_vision_runtime_config.red_roi_red_to_target_bottom_y2, error_message) ||
         !require_int(values, &consumed, "vision.runtime.red_roi.square_side_px", &g_vision_runtime_config.red_roi_square_side_px, error_message) ||
+        !require_int(values, &consumed, "vision.runtime.red_roi.hit_min_y", &g_vision_runtime_config.red_roi_hit_min_y, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.client_sender_enabled", &g_vision_runtime_config.client_sender_enabled, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.screen_display_enabled", &g_vision_runtime_config.screen_display_enabled, error_message) ||
         !require_bool(values, &consumed, "vision.runtime.speed_tuning_mode_enabled", &g_vision_runtime_config.speed_tuning_mode_enabled, error_message))
@@ -1185,8 +1186,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
 
     if (!require_int(values, &consumed, "vision.processor.maze_trace_max_points", &g_vision_processor_config.maze_trace_max_points, error_message) ||
         !require_int(values, &consumed, "vision.processor.maze_lower_region_percent", &g_vision_processor_config.maze_lower_region_percent, error_message) ||
-        !require_bool(values, &consumed, "vision.processor.demand_otsu_enable", &g_vision_processor_config.demand_otsu_enable, error_message) ||
-        !require_bool(values, &consumed, "vision.processor.demand_otsu_keep_full_binary_cache", &g_vision_processor_config.demand_otsu_keep_full_binary_cache, error_message) ||
+        !require_int(values, &consumed, "vision.processor.otsu_interval_frames", &g_vision_processor_config.otsu_interval_frames, error_message) ||
         !require_bool(values, &consumed, "vision.processor.enable_inverse_perspective", &g_vision_processor_config.enable_inverse_perspective, error_message) ||
         !require_int(values, &consumed, "vision.processor.ipm_output_width", &g_vision_processor_config.ipm_output_width, error_message) ||
         !require_int(values, &consumed, "vision.processor.ipm_output_height", &g_vision_processor_config.ipm_output_height, error_message))

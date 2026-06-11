@@ -413,6 +413,12 @@ static bool detect_and_extract_target_board(const infer_job_t &job,
         return false;
     }
 
+    if (bottom_src_y <= g_vision_runtime_config.red_roi_hit_min_y)
+    {
+        result->board_fail_reason = "hit_y_too_high";
+        return false;
+    }
+
     int bottom_ipm_x = 0;
     int bottom_ipm_y = 0;
     const double dist_ipm = accumulate_ipm_distance(job,

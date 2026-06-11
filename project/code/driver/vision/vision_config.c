@@ -73,6 +73,7 @@ vision_runtime_config_t g_vision_runtime_config = {
     .red_roi_red_to_target_bottom_x2 = 10.0f,
     .red_roi_red_to_target_bottom_y2 = 0.0f,
     .red_roi_square_side_px = 8,
+    .red_roi_hit_min_y = 25,
     // 逐飞客户端发送开关。
     .client_sender_enabled = false,
     // 车载屏显示开关。
@@ -444,10 +445,8 @@ vision_processor_config_t g_vision_processor_config = {
     .maze_trace_max_points = 180,
     // 迷宫法允许追踪的纵向区域百分比，100 表示全高。
     .maze_lower_region_percent = 85,
-    // OTSU 策略：true=按需 OTSU，false=先生成整图二值图。
-    .demand_otsu_enable = true,
-    // 按需 OTSU 时是否保留整图二值缓存，便于调试和发送。
-    .demand_otsu_keep_full_binary_cache = true,
+    // 全图 OTSU 执行间隔（帧数），1=每帧执行。
+    .otsu_interval_frames = 1,
     // 是否启用逆透视流程。
     .enable_inverse_perspective = true,
     // 逆透视输出宽度。
