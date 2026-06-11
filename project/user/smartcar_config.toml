@@ -236,7 +236,7 @@ square_side_px = 8
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
-enabled = true
+enabled = false
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
 max_fps = 20
@@ -259,7 +259,7 @@ rgb_image_format = 1
 # 0=FULL，1=RAW_MINIMAL。
 data_profile = 0
 # 网页端 TCP 状态发送总开关。
-tcp_enabled = true
+tcp_enabled = false
 # PC 接收端 IP 地址。
 server_ip = "192.168.3.9"
 # PC 接收端 UDP 视频端口。
@@ -402,7 +402,7 @@ ipm_output_width = 280
 ipm_output_height = 140
 # 逆透视矩阵。
 # 按 3x3 展平写入，顺序为行优先。
-change_un_mat = [0.228283, -0.165023, -4.090867, -0.000000, 0.010323, 3.078941, 0.000000, -0.002147, 0.359689]
+change_un_mat = [0.636458, -0.438969, -11.985072, -0.000000, 0.095313, -0.063178, -0.000000, -0.005772, 1.003826]
 # 相机内参矩阵。
 # 按 3x3 展平写入，顺序为行优先。
 camera_matrix = [88.352003, 0.0, 76.039402, 0.0, 88.094982, 60.149306, 0.0, 0.0, 1.0]

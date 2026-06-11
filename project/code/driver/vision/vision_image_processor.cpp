@@ -3364,7 +3364,7 @@ static bool binary_point_in_trace_range(int x, int y, int y_min, int x_min, int 
 static bool point_touches_artificial_frame(int x, int y)
 {
     (void)y;
-    return x <= 1 || x >= (kProcWidth - 2);
+    return x <= 2 || x >= (kProcWidth - 3);
 }
 
 static bool point_touches_opposite_side_artificial_frame(int x, bool is_left_boundary)
