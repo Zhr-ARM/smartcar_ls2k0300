@@ -6220,6 +6220,21 @@ float vision_image_processor_ipm_segmented_blended_abs_error(float split_ratio,
     return vision_line_error_layer_segmented_blended_abs_error(split_ratio, front_weight, rear_weight);
 }
 
+float vision_image_processor_ipm_centerline_slope_change_rate()
+{
+    return vision_line_error_layer_centerline_slope_change_rate();
+}
+
+float vision_image_processor_ipm_centerline_slope_change_rate_max()
+{
+    return vision_line_error_layer_centerline_slope_change_rate_max();
+}
+
+int vision_image_processor_ipm_centerline_slope_change_sample_count()
+{
+    return vision_line_error_layer_centerline_slope_change_sample_count();
+}
+
 void vision_image_processor_ipm_rear_exp_weighted_target_point(float split_ratio,
                                                                float exp_lambda,
                                                                bool *valid,

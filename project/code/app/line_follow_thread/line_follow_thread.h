@@ -25,8 +25,11 @@ struct LineFollowPidDebugStatus
     float measured_yaw_rate_dps;
     float yaw_rate_ref_dps;
     float yaw_rate_error_dps;
-    float target_yaw_rate_abs_filtered_dps;
-    float target_yaw_rate_speed_scale;
+    float centerline_slope_change_rate_raw;
+    float centerline_slope_change_rate_filtered;
+    int centerline_slope_change_rate_sample_count;
+    float centerline_slope_change_rate_curve_threshold;
+    bool centerline_slope_change_rate_curve_mode;
     float dynamic_position_kp;
     float dynamic_yaw_rate_kp;
     float applied_yaw_rate_kp;

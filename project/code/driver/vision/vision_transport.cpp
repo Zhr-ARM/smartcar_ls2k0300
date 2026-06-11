@@ -1085,10 +1085,16 @@ static void send_tcp_status()
         append_float(enabled, "pid_common_measured_yaw_rate_dps", line_follow_pid_debug.measured_yaw_rate_dps);
         append_float(enabled, "pid_common_yaw_rate_ref_dps", line_follow_pid_debug.yaw_rate_ref_dps);
         append_float(enabled, "pid_common_yaw_rate_error_dps", line_follow_pid_debug.yaw_rate_error_dps);
-        append_float(enabled, "pid_common_target_yaw_rate_abs_filtered_dps",
-                     line_follow_pid_debug.target_yaw_rate_abs_filtered_dps);
-        append_float(enabled, "pid_common_target_yaw_rate_speed_scale",
-                     line_follow_pid_debug.target_yaw_rate_speed_scale);
+        append_float(enabled, "pid_common_centerline_slope_change_rate_raw",
+                     line_follow_pid_debug.centerline_slope_change_rate_raw);
+        append_float(enabled, "pid_common_centerline_slope_change_rate_filtered",
+                     line_follow_pid_debug.centerline_slope_change_rate_filtered);
+        append_int(enabled, "pid_common_centerline_slope_change_rate_sample_count",
+                   line_follow_pid_debug.centerline_slope_change_rate_sample_count);
+        append_float(enabled, "pid_common_centerline_slope_change_rate_curve_threshold",
+                     line_follow_pid_debug.centerline_slope_change_rate_curve_threshold);
+        append_bool(enabled, "pid_common_centerline_slope_change_rate_curve_mode",
+                    line_follow_pid_debug.centerline_slope_change_rate_curve_mode);
         append_float(enabled, "pid_common_dynamic_position_kp", line_follow_pid_debug.dynamic_position_kp);
         append_float(enabled, "pid_common_dynamic_yaw_rate_kp", line_follow_pid_debug.dynamic_yaw_rate_kp);
         append_float(enabled, "pid_common_applied_yaw_rate_kp", line_follow_pid_debug.applied_yaw_rate_kp);

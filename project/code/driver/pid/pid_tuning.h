@@ -119,11 +119,39 @@ struct Profile
     float speed_scheme_max_drop_ratio_per_cycle;
     float speed_scheme_max_rise_ratio_per_cycle;
     float speed_scheme_min_base_speed;
-    bool speed_scheme_target_yaw_rate_enabled;
-    float speed_scheme_target_yaw_rate_start_dps;
-    float speed_scheme_target_yaw_rate_full_dps;
-    float speed_scheme_target_yaw_rate_min_scale;
-    float speed_scheme_target_yaw_rate_filter_alpha;
+    bool speed_scheme_centerline_slope_change_rate_enabled;
+    float speed_scheme_centerline_slope_change_rate_filter_alpha;
+
+    // 中线斜率变化率直/弯档切换。低于阈值使用上面的默认控制参数，高于阈值使用 curve_* 参数。
+    float slope_control_curve_threshold;
+    int slope_control_straight_confirm_frames;
+    float curve_base_speed;
+    float curve_position_dynamic_kp_quad_a;
+    float curve_position_dynamic_kp_base;
+    float curve_position_dynamic_kp_min;
+    float curve_position_dynamic_kp_max;
+    float curve_position_dynamic_kp_low_error_threshold_px;
+    float curve_position_dynamic_kp_mid_a;
+    float curve_position_dynamic_kp_mid_error_threshold_px;
+    float curve_position_dynamic_kp_high_a;
+    float curve_position_ki;
+    float curve_position_kd;
+    float curve_position_max_integral;
+    float curve_position_max_output;
+    float curve_steering_max_output;
+    float curve_yaw_rate_ref_from_error_gain_dps;
+    float curve_yaw_rate_ref_from_track_point_gain_dps;
+    float curve_yaw_rate_ref_limit_dps;
+    float curve_yaw_rate_kp;
+    float curve_yaw_rate_dynamic_kp_quad_a;
+    float curve_yaw_rate_dynamic_kp_min;
+    float curve_yaw_rate_dynamic_kp_max;
+    float curve_yaw_rate_kp_enable_error_threshold_px;
+    float curve_yaw_rate_ki;
+    float curve_yaw_rate_kd;
+    float curve_yaw_rate_max_integral;
+    float curve_yaw_rate_max_output;
+    float curve_speed_scheme_min_base_speed;
 };
 
 extern float kGlobalBaseSpeedScale;

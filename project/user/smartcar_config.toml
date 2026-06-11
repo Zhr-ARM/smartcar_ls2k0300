@@ -240,7 +240,7 @@ hit_min_y = 25
 
 [vision.runtime.web]
 # 网页端 UDP 图传总开关。
-enabled = true
+enabled = false
 # 网页端 UDP 图传最大发送帧率。
 # 0 表示不限速。
 max_fps = 20
@@ -263,9 +263,9 @@ rgb_image_format = 1
 # 0=FULL，1=RAW_MINIMAL。
 data_profile = 0
 # 网页端 TCP 状态发送总开关。
-tcp_enabled = true
+tcp_enabled = false
 # PC 接收端 IP 地址。
-server_ip = "192.168.3.9"
+server_ip = "192.168.3.11"
 # PC 接收端 UDP 视频端口。
 video_port = 10000
 # PC 接收端 TCP 状态端口。
@@ -383,7 +383,7 @@ ipm_size = true
 # 逐飞助手 UDP 通道开关。
 enabled = false
 # 逐飞助手接收端 IP。
-server_ip = "192.168.3.9"
+server_ip = "192.168.3.11"
 # 逐飞助手接收端端口。
 server_port = 8899
 
@@ -506,11 +506,11 @@ base_speed_scale = 1.0
 
 [pid.route_line_follow.normal]
 # NORMAL 档基础速度。
-base_speed = 525.0
+base_speed = 520.0
 # NORMAL 档位置环动态 Kp 低误差段一次项系数。
 position_dynamic_kp_quad_a = 0.0
 # NORMAL 档位置环动态 Kp 基础值。
-position_dynamic_kp_base = 9.55
+position_dynamic_kp_base = 8.0
 # NORMAL 档位置环动态 Kp 下限。
 position_dynamic_kp_min = 0.0
 # NORMAL 档位置环动态 Kp 上限。
@@ -518,15 +518,15 @@ position_dynamic_kp_max = 200.0
 # NORMAL 档位置环动态 Kp 低误差段结束阈值。
 position_dynamic_kp_low_error_threshold_px = 10.0
 # NORMAL 档位置环动态 Kp 中误差段一次项系数。
-position_dynamic_kp_mid_a = 0.2
+position_dynamic_kp_mid_a = 0.0
 # NORMAL 档位置环动态 Kp 中误差段结束阈值。
 position_dynamic_kp_mid_error_threshold_px = 20.0
 # NORMAL 档位置环动态 Kp 高误差段一次项系数。
-position_dynamic_kp_high_a = 0.4
+position_dynamic_kp_high_a = 0.0
 # NORMAL 档位置环 Ki。
 position_ki = 0.0
 # NORMAL 档位置环 Kd 基础值。
-position_kd = 0.12
+position_kd = 0.06
 # NORMAL 档位置环积分限幅。
 position_max_integral = 0.0
 # NORMAL 档位置环输出限幅。
@@ -541,7 +541,7 @@ yaw_rate_ref_from_track_point_gain_dps = 12.0
 # NORMAL 档目标横摆角速度限幅。
 yaw_rate_ref_limit_dps = 360.0
 # NORMAL 档角速度环 Kp。
-yaw_rate_kp = 0.5
+yaw_rate_kp = 0.3
 # NORMAL 档角速度环动态 Kp 一次项系数。
 yaw_rate_dynamic_kp_quad_a = 0.0
 # NORMAL 档角速度环动态 Kp 下限。
@@ -566,18 +566,69 @@ speed_scheme_max_drop_ratio_per_cycle = 0.95
 # 速度方案单周期最大升速比例。
 speed_scheme_max_rise_ratio_per_cycle = 0.05
 # 速度方案基础速度下限。
-speed_scheme_min_base_speed = 475.0
-# 目标角速度降速开关。
-speed_scheme_target_yaw_rate_enabled = true
-# 目标角速度降速起始阈值，单位 dps。
-# 目标角速度绝对值低于此值时不降速。
-speed_scheme_target_yaw_rate_start_dps = 25.0
-# 目标角速度达到此阈值时进入最大降速，单位 dps。
-speed_scheme_target_yaw_rate_full_dps = 26.0
-# 目标角速度最大时的最低速度倍率。
-speed_scheme_target_yaw_rate_min_scale = 0.2
-# 目标角速度低通滤波 alpha。
-speed_scheme_target_yaw_rate_filter_alpha = 0.99
+speed_scheme_min_base_speed = 330.0
+# 中线斜率变化率降速开关。
+speed_scheme_centerline_slope_change_rate_enabled = true
+# 中线斜率变化率低通滤波 alpha。
+speed_scheme_centerline_slope_change_rate_filter_alpha = 0.2
+# 中线斜率变化率直/弯档切换阈值；filtered 小于该值走上方直道档，大于等于该值走下方 curve 档。
+slope_control_curve_threshold = 0.5
+# 从弯道档切回直道档需要连续满足直道条件的新视觉帧数；1 表示一满足就切回。
+slope_control_straight_confirm_frames = 50
+# NORMAL 弯道档基础速度。
+curve_base_speed = 360.0
+# NORMAL 弯道档位置环动态 Kp 低误差段一次项系数。
+curve_position_dynamic_kp_quad_a = 0.0
+# NORMAL 弯道档位置环动态 Kp 基础值。
+curve_position_dynamic_kp_base = 8.45
+# NORMAL 弯道档位置环动态 Kp 下限。
+curve_position_dynamic_kp_min = 0.0
+# NORMAL 弯道档位置环动态 Kp 上限。
+curve_position_dynamic_kp_max = 200.0
+# NORMAL 弯道档位置环动态 Kp 低误差段结束阈值。
+curve_position_dynamic_kp_low_error_threshold_px = 10.0
+# NORMAL 弯道档位置环动态 Kp 中误差段一次项系数。
+curve_position_dynamic_kp_mid_a = 0.00
+# NORMAL 弯道档位置环动态 Kp 中误差段结束阈值。
+curve_position_dynamic_kp_mid_error_threshold_px = 20.0
+# NORMAL 弯道档位置环动态 Kp 高误差段一次项系数。
+curve_position_dynamic_kp_high_a = 0.0
+# NORMAL 弯道档位置环 Ki。
+curve_position_ki = 0.0
+# NORMAL 弯道档位置环 Kd。
+curve_position_kd = 0.06
+# NORMAL 弯道档位置环积分限幅。
+curve_position_max_integral = 0.0
+# NORMAL 弯道档位置环输出限幅。
+curve_position_max_output = 3500.0
+# NORMAL 弯道档总转向输出限幅。
+curve_steering_max_output = 360.0
+# NORMAL 弯道档由横向误差生成目标横摆角速度的增益。
+curve_yaw_rate_ref_from_error_gain_dps = 1.0
+# NORMAL 弯道档由跟踪点夹角生成目标横摆角速度的增益。
+curve_yaw_rate_ref_from_track_point_gain_dps = 12.0
+# NORMAL 弯道档目标横摆角速度限幅。
+curve_yaw_rate_ref_limit_dps = 360.0
+# NORMAL 弯道档角速度环 Kp。
+curve_yaw_rate_kp = 0.075
+# NORMAL 弯道档角速度环动态 Kp 一次项系数。
+curve_yaw_rate_dynamic_kp_quad_a = 0.0
+# NORMAL 弯道档角速度环动态 Kp 下限。
+curve_yaw_rate_dynamic_kp_min = 0.0
+# NORMAL 弯道档角速度环动态 Kp 上限。
+curve_yaw_rate_dynamic_kp_max = 10.0
+# NORMAL 弯道档角速度环启用阈值。
+curve_yaw_rate_kp_enable_error_threshold_px = 0.0
+# NORMAL 弯道档角速度环 Ki。
+curve_yaw_rate_ki = 0.0
+# NORMAL 弯道档角速度环 Kd。
+curve_yaw_rate_kd = 0.0
+# NORMAL 弯道档角速度环积分限幅。
+curve_yaw_rate_max_integral = 0.0
+# NORMAL 弯道档角速度环输出限幅。
+curve_yaw_rate_max_output = 1000.0
+# NORMAL 弯道档速度下限。
+curve_speed_scheme_min_base_speed = 0.0
 
 [pid.route_line_follow.circle]
 # CIRCLE 档基础速度。
@@ -641,14 +692,65 @@ speed_scheme_max_drop_ratio_per_cycle = 0.95
 speed_scheme_max_rise_ratio_per_cycle = 0.05
 # 速度方案基础速度下限。
 speed_scheme_min_base_speed = 550.0
-# 目标角速度降速开关。
-speed_scheme_target_yaw_rate_enabled = true
-# 目标角速度降速起始阈值，单位 dps。
-# 目标角速度绝对值低于此值时不降速。
-speed_scheme_target_yaw_rate_start_dps = 25.0
-# 目标角速度达到此阈值时进入最大降速，单位 dps。
-speed_scheme_target_yaw_rate_full_dps = 26.0
-# 目标角速度最大时的最低速度倍率。
-speed_scheme_target_yaw_rate_min_scale = 0.2
-# 目标角速度低通滤波 alpha。
-speed_scheme_target_yaw_rate_filter_alpha = 0.99
+# 中线斜率变化率降速开关。
+speed_scheme_centerline_slope_change_rate_enabled = true
+# 中线斜率变化率低通滤波 alpha。
+speed_scheme_centerline_slope_change_rate_filter_alpha = 0.45
+# 中线斜率变化率直/弯档切换阈值；filtered 小于该值走上方直道档，大于等于该值走下方 curve 档。
+slope_control_curve_threshold = 1.10
+# 从弯道档切回直道档需要连续满足直道条件的新视觉帧数；1 表示一满足就切回。
+slope_control_straight_confirm_frames = 20
+# CIRCLE 弯道档基础速度。
+curve_base_speed = 550.0
+# CIRCLE 弯道档位置环动态 Kp 低误差段一次项系数。
+curve_position_dynamic_kp_quad_a = 0.0
+# CIRCLE 弯道档位置环动态 Kp 基础值。
+curve_position_dynamic_kp_base = 12.00
+# CIRCLE 弯道档位置环动态 Kp 下限。
+curve_position_dynamic_kp_min = 0.0
+# CIRCLE 弯道档位置环动态 Kp 上限。
+curve_position_dynamic_kp_max = 200.0
+# CIRCLE 弯道档位置环动态 Kp 低误差段结束阈值。
+curve_position_dynamic_kp_low_error_threshold_px = 10.0
+# CIRCLE 弯道档位置环动态 Kp 中误差段一次项系数。
+curve_position_dynamic_kp_mid_a = 0.4
+# CIRCLE 弯道档位置环动态 Kp 中误差段结束阈值。
+curve_position_dynamic_kp_mid_error_threshold_px = 20.0
+# CIRCLE 弯道档位置环动态 Kp 高误差段一次项系数。
+curve_position_dynamic_kp_high_a = 0.8
+# CIRCLE 弯道档位置环 Ki。
+curve_position_ki = 0.0
+# CIRCLE 弯道档位置环 Kd。
+curve_position_kd = 0.25
+# CIRCLE 弯道档位置环积分限幅。
+curve_position_max_integral = 0.0
+# CIRCLE 弯道档位置环输出限幅。
+curve_position_max_output = 3500.0
+# CIRCLE 弯道档总转向输出限幅。
+curve_steering_max_output = 1000.0
+# CIRCLE 弯道档由横向误差生成目标横摆角速度的增益。
+curve_yaw_rate_ref_from_error_gain_dps = 1.0
+# CIRCLE 弯道档由跟踪点夹角生成目标横摆角速度的增益。
+curve_yaw_rate_ref_from_track_point_gain_dps = 12.0
+# CIRCLE 弯道档目标横摆角速度限幅。
+curve_yaw_rate_ref_limit_dps = 360.0
+# CIRCLE 弯道档角速度环 Kp。
+curve_yaw_rate_kp = 0.5
+# CIRCLE 弯道档角速度环动态 Kp 一次项系数。
+curve_yaw_rate_dynamic_kp_quad_a = 0.0
+# CIRCLE 弯道档角速度环动态 Kp 下限。
+curve_yaw_rate_dynamic_kp_min = 0.0
+# CIRCLE 弯道档角速度环动态 Kp 上限。
+curve_yaw_rate_dynamic_kp_max = 10.0
+# CIRCLE 弯道档角速度环启用阈值。
+curve_yaw_rate_kp_enable_error_threshold_px = 0.0
+# CIRCLE 弯道档角速度环 Ki。
+curve_yaw_rate_ki = 0.0
+# CIRCLE 弯道档角速度环 Kd。
+curve_yaw_rate_kd = 0.0
+# CIRCLE 弯道档角速度环积分限幅。
+curve_yaw_rate_max_integral = 0.0
+# CIRCLE 弯道档角速度环输出限幅。
+curve_yaw_rate_max_output = 1000.0
+# CIRCLE 弯道档速度下限。
+curve_speed_scheme_min_base_speed = 550.0

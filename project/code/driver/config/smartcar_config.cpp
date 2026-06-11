@@ -712,11 +712,37 @@ bool load_route_profile(const RawMap &values,
            require_float(values, consumed, prefix + ".speed_scheme_max_drop_ratio_per_cycle", &profile->speed_scheme_max_drop_ratio_per_cycle, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_max_rise_ratio_per_cycle", &profile->speed_scheme_max_rise_ratio_per_cycle, error_message) &&
            require_float(values, consumed, prefix + ".speed_scheme_min_base_speed", &profile->speed_scheme_min_base_speed, error_message) &&
-           require_bool(values, consumed, prefix + ".speed_scheme_target_yaw_rate_enabled", &profile->speed_scheme_target_yaw_rate_enabled, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_start_dps", &profile->speed_scheme_target_yaw_rate_start_dps, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_full_dps", &profile->speed_scheme_target_yaw_rate_full_dps, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_min_scale", &profile->speed_scheme_target_yaw_rate_min_scale, error_message) &&
-           require_float(values, consumed, prefix + ".speed_scheme_target_yaw_rate_filter_alpha", &profile->speed_scheme_target_yaw_rate_filter_alpha, error_message);
+           require_bool(values, consumed, prefix + ".speed_scheme_centerline_slope_change_rate_enabled", &profile->speed_scheme_centerline_slope_change_rate_enabled, error_message) &&
+           require_float(values, consumed, prefix + ".speed_scheme_centerline_slope_change_rate_filter_alpha", &profile->speed_scheme_centerline_slope_change_rate_filter_alpha, error_message) &&
+           require_float(values, consumed, prefix + ".slope_control_curve_threshold", &profile->slope_control_curve_threshold, error_message) &&
+           require_int(values, consumed, prefix + ".slope_control_straight_confirm_frames", &profile->slope_control_straight_confirm_frames, error_message) &&
+           require_float(values, consumed, prefix + ".curve_base_speed", &profile->curve_base_speed, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_dynamic_kp_quad_a", &profile->curve_position_dynamic_kp_quad_a, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_dynamic_kp_base", &profile->curve_position_dynamic_kp_base, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_dynamic_kp_min", &profile->curve_position_dynamic_kp_min, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_dynamic_kp_max", &profile->curve_position_dynamic_kp_max, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_dynamic_kp_low_error_threshold_px", &profile->curve_position_dynamic_kp_low_error_threshold_px, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_dynamic_kp_mid_a", &profile->curve_position_dynamic_kp_mid_a, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_dynamic_kp_mid_error_threshold_px", &profile->curve_position_dynamic_kp_mid_error_threshold_px, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_dynamic_kp_high_a", &profile->curve_position_dynamic_kp_high_a, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_ki", &profile->curve_position_ki, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_kd", &profile->curve_position_kd, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_max_integral", &profile->curve_position_max_integral, error_message) &&
+           require_float(values, consumed, prefix + ".curve_position_max_output", &profile->curve_position_max_output, error_message) &&
+           require_float(values, consumed, prefix + ".curve_steering_max_output", &profile->curve_steering_max_output, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_ref_from_error_gain_dps", &profile->curve_yaw_rate_ref_from_error_gain_dps, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_ref_from_track_point_gain_dps", &profile->curve_yaw_rate_ref_from_track_point_gain_dps, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_ref_limit_dps", &profile->curve_yaw_rate_ref_limit_dps, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_kp", &profile->curve_yaw_rate_kp, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_dynamic_kp_quad_a", &profile->curve_yaw_rate_dynamic_kp_quad_a, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_dynamic_kp_min", &profile->curve_yaw_rate_dynamic_kp_min, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_dynamic_kp_max", &profile->curve_yaw_rate_dynamic_kp_max, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_kp_enable_error_threshold_px", &profile->curve_yaw_rate_kp_enable_error_threshold_px, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_ki", &profile->curve_yaw_rate_ki, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_kd", &profile->curve_yaw_rate_kd, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_max_integral", &profile->curve_yaw_rate_max_integral, error_message) &&
+           require_float(values, consumed, prefix + ".curve_yaw_rate_max_output", &profile->curve_yaw_rate_max_output, error_message) &&
+           require_float(values, consumed, prefix + ".curve_speed_scheme_min_base_speed", &profile->curve_speed_scheme_min_base_speed, error_message);
 }
 
 PidSnapshot capture_pid_snapshot()

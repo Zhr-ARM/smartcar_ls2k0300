@@ -41,11 +41,8 @@ struct SpeedSchemeRuntimeParams
     float max_drop_ratio_per_cycle;
     float max_rise_ratio_per_cycle;
     float min_base_speed;
-    bool target_yaw_rate_enabled;
-    float target_yaw_rate_start_dps;
-    float target_yaw_rate_full_dps;
-    float target_yaw_rate_min_scale;
-    float target_yaw_rate_filter_alpha;
+    bool centerline_slope_change_rate_enabled;
+    float centerline_slope_change_rate_filter_alpha;
 };
 
 SpeedSchemeRuntimeParams read_speed_scheme_runtime_params(const RouteProfile &profile)
@@ -57,13 +54,9 @@ SpeedSchemeRuntimeParams read_speed_scheme_runtime_params(const RouteProfile &pr
     params.max_rise_ratio_per_cycle =
         std::clamp(profile.speed_scheme_max_rise_ratio_per_cycle, 0.0f, 1.0f);
     params.min_base_speed = std::max(0.0f, profile.speed_scheme_min_base_speed);
-    params.target_yaw_rate_enabled = profile.speed_scheme_target_yaw_rate_enabled;
-    params.target_yaw_rate_start_dps = std::max(0.0f, profile.speed_scheme_target_yaw_rate_start_dps);
-    params.target_yaw_rate_full_dps =
-        std::max(params.target_yaw_rate_start_dps, profile.speed_scheme_target_yaw_rate_full_dps);
-    params.target_yaw_rate_min_scale = std::clamp(profile.speed_scheme_target_yaw_rate_min_scale, 0.0f, 1.0f);
-    params.target_yaw_rate_filter_alpha =
-        std::clamp(profile.speed_scheme_target_yaw_rate_filter_alpha, 0.0f, 1.0f);
+    params.centerline_slope_change_rate_enabled = profile.speed_scheme_centerline_slope_change_rate_enabled;
+    params.centerline_slope_change_rate_filter_alpha =
+        std::clamp(profile.speed_scheme_centerline_slope_change_rate_filter_alpha, 0.0f, 1.0f);
     return params;
 }
 
@@ -87,8 +80,10 @@ float g_filtered_yaw_rate_dps = 0.0f;
 // 滤波后的目标点夹角：由跟踪点相对图像中垂线的偏转角得到。
 // 注意：状态只在“拿到新视觉帧”时推进一次。
 float g_filtered_track_point_angle_deg = 0.0f;
-// 目标角速度降速状态：对目标横摆角速度绝对值做低通滤波，越大降速越多。
-float g_filtered_abs_target_yaw_rate_dps = 0.0f;
+// 中线斜率变化率降速状态：对视觉形状指标做低通滤波，弯越急降速越多。
+float g_filtered_centerline_slope_change_rate = 0.0f;
+bool g_slope_curve_control_mode = false;
+int g_slope_straight_candidate_frames = 0;
 // 当前真正参与左右轮目标合成的基础速度状态：把“理想基础速度”做成缓增缓降，避免一帧一跳。
 float g_applied_base_speed_state = -1.0f;
 // 位置环与角速度环各自最近一次真实更新后的输出，样本未更新时沿用旧值。
@@ -124,12 +119,12 @@ struct ControlErrorState
     float control_error_px;
 };
 
-struct TargetYawRateSpeedRuntime
+struct CenterlineSlopeChangeSpeedRuntime
 {
-    float filtered_abs_target_yaw_rate_dps;
-    float speed_scale;
+    float raw_slope_change_rate;
+    float filtered_slope_change_rate;
+    int sample_count;
     bool ready;
-    bool triggered;
 };
 
 float apply_iir_filter(float previous_value, float current_value, float alpha)
@@ -235,7 +230,9 @@ void reset_line_follow_runtime_state()
     g_filtered_error = 0.0f;
     g_filtered_yaw_rate_dps = 0.0f;
     g_filtered_track_point_angle_deg = 0.0f;
-    g_filtered_abs_target_yaw_rate_dps = 0.0f;
+    g_filtered_centerline_slope_change_rate = 0.0f;
+    g_slope_curve_control_mode = false;
+    g_slope_straight_candidate_frames = 0;
     g_applied_base_speed_state = -1.0f;
     g_position_output_state = 0.0f;
     g_yaw_rate_output_state = 0.0f;
@@ -453,47 +450,138 @@ float update_pid_output_state_if_needed(bool should_update,
                       output_limit);
 }
 
-TargetYawRateSpeedRuntime update_target_yaw_rate_speed_runtime(bool vision_updated,
-                                                               float vision_frame_dt_seconds,
-                                                               float yaw_rate_ref_dps,
-                                                               const SpeedSchemeRuntimeParams &speed_scheme)
+CenterlineSlopeChangeSpeedRuntime update_centerline_slope_change_speed_runtime(bool vision_updated,
+                                                                               const SpeedSchemeRuntimeParams &speed_scheme)
 {
-    TargetYawRateSpeedRuntime runtime{};
-    runtime.filtered_abs_target_yaw_rate_dps = g_filtered_abs_target_yaw_rate_dps;
-    runtime.speed_scale = 1.0f;
-
-    // 目标角速度绝对值：弯越急、目标横摆越大，绝对值越大。
-    const float abs_target_yaw_rate_dps = std::fabs(yaw_rate_ref_dps);
+    CenterlineSlopeChangeSpeedRuntime runtime{};
+    runtime.raw_slope_change_rate = vision_image_processor_ipm_centerline_slope_change_rate();
+    runtime.filtered_slope_change_rate = g_filtered_centerline_slope_change_rate;
+    runtime.sample_count = vision_image_processor_ipm_centerline_slope_change_sample_count();
 
     if (vision_updated)
     {
-        g_filtered_abs_target_yaw_rate_dps =
-            apply_iir_filter(g_filtered_abs_target_yaw_rate_dps,
-                             abs_target_yaw_rate_dps,
-                             speed_scheme.target_yaw_rate_filter_alpha);
+        g_filtered_centerline_slope_change_rate =
+            apply_iir_filter(g_filtered_centerline_slope_change_rate,
+                             runtime.raw_slope_change_rate,
+                             speed_scheme.centerline_slope_change_rate_filter_alpha);
     }
 
-    runtime.filtered_abs_target_yaw_rate_dps = g_filtered_abs_target_yaw_rate_dps;
-    runtime.ready = true;
-
-    if (!speed_scheme.target_yaw_rate_enabled ||
-        speed_scheme.target_yaw_rate_full_dps <= speed_scheme.target_yaw_rate_start_dps)
-    {
-        return runtime;
-    }
-
-    // 将滤波后的目标角速度绝对值线性映射到 [0,1] 归一化区间。
-    const float yaw_norm =
-        std::clamp((runtime.filtered_abs_target_yaw_rate_dps - speed_scheme.target_yaw_rate_start_dps) /
-                       (speed_scheme.target_yaw_rate_full_dps - speed_scheme.target_yaw_rate_start_dps),
-                   0.0f,
-                   1.0f);
-    // 归一化值越大 → 速度倍率越低。
-    runtime.speed_scale = std::clamp(1.0f - yaw_norm * (1.0f - speed_scheme.target_yaw_rate_min_scale),
-                                     speed_scheme.target_yaw_rate_min_scale,
-                                     1.0f);
-    runtime.triggered = runtime.speed_scale < 0.999f;
+    runtime.filtered_slope_change_rate = g_filtered_centerline_slope_change_rate;
+    runtime.ready = runtime.sample_count > 0;
     return runtime;
+}
+
+bool update_slope_curve_control_mode(bool vision_updated,
+                                     const RouteProfile &profile,
+                                     const CenterlineSlopeChangeSpeedRuntime &runtime)
+{
+    if (!profile.speed_scheme_centerline_slope_change_rate_enabled || !runtime.ready)
+    {
+        g_slope_curve_control_mode = false;
+        g_slope_straight_candidate_frames = 0;
+        return false;
+    }
+
+    if (!vision_updated)
+    {
+        return g_slope_curve_control_mode;
+    }
+
+    const bool curve_candidate =
+        runtime.filtered_slope_change_rate >= std::max(0.0f, profile.slope_control_curve_threshold);
+    if (curve_candidate)
+    {
+        g_slope_curve_control_mode = true;
+        g_slope_straight_candidate_frames = 0;
+        return true;
+    }
+
+    if (g_slope_curve_control_mode)
+    {
+        ++g_slope_straight_candidate_frames;
+        if (g_slope_straight_candidate_frames >= std::max(1, profile.slope_control_straight_confirm_frames))
+        {
+            g_slope_curve_control_mode = false;
+            g_slope_straight_candidate_frames = 0;
+        }
+    }
+    else
+    {
+        g_slope_straight_candidate_frames = 0;
+    }
+
+    return g_slope_curve_control_mode;
+}
+
+RouteProfile make_active_route_profile_for_slope_mode(const RouteProfile &profile, bool curve_mode)
+{
+    if (!curve_mode)
+    {
+        return profile;
+    }
+
+    RouteProfile active = profile;
+    active.base_speed = profile.curve_base_speed;
+    active.position_dynamic_kp_quad_a = profile.curve_position_dynamic_kp_quad_a;
+    active.position_dynamic_kp_base = profile.curve_position_dynamic_kp_base;
+    active.position_dynamic_kp_min = profile.curve_position_dynamic_kp_min;
+    active.position_dynamic_kp_max = profile.curve_position_dynamic_kp_max;
+    active.position_dynamic_kp_low_error_threshold_px =
+        profile.curve_position_dynamic_kp_low_error_threshold_px;
+    active.position_dynamic_kp_mid_a = profile.curve_position_dynamic_kp_mid_a;
+    active.position_dynamic_kp_mid_error_threshold_px =
+        profile.curve_position_dynamic_kp_mid_error_threshold_px;
+    active.position_dynamic_kp_high_a = profile.curve_position_dynamic_kp_high_a;
+    active.position_ki = profile.curve_position_ki;
+    active.position_kd = profile.curve_position_kd;
+    active.position_max_integral = profile.curve_position_max_integral;
+    active.position_max_output = profile.curve_position_max_output;
+    active.steering_max_output = profile.curve_steering_max_output;
+    active.yaw_rate_ref_from_error_gain_dps = profile.curve_yaw_rate_ref_from_error_gain_dps;
+    active.yaw_rate_ref_from_track_point_gain_dps = profile.curve_yaw_rate_ref_from_track_point_gain_dps;
+    active.yaw_rate_ref_limit_dps = profile.curve_yaw_rate_ref_limit_dps;
+    active.yaw_rate_kp = profile.curve_yaw_rate_kp;
+    active.yaw_rate_dynamic_kp_quad_a = profile.curve_yaw_rate_dynamic_kp_quad_a;
+    active.yaw_rate_dynamic_kp_min = profile.curve_yaw_rate_dynamic_kp_min;
+    active.yaw_rate_dynamic_kp_max = profile.curve_yaw_rate_dynamic_kp_max;
+    active.yaw_rate_kp_enable_error_threshold_px =
+        profile.curve_yaw_rate_kp_enable_error_threshold_px;
+    active.yaw_rate_ki = profile.curve_yaw_rate_ki;
+    active.yaw_rate_kd = profile.curve_yaw_rate_kd;
+    active.yaw_rate_max_integral = profile.curve_yaw_rate_max_integral;
+    active.yaw_rate_max_output = profile.curve_yaw_rate_max_output;
+    active.speed_scheme_min_base_speed = profile.curve_speed_scheme_min_base_speed;
+    return active;
+}
+
+void log_centerline_slope_change_if_needed(bool vision_updated,
+                                           const CenterlineSlopeChangeSpeedRuntime &runtime,
+                                           float applied_base_speed,
+                                           bool curve_mode)
+{
+    static bool has_last_log_time = false;
+    static std::chrono::steady_clock::time_point last_log_time;
+
+    if (!vision_updated)
+    {
+        return;
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+    if (has_last_log_time &&
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - last_log_time).count() < 200)
+    {
+        return;
+    }
+
+    last_log_time = now;
+    has_last_log_time = true;
+
+    printf("[SLOPE_MODE] filtered=%.6f base_speed=%.2f curve=%d straight_count=%d\r\n",
+           static_cast<double>(runtime.filtered_slope_change_rate),
+           static_cast<double>(applied_base_speed),
+           curve_mode ? 1 : 0,
+           g_slope_straight_candidate_frames);
 }
 
 float alpha_to_time_constant_seconds(float alpha, float nominal_dt_seconds)
@@ -666,7 +754,7 @@ void refresh_thread_info()
  * 2) 巡线线程只在“拿到新视觉帧 / 新 IMU 样本”时推进各自滤波状态；
  * 3) 再统一方向约定，并通过归一化、死区、小误差降增益把视觉噪声整形成“可控误差”；
  * 4) 位置环 PID 负责“回中线”，角速度环 PID 负责“按视觉期望横摆率转过去”；
- * 5) 两条反馈支路并级叠加成最终差速，再叠加基础速度与角速度变化率降速后下发左右轮目标。
+ * 5) 两条反馈支路并级叠加成最终差速，再叠加基于中线斜率变化率的基础速度降速后下发左右轮目标。
  */
 void line_follow_loop()
 {
@@ -686,7 +774,9 @@ void line_follow_loop()
             position_pid1.reset();
             position_pid2.reset();
             g_normal_speed_reference.store(std::max(0.0f, pid_tuning::route_line_follow::kNormalProfile.base_speed));
-            g_filtered_abs_target_yaw_rate_dps = 0.0f;
+            g_filtered_centerline_slope_change_rate = 0.0f;
+            g_slope_curve_control_mode = false;
+            g_slope_straight_candidate_frames = 0;
         }
 
         // 这里的 normal_speed_reference 表示“当前希望的 NORMAL 档直道参考速度”。
@@ -697,8 +787,6 @@ void line_follow_loop()
         const RouteProfileSelection route_selection =
             select_route_profile_selection(route_main_state, route_sub_state);//状态对应参数包
         const RouteProfile &route_profile = route_selection.profile;//取出参数包中数据
-        const float profile_base_speed =
-            compute_profile_base_speed_from_normal_reference(current_normal_speed_reference, route_profile);
         // 这些滤波器只在“数据源真的更新了”时推进一次；
         // 若当前 1ms 周期只是重复读到旧样本，就沿用上一份滤波状态，避免 alpha 被空转放大。
         float imu_sample_dt_seconds = IMU_NOMINAL_DT_SECONDS;
@@ -713,18 +801,28 @@ void line_follow_loop()
         // 后面的 deadzone / 小误差降增益继续使用像素尺度判断，
         // 位置环当前也直接在像素量纲下工作。
         const ControlErrorState error_state = compute_control_error_state(g_filtered_error);
+        const SpeedSchemeRuntimeParams slope_filter_speed_scheme =
+            read_speed_scheme_runtime_params(route_profile);
+        const CenterlineSlopeChangeSpeedRuntime slope_change_runtime =
+            update_centerline_slope_change_speed_runtime(vision_updated, slope_filter_speed_scheme);
+        const bool slope_curve_mode =
+            update_slope_curve_control_mode(vision_updated, route_profile, slope_change_runtime);
+        const RouteProfile active_route_profile =
+            make_active_route_profile_for_slope_mode(route_profile, slope_curve_mode);
+        const float profile_base_speed =
+            compute_profile_base_speed_from_normal_reference(current_normal_speed_reference, active_route_profile);
 
         // 动态 Kp：误差越大，比例增益越强。
         // 这里不再对动态 Kp 的输入额外归一化，直接用经过死区/低增益处理后的像素误差。
         const float dynamic_kp =
-            compute_piecewise_linear_abs_gain(route_profile.position_dynamic_kp_base,
-                                              route_profile.position_dynamic_kp_quad_a,
-                                              route_profile.position_dynamic_kp_low_error_threshold_px,
-                                              route_profile.position_dynamic_kp_mid_a,
-                                              route_profile.position_dynamic_kp_mid_error_threshold_px,
-                                              route_profile.position_dynamic_kp_high_a,
-                                              route_profile.position_dynamic_kp_min,
-                                              route_profile.position_dynamic_kp_max,
+            compute_piecewise_linear_abs_gain(active_route_profile.position_dynamic_kp_base,
+                                              active_route_profile.position_dynamic_kp_quad_a,
+                                              active_route_profile.position_dynamic_kp_low_error_threshold_px,
+                                              active_route_profile.position_dynamic_kp_mid_a,
+                                              active_route_profile.position_dynamic_kp_mid_error_threshold_px,
+                                              active_route_profile.position_dynamic_kp_high_a,
+                                              active_route_profile.position_dynamic_kp_min,
+                                              active_route_profile.position_dynamic_kp_max,
                                               error_state.control_error_px);
 
         // 第二条支路：角速度环 PID。
@@ -734,23 +832,23 @@ void line_follow_loop()
         // 3) 角速度环去逼近这个由夹角生成的目标横摆角速度。
         // 这样位置环和角速度环职责更清楚：位置环回中线，角速度环管车头朝向。
         const float yaw_rate_ref_dps = std::clamp(
-            g_filtered_track_point_angle_deg * route_profile.yaw_rate_ref_from_track_point_gain_dps,
-            -route_profile.yaw_rate_ref_limit_dps,
-            route_profile.yaw_rate_ref_limit_dps);
+            g_filtered_track_point_angle_deg * active_route_profile.yaw_rate_ref_from_track_point_gain_dps,
+            -active_route_profile.yaw_rate_ref_limit_dps,
+            active_route_profile.yaw_rate_ref_limit_dps);
         //角速度的差
         const float yaw_rate_error_dps = yaw_rate_ref_dps - g_filtered_yaw_rate_dps; // 目标角速度与实际角速度之差
-        const float dynamic_yaw_rate_kp = compute_linear_abs_gain(route_profile.yaw_rate_kp,
-                                                                  route_profile.yaw_rate_dynamic_kp_quad_a,
-                                                                  route_profile.yaw_rate_dynamic_kp_min,
-                                                                  route_profile.yaw_rate_dynamic_kp_max,
+        const float dynamic_yaw_rate_kp = compute_linear_abs_gain(active_route_profile.yaw_rate_kp,
+                                                                  active_route_profile.yaw_rate_dynamic_kp_quad_a,
+                                                                  active_route_profile.yaw_rate_dynamic_kp_min,
+                                                                  active_route_profile.yaw_rate_dynamic_kp_max,
                                                                   yaw_rate_error_dps);
         const bool enable_yaw_rate_kp =
-            (route_profile.yaw_rate_kp_enable_error_threshold_px <= 0.0f) ||
-            (error_state.abs_filtered_error_px >= route_profile.yaw_rate_kp_enable_error_threshold_px);
+            (active_route_profile.yaw_rate_kp_enable_error_threshold_px <= 0.0f) ||
+            (error_state.abs_filtered_error_px >= active_route_profile.yaw_rate_kp_enable_error_threshold_px);
         const float applied_yaw_rate_kp = enable_yaw_rate_kp ? dynamic_yaw_rate_kp : 0.0f;
-        configure_line_follow_controllers_for_profile(route_profile,
+        configure_line_follow_controllers_for_profile(active_route_profile,
                                                       dynamic_kp,
-                                                      route_profile.position_kd,
+                                                      active_route_profile.position_kd,
                                                       applied_yaw_rate_kp);
 
         // ---------------- 并级控制核心 ----------------
@@ -761,7 +859,7 @@ void line_follow_loop()
                                                                     vision_frame_dt_seconds,
                                                                     g_last_position_pid_time,
                                                                     g_has_last_position_pid_time,
-                                                                    route_profile.position_max_output,
+                                                                    active_route_profile.position_max_output,
                                                                     position_pid1,
                                                                     g_position_output_state);
         const float realtime_speed =
@@ -777,7 +875,7 @@ void line_follow_loop()
                                                                     yaw_rate_pid_dt_fallback,
                                                                     g_last_yaw_rate_pid_time,
                                                                     g_has_last_yaw_rate_pid_time,
-                                                                    route_profile.yaw_rate_max_output,
+                                                                    active_route_profile.yaw_rate_max_output,
                                                                     position_pid2,
                                                                     g_yaw_rate_output_state);
         const float yaw_rate_output = g_yaw_rate_output_state;
@@ -786,8 +884,8 @@ void line_follow_loop()
         const float feedback_output = position_output + yaw_rate_output;
         const float raw_steering_output =
             std::clamp(feedback_output,
-                       -route_profile.steering_max_output,
-                       route_profile.steering_max_output);
+                       -active_route_profile.steering_max_output,
+                       active_route_profile.steering_max_output);
 
         bool force_full_speed = false;
         const float mean_abs_path_error = vision_image_processor_ipm_mean_abs_offset_error(); // 视觉给出的整条分析路径平均绝对偏差像素
@@ -795,24 +893,17 @@ void line_follow_loop()
         int track_point_x = 0;
         int track_point_y = 0;
         vision_image_processor_get_ipm_line_error_track_point(&track_point_valid, &track_point_x, &track_point_y);
-        const SpeedSchemeRuntimeParams speed_scheme = read_speed_scheme_runtime_params(route_profile);
-        const TargetYawRateSpeedRuntime target_yaw_rate_runtime =
-            update_target_yaw_rate_speed_runtime(vision_updated,
-                                                 vision_frame_dt_seconds,
-                                                 yaw_rate_ref_dps,
-                                                 speed_scheme);
-        const float speed_scheme_error_scale_raw = target_yaw_rate_runtime.speed_scale;
-        const float min_base_speed = std::clamp(speed_scheme.min_base_speed, 0.0f, profile_base_speed);
-        const float desired_base_speed = std::clamp(profile_base_speed * speed_scheme_error_scale_raw,
-                                                    min_base_speed,
-                                                    profile_base_speed);
+        const SpeedSchemeRuntimeParams speed_scheme = read_speed_scheme_runtime_params(active_route_profile);
+        const float speed_scheme_error_scale_raw = 1.0f;
+        const float min_base_speed =
+            std::clamp(speed_scheme.min_base_speed, 0.0f, pid_tuning::line_follow::kTargetCountMax);
+        const float desired_base_speed = std::max(profile_base_speed, min_base_speed);
         const float speed_scheme_final_speed_scale =
             (profile_base_speed > 1.0e-4f) ? (desired_base_speed / profile_base_speed) : 1.0f;
-        const bool speed_scheme_ready = target_yaw_rate_runtime.ready;
-        const bool speed_scheme_triggered = target_yaw_rate_runtime.triggered &&
-                                            (desired_base_speed < profile_base_speed - 0.5f);
-        int speed_scheme_winner_branch = speed_scheme_triggered ? 1 : 0;
-        // 速度方案：目标角速度越大，基础速度越低；最终速度再经单周期升降速限幅平滑。
+        const bool speed_scheme_ready = slope_change_runtime.ready;
+        const bool speed_scheme_triggered = slope_curve_mode;
+        int speed_scheme_winner_branch = slope_curve_mode ? 2 : 0;
+        // 速度方案：中线斜率变化率低于阈值用直道档，高于阈值用弯道档；最终速度再经单周期升降速限幅平滑。
         g_applied_base_speed_state = update_applied_base_speed(g_applied_base_speed_state,
                                                                profile_base_speed,
                                                                desired_base_speed,
@@ -821,6 +912,10 @@ void line_follow_loop()
         const float applied_base_speed = std::clamp(g_applied_base_speed_state, // 经过所有降速和缓冲限幅后的最终下发基础速度
                                                     pid_tuning::line_follow::kTargetCountMin,
                                                     pid_tuning::line_follow::kTargetCountMax);
+        log_centerline_slope_change_if_needed(vision_updated,
+                                              slope_change_runtime,
+                                              applied_base_speed,
+                                              slope_curve_mode);
         const float steering_output = clamp_steering_to_wheel_room(applied_base_speed,
                                                                    raw_steering_output);
 
@@ -871,10 +966,15 @@ void line_follow_loop()
             g_pid_debug_status.measured_yaw_rate_dps = measured_yaw_rate_dps;
             g_pid_debug_status.yaw_rate_ref_dps = yaw_rate_ref_dps;
             g_pid_debug_status.yaw_rate_error_dps = yaw_rate_error_dps;
-            g_pid_debug_status.target_yaw_rate_abs_filtered_dps =
-                target_yaw_rate_runtime.filtered_abs_target_yaw_rate_dps;
-            g_pid_debug_status.target_yaw_rate_speed_scale =
-                target_yaw_rate_runtime.speed_scale;
+            g_pid_debug_status.centerline_slope_change_rate_raw =
+                slope_change_runtime.raw_slope_change_rate;
+            g_pid_debug_status.centerline_slope_change_rate_filtered =
+                slope_change_runtime.filtered_slope_change_rate;
+            g_pid_debug_status.centerline_slope_change_rate_sample_count =
+                slope_change_runtime.sample_count;
+            g_pid_debug_status.centerline_slope_change_rate_curve_threshold =
+                route_profile.slope_control_curve_threshold;
+            g_pid_debug_status.centerline_slope_change_rate_curve_mode = slope_curve_mode;
             g_pid_debug_status.dynamic_position_kp = dynamic_kp;
             g_pid_debug_status.dynamic_yaw_rate_kp = dynamic_yaw_rate_kp;
             g_pid_debug_status.applied_yaw_rate_kp = applied_yaw_rate_kp;
@@ -896,14 +996,15 @@ void line_follow_loop()
             g_pid_debug_status.yaw_pid_output = position_pid2.get_output();
             g_pid_debug_status.yaw_pid_max_integral = position_pid2.max_integral();
             g_pid_debug_status.yaw_pid_max_output = position_pid2.max_output();
-            g_pid_debug_status.route_yaw_rate_ref_gain = route_profile.yaw_rate_ref_from_track_point_gain_dps;
-            g_pid_debug_status.route_yaw_rate_ref_limit = route_profile.yaw_rate_ref_limit_dps;
-            g_pid_debug_status.route_steering_max_output = route_profile.steering_max_output;
+            g_pid_debug_status.route_yaw_rate_ref_gain =
+                active_route_profile.yaw_rate_ref_from_track_point_gain_dps;
+            g_pid_debug_status.route_yaw_rate_ref_limit = active_route_profile.yaw_rate_ref_limit_dps;
+            g_pid_debug_status.route_steering_max_output = active_route_profile.steering_max_output;
             g_pid_debug_status.route_yaw_rate_kp_enable_error_threshold_px =
-                route_profile.yaw_rate_kp_enable_error_threshold_px;
+                active_route_profile.yaw_rate_kp_enable_error_threshold_px;
             g_pid_debug_status.mean_abs_path_error = mean_abs_path_error;
             g_pid_debug_status.speed_scheme_blended_abs_error_sum =
-                target_yaw_rate_runtime.filtered_abs_target_yaw_rate_dps;
+                slope_change_runtime.filtered_slope_change_rate;
             g_pid_debug_status.speed_scheme_realtime_speed = realtime_speed;
             g_pid_debug_status.speed_scheme_error_scale_raw = speed_scheme_error_scale_raw;
             g_pid_debug_status.speed_scheme_final_speed_scale = speed_scheme_final_speed_scale;

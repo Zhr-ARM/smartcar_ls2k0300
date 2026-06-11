@@ -58,6 +58,9 @@ float g_abs_error_sum_to_required_index = 0.0f;
 std::array<float, VISION_DOWNSAMPLED_HEIGHT * 2> g_front_abs_errors = {};
 std::array<uint16, VISION_DOWNSAMPLED_HEIGHT * 2> g_centerline_xs = {};
 std::array<uint16, VISION_DOWNSAMPLED_HEIGHT * 2> g_centerline_ys = {};
+std::atomic<float> g_centerline_slope_change_rate(0.0f);
+std::atomic<float> g_centerline_slope_change_rate_max(0.0f);
+std::atomic<int> g_centerline_slope_change_sample_count(0);
 
 static void reset_ipm_line_error_weighted_points_to_default()
 {
@@ -70,6 +73,79 @@ static void reset_ipm_line_error_weighted_points_to_default()
         g_ipm_line_error_weights[i] = g_vision_runtime_config.ipm_line_error_weights[i];
     }
     g_ipm_line_error_weighted_point_count = g_vision_runtime_config.ipm_line_error_weighted_point_count;
+}
+
+static bool fit_centerline_slope_by_y(const uint16 *xs,
+                                      const uint16 *ys,
+                                      int begin_index,
+                                      int end_index,
+                                      float *slope)
+{
+    if (xs == nullptr || ys == nullptr || slope == nullptr || begin_index < 0 || end_index <= begin_index)
+    {
+        return false;
+    }
+
+    double sum_y = 0.0;
+    double sum_x = 0.0;
+    double sum_yy = 0.0;
+    double sum_yx = 0.0;
+    int n = 0;
+    for (int i = begin_index; i < end_index; ++i)
+    {
+        const double y = static_cast<double>(ys[i]);
+        const double x = static_cast<double>(xs[i]);
+        sum_y += y;
+        sum_x += x;
+        sum_yy += y * y;
+        sum_yx += y * x;
+        ++n;
+    }
+
+    if (n < 2)
+    {
+        return false;
+    }
+
+    const double denom = static_cast<double>(n) * sum_yy - sum_y * sum_y;
+    if (std::fabs(denom) < 1.0e-6)
+    {
+        return false;
+    }
+
+    *slope = static_cast<float>((static_cast<double>(n) * sum_yx - sum_y * sum_x) / denom);
+    return true;
+}
+
+static void update_centerline_slope_change_stats(const uint16 *xs, const uint16 *ys, int count)
+{
+    g_centerline_slope_change_rate.store(0.0f);
+    g_centerline_slope_change_rate_max.store(0.0f);
+    g_centerline_slope_change_sample_count.store(0);
+
+    const int safe_count = std::clamp(count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2));
+    const int min_fit_points = std::max(3, g_centerline_curvature_step.load());
+    if (xs == nullptr || ys == nullptr || safe_count < min_fit_points * 2)
+    {
+        return;
+    }
+
+    int split_index = safe_count / 2;
+    split_index = std::clamp(split_index, min_fit_points, safe_count - min_fit_points);
+
+    float near_slope = 0.0f;
+    float far_slope = 0.0f;
+    if (!fit_centerline_slope_by_y(xs, ys, 0, split_index, &near_slope) ||
+        !fit_centerline_slope_by_y(xs, ys, split_index, safe_count, &far_slope))
+    {
+        return;
+    }
+
+    const float change_rate = std::fabs(far_slope - near_slope);
+
+    g_centerline_slope_change_rate.store(change_rate);
+    g_centerline_slope_change_rate_max.store(change_rate);
+    g_centerline_slope_change_sample_count.store(safe_count);
 }
 
 } // namespace
@@ -98,6 +174,9 @@ void vision_line_error_layer_reset()
     g_front_abs_errors.fill(0.0f);
     g_centerline_xs.fill(0);
     g_centerline_ys.fill(0);
+    g_centerline_slope_change_rate.store(0.0f);
+    g_centerline_slope_change_rate_max.store(0.0f);
+    g_centerline_slope_change_sample_count.store(0);
 }
 
 int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ipm_center_x,
@@ -121,6 +200,7 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
     g_front_abs_errors.fill(0.0f);
     g_centerline_xs.fill(0);
     g_centerline_ys.fill(0);
+    update_centerline_slope_change_stats(nullptr, nullptr, 0);
 
     const int center_count = std::clamp(ipm_center_count, 0, static_cast<int>(VISION_DOWNSAMPLED_HEIGHT * 2));
     if (center_count <= 0)
@@ -140,6 +220,7 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         g_front_abs_errors.fill(0.0f);
         g_centerline_xs.fill(0);
         g_centerline_ys.fill(0);
+        update_centerline_slope_change_stats(nullptr, nullptr, 0);
         return 0;
     }
 
@@ -162,6 +243,7 @@ int vision_line_error_layer_compute_from_ipm_shifted_centerline(const uint16 *ip
         }
         g_mean_abs_offset = (count > 0) ? static_cast<float>(sum_abs / static_cast<double>(count)) : 0.0f;
     }
+    update_centerline_slope_change_stats(xs, ys, count);
 
     float x = 0.0f;
     float y = 0.0f;
@@ -558,6 +640,21 @@ float vision_line_error_layer_segmented_blended_abs_error(float split_ratio,
 
     return (front_mean * clamped_front_weight + rear_mean * clamped_rear_weight) /
            (clamped_front_weight + clamped_rear_weight);
+}
+
+float vision_line_error_layer_centerline_slope_change_rate()
+{
+    return g_centerline_slope_change_rate.load();
+}
+
+float vision_line_error_layer_centerline_slope_change_rate_max()
+{
+    return g_centerline_slope_change_rate_max.load();
+}
+
+int vision_line_error_layer_centerline_slope_change_sample_count()
+{
+    return g_centerline_slope_change_sample_count.load();
 }
 
 void vision_line_error_layer_rear_exp_weighted_target_point(float split_ratio,

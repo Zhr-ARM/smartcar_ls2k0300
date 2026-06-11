@@ -175,6 +175,9 @@ float vision_image_processor_ipm_front_weighted_abs_error_sum(int point_count);
 float vision_image_processor_ipm_segmented_blended_abs_error(float split_ratio,
                                                              float front_weight,
                                                              float rear_weight);
+float vision_image_processor_ipm_centerline_slope_change_rate();
+float vision_image_processor_ipm_centerline_slope_change_rate_max();
+int vision_image_processor_ipm_centerline_slope_change_sample_count();
 void vision_image_processor_ipm_rear_exp_weighted_target_point(float split_ratio,
                                                                 float exp_lambda,
                                                                 bool *valid,

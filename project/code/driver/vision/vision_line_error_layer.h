@@ -53,6 +53,9 @@ float vision_line_error_layer_front_weighted_abs_error_sum(int point_count);
 float vision_line_error_layer_segmented_blended_abs_error(float split_ratio,
                                                           float front_weight,
                                                           float rear_weight);
+float vision_line_error_layer_centerline_slope_change_rate();
+float vision_line_error_layer_centerline_slope_change_rate_max();
+int vision_line_error_layer_centerline_slope_change_sample_count();
 void vision_line_error_layer_rear_exp_weighted_target_point(float split_ratio,
                                                             float exp_lambda,
                                                             bool *valid,
