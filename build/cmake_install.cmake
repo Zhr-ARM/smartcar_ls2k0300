@@ -1,4 +1,4 @@
-# Install script for directory: /home/zhr/2k0300/test1/project/user
+# Install script for directory: /home/lucy/loongcar/smartcar_ls2k0300/project/user
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -50,5 +50,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/zhr/2k0300/test1/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/lucy/loongcar/smartcar_ls2k0300/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

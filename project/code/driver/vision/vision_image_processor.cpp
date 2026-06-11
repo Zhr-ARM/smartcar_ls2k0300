@@ -294,6 +294,7 @@ static std::atomic<int> g_cross_lower_corner_pre_min_votes(g_vision_runtime_conf
 static std::atomic<int> g_cross_lower_corner_post_min_votes(g_vision_runtime_config.cross_lower_corner_post_min_votes);
 static std::atomic<int> g_cross_lower_corner_transition_max_len(g_vision_runtime_config.cross_lower_corner_transition_max_len);
 static std::atomic<int> g_cross_lower_corner_pair_y_diff_max(g_vision_runtime_config.cross_lower_corner_pair_y_diff_max);
+static std::atomic<int> g_cross_lower_corner_regular_jump_x_diff(g_vision_runtime_config.cross_lower_corner_regular_jump_x_diff);
 static std::atomic<int> g_maze_trace_x_min(g_vision_processor_config.default_maze_trace_x_min);
 static std::atomic<int> g_maze_trace_x_max(g_vision_processor_config.default_maze_trace_x_max);
 // 去畸变开关（默认开启）。
@@ -460,6 +461,14 @@ struct cross_lower_corner_detection_t
     int index = -1;
     maze_point_t point{0, 0};
 };
+
+static void refine_cross_lower_corner_by_regular_x_jump(
+    const maze_point_t *regular_pts,
+    int regular_num,
+    bool is_left,
+    std::atomic<int> &corner_x,
+    std::atomic<int> &corner_y,
+    std::atomic<bool> &corner_found);
 
 static void fill_boundary_arrays_from_maze(const maze_point_t *left_pts,
                                            int left_num,
@@ -3843,6 +3852,73 @@ static int extract_one_point_per_row_from_contour(const maze_point_t *raw_pts,
     return out_num;
 }
 
+static void refine_cross_lower_corner_by_regular_x_jump(
+    const maze_point_t *regular_pts,
+    int regular_num,
+    bool is_left,
+    std::atomic<int> &corner_x,
+    std::atomic<int> &corner_y,
+    std::atomic<bool> &corner_found)
+{
+    if (regular_pts == nullptr || regular_num <= 0)
+    {
+        corner_found.store(false);
+        return;
+    }
+
+    const int orig_corner_y = corner_y.load();
+    const int y_start = orig_corner_y + 2;
+    const int y_end   = orig_corner_y - 8;
+
+    int prev_x = 0;
+    int prev_y = 0;
+    bool have_prev = false;
+
+    for (int i = 0; i < regular_num; ++i)
+    {
+        const maze_point_t pt = regular_pts[i];
+
+        if (pt.y > y_start || pt.y < y_end)
+        {
+            continue;
+        }
+
+        if (!have_prev)
+        {
+            prev_x = pt.x;
+            prev_y = pt.y;
+            have_prev = true;
+            continue;
+        }
+
+        const int dx = pt.x - prev_x;
+
+        const int jump_threshold = g_cross_lower_corner_regular_jump_x_diff.load();
+
+        bool is_jump = false;
+        if (is_left)
+        {
+            is_jump = (dx < -jump_threshold);
+        }
+        else
+        {
+            is_jump = (dx > jump_threshold);
+        }
+
+        if (is_jump)
+        {
+            corner_x.store(prev_x);
+            corner_y.store(prev_y);
+            return;
+        }
+
+        prev_x = pt.x;
+        prev_y = pt.y;
+    }
+
+    corner_found.store(false);
+}
+
 static int trace_num_for_ipm_artificial_frame_policy(const maze_point_t *raw_pts,
                                                      int raw_num,
                                                      int first_frame_touch_index)
@@ -4714,6 +4790,27 @@ bool vision_image_processor_process_step()
         g_cross_left_corner_post_frame_wall_rows.store(left_corner_post_frame_wall_rows);
         g_cross_right_corner_post_frame_wall_rows.store(right_corner_post_frame_wall_rows);
         g_cross_start_boundary_gap_x.store(start_boundary_gap_x);
+
+        if (g_cross_lower_left_corner_found.load())
+        {
+            refine_cross_lower_corner_by_regular_x_jump(
+                left_regular_pts.data(),
+                left_regular_num,
+                true,
+                g_cross_lower_left_corner_x,
+                g_cross_lower_left_corner_y,
+                g_cross_lower_left_corner_found);
+        }
+        if (g_cross_lower_right_corner_found.load())
+        {
+            refine_cross_lower_corner_by_regular_x_jump(
+                right_regular_pts.data(),
+                right_regular_num,
+                false,
+                g_cross_lower_right_corner_x,
+                g_cross_lower_right_corner_y,
+                g_cross_lower_right_corner_found);
+        }
 
         const bool cross1_state_active_before_trace =
             (route_snapshot_before_trace.main_state == VISION_ROUTE_MAIN_CROSS) &&
@@ -5748,6 +5845,7 @@ void vision_image_processor_reload_config_from_globals()
     g_cross_lower_corner_post_min_votes.store(g_vision_runtime_config.cross_lower_corner_post_min_votes);
     g_cross_lower_corner_transition_max_len.store(g_vision_runtime_config.cross_lower_corner_transition_max_len);
     g_cross_lower_corner_pair_y_diff_max.store(g_vision_runtime_config.cross_lower_corner_pair_y_diff_max);
+    g_cross_lower_corner_regular_jump_x_diff.store(g_vision_runtime_config.cross_lower_corner_regular_jump_x_diff);
     g_maze_trace_x_min.store(g_vision_processor_config.default_maze_trace_x_min);
     g_maze_trace_x_max.store(g_vision_processor_config.default_maze_trace_x_max);
     line_sample_ratio = g_vision_processor_config.default_line_sample_ratio;

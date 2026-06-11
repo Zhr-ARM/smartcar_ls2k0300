@@ -1098,6 +1098,7 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_BOOL(cross_lower_corner_extrapolate_enabled);
     REQUIRE_RUNTIME_INT(cross_lower_corner_extrapolate_min_y);
     REQUIRE_RUNTIME_INT(cross_lower_corner_extrapolate_y_span);
+    REQUIRE_RUNTIME_INT(cross_lower_corner_regular_jump_x_diff);
     REQUIRE_RUNTIME_INT(src_boundary_straight_check_count);
     REQUIRE_RUNTIME_FLOAT(src_boundary_straight_dir45_ratio_min);
     REQUIRE_RUNTIME_BOOL(undistort_enabled);

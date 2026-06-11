@@ -48,14 +48,14 @@ maze_trace_y_fallback_stop_delta = 15
 cross_lower_corner_dir_enabled = true
 # 十字下角点前平台窗口长度。
 # 用于检查角点前是否形成足够长的 {4,5}/{5,6} 平台。
-cross_lower_corner_pre_window = 8
+cross_lower_corner_pre_window = 5
 # 十字下角点后平台窗口长度。
 # 用于检查角点后是否形成足够长的 {1,2}/{2,3} 平台。
-cross_lower_corner_post_window = 8
+cross_lower_corner_post_window = 5
 # 十字下角点前平台最少投票数。
-cross_lower_corner_pre_min_votes = 7
+cross_lower_corner_pre_min_votes = 4
 # 十字下角点后平台最少投票数。
-cross_lower_corner_post_min_votes = 7
+cross_lower_corner_post_min_votes = 4
 # 十字下角点平台间允许的最大过渡长度。
 cross_lower_corner_transition_max_len = 4
 # 左右下角点 y 坐标最大允许差值。
@@ -69,6 +69,8 @@ cross_lower_corner_extrapolate_enabled = false
 cross_lower_corner_extrapolate_min_y = 35
 # 原图下角点外推补线的向上延伸行数。
 cross_lower_corner_extrapolate_y_span = 30
+# 十字下角点精炼时规则边界相邻点 x 跳变阈值（绝对差值）。
+cross_lower_corner_regular_jump_x_diff = 3
 # 原图直边判断时检查的边界前部点数。
 src_boundary_straight_check_count = 40
 # 原图直边判断中 dir=4/5 的最小占比阈值。

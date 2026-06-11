@@ -213,6 +213,9 @@ typedef struct
     int cross_lower_corner_extrapolate_min_y;
     // 十字下角点补线向上的延伸长度（按 y 行数计算）。
     int cross_lower_corner_extrapolate_y_span;
+    // 十字下角点精炼：规则边界 x 跳变阈值。
+    // 在角点附近窗口内，相邻规则边界点的 x 差值绝对值大于此阈值时视为跳变。
+    int cross_lower_corner_regular_jump_x_diff;
     // 原图直边判断：检查边界数组前多少个点的 dir。
     int src_boundary_straight_check_count;
     // 原图直边判断：前 N 个点中 dir=4/5 的最小占比阈值，范围 [0,1]。

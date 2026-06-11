@@ -285,6 +285,8 @@ vision_runtime_config_t g_vision_runtime_config = {
     .cross_lower_corner_extrapolate_min_y = 35,
     // 十字下角点补线向上的延伸长度（按 y 行数计算）。
     .cross_lower_corner_extrapolate_y_span = 30,
+    // 十字下角点精炼：规则边界相邻点 x 跳变阈值（绝对差值）。
+    .cross_lower_corner_regular_jump_x_diff = 3,
     // 原图直边判断：检查边界数组前 60 个点。
     .src_boundary_straight_check_count = 80,
     // 原图直边判断：前 N 个点中 90% 以上为 dir=4/5 判定为直边。
