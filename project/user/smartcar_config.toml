@@ -17,7 +17,7 @@ send_mode = 1
 send_max_fps = 60
 # 推理总开关。
 # false 时关闭红框检测和 ncnn 分类主链。
-infer_enabled = true
+infer_enabled = false
 # ncnn 分类子开关。
 # false 时即使 infer_enabled=true，也只保留红框检测，不做 ncnn 分类。
 ncnn_enabled = true
@@ -473,7 +473,7 @@ feedback_low_pass_alpha = 1.0
 
 [pid.brushless]
 # 是否启用主循环实时无刷控制。
-realtime_enabled = true
+realtime_enabled = false
 # 左侧无刷目标占空比，单位百分比 [0, 100]。
 left_duty_percent = 0.0
 # 右侧无刷目标占空比，单位百分比 [0, 100]。
