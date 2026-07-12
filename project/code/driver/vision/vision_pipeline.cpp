@@ -3,6 +3,7 @@
 #include "driver/vision/vision_config.h"
 #include "driver/vision/vision_image_processor.h"
 #include "driver/vision/vision_infer_async.h"
+#include "driver/vision/vision_route_state_machine.h"
 #include "driver/vision/vision_transport.h"
 
 #include <algorithm>
@@ -363,7 +364,8 @@ bool vision_pipeline_process_step()
     const uint8 *bgr_proc_data = vision_image_processor_bgr_image();
     const uint8 *bgr_full_data = vision_image_processor_bgr_full_image();
     // 2) 推理关闭或处理图无效时，清空推理相关状态但不影响巡线主链。
-    if (!vision_infer_async_enabled() || bgr_proc_data == nullptr)
+    if (!vision_infer_async_enabled() || bgr_proc_data == nullptr ||
+        vision_route_state_machine_main_state() == VISION_ROUTE_MAIN_BRICK)
     {
         reset_dynamic_center_target_offset_state(true);
         clear_infer_result_in_image_processor();

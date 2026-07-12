@@ -8,7 +8,8 @@ typedef enum
     VISION_ROUTE_MAIN_NORMAL = 0,
     VISION_ROUTE_MAIN_CIRCLE,
     VISION_ROUTE_MAIN_STRAIGHT,
-    VISION_ROUTE_MAIN_CROSS
+    VISION_ROUTE_MAIN_CROSS,
+    VISION_ROUTE_MAIN_BRICK
 } vision_route_main_state_enum;
 
 typedef enum
@@ -67,6 +68,8 @@ typedef struct
     float straight_abs_error_sum;
     bool left_circle_entry_raw_gap_ok;
     bool right_circle_entry_raw_gap_ok;
+    bool left_brick_detected;
+    bool right_brick_detected;
     uint32 frame_encoder_delta;
 } vision_route_state_input_t;
 
@@ -81,6 +84,7 @@ typedef struct
     int left_gain_count;
     int right_loss_count;
     int right_gain_count;
+    int brick_both_straight_count;
 } vision_route_state_snapshot_t;
 
 void vision_route_state_machine_reset();

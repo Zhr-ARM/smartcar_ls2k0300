@@ -395,6 +395,21 @@ vision_runtime_config_t g_vision_runtime_config = {
     .circle_guide_anchor_offset_stage5 = 0,
     // 圆环送 IPM 前触边判定边距。
     .route_circle_apply_touch_margin_px = 2,
+    // ==================== 砖块状态 ====================
+    // 砖块状态识别开关。
+    .route_brick_detection_enabled = true,
+    // 砖块入口：规则边界相邻点 x 差 <= 该值视为直线段。
+    .route_brick_straight_segment_dx_max = 3,
+    // 砖块入口：规则边界相邻点 x 差 > 该值视为跳变。
+    .route_brick_jump_dx_min = 8,
+    // 砖块入口：每段直线最少连续点数。
+    .route_brick_straight_segment_min_points = 5,
+    // 砖块入口：规则数组最少总点数。
+    .route_brick_detection_min_regular_points = 25,
+    // 砖块中线偏移增量（14 ± x，默认 x=10）。
+    .route_brick_offset_delta_from_center = 10.0f,
+    // 砖块退出：双侧直边连续确认帧数。
+    .route_brick_exit_straight_confirm_frames = 3,
     // straight 判定：固定窗口最少中线点数（前 N 点）。
     .route_straight_min_centerline_points = 20,
     // 进入 straight 状态所需连续帧数。

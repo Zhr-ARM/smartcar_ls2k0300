@@ -338,6 +338,21 @@ typedef struct
     int circle_guide_anchor_offset_stage5;
     // 圆环送 IPM 前硬截断触边判定边距（像素）。
     int route_circle_apply_touch_margin_px;
+    // ==================== 砖块状态 ====================
+    // 砖块状态识别开关：true=允许进入砖块状态，false=禁用。
+    bool route_brick_detection_enabled;
+    // 砖块入口判定：规则边界相邻点 x 差值绝对值 <= 该值视为直线段。
+    int route_brick_straight_segment_dx_max;
+    // 砖块入口判定：规则边界相邻点 x 差绝对值 > 该值视为跳变。
+    int route_brick_jump_dx_min;
+    // 砖块入口判定：每个直线段至少包含的连续点数。
+    int route_brick_straight_segment_min_points;
+    // 砖块入口判定：规则数组至少需要的最小总点数才能进行检测。
+    int route_brick_detection_min_regular_points;
+    // 砖块状态中线偏移增量：偏移量 = 14 +/- x，x 为该参数。
+    float route_brick_offset_delta_from_center;
+    // 砖块退出：两侧都直边的连续帧数 >= 该值则退出 BRICK 回 NORMAL。
+    int route_brick_exit_straight_confirm_frames;
     // straight 判定：参与判定的最少中线点数要求（固定窗口长度）。
     int route_straight_min_centerline_points;
     // 进入 straight 状态所需的连续满足帧数。

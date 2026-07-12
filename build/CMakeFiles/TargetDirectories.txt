@@ -1,3 +1,3 @@
-/home/lucy/loongcar/smartcar_ls2k0300/build/CMakeFiles/project.dir
-/home/lucy/loongcar/smartcar_ls2k0300/build/CMakeFiles/edit_cache.dir
-/home/lucy/loongcar/smartcar_ls2k0300/build/CMakeFiles/rebuild_cache.dir
+/home/angela/LoongCar/smartcar_ls2k0300/build/CMakeFiles/project.dir
+/home/angela/LoongCar/smartcar_ls2k0300/build/CMakeFiles/edit_cache.dir
+/home/angela/LoongCar/smartcar_ls2k0300/build/CMakeFiles/rebuild_cache.dir

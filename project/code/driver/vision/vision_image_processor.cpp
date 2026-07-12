@@ -1827,6 +1827,94 @@ static bool detect_src_straight_boundary_from_dirs(const uint8 *dirs, int count)
     return ratio >= cfg_ratio_min;
 }
 
+static bool detect_brick_pattern_on_regular_boundary(const maze_point_t *regular_pts,
+                                                      int regular_num,
+                                                      bool is_left)
+{
+    if (regular_pts == nullptr || regular_num <= 0)
+    {
+        return false;
+    }
+
+    const int min_regular =
+        g_vision_runtime_config.route_brick_detection_min_regular_points;
+    if (regular_num < min_regular)
+    {
+        return false;
+    }
+
+    const int straight_dx_max =
+        g_vision_runtime_config.route_brick_straight_segment_dx_max;
+    const int jump_dx_min =
+        g_vision_runtime_config.route_brick_jump_dx_min;
+    const int min_seg =
+        g_vision_runtime_config.route_brick_straight_segment_min_points;
+
+    const int max_idx = regular_num - 1;
+    int i = 0;
+
+    while (i < max_idx)
+    {
+        const int s1_start = i;
+        while (i < max_idx &&
+               std::abs(regular_pts[i + 1].x - regular_pts[i].x) <= straight_dx_max)
+        {
+            ++i;
+        }
+        const int s1_len = i - s1_start;
+        if (s1_len < min_seg || i >= max_idx)
+        {
+            ++i;
+            continue;
+        }
+
+        const int dx1 = regular_pts[i + 1].x - regular_pts[i].x;
+        const bool inward = is_left ? (dx1 > jump_dx_min) : (dx1 < -jump_dx_min);
+        if (!inward)
+        {
+            ++i;
+            continue;
+        }
+        ++i;
+
+        const int s2_start = i;
+        while (i < max_idx &&
+               std::abs(regular_pts[i + 1].x - regular_pts[i].x) <= straight_dx_max)
+        {
+            ++i;
+        }
+        const int s2_len = i - s2_start;
+        if (s2_len < min_seg || i >= max_idx)
+        {
+            ++i;
+            continue;
+        }
+
+        const int dx2 = regular_pts[i + 1].x - regular_pts[i].x;
+        const bool outward = is_left ? (dx2 < -jump_dx_min) : (dx2 > jump_dx_min);
+        if (!outward)
+        {
+            ++i;
+            continue;
+        }
+        ++i;
+
+        const int s3_start = i;
+        while (i < max_idx &&
+               std::abs(regular_pts[i + 1].x - regular_pts[i].x) <= straight_dx_max)
+        {
+            ++i;
+        }
+        const int s3_len = i - s3_start;
+        if (s3_len >= min_seg)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static int pick_cross_lower_corner_index_near_transition(const uint8 *dirs,
                                                          int transition_start,
                                                          int transition_end,
@@ -2854,6 +2942,24 @@ static int render_ipm_boundary_image_and_update_boundaries(const maze_point_t *l
                                                     0.0f,
                                                     track_width_px);
         target_offset_from_left_px = std::max(0.0f, track_width_px - left_circle_offset);
+    }
+    const bool brick_offset_active =
+        (route_snapshot.main_state == VISION_ROUTE_MAIN_BRICK);
+    if (brick_offset_active)
+    {
+        const float brick_delta = g_vision_runtime_config.route_brick_offset_delta_from_center;
+        const float base_offset = std::clamp(g_ipm_center_target_offset_from_left_px.load(),
+                                             0.0f, track_width_px);
+        if (route_snapshot.preferred_source == VISION_ROUTE_PREFERRED_SOURCE_RIGHT)
+        {
+            target_offset_from_left_px = std::clamp(base_offset + brick_delta,
+                                                    0.0f, track_width_px);
+        }
+        else
+        {
+            target_offset_from_left_px = std::clamp(base_offset - brick_delta,
+                                                    0.0f, track_width_px);
+        }
     }
     const float shift_dist_from_left_px = target_offset_from_left_px;
     const float shift_dist_from_right_px = std::max(0.0f, track_width_px - target_offset_from_left_px);
@@ -5047,6 +5153,11 @@ bool vision_image_processor_process_step()
     }
     auto t_maze_trace_end = std::chrono::steady_clock::now();
 
+    const bool left_brick_detected = detect_brick_pattern_on_regular_boundary(
+        left_regular_pts.data(), left_regular_num, true);
+    const bool right_brick_detected = detect_brick_pattern_on_regular_boundary(
+        right_regular_pts.data(), right_regular_num, false);
+
     vision_route_state_input_t route_input{};
     route_input.base_preferred_source = g_ipm_line_error_preferred_source.load();
     route_input.left_corner_found = g_cross_lower_left_corner_found.load();
@@ -5083,6 +5194,8 @@ bool vision_image_processor_process_step()
                                                                                     right_trace_pts_raw.data(),
                                                                                     right_trace_raw_num,
                                                                                     route_input.right_corner_src_y);
+    route_input.left_brick_detected = left_brick_detected;
+    route_input.right_brick_detected = right_brick_detected;
     route_input.frame_encoder_delta = static_cast<uint32>(std::lround((std::fabs(motor_thread_left_count()) + std::fabs(motor_thread_right_count())) * 0.5f));
     vision_route_state_machine_update(&route_input);
     const vision_route_state_snapshot_t route_snapshot = vision_route_state_machine_snapshot();

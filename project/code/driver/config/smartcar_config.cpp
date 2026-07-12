@@ -1181,6 +1181,13 @@ bool load_from_path(const std::string &path, std::string *error_message)
     REQUIRE_RUNTIME_INT(circle_guide_target_offset_stage3);
     REQUIRE_RUNTIME_INT(circle_guide_anchor_offset_stage5);
     REQUIRE_RUNTIME_INT(route_circle_apply_touch_margin_px);
+    REQUIRE_RUNTIME_BOOL(route_brick_detection_enabled);
+    REQUIRE_RUNTIME_INT(route_brick_straight_segment_dx_max);
+    REQUIRE_RUNTIME_INT(route_brick_jump_dx_min);
+    REQUIRE_RUNTIME_INT(route_brick_straight_segment_min_points);
+    REQUIRE_RUNTIME_INT(route_brick_detection_min_regular_points);
+    REQUIRE_RUNTIME_FLOAT(route_brick_offset_delta_from_center);
+    REQUIRE_RUNTIME_INT(route_brick_exit_straight_confirm_frames);
     REQUIRE_RUNTIME_INT(route_straight_min_centerline_points);
     REQUIRE_RUNTIME_INT(route_straight_enter_consecutive_frames);
     REQUIRE_RUNTIME_FLOAT(route_straight_abs_error_sum_max);

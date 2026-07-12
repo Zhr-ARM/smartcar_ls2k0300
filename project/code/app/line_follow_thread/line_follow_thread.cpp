@@ -274,6 +274,7 @@ const char *route_main_state_name(int route_main_state)
         case VISION_ROUTE_MAIN_CIRCLE:       return "CIRCLE";
         case VISION_ROUTE_MAIN_STRAIGHT:     return "STRAIGHT_DISABLED";
         case VISION_ROUTE_MAIN_CROSS:        return "CROSS_REPAIR";
+        case VISION_ROUTE_MAIN_BRICK:       return "BRICK";
         default:                             return "UNKNOWN_MAIN";
     }
 }
@@ -312,6 +313,9 @@ RouteProfileSelection select_route_profile_selection(int route_main_state, int r
         case VISION_ROUTE_MAIN_CIRCLE:
             (void)route_sub_state;
             return {kCircleProfile, "CIRCLE"};
+        case VISION_ROUTE_MAIN_BRICK:
+            (void)route_sub_state;
+            return {kNormalProfile, "BRICK"};
 
         default:
             return {kNormalProfile, "NORMAL"};

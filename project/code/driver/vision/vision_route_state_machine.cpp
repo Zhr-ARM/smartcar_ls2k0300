@@ -14,6 +14,7 @@ static int g_left_loss_count = 0;
 static int g_left_gain_count = 0;
 static int g_right_loss_count = 0;
 static int g_right_gain_count = 0;
+static int g_brick_both_straight_count = 0;
 
 static int normalize_preferred_source(int preferred_source)
 {
@@ -38,6 +39,7 @@ static void clear_runtime_counters()
     g_left_gain_count = 0;
     g_right_loss_count = 0;
     g_right_gain_count = 0;
+    g_brick_both_straight_count = 0;
 }
 
 static void enter_state(vision_route_main_state_enum main_state,
@@ -80,6 +82,24 @@ static bool right_circle_entry_ready(const vision_route_state_input_t *input)
            input->left_boundary_count > g_vision_runtime_config.route_circle_entry_min_boundary_count &&
            input->right_circle_entry_raw_gap_ok &&
            input->right_corner_index < (input->left_boundary_count - g_vision_runtime_config.route_circle_entry_corner_tail_margin);
+}
+
+static bool brick_entry_ready(const vision_route_state_input_t *input)
+{
+    if (input == nullptr || !g_vision_runtime_config.route_brick_detection_enabled)
+    {
+        return false;
+    }
+
+    if (input->left_straight && !input->right_straight && input->right_brick_detected)
+    {
+        return true;
+    }
+    if (input->right_straight && !input->left_straight && input->left_brick_detected)
+    {
+        return true;
+    }
+    return false;
 }
 
 static bool cross_entry_ready(const vision_route_state_input_t *input)
@@ -168,6 +188,11 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
     {
         enter_state(VISION_ROUTE_MAIN_NORMAL, VISION_ROUTE_SUB_NONE, input->base_preferred_source);
     }
+    if (!g_vision_runtime_config.route_brick_detection_enabled &&
+        g_main_state == VISION_ROUTE_MAIN_BRICK)
+    {
+        enter_state(VISION_ROUTE_MAIN_NORMAL, VISION_ROUTE_SUB_NONE, input->base_preferred_source);
+    }
 
     switch (g_main_state)
     {
@@ -192,6 +217,25 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
             enter_state(VISION_ROUTE_MAIN_CIRCLE,
                         VISION_ROUTE_SUB_CIRCLE_RIGHT_1,
                         VISION_ROUTE_PREFERRED_SOURCE_LEFT);
+        }
+        else if (brick_entry_ready(input))
+        {
+            const bool brick_on_left = input->left_brick_detected;
+            enter_state(VISION_ROUTE_MAIN_BRICK,
+                        VISION_ROUTE_SUB_NONE,
+                        brick_on_left ? VISION_ROUTE_PREFERRED_SOURCE_RIGHT
+                                      : VISION_ROUTE_PREFERRED_SOURCE_LEFT);
+        }
+        break;
+    case VISION_ROUTE_MAIN_STRAIGHT:
+        g_preferred_source = normalize_preferred_source(input->base_preferred_source);
+        if (brick_entry_ready(input))
+        {
+            const bool brick_on_left = input->left_brick_detected;
+            enter_state(VISION_ROUTE_MAIN_BRICK,
+                        VISION_ROUTE_SUB_NONE,
+                        brick_on_left ? VISION_ROUTE_PREFERRED_SOURCE_RIGHT
+                                      : VISION_ROUTE_PREFERRED_SOURCE_LEFT);
         }
         break;
     case VISION_ROUTE_MAIN_CIRCLE:
@@ -347,6 +391,23 @@ void vision_route_state_machine_update(const vision_route_state_input_t *input)
             break;
         }
         break;
+    case VISION_ROUTE_MAIN_BRICK:
+        if (input->left_straight && input->right_straight)
+        {
+            ++g_brick_both_straight_count;
+            if (g_brick_both_straight_count >=
+                g_vision_runtime_config.route_brick_exit_straight_confirm_frames)
+            {
+                enter_state(VISION_ROUTE_MAIN_NORMAL,
+                            VISION_ROUTE_SUB_NONE,
+                            input->base_preferred_source);
+            }
+        }
+        else
+        {
+            g_brick_both_straight_count = 0;
+        }
+        break;
     default:
         enter_state(VISION_ROUTE_MAIN_NORMAL,
                     VISION_ROUTE_SUB_NONE,
@@ -367,6 +428,7 @@ vision_route_state_snapshot_t vision_route_state_machine_snapshot()
     snapshot.left_gain_count = g_left_gain_count;
     snapshot.right_loss_count = g_right_loss_count;
     snapshot.right_gain_count = g_right_gain_count;
+    snapshot.brick_both_straight_count = g_brick_both_straight_count;
     return snapshot;
 }
 
