@@ -10812,6 +10812,7 @@ CMakeFiles/project.dir/home/angela/LoongCar/smartcar_ls2k0300/project/code/drive
   /home/angela/LoongCar/smartcar_ls2k0300/project/code/driver/vision/vision_transport.h \
   /home/angela/LoongCar/smartcar_ls2k0300/project/code/driver/vision/vision_config.h \
   /home/angela/LoongCar/smartcar_ls2k0300/project/code/driver/vision/vision_image_processor.h \
+  /home/angela/LoongCar/smartcar_ls2k0300/project/code/driver/vision/vision_route_state_machine.h \
   /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/opencv.hpp \
   /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/calib3d.hpp \
   /opt/ls_2k0300_env/opencv_4_10_build/include/opencv4/opencv2/features2d.hpp \
